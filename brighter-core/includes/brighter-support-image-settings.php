@@ -1,35 +1,96 @@
 <?php
 /**
- * 
  * Brighter Tools: Image Optimisation Settings (Admin UI)
+ * 
  * File: brighter-support-image-settings.php
+ * Version: 4.1.0
+ *
+ * Changelog:
+ * 4.1.0 - Performance: Batch load settings, cache registered sizes, reduce queries
+ * 4.0.0 - Initial release
+ *
  * Purpose: Registers admin settings for image optimisation features
  * including resizing, JPEG quality, and image size toggles.
- *  
- * Version: 4.0.0
- *
- * Responsibilities:
- * - Register options for image resizing and JPEG quality
- * - Provide UI toggles for custom and core image sizes
- * - Output overview of registered sizes in settings page
- * - Add an og:logo meta tag site 
- * - Use our 1200x630 "og-image" size for single posts
- *
- * Notes:
- * - Related runtime logic lives in image-optimisation.php
- * - Admin-only; does not handle upload resizing directly
- *
  */
 
 if (!defined('ABSPATH')) exit;
 
 /**
- * ================================================================
- * Image Optimisation Settings
- * Register options and fields for image resizing, custom sizes,
- * JPEG quality, and optimisation settings in admin.
- * Related: Actual resizing and cleanup logic is handled in other files.
- * -----------------------------------------------------------------
+ * Cache for image settings (reduces get_option calls)
+ */
+class Brighter_Image_Settings_Cache {
+    private static $settings = null;
+    
+    /**
+     * Load all image settings in one go
+     */
+    public static function get_all() {
+        if (self::$settings !== null) {
+            return self::$settings;
+        }
+        
+        global $wpdb;
+        
+        // Get all brighter image settings in one query
+        $options = $wpdb->get_results(
+            "SELECT option_name, option_value 
+            FROM {$wpdb->options} 
+            WHERE option_name LIKE 'enable_size_%' 
+               OR option_name IN ('enable_image_resize', 'image_max_dimension', 'jpeg_quality')",
+            OBJECT_K
+        );
+        
+        self::$settings = [];
+        foreach ($options as $key => $row) {
+            self::$settings[$key] = maybe_unserialize($row->option_value);
+        }
+        
+        return self::$settings;
+    }
+    
+    /**
+     * Get a specific setting with caching
+     */
+    public static function get($key, $default = null) {
+        $all = self::get_all();
+        return isset($all[$key]) ? $all[$key] : $default;
+    }
+    
+    /**
+     * Clear cache
+     */
+    public static function clear() {
+        self::$settings = null;
+    }
+}
+
+/**
+ * Get image size configuration (cached)
+ */
+function brighter_get_image_sizes_config() {
+    static $config = null;
+    
+    if ($config !== null) {
+        return $config;
+    }
+    
+    $config = [
+        'thumbnail'     => [150, 150, true, 'Thumbnail (150x150)'],
+        'medium'        => [300, 0, false, 'Medium (300x300)'],
+        'medium_large'  => [768, 0, false, 'Medium Large (768w)'],
+        'large'         => [1200, 0, false, 'Large (1200x?)'],
+        'custom_768w'   => [768, 0, false, 'Custom 768w'],
+        'custom_1200w'  => [1200, 0, false, 'Custom 1200w'],
+        'og-image'      => [1200, 630, true, 'Open Graph (1200x630)'],
+        '1536x1536'     => [1536, 1536, false, '1536x1536'],
+        '2048x2048'     => [2048, 2048, false, '2048x2048'],
+    ];
+    
+    return $config;
+}
+
+/**
+ * Register all image optimization settings
  */
 add_action('admin_init', function () {
     // Register base options
@@ -37,95 +98,138 @@ add_action('admin_init', function () {
     register_setting('brighter_optimisation_settings', 'image_max_dimension');
     register_setting('brighter_optimisation_settings', 'jpeg_quality');
 
-    // Define image sizes we want toggles for
-    $image_sizes = [
-        'thumbnail'       => 'Thumbnail (150x150)',
-        'medium'          => 'Medium (300x300)',
-      //  'medium_large'    => 'Medium Large (768w)',
-      //  'large'           => 'Large (1200x?)',
-        'custom_768w'     => 'Custom 768w',
-        'custom_1200w'    => 'Custom 1200w',
-         'og-image'        => 'Open Graph (1200x630)',
-        '1536x1536'       => '1536x1536',
-        '2048x2048'       => '2048x2048',
-       
-    ];
-
     // Register settings for each image size
-    foreach ($image_sizes as $size => $label) {
+    $sizes = array_keys(brighter_get_image_sizes_config());
+    foreach ($sizes as $size) {
         register_setting('brighter_optimisation_settings', "enable_size_$size");
     }
 
     // Section: Image Settings
-    add_settings_section('image_optimisation_section', '🖼️ Image Settings', '__return_false', 'brighter_optimisation_page');
+    add_settings_section(
+        'image_optimisation_section', 
+        '??? Image Settings', 
+        '__return_false', 
+        'brighter_optimisation_page'
+    );
 
     // Register: Enable image resize toggle
     add_settings_field('enable_image_resize', 'Enable Image Resizing?', function () {
-        $enabled = get_option('enable_image_resize', 'yes');
+        $enabled = Brighter_Image_Settings_Cache::get('enable_image_resize', 'yes');
         echo '<label><input type="checkbox" name="enable_image_resize" value="yes" ' . checked('yes', $enabled, false) . '> Resize uploaded images</label>';
         echo '<p class="description">If unchecked, original images will be stored without resizing.</p>';
     }, 'brighter_optimisation_page', 'image_optimisation_section');
 
     // Register: Max upload dimension
     add_settings_field('image_max_dimension', 'Max Upload Dimension (px)', function () {
-        echo '<input type="number" name="image_max_dimension" value="' . esc_attr(get_option('image_max_dimension', 2480)) . '" class="small-text" min="500" step="10">';
+        $value = Brighter_Image_Settings_Cache::get('image_max_dimension', 2480);
+        echo '<input type="number" name="image_max_dimension" value="' . esc_attr($value) . '" class="small-text" min="500" step="10">';
         echo '<p class="description">Maximum dimension for uploaded images (longest side).</p>';
     }, 'brighter_optimisation_page', 'image_optimisation_section');
 
     // Register: Checkboxes for each image size
-    foreach ($image_sizes as $size => $label) {
+    $size_config = brighter_get_image_sizes_config();
+    foreach ($size_config as $size => $data) {
+        $label = $data[3];
         add_settings_field("enable_size_$size", "Enable $label", function () use ($size) {
-            $enabled = get_option("enable_size_$size", 1);
+            $enabled = Brighter_Image_Settings_Cache::get("enable_size_$size", 1);
             echo '<input type="checkbox" name="enable_size_' . esc_attr($size) . '" value="1" ' . checked(1, $enabled, false) . '> ' . ucfirst($size);
         }, 'brighter_optimisation_page', 'image_optimisation_section');
     }
 
     // Register: JPEG quality field
     add_settings_field('jpeg_quality', 'JPEG Compression Quality', function () {
-        $quality = get_option('jpeg_quality', 75);
+        $quality = Brighter_Image_Settings_Cache::get('jpeg_quality', 75);
         echo '<input type="number" min="30" max="100" step="1" name="jpeg_quality" value="' . esc_attr($quality) . '" />';
+        echo '<p class="description">Lower = smaller files, higher = better quality. Recommended: 75-85</p>';
     }, 'brighter_optimisation_page', 'image_optimisation_section');
 
-    // Section: Registered sizes overview
-    add_settings_section('registered_sizes_section', '📏 Registered Image Sizes', function () use ($image_sizes) {
+    // Section: Registered sizes overview (cached for performance)
+    add_settings_section('registered_sizes_section', '?? Registered Image Sizes', function () {
+        // Cache the output for 5 minutes
+        $transient_key = 'brighter_registered_sizes_html';
+        $cached_html = get_transient($transient_key);
+        
+        if ($cached_html !== false) {
+            echo $cached_html;
+            return;
+        }
+        
+        ob_start();
         $all_sizes = wp_get_registered_image_subsizes();
+        $settings = Brighter_Image_Settings_Cache::get_all();
+        
         echo '<ul>';
         foreach ($all_sizes as $name => $size) {
-            $enabled = get_option("enable_size_$name", false);
+            $enabled = isset($settings["enable_size_$name"]) ? $settings["enable_size_$name"] : false;
             $width = esc_html($size['width']);
             $height = esc_html($size['height']);
             $crop = !empty($size['crop']) ? ' (cropped)' : '';
-            $status = $enabled ? '✅ Enabled' : '❌ Disabled';
-            echo "<li><strong>{$name}</strong>: {$width}×{$height}{$crop} — {$status}</li>";
+            $status = $enabled ? '? Enabled' : '? Disabled';
+            echo "<li><strong>{$name}</strong>: {$width}�{$height}{$crop} � {$status}</li>";
         }
         echo '</ul>';
+        
+        $output = ob_get_clean();
+        set_transient($transient_key, $output, 5 * MINUTE_IN_SECONDS);
+        echo $output;
     }, 'brighter_optimisation_page');
 
-    add_settings_section('other_optimisation_section', '️Other Optimisations', function () {
+    add_settings_section('other_optimisation_section', '? Other Optimisations', function () {
         echo '<p>More performance tools coming soon...</p>';
     }, 'brighter_optimisation_page');
 });
 
-// Add an og:logo meta tag site‑wide
-add_action( 'wp_head', function() {
-    // Only run on the front end
-    if ( !is_admin() ) {
-        $logo = get_option( 'your_logo_option' ); // or pull from SEOPress settings
-        if ( $logo ) {
-            echo '<meta property="og:logo" content="' . esc_url( $logo ) . '">' . "\n";
+/**
+ * Clear cache when settings are saved
+ */
+add_action('update_option', function($option_name) {
+    if (strpos($option_name, 'enable_size_') === 0 || 
+        in_array($option_name, ['enable_image_resize', 'image_max_dimension', 'jpeg_quality'])) {
+        Brighter_Image_Settings_Cache::clear();
+        delete_transient('brighter_registered_sizes_html');
+    }
+}, 10, 1);
+
+/**
+ * Add og:logo meta tag site-wide (cached)
+ */
+add_action('wp_head', function() {
+    if (is_admin()) return;
+    
+    static $logo_output = null;
+    
+    if ($logo_output === null) {
+        $logo = get_option('your_logo_option');
+        if ($logo) {
+            $logo_output = '<meta property="og:logo" content="' . esc_url($logo) . '">' . "\n";
+        } else {
+            $logo_output = '';
         }
     }
-} );
+    
+    echo $logo_output;
+});
 
-
-// Use our 1200x630 "og-image" size for single posts
-add_filter( 'seopress_social_og_image', function( $url, $post_id ) {
-    if ( has_post_thumbnail( $post_id ) ) {
-        // get the 1200x630 version, fall back to full if not available
-        $new_url = wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'og-image' );
-        if ( $new_url ) {
+/**
+ * Use 1200x630 "og-image" size for single posts (with caching)
+ */
+add_filter('seopress_social_og_image', function($url, $post_id) {
+    // Cache the OG image per post
+    $cache_key = 'brighter_og_image_' . $post_id;
+    $cached = wp_cache_get($cache_key, 'brighter_og_images');
+    
+    if ($cached !== false) {
+        return $cached;
+    }
+    
+    if (has_post_thumbnail($post_id)) {
+        $new_url = wp_get_attachment_image_url(get_post_thumbnail_id($post_id), 'og-image');
+        if ($new_url) {
+            wp_cache_set($cache_key, $new_url, 'brighter_og_images', HOUR_IN_SECONDS);
             return $new_url;
         }
     }
+    
+    wp_cache_set($cache_key, $url, 'brighter_og_images', HOUR_IN_SECONDS);
     return $url;
-}, 10, 2 );
+}, 10, 2);

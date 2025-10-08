@@ -223,4 +223,14 @@ add_filter("breakdance_form_submission_capability",function()
     return "edit_posts";
 });
 
+// Kill any Google Fonts <link> tag in the head, regardless of source
+add_action('template_redirect', function () {
+    ob_start(function ($html) {
+        return preg_replace('/<link[^>]+fonts\.googleapis\.com[^>]+>/', '', $html);
+    });
+});
+
+add_action('rest_api_init', function() {
+    do_action('litespeed_rest_api_init');
+}, 20);
 

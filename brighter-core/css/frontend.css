@@ -1,0 +1,15 @@
+
+/* The following CSS can be used to create a "fade-in" effect for your lazy-loaded images: https://docs.litespeedtech.com/lscache/lscwp/pageopt/#lazy-load-images
+
+
+/* PART 1 - Before Lazy Load */
+img[data-lazyloaded]{
+    opacity: 0;
+}
+/* PART 2 - Upon Lazy Load */
+img.litespeed-loaded{
+    -webkit-transition: opacity .5s linear 0.2s;
+    -moz-transition: opacity .5s linear 0.2s;
+    transition: opacity .5s linear 0.2s;
+    opacity: 1;
+}

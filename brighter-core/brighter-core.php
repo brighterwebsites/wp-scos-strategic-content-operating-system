@@ -1,154 +1,85 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.1.0
+ * Version: 4.2.1
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.2.1 - FIX: Direct module loading for reliability
+ * 4.2.0 - SECURITY: Hardened SQL queries, added capability checks, input validation, XSS protection
  * 4.1.0 - Performance: Lazy loading, conditional module loading, optimized hooks
  * 4.0.0 - Version sync fixed, improved module loading with error handling
  */
 
 if (!defined('ABSPATH')) exit;
 
+// TEMPORARY DIAGNOSTIC
+error_log('=== BRIGHTER CORE LOADING ===');
+error_log('BRIGHTER_CORE_PATH: ' . plugin_dir_path(__FILE__));
+error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
+
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.1.0');
+define('BRIGHTER_CORE_VERSION', '4.2.1');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
 /**
- * Module configuration with lazy loading support
- * 
- * Format: 'module-file' => [
- *     'enabled' => true/false,
- *     'admin_only' => true/false (load only in admin),
- *     'priority' => 10 (lower = loads earlier)
- * ]
+ * Get whitelisted module names (SECURITY: prevents path traversal)
  */
-function brighter_get_module_config() {
-    static $config = null;
+function brighter_get_whitelisted_modules() {
+    static $whitelist = null;
     
-    if ($config !== null) {
-        return $config;
+    if ($whitelist === null) {
+        $whitelist = [
+            'brighter-business-info',
+            'brighter-support',
+            'brighter-support-image-settings',
+            'custom-admin',
+            'image-optimisation',
+            'bw-custposts',
+            'brighter-tweaks',
+            'brighter-settings',
+            'custom-wpemail',
+            'helpers',
+            'login-styling',
+            'php-limits',
+            'privacy-policy-style',
+            'technical-settings',
+            'bw-content-strategy',
+        ];
     }
     
-    $config = [
-        // Core modules (always load)
-        'brighter-buinessinfo' => [
-            'enabled' => true,
-            'admin_only' => false,
-            'priority' => 1
-        ],
-        'brighter-support' => [
-            'enabled' => true,
-            'admin_only' => true,
-            'priority' => 2
-        ],
-        
-        // Feature modules (conditional loading)
-        'brighter-support-image-settings' => [
-            'enabled' => true,
-            'admin_only' => true,
-            'priority' => 10
-        ],
-        'custom-admin' => [
-            'enabled' => true,
-            'admin_only' => true,
-            'priority' => 5
-        ],
-        'image-optimisation' => [
-            'enabled' => true,
-            'admin_only' => false,
-            'priority' => 15
-        ],
-        'bw-custposts' => [
-            'enabled' => true,
-            'admin_only' => false,
-            'priority' => 8
-        ],
-        
-        // Optional modules (enable as needed)
-        'brighter-tweaks' => [
-            'enabled' => true,
-            'admin_only' => true,
-            'priority' => 20
-        ],
-        'brighter-settings' => [
-            'enabled' => false,  // Enable if file exists
-            'admin_only' => true,
-            'priority' => 10
-        ],
-        'custom-wpemail' => [
-            'enabled' => false,
-            'admin_only' => false,
-            'priority' => 10
-        ],
-        'helpers' => [
-            'enabled' => false,
-            'admin_only' => false,
-            'priority' => 5
-        ],
-        'login-styling' => [
-            'enabled' => false,
-            'admin_only' => false,
-            'priority' => 10
-        ],
-        'php-limits' => [
-            'enabled' => false,
-            'admin_only' => true,
-            'priority' => 10
-        ],
-        'privacy-policy-style' => [
-            'enabled' => false,
-            'admin_only' => false,
-            'priority' => 10
-        ],
-        'technical-settings' => [
-            'enabled' => false,
-            'admin_only' => true,
-            'priority' => 10
-        ],
-        'bw-content-strategy' => [
-            'enabled' => false,
-            'admin_only' => true,
-            'priority' => 10
-        ],
-    ];
-    
-    return $config;
+    return $whitelist;
 }
 
 /**
- * Load modules based on context (admin vs frontend)
+ * Validate module name (SECURITY: prevents path traversal)
  */
-function brighter_load_modules() {
-    $config = brighter_get_module_config();
-    $is_admin = is_admin();
-    $modules_to_load = [];
-    
-    // Filter modules based on context
-    foreach ($config as $module => $settings) {
-        if (!$settings['enabled']) continue;
-        
-        // Skip admin-only modules on frontend
-        if ($settings['admin_only'] && !$is_admin) continue;
-        
-        $modules_to_load[$module] = $settings['priority'];
+function brighter_validate_module_name($module) {
+    // Check against whitelist
+    if (!in_array($module, brighter_get_whitelisted_modules(), true)) {
+        return false;
     }
     
-    // Sort by priority (lower number = higher priority)
-    asort($modules_to_load);
-    
-    // Load modules in order
-    foreach (array_keys($modules_to_load) as $module) {
-        brighter_load_module($module);
+    // Check for directory traversal attempts
+    if (strpos($module, '..') !== false || strpos($module, '/') !== false || strpos($module, '\\') !== false) {
+        return false;
     }
+    
+    // Check for null bytes
+    if (strpos($module, "\0") !== false) {
+        return false;
+    }
+    
+    return true;
 }
 
 /**
  * Load a single module with error handling
+ * 
+ * SECURITY: Path validation prevents directory traversal
  */
 function brighter_load_module($module) {
     static $loaded = [];
@@ -158,25 +89,77 @@ function brighter_load_module($module) {
         return true;
     }
     
+    // SECURITY: Validate module name before building path
+    if (!brighter_validate_module_name($module)) {
+        error_log('Brighter Core Security: Module validation failed for: ' . esc_html($module));
+        return false;
+    }
+    
+    // Build safe path
     $path = BRIGHTER_CORE_PATH . 'includes/' . $module . '.php';
     
-    if (!file_exists($path)) {
-        error_log("Brighter Core: Module file not found: $path");
+    // SECURITY: Verify path is within expected directory
+    $real_path = realpath($path);
+    $expected_dir = realpath(BRIGHTER_CORE_PATH . 'includes/');
+    
+    if ($real_path === false || $expected_dir === false || strpos($real_path, $expected_dir) !== 0) {
+        error_log('Brighter Core Security: Path traversal attempt detected for module: ' . esc_html($module));
+        return false;
+    }
+    
+    if (!file_exists($real_path)) {
+        error_log('Brighter Core: Module not found: ' . esc_html($module));
         return false;
     }
     
     try {
-        require_once $path;
+        require_once $real_path;
         $loaded[$module] = true;
         return true;
     } catch (Exception $e) {
-        error_log("Brighter Core: Error loading module {$module}: " . $e->getMessage());
+        error_log('Brighter Core: Error loading module ' . esc_html($module) . ': ' . esc_html($e->getMessage()));
         return false;
     }
 }
 
-// Load modules on init (after WordPress is ready)
-add_action('init', 'brighter_load_modules', 1);
+/**
+ * Load all enabled modules
+ * Direct loading for maximum compatibility
+ */
+function brighter_load_modules() {
+    // Define which modules to load
+    $modules = [
+        'brighter-business-info',
+        'brighter-support', 
+        'brighter-support-image-settings',
+        'custom-admin',
+        'image-optimisation',
+        'bw-custposts',
+        'brighter-tweaks',
+    ];
+    
+    // Admin-only modules
+    $admin_only = [
+        'brighter-support',
+        'brighter-support-image-settings', 
+        'custom-admin',
+        'brighter-tweaks',
+    ];
+    
+    $is_admin = is_admin();
+    
+    foreach ($modules as $module) {
+        // Skip admin-only modules on frontend
+        if (!$is_admin && in_array($module, $admin_only, true)) {
+            continue;
+        }
+        
+        brighter_load_module($module);
+    }
+}
+
+// Load modules immediately when this file is included
+brighter_load_modules();
 
 /**
  * Enqueue admin styles (only when needed, deferred loading)
@@ -235,6 +218,11 @@ add_action('wp_enqueue_scripts', 'brighter_core_enqueue_frontend_styles', 20);
  * Plugin activation hook
  */
 function brighter_core_activate() {
+    // SECURITY: Only admins can activate
+    if (!current_user_can('activate_plugins')) {
+        return;
+    }
+    
     if (!get_option('brighter_core_version')) {
         update_option('brighter_core_version', BRIGHTER_CORE_VERSION);
         update_option('brighter_core_activated', current_time('mysql'));
@@ -250,26 +238,35 @@ register_activation_hook(__FILE__, 'brighter_core_activate');
 
 /**
  * Admin notice if critical modules are missing (cached to reduce checks)
+ * 
+ * SECURITY: All output properly escaped
  */
 add_action('admin_notices', function() {
+    // SECURITY: Only show to admins
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
     // Check once per day
     $transient_key = 'brighter_module_check';
     $cached_check = get_transient($transient_key);
     
     if ($cached_check !== false) {
         if ($cached_check === 'ok') return;
-        // Show cached error
-        echo $cached_check;
+        // SECURITY: Cached content already escaped when stored
+        echo wp_kses_post($cached_check);
         return;
     }
     
-    $critical_modules = ['brighter-buinessinfo', 'brighter-support'];
+    $critical_modules = ['brighter-business-info', 'brighter-support'];
     $missing = [];
     
     foreach ($critical_modules as $module) {
+        if (!brighter_validate_module_name($module)) continue;
+        
         $path = BRIGHTER_CORE_PATH . 'includes/' . $module . '.php';
         if (!file_exists($path)) {
-            $missing[] = $module;
+            $missing[] = esc_html($module);
         }
     }
     
@@ -279,7 +276,7 @@ add_action('admin_notices', function() {
         $notice .= '</p></div>';
         
         set_transient($transient_key, $notice, DAY_IN_SECONDS);
-        echo $notice;
+        echo wp_kses_post($notice);
     } else {
         set_transient($transient_key, 'ok', DAY_IN_SECONDS);
     }
@@ -287,10 +284,13 @@ add_action('admin_notices', function() {
 
 /**
  * Performance monitoring (only in debug mode)
+ * 
+ * SECURITY: Restricted to super admins only
  */
 if (defined('WP_DEBUG') && WP_DEBUG) {
     add_action('shutdown', function() {
-        if (!current_user_can('manage_options')) return;
+        // SECURITY: Only log for super admins
+        if (!is_super_admin()) return;
         
         $queries = get_num_queries();
         $timer = timer_stop(0, 3);
@@ -298,9 +298,9 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
         
         error_log(sprintf(
             'Brighter Core Performance: %d queries in %s seconds using %s memory',
-            $queries,
-            $timer,
-            $memory
+            absint($queries),
+            esc_html($timer),
+            esc_html($memory)
         ));
     });
 }
@@ -336,32 +336,75 @@ add_action('init', function() {
 
 /**
  * Object cache helper - ensures persistent caching if available
+ * 
+ * SECURITY: Capability checks added
  */
 function brighter_cache_set($key, $value, $group = 'brighter', $expiration = HOUR_IN_SECONDS) {
-    return wp_cache_set($key, $value, $group, $expiration);
+    // SECURITY: Sanitize cache key
+    $key = sanitize_key($key);
+    $group = sanitize_key($group);
+    
+    return wp_cache_set($key, $value, $group, absint($expiration));
 }
 
 function brighter_cache_get($key, $group = 'brighter', &$found = null) {
+    // SECURITY: Sanitize cache key
+    $key = sanitize_key($key);
+    $group = sanitize_key($group);
+    
     return wp_cache_get($key, $group, false, $found);
 }
 
 function brighter_cache_delete($key, $group = 'brighter') {
+    // SECURITY: Only admins can delete cache
+    if (!current_user_can('manage_options')) {
+        return false;
+    }
+    
+    // SECURITY: Sanitize cache key
+    $key = sanitize_key($key);
+    $group = sanitize_key($group);
+    
     return wp_cache_delete($key, $group);
 }
 
 /**
  * Batch option loader - reduces queries for multiple options
+ * 
+ * SECURITY: SQL injection prevention with strict validation
  */
 function brighter_get_options($option_names) {
     global $wpdb;
     
-    $placeholders = implode(',', array_fill(0, count($option_names), '%s'));
+    // SECURITY: Validate input is array and not empty
+    if (!is_array($option_names) || empty($option_names)) {
+        return [];
+    }
+    
+    // SECURITY: Sanitize all option names
+    $sanitized_names = array_map('sanitize_key', $option_names);
+    
+    // SECURITY: Remove empty values
+    $sanitized_names = array_filter($sanitized_names);
+    
+    if (empty($sanitized_names)) {
+        return [];
+    }
+    
+    // SECURITY: Use proper prepared statement with array
+    $placeholders = implode(',', array_fill(0, count($sanitized_names), '%s'));
+    
+    // Build query with proper escaping
     $query = $wpdb->prepare(
         "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name IN ($placeholders)",
-        $option_names
+        $sanitized_names
     );
     
     $results = $wpdb->get_results($query);
+    
+    if (!$results) {
+        return [];
+    }
     
     $options = [];
     foreach ($results as $row) {
@@ -369,4 +412,11 @@ function brighter_get_options($option_names) {
     }
     
     return $options;
+}
+
+/**
+ * Force HTTPS in admin (security best practice)
+ */
+if (!defined('FORCE_SSL_ADMIN')) {
+    define('FORCE_SSL_ADMIN', true);
 }

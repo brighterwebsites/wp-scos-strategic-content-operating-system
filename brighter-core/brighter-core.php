@@ -16,9 +16,9 @@
 if (!defined('ABSPATH')) exit;
 
 // TEMPORARY DIAGNOSTIC
-error_log('=== BRIGHTER CORE LOADING ===');
-error_log('BRIGHTER_CORE_PATH: ' . plugin_dir_path(__FILE__));
-error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
+//error_log('=== BRIGHTER CORE LOADING ===');
+//error_log('BRIGHTER_CORE_PATH: ' . plugin_dir_path(__FILE__));
+//error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
 define('BRIGHTER_CORE_VERSION', '4.2.1');
@@ -36,7 +36,7 @@ function brighter_get_whitelisted_modules() {
             'brighter-business-info',
             'brighter-support',
             'brighter-support-image-settings',
-            'custom-admin',
+            'bw-admin-tweaks',
             'image-optimisation',
             'bw-custposts',
             'brighter-tweaks',
@@ -48,6 +48,9 @@ function brighter_get_whitelisted_modules() {
             'privacy-policy-style',
             'technical-settings',
             'bw-content-strategy',
+            'bw-analytics-seeder',
+            'bw-ga4-seed-admin',
+
         ];
     }
     
@@ -132,18 +135,21 @@ function brighter_load_modules() {
         'brighter-business-info',
         'brighter-support', 
         'brighter-support-image-settings',
-        'custom-admin',
+        'bw-admin-tweaks',
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
+	'bw-content-strategy',  // ? Make sure this is here
+ 	'bw-analytics-seeder',
+          
     ];
     
     // Admin-only modules
     $admin_only = [
         'brighter-support',
         'brighter-support-image-settings', 
-        'custom-admin',
-        'brighter-tweaks',
+       	'bw-ga4-seed-admin',
+       // 'brighter-tweaks',
     ];
     
     $is_admin = is_admin();

@@ -7,22 +7,18 @@
  * content duplication, taxonomy management, custom email handling,
  * and editor capabilities.
  *
- * Version: 4.0.0
+ * Version: 4.0.1
  *
  * Responsibilities:
  * - Add UI helpers: enable excerpts on pages, duplicate post/page action, 
  *   and admin success notices.
- * - Register and manage a "Page Type" taxonomy for pages, including 
- *   dropdown filters in the admin list view.
  * - Customise email behaviour: adjust comment moderation subject, 
  *   redirect user registration emails to business/admin email, and 
  *   allow editors access to Breakdance form submissions.
- *
+ * - adds ajax handler for custom front end LS purge
  * Notes:
  * - Duplication preserves content, taxonomies, and meta fields 
  *   (excluding `_wp_old_slug`).
- * - Registers "Page Types" taxonomy twice — likely a duplicate block 
- *   that can be safely removed to avoid redundancy.
  * - Customises new user notification emails to route to the 
  *   Business Info email (with fallback to site admin email).
  * - Expands permissions for editors by lowering the Breakdance 
@@ -33,10 +29,6 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Enable excerpts for pages
-add_action('init', function() {
-    add_post_type_support('page', 'excerpt');
-});
 
 if (is_admin()) {
     // Add Duplicate action
@@ -116,72 +108,6 @@ if (is_admin()) {
 }
 
 
-add_action('init', function() {
-    $labels = [
-        "name" => "Page Types",
-        "singular_name" => "Page Type",
-    ];
-    register_taxonomy("pagetype", ["page"], [
-        "label" => "Page Types",
-        "labels" => $labels,
-        "hierarchical" => true,
-        "public" => true,
-        "show_ui" => true,
-        "show_in_menu" => true,
-        "show_admin_column" => true,
-        "show_in_rest" => true,
-        "rewrite" => ['slug' => 'pagetype'],
-        "default_term" => ['name' => 'General'],
-    ]);
-});
-
-add_action('init', function() {
-    $labels = [
-        "name" => "Page Types",
-        "singular_name" => "Page Type",
-    ];
-    register_taxonomy("pagetype", ["page"], [
-        "label" => "Page Types",
-        "labels" => $labels,
-        "hierarchical" => true,
-        "public" => true,
-        "show_ui" => true,
-        "show_in_menu" => true,
-        "show_admin_column" => true,
-        "show_in_rest" => true,
-        "rewrite" => ['slug' => 'pagetype'],
-        "default_term" => ['name' => 'General'],
-    ]);
-});
-
-
-// Add taxonomy filter dropdown
-add_action('restrict_manage_posts', function() {
-    global $typenow;
-    if ($typenow === 'page') {
-        wp_dropdown_categories([
-            'show_option_all' => 'Show all Page Types',
-            'taxonomy'        => 'pagetype',
-            'name'            => 'pagetype',
-            'orderby'         => 'name',
-            'selected'        => $_GET['pagetype'] ?? '',
-            'show_count'      => true,
-            'hide_empty'      => false,
-        ]);
-    }
-});
-
-// Make the filter work
-add_filter('parse_query', function($query) {
-    global $pagenow;
-    if ($pagenow === 'edit.php' && isset($_GET['pagetype']) && is_numeric($_GET['pagetype'])) {
-        $term = get_term_by('id', $_GET['pagetype'], 'pagetype');
-        if ($term) {
-            $query->query_vars['pagetype'] = $term->slug;
-        }
-    }
-});
-
 
 // Custom subject for comment moderation emails
 add_filter('comment_moderation_subject', function($email_subject, $comment_id) {
@@ -234,3 +160,42 @@ add_action('rest_api_init', function() {
     do_action('litespeed_rest_api_init');
 }, 20);
 
+//**************************************************
+//Add AJAX handler for LiteSpeed cache purge on Front end
+//
+//**************************************************
+// Add AJAX handler for LiteSpeed cache purge
+add_action('wp_ajax_gs_purge_litespeed', 'gs_purge_litespeed_cache');
+
+function gs_purge_litespeed_cache() {
+    // Verify nonce
+    check_ajax_referer('gs_purge_cache', 'nonce');
+    
+    // Check user capabilities
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    // Purge LiteSpeed cache
+    if (class_exists('LiteSpeed\Purge')) {
+        do_action('litespeed_purge_all');
+        wp_send_json_success('Cache purged successfully');
+    } else {
+        wp_send_json_error('LiteSpeed Cache not found');
+    }
+}
+
+// Enqueue script for frontend cache purge
+add_action('wp_enqueue_scripts', 'gs_enqueue_cache_purge_script');
+
+function gs_enqueue_cache_purge_script() {
+    if (is_user_logged_in() && current_user_can('manage_options')) {
+        wp_enqueue_script('gs-cache-purge', get_template_directory_uri() . '/js/cache-purge.js', array('jquery'), '1.0', true);
+        wp_localize_script('gs-cache-purge', 'gsCachePurge', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('gs_purge_cache')
+        ));
+    }
+}
+
+//**************************************************

@@ -3,17 +3,19 @@
  * Brighter Tools: Tweaks
  *
  * File: brighter-tweaks.php
- * Version: 4.3.0
+ * Version: 4.3.1
  *
  * Changelog:
- * 4.3.0 - FIXED: Preloads now working, pagination fixed, Google Fonts removed, cleaned duplicate code
+ * 4.3.1 - MERGED: All features from v4.0.0 + v4.3.0, OG image size, Google Fonts removal fixed
+ * 4.3.0 - FIXED: Preloads now working, pagination fixed, cleaned duplicate code
  * 4.0.0 - Initial version
  *
  * Purpose: Site tweaks and performance optimizations
  * - Per-page image/asset preloads
- * - Auto-preload featured images on singles
- * - Remove Google Fonts
- * - LCP image optimization
+ * - Auto-preload featured images on singles (using OG image size)
+ * - Remove Google Fonts completely
+ * - LCP image optimization with fetchpriority=high
+ * - Normalize /core/storage/ paths
  */
 
 defined('ABSPATH') || exit;
@@ -27,18 +29,23 @@ class Brighter_Tweaks {
         // Admin
         add_action('admin_init', [__CLASS__, 'register_settings']);
         
-        // Frontend output - HIGHER PRIORITY to run earlier
-        add_action('wp_head', [__CLASS__, 'output_preloads'], 2); // Changed from 1 to 2
-        add_action('wp_head', [__CLASS__, 'output_featured_image_preload'], 2); // Changed from 1 to 2
-        add_action('wp_head', [__CLASS__, 'remove_google_fonts'], 1);
+        // Frontend output - priority 1 for early loading
+        add_action('wp_head', [__CLASS__, 'output_preloads'], 1);
+        add_action('wp_head', [__CLASS__, 'output_featured_image_preload'], 1);
+        
+        // Google Fonts removal - CRITICAL
+        add_action('wp_loaded', [__CLASS__, 'remove_google_fonts']);
         
         // Meta box for individual pages
         add_action('add_meta_boxes', [__CLASS__, 'add_meta_box']);
         add_action('save_post_page', [__CLASS__, 'save_meta_box']);
         
-        // LCP optimization
+        // LCP optimization filters
         add_filter('wp_get_attachment_image_attributes', [__CLASS__, 'add_fetchpriority'], 99, 3);
         add_filter('the_content', [__CLASS__, 'add_fetchpriority_to_content'], 99);
+        
+        // Path normalization
+        add_action('template_redirect', [__CLASS__, 'normalize_paths']);
     }
 
     /**
@@ -236,7 +243,7 @@ class Brighter_Tweaks {
                 </table>
 
                 <?php
-                // FIXED: Pagination with correct tab parameter
+                // Pagination with correct tab parameter
                 $total_pages = $q->max_num_pages ?: 1;
                 if ($total_pages > 1) {
                     echo '<p>';
@@ -267,10 +274,9 @@ class Brighter_Tweaks {
 
     /**
      * Output preloads for current page
-     * FIXED: More aggressive checking and output
      */
     public static function output_preloads() {
-        // Work on any singular page/post, not just is_page()
+        // Work on any singular page/post
         if (!is_singular()) return;
         
         global $post;
@@ -318,7 +324,7 @@ class Brighter_Tweaks {
 
     /**
      * Output featured image preload for singles
-     * FIXED: Now working with settings
+     * Uses 'og-image' size (1200x630) for better OG compatibility
      */
     public static function output_featured_image_preload() {
         if (!is_singular()) return;
@@ -330,9 +336,19 @@ class Brighter_Tweaks {
         if (!has_post_thumbnail()) return;
         
         $id = get_post_thumbnail_id();
-        $src = wp_get_attachment_image_url($id, 'full');
-        $srcset = wp_get_attachment_image_srcset($id, 'full');
-        $mime = wp_get_image_mime($id) ?: 'image/*';
+        
+        // Try to use 'og-image' size first (1200x630), fallback to 'full'
+        $size = 'og-image';
+        $src = wp_get_attachment_image_url($id, $size);
+        
+        // If og-image doesn't exist, use full
+        if (!$src) {
+            $size = 'full';
+            $src = wp_get_attachment_image_url($id, $size);
+        }
+        
+        $srcset = wp_get_attachment_image_srcset($id, $size);
+        $mime = get_post_mime_type($id) ?: 'image/*';
         
         if ($src) {
             $src = self::normalise_url($src);
@@ -346,43 +362,35 @@ class Brighter_Tweaks {
     }
 
     /**
-     * Remove Google Fonts
-     * FIXED: More reliable removal that works with caching
+     * Remove Google Fonts - THE NUCLEAR OPTION
+     * This removes fonts.googleapis.com from everywhere
      */
     public static function remove_google_fonts() {
-        // Remove from wp_head
-        remove_action('wp_head', 'wp_print_styles', 8);
-        add_action('wp_head', function() {
-            global $wp_styles;
-            if (!is_object($wp_styles)) return;
-            
-            foreach ($wp_styles->registered as $handle => $style) {
-                if (isset($style->src) && strpos($style->src, 'fonts.googleapis.com') !== false) {
-                    wp_dequeue_style($handle);
-                    wp_deregister_style($handle);
-                }
+        // Method 1: Filter style tags
+        add_filter('style_loader_tag', function($html, $handle) {
+            if (strpos($html, 'fonts.googleapis.com') !== false) {
+                return '';
             }
-            
-            wp_print_styles();
-        }, 8);
+            return $html;
+        }, 10, 2);
         
-        // Also strip from final HTML output
-        add_action('wp_loaded', function() {
-            ob_start(function($html) {
-                // Remove any Google Fonts links
-                $html = preg_replace(
-                    '/<link[^>]*fonts\.googleapis\.com[^>]*>/i',
-                    '',
-                    $html
-                );
-                // Remove any @import statements with Google Fonts
-                $html = preg_replace(
-                    '/@import\s+url\([\'"]?https?:\/\/fonts\.googleapis\.com[^\)]+\)[\'"]?;?/i',
-                    '',
-                    $html
-                );
-                return $html;
-            });
+        // Method 2: Output buffering to strip from final HTML
+        ob_start(function($html) {
+            // Remove <link> tags with fonts.googleapis.com
+            $html = preg_replace(
+                '/<link[^>]*fonts\.googleapis\.com[^>]*>/i',
+                '',
+                $html
+            );
+            
+            // Remove @import statements with Google Fonts
+            $html = preg_replace(
+                '/@import\s+url\([\'"]?https?:\/\/fonts\.googleapis\.com[^\)]+\)[\'"]?;?/i',
+                '',
+                $html
+            );
+            
+            return $html;
         });
     }
 
@@ -438,6 +446,35 @@ class Brighter_Tweaks {
             },
             $html
         );
+    }
+
+    /**
+     * Normalize /core/storage/ paths to /storage/
+     * Also adds fetchpriority="high" to image preloads missing it
+     */
+    public static function normalize_paths() {
+        if (is_feed() || is_admin() || wp_doing_ajax()) return;
+        if (defined('REST_REQUEST') && REST_REQUEST) return;
+
+        ob_start(function ($html) {
+            // Normalize hidden path to public one
+            $html = str_replace('/core/storage/', '/storage/', $html);
+
+            // Add fetchpriority="high" to image preloads that don't have it
+            $html = preg_replace_callback(
+                '#<link\s+([^>]*\brel=["\']preload["\'][^>]*\bas=["\']image["\'][^>]*)>#i',
+                function ($m) {
+                    $tag = $m[0];
+                    if (stripos($tag, 'fetchpriority=') !== false) {
+                        return $tag;
+                    }
+                    return rtrim($tag, '>') . ' fetchpriority="high">';
+                },
+                $html
+            );
+
+            return $html;
+        });
     }
 
     /**

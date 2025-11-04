@@ -114,7 +114,7 @@ function bw_cs_purpose_options() {
 
 function bw_cs_opt_status_options() {
     return [
-        ''              => ['label' => '� No status �',	    'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
+        ''              => ['label' => '� No status �',	    'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
         'none'          => ['label' => 'Not Optimised', 'color' => '#9d174d', 'bg' => '#fce7f3'],  // Pink: Queued, low priority start
          // --- Workflow Stages (In Progress) ---
         'idea'          => ['label' => 'Idea', 	        	'color' => '#4f46e5', 'bg' => '#eef2ff'],   // Indigo: Planning Phase
@@ -216,7 +216,7 @@ add_action('admin_init', function() {
                     $notes = get_post_meta($post_id, 'bw_notes', true);
     // Manual truncation that's more reliable with special characters
     $display_notes = mb_strlen($notes) > 60 
-        ? mb_substr($notes, 0, 60) . '�' 
+        ? mb_substr($notes, 0, 60) . '�' 
         : $notes;
     echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">' 
          . esc_html($display_notes) . '</span>';
@@ -492,7 +492,7 @@ foreach ($pillar_pages as $p) {
             $select.prop("disabled", true);
             saveField(postId, "bw_pillar_page_id", value).done(function(resp) {
                 if (resp && resp.success) {
-                    const label = pillarOpts[value] || "�";
+                    const label = pillarOpts[value] || "�";
                     const $span = $("<span>", {
                         class: "bw-cs-pillar",
                         "data-post": postId,
@@ -831,8 +831,25 @@ add_action('save_post', function($post_id) {
 }, 10);
 
 /**
- * 
  * Injects content strategy metadata into GA4 tracking
+ *
+ * VERIFICATION: These custom dimensions ARE being sent to GA4
+ * ================================================================
+ * WordPress Meta Field → GA4 Parameter Name → Example Value
+ * ----------------------------------------------------------------
+ * bw_page_topic       → content_topic         → "SEO Services"
+ * bw_intent           → content_intent        → "informational"
+ * bw_purpose          → content_purpose       → "pillar"
+ * _brt_opt_status     → optimization_status   → "cro"
+ * bw_pillar_page_id   → pillar_page           → "About Us"
+ *
+ * These dimensions are automatically included in ALL GA4 events:
+ * - page_view events (brighter-ga4-enhanced.js:277)
+ * - click events (brighter-ga4-enhanced.js:204)
+ * - impression tracking (brighter-ga4-enhanced.js:229)
+ * - form interactions (brighter-ga4-enhanced.js:252, 262)
+ *
+ * The data flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
  */
 
 add_action('wp_head', function() {

@@ -93,3 +93,43 @@ add_action('wp_footer', function() {
     }
 });
 
+/**
+ * Redirect all users to Brighter Support page on login
+ * Compatible with WPGhost redirect override
+ */
+add_filter( 'login_redirect', 'bw_redirect_to_support_page', 100, 3 );
+function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
+    // Only redirect on successful login (user object exists)
+    if ( isset( $user->ID ) ) {
+        // Set a transient to show the notice (expires in 60 seconds)
+        set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
+        
+        // Redirect to Brighter Support page
+        return admin_url( 'admin.php?page=brighter_support&tab=support' );
+    }
+    
+    return $redirect_to;
+}
+
+/**
+ * Display backup reminder notice after login redirect
+ */
+add_action( 'admin_notices', 'bw_backup_reminder_notice' );
+function bw_backup_reminder_notice() {
+    $user_id = get_current_user_id();
+    
+    // Check if the transient exists for this user
+    if ( get_transient( 'bw_backup_reminder_' . $user_id ) ) {
+        // Delete the transient so it only shows once
+        delete_transient( 'bw_backup_reminder_' . $user_id );
+        
+        $backup_url = admin_url( 'admin.php?page=WPvivid' );
+        ?>
+        <div class="notice notice-warning is-dismissible" style="border-left-width: 6px; padding: 20px 30px; margin: 20px 20px 20px 0;">
+            <p style="font-size: 16px; line-height: 1.6; margin: 0;">
+                <strong style="font-size: 18px;">?? Making big changes today?</strong><br>
+                <span style="font-size: 15px;">Take a manual backup first! <a href="<?php echo esc_url( $backup_url ); ?>" style="font-weight: 600; text-decoration: none;">Go to backup page ?</a></span>
+            </p>
+        </div>        <?php
+    }
+}

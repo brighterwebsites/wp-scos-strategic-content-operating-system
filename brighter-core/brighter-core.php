@@ -50,7 +50,8 @@ function brighter_get_whitelisted_modules() {
             'bw-content-strategy',
             'bw-analytics-seeder',
             'bw-ga4-seed-admin',
-
+            'bw-support-cache-dashbrd',
+            'bw-faq',
         ];
     }
     
@@ -141,7 +142,8 @@ function brighter_load_modules() {
         'brighter-tweaks',
 	'bw-content-strategy',  // ? Make sure this is here
  	'bw-analytics-seeder',
-          
+ 	'bw-support-cache-dashbrd',
+        'bw-faq',     
     ];
     
     // Admin-only modules

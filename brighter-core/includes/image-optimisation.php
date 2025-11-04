@@ -4,9 +4,13 @@
  * 
  * File: image-optimisation.php
  * Purpose: Core logic for resizing uploads, managing registered sizes,
- * thumbnail control, comment disable on attachments, and LiteSpeed fade-in CSS.
+ * thumbnail control, comment disable on attachments, and LiteSpeed fade-in CSS. and OG image injection.
  *  
- * Version: 4.0.0
+ * Version: 4.1.0
+ *
+ * Changelog:
+ * 4.1.0 - Added direct OG image meta tag injection (bypasses SEOPress filter issues)
+ * 4.0.0 - Initial release
  *
  * Responsibilities:
  * - Resize uploaded images to a max dimension
@@ -182,3 +186,99 @@ function brighterwebsites_lazyload_css() {
     <?php
 }
 add_action('wp_head', 'brighterwebsites_lazyload_css'); // frontend
+
+
+// ==========================================
+// ? Force og-image (1200x630) for SEOPress OG tags
+// ==========================================
+// Priority 1: Filter the OG image URL (for SEOPress)
+add_filter('seopress_social_og_image', 'brighter_force_og_image_size', 999, 2);
+add_filter('seopress_social_og_default_image', 'brighter_force_og_image_size', 999, 2); // ADD THIS LINE
+// ==========================================
+// ? Force og:image meta tags directly (bypass SEOPress)
+// ==========================================
+
+add_action('wp_head', 'brighter_inject_og_image_tags', 1);
+function brighter_inject_og_image_tags() {
+    // Only run on single posts/pages
+    if (!is_singular()) {
+        return;
+    }
+    
+    global $post;
+    
+    // Skip if no featured image
+    if (!has_post_thumbnail($post->ID)) {
+        return;
+    }
+    
+    $attachment_id = get_post_thumbnail_id($post->ID);
+    $og_image_url = wp_get_attachment_image_url($attachment_id, 'og-image');
+    
+    // Fallback to full size if og-image doesn't exist
+    if (!$og_image_url) {
+        $og_image_url = wp_get_attachment_image_url($attachment_id, 'full');
+    }
+    
+    if ($og_image_url) {
+        // Get image dimensions
+        $image_meta = wp_get_attachment_metadata($attachment_id);
+        $width = 1200;
+        $height = 630;
+        
+        // Check if og-image size exists in metadata
+        if (isset($image_meta['sizes']['og-image'])) {
+            $width = $image_meta['sizes']['og-image']['width'];
+            $height = $image_meta['sizes']['og-image']['height'];
+        }
+        
+        // Get alt text
+        $alt_text = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+        
+        // Determine image type
+        $image_type = 'image/jpeg'; // default
+        if (isset($image_meta['file'])) {
+            $ext = strtolower(pathinfo($image_meta['file'], PATHINFO_EXTENSION));
+            if ($ext === 'png') {
+                $image_type = 'image/png';
+            } elseif ($ext === 'gif') {
+                $image_type = 'image/gif';
+            } elseif ($ext === 'webp') {
+                $image_type = 'image/webp';
+            }
+        }
+        
+        // Output the meta tags directly
+        echo "\n";
+        echo '<meta property="og:image" content="' . esc_url($og_image_url) . '">' . "\n";
+        echo '<meta property="og:image:secure_url" content="' . esc_url($og_image_url) . '">' . "\n";
+        echo '<meta property="og:image:type" content="' . esc_attr($image_type) . '">' . "\n";
+        echo '<meta property="og:image:width" content="' . esc_attr($width) . '">' . "\n";
+        echo '<meta property="og:image:height" content="' . esc_attr($height) . '">' . "\n";
+        if ($alt_text) {
+            echo '<meta property="og:image:alt" content="' . esc_attr($alt_text) . '">' . "\n";
+        }
+    }
+}
+
+// ==========================================
+// ? Add author meta tag for LinkedIn/schema
+// ==========================================
+
+add_action('wp_head', 'brighter_inject_author_meta', 2);
+function brighter_inject_author_meta() {
+    // Only run on single posts/pages
+    if (!is_singular()) {
+        return;
+    }
+    
+    global $post;
+    
+    // Get the author name
+    $author_name = get_the_author_meta('display_name', $post->post_author);
+    
+    if ($author_name) {
+        echo '<meta name="author" content="' . esc_attr($author_name) . '">' . "\n";
+    }
+}
+ 

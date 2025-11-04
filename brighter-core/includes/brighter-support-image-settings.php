@@ -210,26 +210,3 @@ add_action('wp_head', function() {
     echo $logo_output;
 });
 
-/**
- * Use 1200x630 "og-image" size for single posts (with caching)
- */
-add_filter('seopress_social_og_image', function($url, $post_id) {
-    // Cache the OG image per post
-    $cache_key = 'brighter_og_image_' . $post_id;
-    $cached = wp_cache_get($cache_key, 'brighter_og_images');
-    
-    if ($cached !== false) {
-        return $cached;
-    }
-    
-    if (has_post_thumbnail($post_id)) {
-        $new_url = wp_get_attachment_image_url(get_post_thumbnail_id($post_id), 'og-image');
-        if ($new_url) {
-            wp_cache_set($cache_key, $new_url, 'brighter_og_images', HOUR_IN_SECONDS);
-            return $new_url;
-        }
-    }
-    
-    wp_cache_set($cache_key, $url, 'brighter_og_images', HOUR_IN_SECONDS);
-    return $url;
-}, 10, 2);

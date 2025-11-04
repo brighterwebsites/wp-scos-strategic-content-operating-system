@@ -167,8 +167,13 @@ add_filter('comments_open', function ($open, $post_id) {
 }, 10, 2);
 /**
  * Inline CSS for lazy-loaded image fade-in
+ * Only loads if LiteSpeed Cache plugin is active
  */
 function brighterwebsites_lazyload_css() {
+    // Only load if LiteSpeed Cache is active
+    if (!defined('LSCWP_V') && !class_exists('LiteSpeed\Core')) {
+        return;
+    }
     ?>
     <style>
     /* PART 1 - Before Lazy Load */

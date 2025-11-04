@@ -16,70 +16,6 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Design Credit Hook - JSON-LD Schema
- * SECURITY: All output properly escaped
- */
-add_action('wp_head', function () {
-    if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
-        return;
-    }
-
-    $site_name = get_bloginfo('name');
-    $site_url = home_url('/');
-
-    $schema = [
-        '@context'   => 'https://schema.org',
-        '@type'      => 'WebSite',
-        'name'       => $site_name,
-        'url'        => $site_url,
-        'publisher'  => [
-            '@type' => 'Organization',
-            'name'  => 'Brighter Websites',
-            'url'   => 'https://brighterwebsites.com.au',
-        ],
-    ];
-
-    echo "\n<script type=\"application/ld+json\">" . wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "</script>\n";
-}, 20);
-
-/**
- * Footer branding: comment only
- */
-add_action('wp_footer', function () {
-    if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
-        return;
-    }
-    echo "\n<!-- Website built by Brighter Websites - https://brighterwebsites.com.au -->\n";
-}, 99);
-
-/**
- * Shortcode: [brighter_credit hide_on_posts="yes"]
- * SECURITY: All attributes sanitized, output escaped
- */
-function brighter_credit_shortcode($atts) {
-    $atts = shortcode_atts([
-        'hide_on_posts' => 'yes',
-    ], $atts, 'brighter_credit');
-
-    if ('yes' === strtolower($atts['hide_on_posts']) && is_single() && get_post_type() === 'post') {
-        return '';
-    }
-
-    $utm_source = sanitize_title(get_bloginfo('name'));
-    $url = add_query_arg([
-        'utm_source'   => $utm_source,
-        'utm_medium'   => 'footer',
-        'utm_campaign' => 'site-credit',
-    ], 'https://brighterwebsites.com.au/');
-
-    return sprintf(
-        'Proudly Built by <a href="%s" target="_blank" rel="noopener"><strong>BRIGHTER WEBSITES</strong></a>',
-        esc_url($url)
-    );
-}
-add_shortcode('brighter_credit', 'brighter_credit_shortcode');
-
-/**
  * Add Support Hub menu page
  * SECURITY: Proper capability requirement
  */
@@ -277,7 +213,7 @@ function brighter_support_output_main() {
     
     // Website Owners Manual
     echo '<div class="support-container support-manual">';
-    echo '<h2>?? ' . esc_html__('Website Owners Manual', 'brighterwebsites') . '</h2>';
+    echo '<h2>📖 ' . esc_html__('Website Owners Manual', 'brighterwebsites') . '</h2>';
     
     if ($manual_full_link && $manual_full_link !== '#') {
         echo '<div class="bright-manual"><a href="' . esc_url($manual_full_link) . '" target="_blank" rel="noopener">' . esc_html__('Website Manual', 'brighterwebsites') . '</a></div>';
@@ -294,7 +230,7 @@ function brighter_support_output_main() {
 
     // Manage Content
     echo '<div class="support-container support-brand">';
-    echo '<h2>?? ' . esc_html__('Manage Your Content', 'brighterwebsites') . '</h2>';
+    echo '<h2>📝 ' . esc_html__('Manage Your Content', 'brighterwebsites') . '</h2>';
     echo '<table class="compare-table">';
     echo '<thead><tr><th><a href="' . esc_url(admin_url('edit.php')) . '">' . esc_html__('Posts', 'brighterwebsites') . '</a></th><th><a href="' . esc_url(admin_url('edit.php?post_type=page')) . '">' . esc_html__('Pages', 'brighterwebsites') . '</a></th></tr></thead>';
     echo '<tbody>';
@@ -310,7 +246,7 @@ function brighter_support_output_main() {
     echo '<div class="support-help">';
     echo '<div class="support-help-inner">';
     echo '<img class="support-img" src="' . esc_url($logo_url) . '" alt="' . esc_attr__('Support', 'brighterwebsites') . '">';
-    echo '<h2>?? ' . esc_html__('Need Help?', 'brighterwebsites') . '</h2>';
+    echo '<h2>💬 ' . esc_html__('Need Help?', 'brighterwebsites') . '</h2>';
     echo '</div>'; // .support-help-inner
     echo '<p>' . wp_kses_post(__('We\'re here to help with technical issues, updates, or questions. Email us directly at <a href="mailto:support@brighterwebsites.com.au">support@brighterwebsites.com.au</a>', 'brighterwebsites')) . '</p>';
     echo '<div class="bright-button"><a href="https://brighterwebsites.com.au/kb/" target="_blank" rel="noopener">' . esc_html__('Website Knowledge Base', 'brighterwebsites') . '</a></div>';
@@ -320,7 +256,7 @@ function brighter_support_output_main() {
     // Performance & Search
     echo '<div class="support-tips">';
     echo '<div class="support-container support-search">';
-    echo '<h2>?? ' . esc_html__('Performance & Search', 'brighterwebsites') . '</h2>';
+    echo '<h2>🔍 ' . esc_html__('Performance & Search', 'brighterwebsites') . '</h2>';
     echo '<p>' . esc_html__('If we set these up as part of your website package, you\'ll find your account details in your Website Manual.', 'brighterwebsites') . '</p>';
     echo '<ul>';
     echo '<li><strong>' . esc_html__('Google Search Console:', 'brighterwebsites') . '</strong> <a href="https://search.google.com/search-console" target="_blank" rel="noopener">' . esc_html__('Manage Search Performance', 'brighterwebsites') . '</a></li>';
@@ -340,7 +276,7 @@ function brighter_support_output_main() {
 
     // Recommended Tools
     echo '<div class="support-container support-tools">';
-    echo '<p><strong>?? ' . esc_html__('Recommended Tools', 'brighterwebsites') . '</strong> � ' . esc_html__('If these tools have been set up for you, you\'ll find the login details in your Website Owner Manual.', 'brighterwebsites') . '</p>';
+    echo '<p><strong>🛠️ ' . esc_html__('Recommended Tools', 'brighterwebsites') . '</strong> – ' . esc_html__('If these tools have been set up for you, you\'ll find the login details in your Website Owner Manual.', 'brighterwebsites') . '</p>';
     echo '<ul>';
     echo '<li><strong>' . esc_html__('Email Campaigns:', 'brighterwebsites') . '</strong> <a href="https://www.mailerlite.com/invite/e74a69700df56/" target="_blank" rel="noopener">MailerLite</a></li>';
     echo '<li><strong>' . esc_html__('SMS Marketing:', 'brighterwebsites') . '</strong> <a href="https://www.smsglobal.com/" target="_blank" rel="noopener">SMSGlobal</a></li>';
@@ -352,7 +288,7 @@ function brighter_support_output_main() {
     // Website Health (admin only)
     if (current_user_can('manage_options')) {
         echo '<div class="support-container support-health">';
-        echo '<p>?? <strong>' . esc_html__('Admin Tools', 'brighterwebsites') . '</strong> - ' . esc_html__('Log in as admin to access website health.', 'brighterwebsites') . '</p>';
+        echo '<p>⚙️ <strong>' . esc_html__('Admin Tools', 'brighterwebsites') . '</strong> - ' . esc_html__('Log in as admin to access website health.', 'brighterwebsites') . '</p>';
         echo '<ul>';
         echo '<li><strong>' . esc_html__('Check Website Health:', 'brighterwebsites') . '</strong> <a href="' . esc_url(admin_url('site-health.php')) . '">' . esc_html__('Site Health Tool', 'brighterwebsites') . '</a></li>';
         echo '<li><strong>' . esc_html__('Backups:', 'brighterwebsites') . '</strong> <a href="' . esc_url(admin_url('admin.php?page=WPvivid')) . '">' . esc_html__('Go to Backups', 'brighterwebsites') . '</a></li>';

@@ -23,32 +23,6 @@
 if (!defined('ABSPATH')) exit;
 
 // ==========================
-// Custom Admin Bar Logo
-// ==========================
-function brighterwebsites_admin_logo() {
-    $logo_url = site_url('/wp-content/mu-plugins/brighter-core/assets/icon-white.png');
-    ?>
-    <style>
-    #wpadminbar #wp-admin-bar-wp-logo > .ab-item .ab-icon:before {
-        content: "" !important;
-        background-image: url('<?php echo esc_url($logo_url); ?>') !important;
-        background-size: contain !important;
-        background-repeat: no-repeat !important;
-        background-position: center center !important;
-        width: 20px !important;
-        height: 20px !important;
-        display: inline-block !important;
-    }
-    #wpadminbar #wp-admin-bar-wp-logo > .ab-item .ab-icon {
-        background: none !important;
-    }
-    </style>
-    <?php
-}
-add_action('admin_head', 'brighterwebsites_admin_logo');
-add_action('wp_head', 'brighterwebsites_admin_logo');
-
-// ==========================
 // Frontend Admin Bar Replacement
 // ==========================
 add_filter('show_admin_bar', '__return_false');
@@ -81,12 +55,12 @@ add_action('wp_footer', function() {
             }
         </style>
          <div class="gs-admin-bar-links">
-            <a href="https://brighterwebsites.com.au/support" target="_blank" rel="noopener">?? Support</a>
-            <a href="<?php echo esc_url(admin_url('edit.php')); ?>">?? Dashboard</a>
- 		
-<a href="#" class="gs-purge-cache">?? Purge Cache</a>
+            <a href="https://brighterwebsites.com.au/support" target="_blank" rel="noopener">💬 Support</a>
+            <a href="<?php echo esc_url(admin_url('edit.php')); ?>">📊 Dashboard</a>
+
+<a href="#" class="gs-purge-cache">🔄 Purge Cache</a>
             <?php if ($post && $post->ID): ?>
-                <a href="<?php echo esc_url(get_edit_post_link($post->ID)); ?>">?? Edit This Page</a>
+                <a href="<?php echo esc_url(get_edit_post_link($post->ID)); ?>">✏️ Edit This Page</a>
             <?php endif; ?>
         </div>
         <?php
@@ -127,8 +101,8 @@ function bw_backup_reminder_notice() {
         ?>
         <div class="notice notice-warning is-dismissible" style="border-left-width: 6px; padding: 20px 30px; margin: 20px 20px 20px 0;">
             <p style="font-size: 16px; line-height: 1.6; margin: 0;">
-                <strong style="font-size: 18px;">?? Making big changes today?</strong><br>
-                <span style="font-size: 15px;">Take a manual backup first! <a href="<?php echo esc_url( $backup_url ); ?>" style="font-weight: 600; text-decoration: none;">Go to backup page ?</a></span>
+                <strong style="font-size: 18px;">💾 Making big changes today?</strong><br>
+                <span style="font-size: 15px;">Take a manual backup first! <a href="<?php echo esc_url( $backup_url ); ?>" style="font-weight: 600; text-decoration: none;">Go to backup page →</a></span>
             </p>
         </div>        <?php
     }

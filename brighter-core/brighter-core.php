@@ -30,11 +30,13 @@ define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
  */
 function brighter_get_whitelisted_modules() {
     static $whitelist = null;
-    
+
     if ($whitelist === null) {
         $whitelist = [
             'brighter-business-info',
             'brighter-support',
+            'brighter-frontend',
+            'brighter-admin-branding',
             'brighter-support-image-settings',
             'bw-admin-tweaks',
             'image-optimisation',
@@ -42,8 +44,8 @@ function brighter_get_whitelisted_modules() {
             'brighter-tweaks',
             'brighter-settings',
             'custom-wpemail',
+            'custom-admin',
             'helpers',
-            'login-styling',
             'php-limits',
             'privacy-policy-style',
             'technical-settings',
@@ -54,7 +56,7 @@ function brighter_get_whitelisted_modules() {
             'bw-faq',
         ];
     }
-    
+
     return $whitelist;
 }
 
@@ -134,22 +136,27 @@ function brighter_load_modules() {
     // Define which modules to load
     $modules = [
         'brighter-business-info',
-        'brighter-support', 
+        'brighter-frontend',
+        'brighter-support',
+        'brighter-admin-branding',
         'brighter-support-image-settings',
         'bw-admin-tweaks',
+        'custom-admin',
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
-	'bw-content-strategy',  // ? Make sure this is here
+	'bw-content-strategy',  // Make sure this is here
  	'bw-analytics-seeder',
  	'bw-support-cache-dashbrd',
-        'bw-faq',     
+        'bw-faq',
     ];
-    
-    // Admin-only modules
+
+    // Admin-only modules (backend only, not frontend)
     $admin_only = [
         'brighter-support',
-        'brighter-support-image-settings', 
+        'brighter-admin-branding',
+        'brighter-support-image-settings',
+        'custom-admin',
        	'bw-ga4-seed-admin',
        // 'brighter-tweaks',
     ];

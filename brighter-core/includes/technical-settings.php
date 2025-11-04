@@ -8,17 +8,17 @@
  * Version: 4.0.0
  *
  * Responsibilities:
- * - Add a new “Technical Settings” options page
- * - 
+ * - Add a new â€œTechnical Settingsâ€ options page
+ * - Add toggles & settings for hard coded optimisations
  * - 
  *
  * Notes:
- * - Part of the Brighter Support Tools for Client Sites MU plugin 
- * - Loaded automatically by /mu-plugins/brighter-core.php
+ * Draft only will be Part of the Brighter Support Tools for Client Sites MU plugin 
+ * not included in mu-plugins/brighter-core.php
  */
 
 
-// Add a new “Technical Settings” options page
+// Add a new â€œTechnical Settingsâ€ options page
 add_action('admin_menu', function () {
     add_submenu_page(
   'brighter_support',           // parent slug

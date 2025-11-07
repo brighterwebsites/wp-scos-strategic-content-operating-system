@@ -132,39 +132,48 @@
     { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'Meetings', l: 'Meeting CTA', v: 25 },
     
     // CTAs
-    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'Contact', l: 'Phone CTA', v: 10 },
-    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'Contact', l: 'Email CTA', v: 10 },
-    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'Quote', l: 'Menu CTA', v: 30 },
-    { s: '.ga-cta-main', e: 'click_main_cta', c: 'Quote', l: 'Main CTA', v: 30 },
-    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'Quote', l: 'Micro CTA', v: 15 },
+    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 30 },  //Primary Conversion CTA High intent, core business outcome
+    { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 30 },  //Primary Conversion CTA High intent, core business outcome
+    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 15 },  //Soft Conversion  Medium intent, lead warming
+    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 15 },  //Assisted Conversion Alternate path to same business goal
+    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 10 },
+    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 10 },
+
     
     // Downloads & Lead Magnets
     { s: '.ga-lead_magnet', e: 'get_lead_magnet', c: 'Lead Magnet', l: 'Access LM', v: 20 },
     { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 5 },
     
-    // Navigation
-    { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog', v: 1 },
-    { s: '.ga-nav-project', e: 'nav_project', c: 'Navigation', l: 'Portfolio', v: 1 },
-    { s: '.ga-nav-product', e: 'click_product', c: 'Product', l: 'Product', v: 2 },
-    { s: '.ga-nav-service', e: 'click_service', c: 'Service', l: 'Service', v: 2 },
-    { s: '.ga-click-pricing', e: 'click_pricing_detail', c: 'Navigation', l: 'Pricing Detail Click', v: 8 },
-    { s: '.ga-click-compare', e: 'click_comparison', c: 'Navigation', l: 'Comparison Page Click', v: 8 },
+    // Navigation - Conversion Pathways
+    { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog Path', v: 1 },
+    { s: '.ga-nav-project', e: 'nav_project', c: 'Navigation', l: 'Portfolio Path', v: 1 },
+    { s: '.ga-nav-product', e: 'nav_product', c: 'Navigation', l: 'Product Path', v: 2 },
+    { s: '.ga-nav-service', e: 'nav_service', c: 'Navigation', l: 'Service Path', v: 2 },
+    { s: '.ga-nav-pricing', e: 'nav_pricing_detail', c: 'Navigation', l: 'Pricing Path', v: 8 },
+    { s: '.ga-nav-compare', e: 'nav_comparison', c: 'Navigation', l: 'Comparison Path', v: 8 },
+    { s: '.ga-nav-faq', e: 'nav_faq', c: 'Navigation', l: 'FAQ Path', v: 8 },
+    { s: '.ga-nav-path', e: 'nav_path', c: 'Navigation', l: 'Conversion Path', v: 8 }, //Navigational Engagement Low intent, user path continuation
+
     
-    // Trust signals
+    // Specific Trust signals
     { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed', v: 5 },
     { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed', v: 8 },
     { s: '.ga-trust-specs', e: 'view_specs', c: 'Trust', l: 'Specifications Viewed', v: 7 },
     { s: '.ga-trust-case', e: 'view_case', c: 'Trust', l: 'Case Study Excerpt Viewed', v: 6 },
     { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 2 },
+    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 7 }
     
-    // Page hierarchy
-    { s: '.ga-hrcy-atf', e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed', v: 1 },
-    { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 2 },
-    { s: '.ga-hrcy-add', e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed', v: 3 },
-    { s: '.ga-hrcy-tac', e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed', v: 4 },
-    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 5 },
-    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 3 },
-    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 5 },
+    // Page hierarchy - sections
+    { s: '.ga-hrcy-atf', e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed', v: 1 },  //Primary CTA above the fold (main goal)Measure exposure to your most important CTA (e.g. Get a Quote).High intent, core business outcome
+    { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 2 },  //or main content section of page
+    { s: '.ga-hrcy-aut', e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed', v: 3 },  //Specific Authority section ie Case Studies/blog articles
+    { s: '.ga-hrcy-tac', e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed', v: 4 },  // Specific Trust section ie Reviews
+    { s: '.ga-hrcy-faq', e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed', v: 3 },
+
+    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 3 },  //Secondary Soft CTA (low-friction micro-conversion) Tracks mid-page intent lead warming (e.g. Download Guide, Learn More, Ask a Question).
+    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 5 },  // Main CTA Repeat / Final Push CTA Reinforced Measures whether re-presenting your main offer at bottom helps lift conversions.
+    { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 5 },  // Assist CTA Section Alternate path to same business goal
+    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 5 },  // Convenience / Alternate Path CTAs Captures users preferring contact by phone/chat/specialist rather than a form.
 
     
     // Forms
@@ -288,4 +297,5 @@
   
   // Initialize tagging
   tag();
+
 })();

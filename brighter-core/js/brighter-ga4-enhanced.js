@@ -14,11 +14,48 @@
 
 (function() {
   'use strict';
-  
-  // Exit if no consent or gtag not loaded
-	if (document.cookie.indexOf('seopress-user-consent-accept=1') === -1 && 
-    document.cookie.indexOf('seopress-user-consent-accept=true') === -1) return;
-  if (typeof window.gtag !== 'function') return;
+
+  // Universal consent check (same as loader)
+  function hasConsent() {
+    const cookie = document.cookie;
+
+    // SEOPress
+    if (cookie.indexOf('seopress-user-consent-accept=1') !== -1) return true;
+    if (cookie.indexOf('seopress-user-consent-accept=true') !== -1) return true;
+
+    // Cookie Notice
+    if (cookie.indexOf('cookie_notice_accepted=true') !== -1) return true;
+
+    // GDPR Cookie Consent
+    if (cookie.indexOf('viewed_cookie_policy=yes') !== -1) return true;
+
+    // Complianz
+    if (cookie.indexOf('cmplz_consented_services') !== -1) return true;
+
+    // CookieYes
+    if (cookie.indexOf('cookieyes-consent=yes') !== -1) return true;
+
+    // No consent plugin = assume consent (for sites without consent management)
+    // Or if brighterGA4 was loaded (means consent was already granted in loader)
+    if (window.brighterGA4 && window.brighterGA4.loaded) return true;
+
+    return false;
+  }
+
+  // Exit if no consent
+  if (!hasConsent()) {
+    console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
+    return;
+  }
+
+  // Wait for gtag to be loaded
+  if (typeof window.gtag !== 'function') {
+    console.log('⏳ GA4 Enhanced: Waiting for gtag.js to load...');
+    setTimeout(arguments.callee, 100);
+    return;
+  }
+
+  console.log('✅ GA4 Enhanced v5.0.0: Lead Hierarchy System Active');
   
   const region = new URLSearchParams(location.search).get('region') || 'zone4-remote';
   

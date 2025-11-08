@@ -1,10 +1,36 @@
 <?php
 /**
- * Brighter GA4 Tracking Loader - OPTIMIZED
- * Version: 2.2.0 - Works with SEOPress GA4
- * 
- * Note: SEOPress loads gtag.js, we just add enhanced tracking
+ * Brighter GA4 Tracking Loader
+ * Version: 3.0.0 - Standalone GA4 implementation
+ *
+ * Loads GA4 tracking with our configured measurement ID
+ * Falls back to SEOPress if present
  */
+
+/**
+ * PART 0: Load gtag.js with our GA4 measurement ID (GDPR-compliant)
+ */
+add_action('wp_head', function() {
+    // Get GA4 measurement ID from our settings
+    $ga4_id = get_option('brighter_ga4_measurement_id', '');
+
+    // Skip if no ID configured
+    if (empty($ga4_id)) {
+        echo "<!-- Brighter GA4: No measurement ID configured. Visit Support → Analytics to configure. -->\n";
+        return;
+    }
+
+    // Pass GA4 ID to JavaScript for consent-based loading
+    ?>
+    <!-- Google Analytics 4 - Brighter Core -->
+    <script>
+        window.brighterGA4 = {
+            measurementId: '<?php echo esc_js($ga4_id); ?>',
+            loaded: false
+        };
+    </script>
+    <?php
+}, 5); // Priority 5 = loads early
 
 /**
  * PART 1: Inline Core Script (Essential tracking)
@@ -43,19 +69,38 @@ function hasConsent() {
 }        
         // Exit if no consent
         if (!hasConsent()) {
-            console.log('?? GA4 Enhanced: Waiting for cookie consent');
+            console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
             return;
         }
-        
-        // Wait for gtag to be loaded by SEOPress
+
+        // Load gtag.js if we have a measurement ID
+        if (window.brighterGA4 && !window.brighterGA4.loaded) {
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.brighterGA4.measurementId;
+            document.head.appendChild(script);
+
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', window.brighterGA4.measurementId, {
+                'send_page_view': false  // We'll send it ourselves with custom params
+            });
+
+            window.brighterGA4.loaded = true;
+            console.log('✅ GA4 Loaded: ' + window.brighterGA4.measurementId);
+        }
+
+        // Wait for gtag to be ready
         function initTracking() {
             if (typeof window.gtag !== 'function') {
                 // gtag not ready yet, try again in 100ms
                 setTimeout(initTracking, 100);
                 return;
             }
-            
-            console.log('? GA4 Enhanced: Consent granted, tracking active');
+
+            console.log('✅ GA4 Enhanced: Consent granted, tracking active');
             
             // -------------------------------------------------------
             // CORE TRACKING (Inline)
@@ -126,7 +171,7 @@ add_action('wp_enqueue_scripts', function() {
     $src = content_url('mu-plugins/brighter-core/js/brighter-ga4-enhanced.js');
     
     // Load in footer with defer
-    wp_enqueue_script($handle, $src, [], '2.2.0', true);
+    wp_enqueue_script($handle, $src, [], '5.0.0', true);
     
     // Add defer attribute
     add_filter('script_loader_tag', function($tag, $h) use ($handle) {

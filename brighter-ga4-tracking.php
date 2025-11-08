@@ -41,66 +41,68 @@ add_action('wp_head', function() {
     <script>
     (function() {
         'use strict';
-        
+
         // -------------------------------------------------------
         // UNIVERSAL CONSENT CHECK
         // -------------------------------------------------------
-        
+
 function hasConsent() {
     const cookie = document.cookie;
-    
+
     // SEOPress - check for =1 OR =true
     if (cookie.indexOf('seopress-user-consent-accept=1') !== -1) return true;
     if (cookie.indexOf('seopress-user-consent-accept=true') !== -1) return true;
-    
+
     // Cookie Notice
     if (cookie.indexOf('cookie_notice_accepted=true') !== -1) return true;
-    
+
     // GDPR Cookie Consent
     if (cookie.indexOf('viewed_cookie_policy=yes') !== -1) return true;
-    
+
     // Complianz
     if (cookie.indexOf('cmplz_consented_services') !== -1) return true;
-    
+
     // CookieYes
     if (cookie.indexOf('cookieyes-consent=yes') !== -1) return true;
-    
+
     return false;
-}        
-        // Exit if no consent
-        if (!hasConsent()) {
-            console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
-            return;
-        }
+}
 
-        // Load gtag.js if we have a measurement ID
-        if (window.brighterGA4 && !window.brighterGA4.loaded) {
-            const script = document.createElement('script');
-            script.async = true;
-            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.brighterGA4.measurementId;
-            document.head.appendChild(script);
-
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', window.brighterGA4.measurementId, {
-                'send_page_view': false  // We'll send it ourselves with custom params
-            });
-
-            window.brighterGA4.loaded = true;
-            console.log('✅ GA4 Loaded: ' + window.brighterGA4.measurementId);
-        }
-
-        // Wait for gtag to be ready
-        function initTracking() {
-            if (typeof window.gtag !== 'function') {
-                // gtag not ready yet, try again in 100ms
-                setTimeout(initTracking, 100);
+        function initializeTracking() {
+            // Exit if no consent
+            if (!hasConsent()) {
+                console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
                 return;
             }
 
-            console.log('✅ GA4 Enhanced: Consent granted, tracking active');
+            // Load gtag.js if we have a measurement ID
+            if (window.brighterGA4 && !window.brighterGA4.loaded) {
+                const script = document.createElement('script');
+                script.async = true;
+                script.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.brighterGA4.measurementId;
+                document.head.appendChild(script);
+
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                window.gtag = gtag;
+                gtag('js', new Date());
+                gtag('config', window.brighterGA4.measurementId, {
+                    'send_page_view': false  // We'll send it ourselves with custom params
+                });
+
+                window.brighterGA4.loaded = true;
+                console.log('✅ GA4 Loaded: ' + window.brighterGA4.measurementId);
+            }
+
+            // Wait for gtag to be ready
+            function initTracking() {
+                if (typeof window.gtag !== 'function') {
+                    // gtag not ready yet, try again in 100ms
+                    setTimeout(initTracking, 100);
+                    return;
+                }
+
+                console.log('✅ GA4 Enhanced: Consent granted, tracking active');
             
             // -------------------------------------------------------
             // CORE TRACKING (Inline)
@@ -154,10 +156,26 @@ function hasConsent() {
                 }
             }, { passive: true });
         }
-        
+
         // Start initialization
         initTracking();
-        
+    }
+
+    // Try to initialize immediately (if consent cookie already exists)
+    initializeTracking();
+
+    // Listen for SEOPress consent event (fires when user clicks "accept")
+    document.addEventListener('seopress_analytics_cookies_accepted', function() {
+        console.log('🍪 SEOPress consent granted - initializing GA4');
+        initializeTracking();
+    });
+
+    // Also listen for generic consent events from other plugins
+    document.addEventListener('cookie_consent_accepted', function() {
+        console.log('🍪 Cookie consent granted - initializing GA4');
+        initializeTracking();
+    });
+
     })();
     </script>
     <?php

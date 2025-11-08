@@ -42,20 +42,28 @@
     return false;
   }
 
-  // Exit if no consent
-  if (!hasConsent()) {
-    console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
-    return;
-  }
+  // Flag to prevent double initialization
+  let enhancedInitialized = false;
 
-  // Wait for gtag to be loaded
-  if (typeof window.gtag !== 'function') {
-    console.log('⏳ GA4 Enhanced: Waiting for gtag.js to load...');
-    setTimeout(arguments.callee, 100);
-    return;
-  }
+  function initializeEnhanced() {
+    // Exit if already initialized
+    if (enhancedInitialized) return;
 
-  console.log('✅ GA4 Enhanced v5.0.0: Lead Hierarchy System Active');
+    // Exit if no consent
+    if (!hasConsent()) {
+      console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
+      return;
+    }
+
+    // Wait for gtag to be loaded
+    if (typeof window.gtag !== 'function') {
+      console.log('⏳ GA4 Enhanced: Waiting for gtag.js to load...');
+      setTimeout(initializeEnhanced, 100);
+      return;
+    }
+
+    enhancedInitialized = true;
+    console.log('✅ GA4 Enhanced v5.0.0: Lead Hierarchy System Active');
   
   const region = new URLSearchParams(location.search).get('region') || 'zone4-remote';
   
@@ -574,7 +582,24 @@
     });
   });
   contentObserver.observe(document.body, { childList: true, subtree: true });
-  
+
   // Initialize tagging
   tag();
+}
+
+  // Try to initialize immediately (if consent already granted)
+  initializeEnhanced();
+
+  // Listen for SEOPress consent event (fires when user clicks "accept")
+  document.addEventListener('seopress_analytics_cookies_accepted', function() {
+    console.log('🍪 SEOPress consent granted - initializing enhanced tracking');
+    initializeEnhanced();
+  });
+
+  // Also listen for generic consent events from other plugins
+  document.addEventListener('cookie_consent_accepted', function() {
+    console.log('🍪 Cookie consent granted - initializing enhanced tracking');
+    initializeEnhanced();
+  });
+
 })();

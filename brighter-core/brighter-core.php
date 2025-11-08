@@ -50,7 +50,7 @@ function brighter_get_whitelisted_modules() {
             'privacy-policy-style',
             'technical-settings',
             'bw-content-strategy',
-            'bw-analytics-seeder',
+            'bw-ga4-seeder',
             'bw-ga4-seed-admin',
             'bw-support-cache-dashbrd',
             'bw-faq',
@@ -145,8 +145,9 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
-	'bw-content-strategy',  // Make sure this is here
- 	'bw-analytics-seeder',
+	'bw-content-strategy',
+ 	'bw-ga4-seeder',
+ 	'bw-ga4-seed-admin',
  	'bw-support-cache-dashbrd',
         'bw-faq',
     ];

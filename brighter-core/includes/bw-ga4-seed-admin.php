@@ -1,12 +1,13 @@
 <?php
 /**
- * Add to your theme's functions.php
- * 
+ * GA4 Seed Admin Interface
+ *
  * Handles seeding completion flag and provides admin interface
+ * Loaded automatically by Brighter Core module loader
  */
 
-// Include the seeder file
-require_once get_template_directory() . '/includes/analytics-seeder.php';
+// Seeder file (bw-ga4-seeder.php) is loaded independently by module loader
+// No need to require it here
 
 // AJAX handler to mark seeding as complete
 add_action('wp_ajax_brighter_ga4_seed_complete', function() {

@@ -152,17 +152,30 @@ add_action('wp_footer', function() {
         setTimeout(() => {
             const params = getBaseParams();
             params.event_category = event.category;
-            
+
+            // Add lead hierarchy parameters for form-related events
+            if (event.name === 'generate_lead' || event.name === 'form_submit') {
+                params.lead_tier = 'warm';
+                params.lead_type = 'contact_form';
+                params.form_type = 'contact_form';
+                params.form_fields = 3;
+                params.form_id = 'seed_test_form';
+                params.cta_label = 'Seed Test CTA';
+                params.cta_location = 'seed';
+                params.cta_type = 'main';
+                params.element_location = 'above_fold';
+            }
+
             gtag('event', event.name, params);
             count++;
-            
-            console.log(`? Seeded: ${event.name} (${event.category})`);
-            
+
+            console.log(`✓ Seeded: ${event.name} (${event.category})`);
+
             // Summary when done
             if (count === eventsToSeed.length) {
-                console.log(`%c?? Seeded ${count} events`, 'background: #4CAF50; color: white; padding: 6px 12px; font-weight: bold;');
-                console.log('Check GA4 ? Realtime ? Events in ~30 seconds');
-                console.log('Then go to Admin ? Events to mark conversions');
+                console.log(`%c✅ Seeded ${count} events`, 'background: #4CAF50; color: white; padding: 6px 12px; font-weight: bold;');
+                console.log('Check GA4 → Realtime → Events in ~30 seconds');
+                console.log('Then go to Admin → Events to mark conversions');
             }
         }, index * 100); // 100ms between events
     });

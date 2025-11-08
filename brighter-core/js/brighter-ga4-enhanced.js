@@ -1,12 +1,15 @@
 /**
  * Brighter GA4 Enhanced Tracking
- * Version: 4.3.0 - Added Ad Tag Detection
- * Size Target: <10KB
- * 
+ * Version: 5.0.0 - Lead Hierarchy System
+ * Size Target: <15KB
+ *
  * Features:
  * - Selector-based attribution
  * - Content strategy dimensions
  * - Ad tag detection & alerting
+ * - Lead tier classification (hot/warm/cold)
+ * - CTA attribution tracking
+ * - Smart form type detection
  */
 
 (function() {
@@ -37,7 +40,121 @@
       post_type: contentStrategy.post_type || 'page'
     };
   }
-  
+
+  // ============================================
+  // LEAD TIER DETECTION SYSTEM
+  // ============================================
+
+  // Map form type classes to lead data
+  const CLASS_TO_TYPE = {
+    // Hot tier
+    'ga-quote': 'quote_request',
+    'ga-business-enquiry': 'business_enquiry',
+    'ga-quiz-quote': 'quiz_quote',
+
+    // Warm tier
+    'ga-contact': 'contact_form',
+    'ga-quick-contact': 'quick_quote',
+    'ga-meeting': 'meeting_request',
+
+    // Cold tier
+    'ga-subscribe': 'newsletter',
+    'ga-lead_magnet': 'lead_magnet',
+    'ga-newsletter': 'newsletter'
+  };
+
+  // Map form types to default tiers
+  const FORM_TYPE_TO_TIER = {
+    // Hot tier (high intent)
+    'quote_request': 'hot',
+    'business_enquiry': 'hot',
+    'quiz_quote': 'hot',
+
+    // Warm tier (medium intent)
+    'contact_form': 'warm',
+    'quick_quote': 'warm',
+    'meeting_request': 'warm',
+
+    // Cold tier (low intent)
+    'newsletter': 'cold',
+    'lead_magnet': 'cold'
+  };
+
+  // Form ID pattern matching (fallback detection)
+  const ID_PATTERNS = [
+    // Hot
+    { pattern: /quote|enquiry|business/i, type: 'quote_request', tier: 'hot' },
+    { pattern: /quiz.*quote/i, type: 'quiz_quote', tier: 'hot' },
+
+    // Warm
+    { pattern: /contact|inquiry/i, type: 'contact_form', tier: 'warm' },
+    { pattern: /quick|express/i, type: 'quick_quote', tier: 'warm' },
+    { pattern: /meeting|book|schedule/i, type: 'meeting_request', tier: 'warm' },
+
+    // Cold
+    { pattern: /subscribe|newsletter/i, type: 'newsletter', tier: 'cold' },
+    { pattern: /download|magnet|guide/i, type: 'lead_magnet', tier: 'cold' }
+  ];
+
+  // Field count heuristic (last resort)
+  function inferFromFieldCount(count) {
+    if (count >= 7) return { tier: 'hot', type: 'quote_request' };
+    if (count >= 3) return { tier: 'warm', type: 'contact_form' };
+    return { tier: 'cold', type: 'newsletter' };
+  }
+
+  // Detect lead tier and type from form
+  function detectFormLeadData(form) {
+    const wrapper = form.closest('[class*="ga-"]') || form.parentElement;
+    const classList = Array.from(wrapper?.classList || []);
+    const formId = (form.id || form.getAttribute('name') || '').toLowerCase();
+
+    let tier = null;
+    let type = null;
+
+    // 1. Check for explicit tier class (.ga-form-hot, .ga-form-warm, .ga-form-cold)
+    classList.forEach(cls => {
+      if (cls.startsWith('ga-form-')) {
+        tier = cls.replace('ga-form-', '');
+      }
+    });
+
+    // 2. Check for type class (.ga-quote, .ga-contact, etc)
+    classList.forEach(cls => {
+      if (CLASS_TO_TYPE[cls]) {
+        type = CLASS_TO_TYPE[cls];
+        // Auto-infer tier from type if not explicitly set
+        if (!tier && FORM_TYPE_TO_TIER[type]) {
+          tier = FORM_TYPE_TO_TIER[type];
+        }
+      }
+    });
+
+    // 3. Fallback: Try to detect from form ID pattern
+    if (!tier || !type) {
+      for (const item of ID_PATTERNS) {
+        if (item.pattern.test(formId)) {
+          type = type || item.type;
+          tier = tier || item.tier;
+          break;
+        }
+      }
+    }
+
+    // 4. Final fallback: Use field count heuristic
+    if (!tier || !type) {
+      const fieldCount = form.querySelectorAll(
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])'
+      ).length;
+
+      const inferred = inferFromFieldCount(fieldCount);
+      tier = tier || inferred.tier;
+      type = type || inferred.type;
+    }
+
+    return { tier, type };
+  }
+
   // ============================================
   // AD TAG DETECTION SYSTEM
   // ============================================
@@ -195,10 +312,90 @@
     });
   }
   
+  // ============================================
+  // CTA CONTEXT TRACKING
+  // ============================================
+
+  // Store CTA context for attribution
+  function storeCTAContext(element) {
+    try {
+      const ctaData = {
+        label: element.textContent?.trim() || element.value || 'Unknown',
+        location: detectLocation(element),
+        type: detectCTAType(element),
+        timestamp: Date.now()
+      };
+
+      // Get existing CTA history (max 3)
+      const history = JSON.parse(sessionStorage.getItem('bw_cta_history') || '[]');
+      history.unshift(ctaData);
+
+      // Keep only last 3 CTAs
+      if (history.length > 3) history.length = 3;
+
+      sessionStorage.setItem('bw_cta_history', JSON.stringify(history));
+    } catch(e) {
+      console.warn('Failed to store CTA context:', e);
+    }
+  }
+
+  // Detect CTA location from page hierarchy
+  function detectLocation(element) {
+    // Check for ga-hrcy-* classes on ancestor sections
+    const section = element.closest('section, [class*="ga-hrcy-"]');
+    if (section) {
+      const hrchyClass = Array.from(section.classList).find(c => c.startsWith('ga-hrcy-'));
+      if (hrchyClass) return hrchyClass.replace('ga-hrcy-', '');
+    }
+
+    // Check if in header or footer
+    if (element.closest('header')) return 'header';
+    if (element.closest('footer')) return 'footer';
+
+    // Use first class of parent section (Breakdance pattern)
+    if (section && section.classList.length > 0) {
+      return section.classList[0];
+    }
+
+    return 'unknown';
+  }
+
+  // Detect CTA type from classes
+  function detectCTAType(element) {
+    const classList = Array.from(element.classList);
+    if (classList.some(c => c.includes('ga-cta-main'))) return 'main';
+    if (classList.some(c => c.includes('ga-cta-micro'))) return 'micro';
+    if (classList.some(c => c.includes('ga-cta-assist'))) return 'assist';
+    return 'unknown';
+  }
+
+  // Get most recent CTA context
+  function getLastCTAContext() {
+    try {
+      const history = JSON.parse(sessionStorage.getItem('bw_cta_history') || '[]');
+      return history[0] || null;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ============================================
+  // CLICK TRACKING
+  // ============================================
+
   // Enhanced click handler
   document.addEventListener('click', function(e) {
     const el = e.target.closest('[data-ga-event]');
     if (!el || el.dataset.gaSkip === '1') return;
+
+    // Store CTA context for later attribution
+    if (el.classList.contains('ga-cta-main') ||
+        el.classList.contains('ga-cta-micro') ||
+        el.classList.contains('ga-cta-assist') ||
+        el.tagName === 'BUTTON' ||
+        el.tagName === 'A') {
+      storeCTAContext(el);
+    }
     
     const ds = el.dataset;
     const payload = getBaseParams();
@@ -239,37 +436,92 @@
     document.querySelectorAll('[data-ga-impression]').forEach(el => obs.observe(el));
   }
   
-  // Form tracking
+  // ============================================
+  // ENHANCED FORM TRACKING WITH LEAD HIERARCHY
+  // ============================================
+
   const started = new WeakSet();
+
   document.querySelectorAll('form').forEach(form => {
     const id = form.id || form.className || 'Form';
     const cat = form.dataset.gaCategory || 'Forms';
     const label = form.dataset.gaLabel || id;
-    
+
+    // Track form start
     form.addEventListener('input', () => {
       if (!started.has(form)) {
         const payload = getBaseParams();
         payload.event_category = cat;
         payload.event_label = label;
-        
+
         gtag('event', 'form_start', payload);
         started.add(form);
       }
     }, { once: true });
-    
+
+    // Track form submit with lead hierarchy
     form.addEventListener('submit', () => {
-      const val = form.dataset.value;
+      const leadData = detectFormLeadData(form);
+      const lastCTA = getLastCTAContext();
+
+      // Count visible form fields (exclude hidden)
+      const fieldCount = form.querySelectorAll(
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])'
+      ).length;
+
+      // Build payload with all parameters
       const payload = getBaseParams();
       payload.event_category = cat;
       payload.event_label = label;
-      
+
+      // Lead classification
+      payload.lead_tier = leadData.tier;
+      payload.lead_type = leadData.type;
+
+      // Form context
+      payload.form_type = leadData.type;
+      payload.form_fields = fieldCount;
+      payload.form_id = form.id || form.getAttribute('name') || 'unknown';
+
+      // CTA attribution (if available)
+      if (lastCTA) {
+        payload.cta_label = lastCTA.label;
+        payload.cta_location = lastCTA.location;
+        payload.cta_type = lastCTA.type;
+      }
+
+      // Element location (above/below fold)
+      const wrapper = form.closest('[class*="ga-hrcy-"]');
+      if (wrapper && wrapper.classList.contains('ga-hrcy-atf')) {
+        payload.element_location = 'above_fold';
+      } else {
+        payload.element_location = 'below_fold';
+      }
+
+      // Value assignment by tier
+      const val = form.dataset.value;
       if (val && !isNaN(val)) {
         payload.value = parseFloat(val);
-        payload.currency = form.dataset.currency || 'AUD';
+      } else {
+        // Default values by tier if not manually set
+        const tierValues = { hot: 50, warm: 25, cold: 10 };
+        payload.value = tierValues[leadData.tier] || 20;
       }
-      
+      payload.currency = form.dataset.currency || 'AUD';
+
+      // Fire form_submit event (keep for tracking)
       gtag('event', 'form_submit', payload);
+
+      // Fire generate_lead event (new unified lead event)
       gtag('event', 'generate_lead', payload);
+
+      console.info(
+        '%c📊 Lead Generated',
+        'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 3px;',
+        `\nTier: ${leadData.tier} | Type: ${leadData.type}`,
+        `\nFields: ${fieldCount} | Form: ${payload.form_id}`,
+        lastCTA ? `\nLast CTA: "${lastCTA.label}" (${lastCTA.location})` : ''
+      );
     });
   });
   

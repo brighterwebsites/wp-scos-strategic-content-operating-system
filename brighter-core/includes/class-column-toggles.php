@@ -167,4 +167,5 @@ class BW_Column_Toggles {
 }
 
 // Initialize
-BW_Column_Toggles::init();
+// TEMPORARILY DISABLED - Feature not showing and causing issues
+// BW_Column_Toggles::init();

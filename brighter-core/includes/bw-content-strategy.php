@@ -177,12 +177,14 @@ add_action('admin_init', function() {
                     $new['bw_index']   = 'Index Status';
                     $new['bw_pillar']  = 'Pillar';
                     $new['bw_notes']   = 'Notes';
-                    // Stats columns
-                    $new['bw_word_count']     = 'Words';
-                    $new['bw_images']         = 'Images';
-                    $new['bw_h2s']            = 'H2s';
-                    $new['bw_internal_links'] = 'Int Links';
-                    $new['bw_external_links'] = 'Ext Links';
+                    // Stats columns - TEMPORARILY DISABLED for performance testing
+                    // Each column makes get_post_meta() calls which causes query explosion
+                    // TODO: Add proper meta cache priming before re-enabling
+                    // $new['bw_word_count']     = 'Words';
+                    // $new['bw_images']         = 'Images';
+                    // $new['bw_h2s']            = 'H2s';
+                    // $new['bw_internal_links'] = 'Int Links';
+                    // $new['bw_external_links'] = 'Ext Links';
                 }
             }
             return $new;
@@ -268,7 +270,8 @@ add_action('admin_init', function() {
          . esc_html($display_notes) . '</span>';
     break;
 
-                // Stats columns
+                // Stats columns - TEMPORARILY DISABLED for performance testing
+                /*
                 case 'bw_word_count':
                     $count = get_post_meta($post_id, 'bw_word_count', true);
                     echo $count ? '<span style="color:#2271b1;font-weight:600;">' . number_format($count) . '</span>' : '<span style="color:#999;">—</span>';
@@ -294,6 +297,7 @@ add_action('admin_init', function() {
                     $count = get_post_meta($post_id, 'bw_external_link_count', true);
                     echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">0</span>';
                     break;
+                */
             }
         }, 10, 2);
     }
@@ -310,12 +314,12 @@ foreach (['post', 'page'] as $pt) {
         $cols['bw_opt']     = '_brt_opt_status';
         $cols['bw_index']   = 'bw_index_status';
         $cols['bw_pillar']  = 'bw_pillar_page_id';
-        // Stats columns
-        $cols['bw_word_count']     = 'bw_word_count';
-        $cols['bw_images']         = 'bw_image_count';
-        $cols['bw_h2s']            = 'bw_h2_count';
-        $cols['bw_internal_links'] = 'bw_internal_link_count';
-        $cols['bw_external_links'] = 'bw_external_link_count';
+        // Stats columns - TEMPORARILY DISABLED
+        // $cols['bw_word_count']     = 'bw_word_count';
+        // $cols['bw_images']         = 'bw_image_count';
+        // $cols['bw_h2s']            = 'bw_h2_count';
+        // $cols['bw_internal_links'] = 'bw_internal_link_count';
+        // $cols['bw_external_links'] = 'bw_external_link_count';
         return $cols;
     });
 }
@@ -330,11 +334,13 @@ add_action('pre_get_posts', function($q) {
         $q->set('orderby', 'meta_value');
     }
 
-    // Numeric meta fields (stats)
+    // Numeric meta fields (stats) - TEMPORARILY DISABLED
+    /*
     if (in_array($orderby, ['bw_word_count', 'bw_image_count', 'bw_h2_count', 'bw_internal_link_count', 'bw_external_link_count'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value_num');
     }
+    */
 });
 
 // ==========================

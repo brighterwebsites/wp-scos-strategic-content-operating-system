@@ -711,7 +711,9 @@ class BW_ALTC_Admin_Columns {
 }
 
 // Initialize
-BW_ALTC_Admin_Columns::init();
+// TEMPORARILY DISABLED - Causing performance issues (140+ queries from get_post_meta calls)
+// Need to add meta cache priming before re-enabling
+// BW_ALTC_Admin_Columns::init();
 
 // Add CSS for column widths
 add_action('admin_head', function() {

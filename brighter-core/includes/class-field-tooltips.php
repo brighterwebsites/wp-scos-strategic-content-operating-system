@@ -26,6 +26,9 @@ class BW_Field_Tooltips {
      * Enqueue tooltip assets
      */
     public static function enqueue_assets($hook) {
+        // TEMPORARILY DISABLED - Debugging editor hang
+        return;
+
         if (!in_array($hook, ['post.php', 'post-new.php'], true)) return;
 
         // Enqueue CSS

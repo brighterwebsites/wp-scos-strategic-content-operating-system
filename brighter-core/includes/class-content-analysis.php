@@ -20,7 +20,8 @@ class BW_Content_Analysis {
      * Initialize content analysis
      */
     public static function init() {
-        add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
+        // TEMPORARILY DISABLED - Debugging performance issue
+        // add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
     }
 
     /**

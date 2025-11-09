@@ -384,12 +384,13 @@ foreach ($pillar_pages as $p) {
     $pillar_opts[$p->ID] = get_the_title($p) . $type;
 }
     
-    wp_register_script('bw-cs-inline', false, ['jquery'], '1.1', true);
+    wp_register_script('bw-cs-inline', false, ['jquery'], '1.2', true);
     wp_add_inline_script('bw-cs-inline', '(function($){
         const nonce = "' . esc_js(wp_create_nonce('bw_cs_inline')) . '";
         const intentOpts = ' . wp_json_encode(bw_cs_intent_options()) . ';
         const purposeOpts = ' . wp_json_encode(bw_cs_purpose_options()) . ';
         const optOpts = ' . wp_json_encode(bw_cs_opt_status_options()) . ';
+        const indexOpts = ' . wp_json_encode(bw_cs_index_status_options()) . ';
         const pillarOpts = ' . wp_json_encode($pillar_opts) . ';
         
         let activeRequest = null; // Track active AJAX request
@@ -458,13 +459,15 @@ foreach ($pillar_pages as $p) {
             });
         });
         
-        // Select fields (intent, purpose)
+        // Select fields (intent, purpose, index)
         $(document).on("click", ".bw-cs-select", function(e) {
             e.preventDefault();
             const $span = $(this);
             const postId = $span.data("post");
             const field = $span.data("field");
-            const opts = field === "bw_intent" ? intentOpts : purposeOpts;
+            let opts = purposeOpts; // default
+            if (field === "bw_intent") opts = intentOpts;
+            else if (field === "bw_index_status") opts = indexOpts;
             
             const $select = $("<select>", {
                 class: "bw-cs-dropdown",

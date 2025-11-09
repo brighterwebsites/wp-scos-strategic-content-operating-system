@@ -51,6 +51,14 @@ add_action('init', function() {
         'show_in_rest'  => false,
         'auth_callback' => function() { return current_user_can('edit_posts'); },
     ]);
+
+    // Index status
+    register_post_meta('', 'bw_index_status', [
+        'type'          => 'string',
+        'single'        => true,
+        'show_in_rest'  => false,
+        'auth_callback' => function() { return current_user_can('edit_posts'); },
+    ]);
 });
 
 
@@ -109,6 +117,16 @@ function bw_cs_purpose_options() {
         'landing-page'  => 'Landing Page',       // Generic landing page for paid campaigns
         'terms'         => 'Legal/Terms',        // Standard functional page
     
+    ];
+}
+
+function bw_cs_index_status_options() {
+    return [
+        ''            => 'Not Set',
+        'indexed'     => 'Indexed',
+        'crawled'     => 'Crawled',
+        'discovered'  => 'Discovered',
+        'issue'       => 'Issue',
     ];
 }
 
@@ -684,6 +702,7 @@ add_action('save_post', function($post_id) {
         'bw_purpose'        => 'sanitize_text_field',
         'bw_pillar_page_id' => 'absint',
         '_brt_opt_status'   => 'sanitize_text_field',
+        'bw_index_status'   => 'sanitize_text_field',
     ];
     
     foreach ($fields as $key => $sanitizer) {
@@ -801,7 +820,22 @@ function bw_cs_render_metabox($post) {
         </select>
         <p class="bw-cs-help">Internal tracking only</p>
     </div>
-    
+
+    <div class="bw-cs-field">
+        <label for="bw_index_status">Index Status</label>
+        <select id="bw_index_status" name="bw_index_status" style="width:100%;">
+            <?php
+            $index_status = get_post_meta($post->ID, 'bw_index_status', true);
+            foreach (bw_cs_index_status_options() as $key => $label):
+            ?>
+                <option value="<?php echo esc_attr($key); ?>" <?php selected($index_status, $key); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="bw-cs-help">Search engine indexing status</p>
+    </div>
+
     <div class="bw-cs-field">
         <label for="bw_notes">Notes</label>
         <textarea id="bw_notes" name="bw_notes" rows="3" placeholder="Internal notes..."><?php echo esc_textarea($notes); ?></textarea>
@@ -824,6 +858,7 @@ add_action('save_post', function($post_id) {
         'bw_purpose'        => 'sanitize_text_field',
         'bw_pillar_page_id' => 'absint',
         '_brt_opt_status'   => 'sanitize_text_field',
+        'bw_index_status'   => 'sanitize_text_field',
     ];
     
     foreach ($fields as $key => $sanitizer) {

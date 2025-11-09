@@ -23,6 +23,11 @@ class BW_ALTC_Admin_Columns {
         add_action('admin_init', [__CLASS__, 'register_columns']);
         add_action('restrict_manage_posts', [__CLASS__, 'add_filter_dropdowns'], 10, 1);
         add_filter('parse_query', [__CLASS__, 'filter_posts_by_altc']);
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_inline_edit_scripts']);
+        add_action('wp_ajax_bw_altc_save_column', [__CLASS__, 'ajax_save_column']);
+        add_action('quick_edit_custom_box', [__CLASS__, 'quick_edit_fields'], 10, 2);
+        add_action('bulk_edit_custom_box', [__CLASS__, 'bulk_edit_fields'], 10, 2);
+        add_action('admin_footer-edit.php', [__CLASS__, 'quick_edit_javascript']);
     }
 
     /**
@@ -73,14 +78,14 @@ class BW_ALTC_Admin_Columns {
                 if ($altc_id) {
                     $altc_term = get_term($altc_id, 'altc_strategic_lens');
                     if ($altc_term && !is_wp_error($altc_term)) {
-                        echo '<span style="display: inline-block; padding: 3px 8px; background: #e7f5fe; color: #00a0d2; border-radius: 3px; font-size: 11px; font-weight: 600;">';
+                        echo '<span class="bw-altc-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_altc_id" data-value="' . esc_attr($altc_id) . '" style="display: inline-block; padding: 3px 8px; background: #e7f5fe; color: #00a0d2; border-radius: 3px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Click to edit">';
                         echo esc_html($altc_term->name);
                         echo '</span>';
                     } else {
-                        echo '<span style="color: #999;">—</span>';
+                        echo '<span class="bw-altc-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_altc_id" data-value="" style="color: #999; cursor: pointer;" title="Click to set">—</span>';
                     }
                 } else {
-                    echo '<span style="color: #999;">—</span>';
+                    echo '<span class="bw-altc-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_altc_id" data-value="" style="color: #999; cursor: pointer;" title="Click to set">—</span>';
                 }
                 break;
 
@@ -89,27 +94,29 @@ class BW_ALTC_Admin_Columns {
                 if ($topic_id) {
                     $topic_term = get_term($topic_id, 'altc_topic');
                     if ($topic_term && !is_wp_error($topic_term)) {
+                        echo '<span class="bw-topic-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_topic_id" data-value="' . esc_attr($topic_id) . '" style="cursor: pointer; text-decoration: underline dotted;" title="Click to edit">';
                         echo esc_html($topic_term->name);
+                        echo '</span>';
                     } else {
                         // Fallback to old bw_page_topic if exists
                         $old_topic = get_post_meta($post_id, 'bw_page_topic', true);
                         if ($old_topic) {
-                            echo '<span style="color: #999; font-style: italic;">';
+                            echo '<span class="bw-topic-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_topic_id" data-value="" style="color: #999; font-style: italic; cursor: pointer;" title="Click to migrate to taxonomy">';
                             echo esc_html($old_topic);
                             echo '</span>';
                         } else {
-                            echo '<span style="color: #999;">—</span>';
+                            echo '<span class="bw-topic-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_topic_id" data-value="" style="color: #999; cursor: pointer;" title="Click to set">—</span>';
                         }
                     }
                 } else {
                     // Fallback to old bw_page_topic if exists
                     $old_topic = get_post_meta($post_id, 'bw_page_topic', true);
                     if ($old_topic) {
-                        echo '<span style="color: #999; font-style: italic;">';
+                        echo '<span class="bw-topic-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_topic_id" data-value="" style="color: #999; font-style: italic; cursor: pointer;" title="Click to migrate to taxonomy">';
                         echo esc_html($old_topic);
                         echo '</span>';
                     } else {
-                        echo '<span style="color: #999;">—</span>';
+                        echo '<span class="bw-topic-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_primary_topic_id" data-value="" style="color: #999; cursor: pointer;" title="Click to set">—</span>';
                     }
                 }
                 break;
@@ -147,11 +154,11 @@ class BW_ALTC_Admin_Columns {
 
                     $color = isset($colors[$maturity]) ? $colors[$maturity] : ['bg' => '#f3f4f6', 'color' => '#374151'];
 
-                    echo '<span style="display: inline-block; padding: 3px 8px; background: ' . esc_attr($color['bg']) . '; color: ' . esc_attr($color['color']) . '; border-radius: 3px; font-size: 11px; font-weight: 600;">';
+                    echo '<span class="bw-maturity-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_cont_maturity" data-value="' . esc_attr($maturity) . '" style="display: inline-block; padding: 3px 8px; background: ' . esc_attr($color['bg']) . '; color: ' . esc_attr($color['color']) . '; border-radius: 3px; font-size: 11px; font-weight: 600; cursor: pointer;" title="Click to edit">';
                     echo esc_html($label);
                     echo '</span>';
                 } else {
-                    echo '<span style="color: #999;">—</span>';
+                    echo '<span class="bw-maturity-editable" data-post="' . esc_attr($post_id) . '" data-field="bw_cont_maturity" data-value="" style="color: #999; cursor: pointer;" title="Click to set">—</span>';
                 }
                 break;
         }
@@ -330,6 +337,332 @@ class BW_ALTC_Admin_Columns {
         if (!empty($meta_query)) {
             $query->set('meta_query', $meta_query);
         }
+    }
+
+    /**
+     * Enqueue inline edit scripts
+     */
+    public static function enqueue_inline_edit_scripts($hook) {
+        if ($hook !== 'edit.php') {
+            return;
+        }
+
+        $screen = get_current_screen();
+        if (!$screen || !in_array($screen->post_type, BW_ALTC_Taxonomies::get_supported_post_types(), true)) {
+            return;
+        }
+
+        // Get ALTC terms
+        $altc_terms = get_terms([
+            'taxonomy' => 'altc_strategic_lens',
+            'hide_empty' => false,
+            'parent' => 0,
+        ]);
+
+        // Get topic terms
+        $topic_terms = get_terms([
+            'taxonomy' => 'altc_topic',
+            'hide_empty' => false,
+        ]);
+
+        $maturity_options = BW_ALTC_Taxonomies::get_maturity_options();
+
+        // Prepare data for JavaScript
+        $altc_data = [];
+        if (!is_wp_error($altc_terms)) {
+            foreach ($altc_terms as $term) {
+                $altc_data[$term->term_id] = $term->name;
+            }
+        }
+
+        $topic_data = [];
+        if (!is_wp_error($topic_terms)) {
+            foreach ($topic_terms as $term) {
+                $topic_data[$term->term_id] = $term->name;
+            }
+        }
+
+        wp_register_script('bw-altc-inline-edit', false, ['jquery'], '1.0', true);
+        wp_add_inline_script('bw-altc-inline-edit', '(function($){
+            const nonce = "' . esc_js(wp_create_nonce('bw_altc_inline_edit')) . '";
+            const altcOptions = ' . wp_json_encode($altc_data) . ';
+            const topicOptions = ' . wp_json_encode($topic_data) . ';
+            const maturityOptions = ' . wp_json_encode($maturity_options) . ';
+
+            function saveField(postId, field, value) {
+                return $.post(ajaxurl, {
+                    action: "bw_altc_save_column",
+                    post_id: postId,
+                    field: field,
+                    value: value,
+                    _ajax_nonce: nonce
+                });
+            }
+
+            // ALTC dropdown
+            $(document).on("click", ".bw-altc-editable", function(e) {
+                e.preventDefault();
+                const $span = $(this);
+                const postId = $span.data("post");
+                const current = $span.data("value") || "";
+
+                const $select = $("<select>", {
+                    class: "bw-altc-dropdown",
+                    "data-post": postId,
+                    css: { fontSize: "11px" }
+                });
+
+                $select.append($("<option>", { value: "", text: "-- Select ALTC --" }));
+                $.each(altcOptions, function(id, name) {
+                    $select.append($("<option>", {
+                        value: id,
+                        text: name,
+                        selected: id == current
+                    }));
+                });
+
+                $span.replaceWith($select);
+                $select.focus();
+            });
+
+            $(document).on("change blur", ".bw-altc-dropdown", function(e) {
+                const $select = $(this);
+                const postId = $select.data("post");
+                const value = $select.val();
+
+                $select.prop("disabled", true);
+                saveField(postId, "bw_primary_altc_id", value).done(function(resp) {
+                    if (resp && resp.success) {
+                        location.reload();
+                    } else {
+                        alert("Save failed");
+                        $select.prop("disabled", false).focus();
+                    }
+                });
+            });
+
+            // Topic dropdown
+            $(document).on("click", ".bw-topic-editable", function(e) {
+                e.preventDefault();
+                const $span = $(this);
+                const postId = $span.data("post");
+                const current = $span.data("value") || "";
+
+                const $select = $("<select>", {
+                    class: "bw-topic-dropdown",
+                    "data-post": postId
+                });
+
+                $select.append($("<option>", { value: "", text: "-- Select Topic --" }));
+                $.each(topicOptions, function(id, name) {
+                    $select.append($("<option>", {
+                        value: id,
+                        text: name,
+                        selected: id == current
+                    }));
+                });
+
+                $span.replaceWith($select);
+                $select.focus();
+            });
+
+            $(document).on("change blur", ".bw-topic-dropdown", function(e) {
+                const $select = $(this);
+                const postId = $select.data("post");
+                const value = $select.val();
+
+                $select.prop("disabled", true);
+                saveField(postId, "bw_primary_topic_id", value).done(function(resp) {
+                    if (resp && resp.success) {
+                        location.reload();
+                    } else {
+                        alert("Save failed");
+                        $select.prop("disabled", false).focus();
+                    }
+                });
+            });
+
+            // Maturity dropdown
+            $(document).on("click", ".bw-maturity-editable", function(e) {
+                e.preventDefault();
+                const $span = $(this);
+                const postId = $span.data("post");
+                const current = $span.data("value") || "";
+
+                const $select = $("<select>", {
+                    class: "bw-maturity-dropdown",
+                    "data-post": postId,
+                    css: { fontSize: "11px" }
+                });
+
+                $.each(maturityOptions, function(val, label) {
+                    $select.append($("<option>", {
+                        value: val,
+                        text: label,
+                        selected: val === current
+                    }));
+                });
+
+                $span.replaceWith($select);
+                $select.focus();
+            });
+
+            $(document).on("change blur", ".bw-maturity-dropdown", function(e) {
+                const $select = $(this);
+                const postId = $select.data("post");
+                const value = $select.val();
+
+                $select.prop("disabled", true);
+                saveField(postId, "bw_cont_maturity", value).done(function(resp) {
+                    if (resp && resp.success) {
+                        location.reload();
+                    } else {
+                        alert("Save failed");
+                        $select.prop("disabled", false).focus();
+                    }
+                });
+            });
+
+        })(jQuery);');
+        wp_enqueue_script('bw-altc-inline-edit');
+    }
+
+    /**
+     * AJAX handler for saving column values
+     */
+    public static function ajax_save_column() {
+        check_ajax_referer('bw_altc_inline_edit');
+
+        $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
+        $field = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
+        $value = isset($_POST['value']) ? wp_unslash($_POST['value']) : '';
+
+        if (!$post_id || !current_user_can('edit_post', $post_id)) {
+            wp_send_json_error('No permission');
+        }
+
+        $allowed = ['bw_primary_altc_id', 'bw_primary_topic_id', 'bw_cont_maturity'];
+        if (!in_array($field, $allowed, true)) {
+            wp_send_json_error('Invalid field');
+        }
+
+        if (in_array($field, ['bw_primary_altc_id', 'bw_primary_topic_id'], true)) {
+            $value = absint($value);
+        } else {
+            $value = sanitize_text_field($value);
+        }
+
+        update_post_meta($post_id, $field, $value);
+        wp_send_json_success(true);
+    }
+
+    /**
+     * Add quick edit fields
+     */
+    public static function quick_edit_fields($column, $post_type) {
+        if (!in_array($column, ['bw_altc', 'bw_altc_topic', 'bw_altc_maturity'], true)) {
+            return;
+        }
+        if (!in_array($post_type, BW_ALTC_Taxonomies::get_supported_post_types(), true)) {
+            return;
+        }
+
+        // Get terms
+        $altc_terms = get_terms([
+            'taxonomy' => 'altc_strategic_lens',
+            'hide_empty' => false,
+            'parent' => 0,
+        ]);
+
+        $topic_terms = get_terms([
+            'taxonomy' => 'altc_topic',
+            'hide_empty' => false,
+        ]);
+
+        $maturity_options = BW_ALTC_Taxonomies::get_maturity_options();
+
+        ?>
+        <fieldset class="inline-edit-col-left">
+            <div class="inline-edit-col">
+                <?php if ($column === 'bw_altc'): ?>
+                    <label><span class="title">ALTC Strategic Lens</span>
+                        <select name="bw_primary_altc_id">
+                            <option value="">-- Select ALTC --</option>
+                            <?php if (!is_wp_error($altc_terms)): ?>
+                                <?php foreach ($altc_terms as $term): ?>
+                                    <option value="<?php echo esc_attr($term->term_id); ?>">
+                                        <?php echo esc_html($term->name); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </label>
+                <?php elseif ($column === 'bw_altc_topic'): ?>
+                    <label><span class="title">Primary Topic</span>
+                        <select name="bw_primary_topic_id">
+                            <option value="">-- Select Topic --</option>
+                            <?php if (!is_wp_error($topic_terms)): ?>
+                                <?php foreach ($topic_terms as $term): ?>
+                                    <option value="<?php echo esc_attr($term->term_id); ?>">
+                                        <?php echo esc_html($term->name); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </label>
+                <?php elseif ($column === 'bw_altc_maturity'): ?>
+                    <label><span class="title">Content Maturity</span>
+                        <select name="bw_cont_maturity">
+                            <?php foreach ($maturity_options as $value => $label): ?>
+                                <option value="<?php echo esc_attr($value); ?>">
+                                    <?php echo esc_html($label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                <?php endif; ?>
+            </div>
+        </fieldset>
+        <?php
+    }
+
+    /**
+     * Add bulk edit fields (same as quick edit)
+     */
+    public static function bulk_edit_fields($column, $post_type) {
+        self::quick_edit_fields($column, $post_type);
+    }
+
+    /**
+     * JavaScript to populate quick edit fields
+     */
+    public static function quick_edit_javascript() {
+        $screen = get_current_screen();
+        if (!$screen || !in_array($screen->post_type, BW_ALTC_Taxonomies::get_supported_post_types(), true)) {
+            return;
+        }
+        ?>
+        <script>
+        jQuery(function($) {
+            var $qe = inlineEditPost.edit;
+            inlineEditPost.edit = function(id) {
+                $qe.apply(this, arguments);
+                var postId = (typeof id === 'object') ? this.getId(id) : id;
+                var $row = $('#post-' + postId);
+
+                // Get values from data attributes
+                var altcId = $row.find('.bw-altc-editable').data('value') || '';
+                var topicId = $row.find('.bw-topic-editable').data('value') || '';
+                var maturity = $row.find('.bw-maturity-editable').data('value') || '';
+
+                // Set quick edit values
+                $('select[name="bw_primary_altc_id"]', '.inline-edit-row').val(altcId);
+                $('select[name="bw_primary_topic_id"]', '.inline-edit-row').val(topicId);
+                $('select[name="bw_cont_maturity"]', '.inline-edit-row').val(maturity);
+            };
+        });
+        </script>
+        <?php
     }
 }
 

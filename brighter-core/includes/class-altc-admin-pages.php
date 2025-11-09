@@ -210,6 +210,85 @@ class BW_ALTC_Admin_Pages {
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
+
+            <?php
+            // Unassigned Content Section
+            $unassigned_data = self::get_unassigned_content_by_post_type();
+            if (!empty($unassigned_data)):
+            ?>
+                <h2 style="margin-top: 40px;"><?php esc_html_e('Content Without ALTC Assignment', 'brighterwebsites'); ?></h2>
+                <p><?php esc_html_e('Content that has not been assigned to an ALTC strategic lens yet.', 'brighterwebsites'); ?></p>
+
+                <div class="bw-altc-cards">
+                    <?php foreach ($unassigned_data as $data): ?>
+                        <div class="bw-altc-card" style="border-left: 3px solid #d63638;">
+                            <div class="bw-altc-card-header">
+                                <h3><?php echo esc_html($data['label'] . ' - No ALTC Assigned'); ?></h3>
+                                <div class="meta">
+                                    <?php
+                                    printf(
+                                        esc_html__('%d content items', 'brighterwebsites'),
+                                        $data['content_count']
+                                    );
+                                    ?>
+                                </div>
+                            </div>
+
+                            <div class="bw-altc-card-body">
+                                <h4><?php esc_html_e('Topics in this post type:', 'brighterwebsites'); ?></h4>
+                                <?php if (!empty($data['topics'])): ?>
+                                    <ul class="bw-altc-topics-list">
+                                        <?php foreach ($data['topics'] as $topic): ?>
+                                            <li>
+                                                <?php echo esc_html($topic['name']); ?>
+                                                <span style="color: #999; font-size: 12px;">(<?php echo absint($topic['count']); ?>)</span>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php else: ?>
+                                    <p style="color: #999; font-style: italic;"><?php esc_html_e('No topics assigned yet', 'brighterwebsites'); ?></p>
+                                <?php endif; ?>
+
+                                <div class="bw-altc-maturity-bars">
+                                    <h4><?php esc_html_e('Content Maturity Distribution:', 'brighterwebsites'); ?></h4>
+                                    <?php foreach ($data['maturity_distribution'] as $level => $count): ?>
+                                        <?php
+                                        $percentage = $data['content_count'] > 0 ? ($count / $data['content_count']) * 100 : 0;
+                                        $label = BW_ALTC_Taxonomies::get_maturity_options()[$level] ?? $level;
+                                        ?>
+                                        <div class="bw-altc-maturity-bar">
+                                            <div class="bw-altc-maturity-bar-label">
+                                                <span><?php echo esc_html($label); ?></span>
+                                                <span><?php echo absint($count); ?> (<?php echo number_format($percentage, 1); ?>%)</span>
+                                            </div>
+                                            <div class="bw-altc-maturity-bar-track">
+                                                <div class="bw-altc-maturity-bar-fill" style="width: <?php echo esc_attr($percentage); ?>%;"></div>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+
+                                <div class="bw-altc-ratio">
+                                    <div class="bw-altc-ratio-item">
+                                        <div class="bw-altc-ratio-value"><?php echo absint($data['pillar_count']); ?></div>
+                                        <div class="bw-altc-ratio-label"><?php esc_html_e('Pillars', 'brighterwebsites'); ?></div>
+                                    </div>
+                                    <div class="bw-altc-ratio-item">
+                                        <div class="bw-altc-ratio-value"><?php echo absint($data['supporting_count']); ?></div>
+                                        <div class="bw-altc-ratio-label"><?php esc_html_e('Supporting', 'brighterwebsites'); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bw-altc-card-footer">
+                                <a href="<?php echo esc_url(admin_url('edit.php?post_type=' . $data['post_type'] . '&bw_filter_altc=0')); ?>" class="button button-primary">
+                                    <?php esc_html_e('View Content', 'brighterwebsites'); ?>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -440,40 +519,32 @@ class BW_ALTC_Admin_Pages {
                 }
             }
 
-            // Get topics for this ALTC
+            // Get topics for this ALTC by querying posts
+            // This automatically shows topics that are actually being used
             $topics = [];
-            $topic_terms = get_terms([
-                'taxonomy' => 'altc_topic',
-                'hide_empty' => false,
-            ]);
+            $topic_counts = [];
 
-            foreach ($topic_terms as $topic_term) {
-                $serves_altc = get_term_meta($topic_term->term_id, 'topic_serves_altc', true);
-                if (is_array($serves_altc) && in_array($term->term_id, $serves_altc)) {
-                    // Count posts with this topic
-                    $topic_posts = get_posts([
-                        'post_type' => BW_ALTC_Taxonomies::get_supported_post_types(),
-                        'posts_per_page' => -1,
-                        'post_status' => 'any',
-                        'meta_query' => [
-                            [
-                                'key' => 'bw_primary_topic_id',
-                                'value' => $topic_term->term_id,
-                                'compare' => '=',
-                            ],
-                            [
-                                'key' => 'bw_primary_altc_id',
-                                'value' => $term->term_id,
-                                'compare' => '=',
-                            ],
-                        ],
-                        'fields' => 'ids',
-                    ]);
+            foreach ($posts as $post_id) {
+                $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
+                if ($topic_id) {
+                    if (!isset($topic_counts[$topic_id])) {
+                        $topic_counts[$topic_id] = 0;
+                    }
+                    $topic_counts[$topic_id]++;
+                }
+            }
 
+            // Sort topics by count (descending)
+            arsort($topic_counts);
+
+            // Get term names and build topics array
+            foreach ($topic_counts as $topic_id => $count) {
+                $topic_term = get_term($topic_id, 'altc_topic');
+                if ($topic_term && !is_wp_error($topic_term)) {
                     $topics[] = [
                         'term_id' => $topic_term->term_id,
                         'name' => $topic_term->name,
-                        'count' => count($topic_posts),
+                        'count' => $count,
                     ];
                 }
             }
@@ -645,6 +716,116 @@ class BW_ALTC_Admin_Pages {
         } else {
             return 'green';
         }
+    }
+
+    /**
+     * Get unassigned content by post type
+     */
+    private static function get_unassigned_content_by_post_type() {
+        $post_types = BW_ALTC_Taxonomies::get_supported_post_types();
+        $unassigned_data = [];
+
+        foreach ($post_types as $post_type) {
+            // Get post type object for label
+            $pt_obj = get_post_type_object($post_type);
+            $label = $pt_obj ? $pt_obj->labels->name : $post_type;
+
+            // Get posts without ALTC assignment
+            $posts = get_posts([
+                'post_type' => $post_type,
+                'posts_per_page' => -1,
+                'post_status' => ['publish', 'draft'],
+                'meta_query' => [
+                    'relation' => 'OR',
+                    [
+                        'key' => 'bw_primary_altc_id',
+                        'compare' => 'NOT EXISTS',
+                    ],
+                    [
+                        'key' => 'bw_primary_altc_id',
+                        'value' => '',
+                        'compare' => '=',
+                    ],
+                    [
+                        'key' => 'bw_primary_altc_id',
+                        'value' => '0',
+                        'compare' => '=',
+                    ],
+                ],
+            ]);
+
+            if (empty($posts)) {
+                continue;
+            }
+
+            $content_count = count($posts);
+
+            // Get topic distribution for unassigned content
+            $topic_counts = [];
+            $maturity_distribution = [
+                'entry' => 0,
+                'learner' => 0,
+                'professional' => 0,
+                'expert' => 0,
+                'thought_leader' => 0,
+                'industry_authority' => 0,
+            ];
+            $pillar_count = 0;
+            $supporting_count = 0;
+
+            foreach ($posts as $post) {
+                // Topics
+                $topic_id = get_post_meta($post->ID, 'bw_primary_topic_id', true);
+                if ($topic_id) {
+                    if (!isset($topic_counts[$topic_id])) {
+                        $topic_counts[$topic_id] = 0;
+                    }
+                    $topic_counts[$topic_id]++;
+                }
+
+                // Maturity
+                $maturity = get_post_meta($post->ID, 'bw_cont_maturity', true);
+                if (isset($maturity_distribution[$maturity])) {
+                    $maturity_distribution[$maturity]++;
+                }
+
+                // Purpose
+                $purpose = get_post_meta($post->ID, 'bw_purpose', true);
+                if ($purpose === 'pillar') {
+                    $pillar_count++;
+                } else {
+                    $supporting_count++;
+                }
+            }
+
+            // Sort topics by count
+            arsort($topic_counts);
+
+            // Get topic names
+            $topics = [];
+            foreach ($topic_counts as $topic_id => $count) {
+                $topic_term = get_term($topic_id, 'altc_topic');
+                if ($topic_term && !is_wp_error($topic_term)) {
+                    $topics[] = [
+                        'term_id' => $topic_term->term_id,
+                        'name' => $topic_term->name,
+                        'count' => $count,
+                    ];
+                }
+            }
+
+            $unassigned_data[] = [
+                'post_type' => $post_type,
+                'label' => $label,
+                'content_count' => $content_count,
+                'topics' => $topics,
+                'maturity_distribution' => $maturity_distribution,
+                'pillar_count' => $pillar_count,
+                'supporting_count' => $supporting_count,
+            ];
+        }
+
+        return $unassigned_data;
     }
 }
 

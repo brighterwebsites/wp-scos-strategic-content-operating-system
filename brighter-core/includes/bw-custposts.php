@@ -55,7 +55,7 @@ add_filter('register_taxonomy_args', function($args, $taxonomy) {
     $args['show_ui']             = true;
     $args['show_in_menu']        = true;
     $args['show_in_nav_menus']   = false;
-    $args['show_admin_column']   = true;
+    $args['show_admin_column']   = false;
     $args['show_in_quick_edit']  = true;
     $args['show_tagcloud']       = false;
     $args['show_in_rest']        = true;
@@ -140,7 +140,7 @@ if (is_admin()) {
         if ($col !== 'pagetype') return;
         $terms = get_the_terms($post_id, 'pagetype');
         if (is_wp_error($terms) || empty($terms)) {
-            echo '—';
+            echo 'ï¿½';
             return;
         }
         echo esc_html(join(', ', wp_list_pluck($terms, 'name')));

@@ -35,10 +35,15 @@ add_action('wp_head', function() {
 /**
  * PART 1: Inline Core Script (Essential tracking)
  * Only runs if consent given
+ *
+ * PERFORMANCE NOTES:
+ * - Inline = No HTTP request (FAST)
+ * - Not minified = Readable for debugging (comments add ~1KB, negligible)
+ * - Excluded from optimization plugins for reliability
  */
 add_action('wp_head', function() {
     ?>
-    <script>
+    <script data-no-optimize="1" data-cfasync="false">
     (function() {
         'use strict';
 
@@ -187,15 +192,37 @@ function hasConsent() {
 add_action('wp_enqueue_scripts', function() {
     $handle = 'brighter-ga4-enhanced';
     $src = content_url('mu-plugins/brighter-core/js/brighter-ga4-enhanced.js');
-    
+
     // Load in footer with defer
     wp_enqueue_script($handle, $src, [], '5.0.0', true);
     
     // Add defer attribute
     add_filter('script_loader_tag', function($tag, $h) use ($handle) {
-        if ($h === $handle && strpos($tag, 'defer') === false) {
-            $tag = str_replace('<script', '<script defer', $tag);
+        if ($h === $handle) {
+            if (strpos($tag, 'defer') === false) {
+                $tag = str_replace('<script', '<script defer', $tag);
+            }
+            // Exclude from optimization plugins (LiteSpeed, Autoptimize, etc.)
+            if (strpos($tag, 'data-no-optimize') === false) {
+                $tag = str_replace('<script', '<script data-no-optimize="1" data-cfasync="false"', $tag);
+            }
         }
         return $tag;
     }, 10, 2);
 }, 99);
+
+/**
+ * CACHE PLUGIN CONFIGURATION
+ *
+ * For LiteSpeed Cache:
+ * - Go to LiteSpeed Cache → Page Optimization → JS Settings
+ * - Add to "JS Excludes": brighter-ga4
+ * - This ensures tracking scripts are not combined/minified
+ *
+ * For Autoptimize:
+ * - The data-no-optimize="1" attribute automatically excludes these scripts
+ *
+ * For WP Rocket:
+ * - Go to Settings → File Optimization → JavaScript
+ * - Add to "Excluded JavaScript Files": brighter-ga4
+ */

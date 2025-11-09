@@ -69,6 +69,10 @@ function brighter_get_whitelisted_modules() {
             'class-altc-admin-pages',
             'class-altc-ga4-integration',
             'class-altc-migration',
+            // Content Analysis
+            'class-content-analysis',
+            'class-column-toggles',
+            'class-field-tooltips',
         ];
     }
 

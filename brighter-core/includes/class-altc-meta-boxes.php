@@ -174,8 +174,15 @@ class BW_ALTC_Meta_Boxes {
             <label for="bw_cont_maturity">
                 <?php esc_html_e('Content Maturity', 'brighterwebsites'); ?>
                 <span class="required">*</span>
+                <span class="dashicons dashicons-editor-help bw-tooltip-icon"
+                      data-tooltip-type="maturity"
+                      data-current-value="<?php echo esc_attr($content_maturity); ?>"></span>
             </label>
-            <select id="bw_cont_maturity" name="bw_cont_maturity" required>
+            <select id="bw_cont_maturity"
+                    name="bw_cont_maturity"
+                    class="bw-field-with-tooltip"
+                    data-tooltip-type="maturity"
+                    required>
                 <?php foreach ($maturity_options as $value => $label): ?>
                     <option value="<?php echo esc_attr($value); ?>" <?php selected($content_maturity, $value); ?>>
                         <?php echo esc_html($label); ?>

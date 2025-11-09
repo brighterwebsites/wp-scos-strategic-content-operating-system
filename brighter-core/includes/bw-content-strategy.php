@@ -177,6 +177,12 @@ add_action('admin_init', function() {
                     $new['bw_index']   = 'Index Status';
                     $new['bw_pillar']  = 'Pillar';
                     $new['bw_notes']   = 'Notes';
+                    // Stats columns
+                    $new['bw_word_count']     = 'Words';
+                    $new['bw_images']         = 'Images';
+                    $new['bw_h2s']            = 'H2s';
+                    $new['bw_internal_links'] = 'Int Links';
+                    $new['bw_external_links'] = 'Ext Links';
                 }
             }
             return $new;
@@ -258,9 +264,37 @@ add_action('admin_init', function() {
     $display_notes = mb_strlen($notes) > 60 
         ? mb_substr($notes, 0, 60) . '�' 
         : $notes;
-    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">' 
+    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">'
          . esc_html($display_notes) . '</span>';
-    break;            }
+    break;
+
+                // Stats columns
+                case 'bw_word_count':
+                    $count = get_post_meta($post_id, 'bw_word_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . number_format($count) . '</span>' : '<span style="color:#999;">—</span>';
+                    break;
+
+                case 'bw_images':
+                    $count = get_post_meta($post_id, 'bw_image_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">—</span>';
+                    break;
+
+                case 'bw_h2s':
+                    $count = get_post_meta($post_id, 'bw_h2_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">—</span>';
+                    break;
+
+                case 'bw_internal_links':
+                    $count = get_post_meta($post_id, 'bw_internal_link_count', true);
+                    $color = $count > 5 ? '#16a34a' : ($count > 2 ? '#ca8a04' : '#dc2626');
+                    echo $count ? '<span style="color:' . esc_attr($color) . ';font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#dc2626;font-weight:600;">0</span>';
+                    break;
+
+                case 'bw_external_links':
+                    $count = get_post_meta($post_id, 'bw_external_link_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">0</span>';
+                    break;
+            }
         }, 10, 2);
     }
 });
@@ -276,6 +310,12 @@ foreach (['post', 'page'] as $pt) {
         $cols['bw_opt']     = '_brt_opt_status';
         $cols['bw_index']   = 'bw_index_status';
         $cols['bw_pillar']  = 'bw_pillar_page_id';
+        // Stats columns
+        $cols['bw_word_count']     = 'bw_word_count';
+        $cols['bw_images']         = 'bw_image_count';
+        $cols['bw_h2s']            = 'bw_h2_count';
+        $cols['bw_internal_links'] = 'bw_internal_link_count';
+        $cols['bw_external_links'] = 'bw_external_link_count';
         return $cols;
     });
 }
@@ -283,9 +323,17 @@ foreach (['post', 'page'] as $pt) {
 add_action('pre_get_posts', function($q) {
     if (!is_admin() || !$q->is_main_query()) return;
     $orderby = $q->get('orderby');
+
+    // Text-based meta fields
     if (in_array($orderby, ['bw_page_topic', 'bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
+    }
+
+    // Numeric meta fields (stats)
+    if (in_array($orderby, ['bw_word_count', 'bw_image_count', 'bw_h2_count', 'bw_internal_link_count', 'bw_external_link_count'], true)) {
+        $q->set('meta_key', $orderby);
+        $q->set('orderby', 'meta_value_num');
     }
 });
 
@@ -824,32 +872,34 @@ function bw_cs_render_metabox($post) {
         <p class="bw-cs-help">Main topic/theme of this content</p>
     </div>
     
-    <div class="bw-cs-field">
-        <label for="bw_intent">Intent</label>
-        <select id="bw_intent" name="bw_intent">
-            <?php foreach (bw_cs_intent_options() as $key => $label): ?>
-                <option value="<?php echo esc_attr($key); ?>" <?php selected($intent, $key); ?>>
-                    <?php echo esc_html($label); ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <p class="bw-cs-help">User search intent</p>
-    </div>
-    
-    <div class="bw-cs-field">
-        <label for="bw_purpose">Purpose</label>
-        <select id="bw_purpose" name="bw_purpose">
-            <?php foreach (bw_cs_purpose_options() as $key => $label): ?>
-                <option value="<?php echo esc_attr($key); ?>" <?php selected($purpose, $key); ?>>
-                    <?php echo esc_html($label); ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <p class="bw-cs-help">Content purpose in strategy</p>
-        <p class="bw-cs-help" style="margin-top: 6px; padding: 8px; background: #e7f5fe; border-left: 3px solid #00a0d2;">
-            <strong>💡 Tip:</strong> Diversifying content types (case studies, resource guides, etc.) within a topic reduces cannibalization risk.
-        </p>
-    </div>
+    <?php
+    // Intent field with tooltip
+    BW_Field_Tooltips::render_field_with_tooltip(
+        'bw_intent',
+        'bw_intent',
+        'Intent',
+        $intent,
+        bw_cs_intent_options(),
+        'intent'
+    );
+    ?>
+    <p class="bw-cs-help">User search intent</p>
+
+    <?php
+    // Purpose field with tooltip
+    BW_Field_Tooltips::render_field_with_tooltip(
+        'bw_purpose',
+        'bw_purpose',
+        'Purpose',
+        $purpose,
+        bw_cs_purpose_options(),
+        'purpose'
+    );
+    ?>
+    <p class="bw-cs-help">Content purpose in strategy</p>
+    <p class="bw-cs-help" style="margin-top: 6px; padding: 8px; background: #e7f5fe; border-left: 3px solid #00a0d2;">
+        <strong>💡 Tip:</strong> Diversifying content types (case studies, resource guides, etc.) within a topic reduces cannibalization risk.
+    </p>
     
     <div class="bw-cs-field">
         <label for="bw_pillar_page_id">Pillar Page</label>

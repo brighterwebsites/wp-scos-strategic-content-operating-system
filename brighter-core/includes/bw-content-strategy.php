@@ -114,7 +114,7 @@ function bw_cs_purpose_options() {
 
 function bw_cs_opt_status_options() {
     return [
-        ''              => ['label' => '— No status —',	    'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
+        ''              => ['label' => 'ï¿½ No status ï¿½',	    'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
         'none'          => ['label' => 'Not Optimised', 'color' => '#9d174d', 'bg' => '#fce7f3'],  // Pink: Queued, low priority start
          // --- Workflow Stages (In Progress) ---
         'idea'          => ['label' => 'Idea', 	        	'color' => '#4f46e5', 'bg' => '#eef2ff'],   // Indigo: Planning Phase
@@ -216,7 +216,7 @@ add_action('admin_init', function() {
                     $notes = get_post_meta($post_id, 'bw_notes', true);
     // Manual truncation that's more reliable with special characters
     $display_notes = mb_strlen($notes) > 60 
-        ? mb_substr($notes, 0, 60) . '…' 
+        ? mb_substr($notes, 0, 60) . 'ï¿½' 
         : $notes;
     echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">' 
          . esc_html($display_notes) . '</span>';
@@ -492,7 +492,7 @@ foreach ($pillar_pages as $p) {
             $select.prop("disabled", true);
             saveField(postId, "bw_pillar_page_id", value).done(function(resp) {
                 if (resp && resp.success) {
-                    const label = pillarOpts[value] || "—";
+                    const label = pillarOpts[value] || "ï¿½";
                     const $span = $("<span>", {
                         class: "bw-cs-pillar",
                         "data-post": postId,
@@ -770,6 +770,9 @@ function bw_cs_render_metabox($post) {
             <?php endforeach; ?>
         </select>
         <p class="bw-cs-help">Content purpose in strategy</p>
+        <p class="bw-cs-help" style="margin-top: 6px; padding: 8px; background: #e7f5fe; border-left: 3px solid #00a0d2;">
+            <strong>ðŸ’¡ Tip:</strong> Diversifying content types (case studies, resource guides, etc.) within a topic reduces cannibalization risk.
+        </p>
     </div>
     
     <div class="bw-cs-field">

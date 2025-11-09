@@ -1,10 +1,36 @@
 <?php
 /**
- * Brighter GA4 Tracking Loader - OPTIMIZED
- * Version: 2.2.0 - Works with SEOPress GA4
- * 
- * Note: SEOPress loads gtag.js, we just add enhanced tracking
+ * Brighter GA4 Tracking Loader
+ * Version: 3.0.0 - Standalone GA4 implementation
+ *
+ * Loads GA4 tracking with our configured measurement ID
+ * Falls back to SEOPress if present
  */
+
+/**
+ * PART 0: Load gtag.js with our GA4 measurement ID (GDPR-compliant)
+ */
+add_action('wp_head', function() {
+    // Get GA4 measurement ID from our settings
+    $ga4_id = get_option('brighter_ga4_measurement_id', '');
+
+    // Skip if no ID configured
+    if (empty($ga4_id)) {
+        echo "<!-- Brighter GA4: No measurement ID configured. Visit Support → Analytics to configure. -->\n";
+        return;
+    }
+
+    // Pass GA4 ID to JavaScript for consent-based loading
+    ?>
+    <!-- Google Analytics 4 - Brighter Core -->
+    <script>
+        window.brighterGA4 = {
+            measurementId: '<?php echo esc_js($ga4_id); ?>',
+            loaded: false
+        };
+    </script>
+    <?php
+}, 5); // Priority 5 = loads early
 
 /**
  * PART 1: Inline Core Script (Essential tracking)
@@ -20,47 +46,68 @@ add_action('wp_head', function() {
     <script data-no-optimize="1" data-cfasync="false">
     (function() {
         'use strict';
-        
+
         // -------------------------------------------------------
         // UNIVERSAL CONSENT CHECK
         // -------------------------------------------------------
-        
+
 function hasConsent() {
     const cookie = document.cookie;
-    
+
     // SEOPress - check for =1 OR =true
     if (cookie.indexOf('seopress-user-consent-accept=1') !== -1) return true;
     if (cookie.indexOf('seopress-user-consent-accept=true') !== -1) return true;
-    
+
     // Cookie Notice
     if (cookie.indexOf('cookie_notice_accepted=true') !== -1) return true;
-    
+
     // GDPR Cookie Consent
     if (cookie.indexOf('viewed_cookie_policy=yes') !== -1) return true;
-    
+
     // Complianz
     if (cookie.indexOf('cmplz_consented_services') !== -1) return true;
-    
+
     // CookieYes
     if (cookie.indexOf('cookieyes-consent=yes') !== -1) return true;
-    
+
     return false;
-}        
-        // Exit if no consent
-        if (!hasConsent()) {
-            console.log('?? GA4 Enhanced: Waiting for cookie consent');
-            return;
-        }
-        
-        // Wait for gtag to be loaded by SEOPress
-        function initTracking() {
-            if (typeof window.gtag !== 'function') {
-                // gtag not ready yet, try again in 100ms
-                setTimeout(initTracking, 100);
+}
+
+        function initializeTracking() {
+            // Exit if no consent
+            if (!hasConsent()) {
+                console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
                 return;
             }
-            
-            console.log('? GA4 Enhanced: Consent granted, tracking active');
+
+            // Load gtag.js if we have a measurement ID
+            if (window.brighterGA4 && !window.brighterGA4.loaded) {
+                const script = document.createElement('script');
+                script.async = true;
+                script.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.brighterGA4.measurementId;
+                document.head.appendChild(script);
+
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                window.gtag = gtag;
+                gtag('js', new Date());
+                gtag('config', window.brighterGA4.measurementId, {
+                    'send_page_view': false  // We'll send it ourselves with custom params
+                });
+
+                window.brighterGA4.loaded = true;
+                console.log('✅ GA4 Loaded: ' + window.brighterGA4.measurementId);
+            }
+
+            // Wait for gtag to be ready
+            function initTracking() {
+                if (typeof window.gtag !== 'function') {
+                    // gtag not ready yet, try again in 100ms
+                    setTimeout(initTracking, 100);
+                    return;
+                }
+
+                console.log('✅ GA4 Enhanced: Consent granted, tracking active');
             
             // -------------------------------------------------------
             // CORE TRACKING (Inline)
@@ -114,10 +161,26 @@ function hasConsent() {
                 }
             }, { passive: true });
         }
-        
+
         // Start initialization
         initTracking();
-        
+    }
+
+    // Try to initialize immediately (if consent cookie already exists)
+    initializeTracking();
+
+    // Listen for SEOPress consent event (fires when user clicks "accept")
+    document.addEventListener('seopress_analytics_cookies_accepted', function() {
+        console.log('🍪 SEOPress consent granted - initializing GA4');
+        initializeTracking();
+    });
+
+    // Also listen for generic consent events from other plugins
+    document.addEventListener('cookie_consent_accepted', function() {
+        console.log('🍪 Cookie consent granted - initializing GA4');
+        initializeTracking();
+    });
+
     })();
     </script>
     <?php
@@ -131,9 +194,9 @@ add_action('wp_enqueue_scripts', function() {
     $src = content_url('mu-plugins/brighter-core/js/brighter-ga4-enhanced.js');
 
     // Load in footer with defer
-    wp_enqueue_script($handle, $src, [], '2.2.0', true);
-
-    // Add defer attribute and cache plugin exclusions
+    wp_enqueue_script($handle, $src, [], '5.0.0', true);
+    
+    // Add defer attribute
     add_filter('script_loader_tag', function($tag, $h) use ($handle) {
         if ($h === $handle) {
             if (strpos($tag, 'defer') === false) {

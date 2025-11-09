@@ -1,41 +1,43 @@
 <?php
 /**
  * GA4 Event Seeder - Low Traffic Site Edition
- * 
+ *
  * FOR LOW-VOLUME, HIGH-TICKET SITES (< 50 visitors/week)
- * 
+ *
  * Purpose: Pre-register all event names in GA4 on initial setup
  * Trigger: ?seedEvents=true (admin only, runs once)
- * 
+ *
  * This creates a complete event taxonomy immediately so you can:
  * - Mark conversions from day 1
  * - Set up proper attribution
  * - Track rare high-value events
- * 
+ *
  * Safe for production - marks all events clearly as seed data
  */
 
-// Only run for admins
-if (!is_user_logged_in() || !current_user_can('manage_options')) {
-    return;
-}
+// Wrap everything in template_redirect hook to ensure WordPress is fully loaded
+add_action('template_redirect', function() {
+    // Only run for admins
+    if (!is_user_logged_in() || !current_user_can('manage_options')) {
+        return;
+    }
 
-// Only run when explicitly requested
-if (!isset($_GET['seedEvents']) || $_GET['seedEvents'] !== 'true') {
-    return;
-}
+    // Only run when explicitly requested
+    if (!isset($_GET['seedEvents']) || $_GET['seedEvents'] !== 'true') {
+        return;
+    }
 
-// Check if already seeded (store in transient for 30 days)
-$seeded_flag = get_transient('brighter_ga4_events_seeded');
-if ($seeded_flag) {
-    add_action('admin_notices', function() {
-        echo '<div class="notice notice-success"><p>';
-        echo '<strong>GA4 Events Already Seeded</strong><br>';
-        echo 'Events were registered on ' . get_transient('brighter_ga4_seed_date');
-        echo '</p></div>';
-    });
-    return;
-}
+    // Check if already seeded (store in transient for 30 days)
+    $seeded_flag = get_transient('brighter_ga4_events_seeded');
+    if ($seeded_flag) {
+        add_action('admin_notices', function() {
+            echo '<div class="notice notice-success"><p>';
+            echo '<strong>GA4 Events Already Seeded</strong><br>';
+            echo 'Events were registered on ' . get_transient('brighter_ga4_seed_date');
+            echo '</p></div>';
+        });
+        return;
+    }
 
 // Add notice in admin bar
 add_action('wp_footer', function() {
@@ -152,17 +154,30 @@ add_action('wp_footer', function() {
         setTimeout(() => {
             const params = getBaseParams();
             params.event_category = event.category;
-            
+
+            // Add lead hierarchy parameters for form-related events
+            if (event.name === 'generate_lead' || event.name === 'form_submit') {
+                params.lead_tier = 'warm';
+                params.lead_type = 'contact_form';
+                params.form_type = 'contact_form';
+                params.form_fields = 3;
+                params.form_id = 'seed_test_form';
+                params.cta_label = 'Seed Test CTA';
+                params.cta_location = 'seed';
+                params.cta_type = 'main';
+                params.element_location = 'above_fold';
+            }
+
             gtag('event', event.name, params);
             count++;
-            
-            console.log(`? Seeded: ${event.name} (${event.category})`);
-            
+
+            console.log(`✓ Seeded: ${event.name} (${event.category})`);
+
             // Summary when done
             if (count === eventsToSeed.length) {
-                console.log(`%c?? Seeded ${count} events`, 'background: #4CAF50; color: white; padding: 6px 12px; font-weight: bold;');
-                console.log('Check GA4 ? Realtime ? Events in ~30 seconds');
-                console.log('Then go to Admin ? Events to mark conversions');
+                console.log(`%c✅ Seeded ${count} events`, 'background: #4CAF50; color: white; padding: 6px 12px; font-weight: bold;');
+                console.log('Check GA4 → Realtime → Events in ~30 seconds');
+                console.log('Then go to Admin → Events to mark conversions');
             }
         }, index * 100); // 100ms between events
     });
@@ -170,4 +185,5 @@ add_action('wp_footer', function() {
 </script>
 <?php
 }, 999);
-?>
+
+}); // End template_redirect wrapper

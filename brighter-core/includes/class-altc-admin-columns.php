@@ -38,6 +38,9 @@ class BW_ALTC_Admin_Columns {
         $post_types = BW_ALTC_Taxonomies::get_supported_post_types();
 
         foreach ($post_types as $post_type) {
+            // Prime meta cache BEFORE columns render
+            add_action("manage_{$post_type}_posts_custom_column", [__CLASS__, 'prime_meta_cache'], 1, 2);
+
             // Add columns
             add_filter("manage_{$post_type}_posts_columns", [__CLASS__, 'add_columns']);
             add_action("manage_{$post_type}_posts_custom_column", [__CLASS__, 'display_column'], 10, 2);
@@ -46,6 +49,27 @@ class BW_ALTC_Admin_Columns {
 
         // Handle sorting
         add_action('pre_get_posts', [__CLASS__, 'sort_columns']);
+    }
+
+    /**
+     * Prime meta cache for all posts in list
+     * This prevents N+1 query problem
+     */
+    public static function prime_meta_cache($column, $post_id) {
+        static $primed = false;
+
+        // Only prime once per request
+        if ($primed) return;
+        $primed = true;
+
+        // Get all post IDs on current page
+        global $wp_query;
+        if (!isset($wp_query->posts) || empty($wp_query->posts)) return;
+
+        $post_ids = wp_list_pluck($wp_query->posts, 'ID');
+
+        // Prime meta cache for all ALTC-related meta keys
+        update_meta_cache('post', $post_ids);
     }
 
     /**
@@ -711,9 +735,8 @@ class BW_ALTC_Admin_Columns {
 }
 
 // Initialize
-// TEMPORARILY DISABLED - Causing performance issues (140+ queries from get_post_meta calls)
-// Need to add meta cache priming before re-enabling
-// BW_ALTC_Admin_Columns::init();
+// Re-enabled with meta cache priming to prevent N+1 query problem
+BW_ALTC_Admin_Columns::init();
 
 // Add CSS for column widths
 add_action('admin_head', function() {

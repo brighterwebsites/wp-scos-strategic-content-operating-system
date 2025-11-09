@@ -880,31 +880,29 @@ function bw_cs_render_metabox($post) {
         <input type="text" id="bw_page_topic" name="bw_page_topic" value="<?php echo esc_attr($topic); ?>" placeholder="e.g., Web Design, SEO">
         <p class="bw-cs-help">Main topic/theme of this content</p>
     </div>
-    
-    <?php
-    // Intent field with tooltip
-    BW_Field_Tooltips::render_field_with_tooltip(
-        'bw_intent',
-        'bw_intent',
-        'Intent',
-        $intent,
-        bw_cs_intent_options(),
-        'intent'
-    );
-    ?>
+
+    <div class="bw-cs-field">
+        <label for="bw_intent">Intent</label>
+        <select id="bw_intent" name="bw_intent" style="width:100%;">
+            <?php foreach (bw_cs_intent_options() as $value => $label): ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($intent, $value); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
     <p class="bw-cs-help">User search intent</p>
 
-    <?php
-    // Purpose field with tooltip
-    BW_Field_Tooltips::render_field_with_tooltip(
-        'bw_purpose',
-        'bw_purpose',
-        'Purpose',
-        $purpose,
-        bw_cs_purpose_options(),
-        'purpose'
-    );
-    ?>
+    <div class="bw-cs-field">
+        <label for="bw_purpose">Purpose</label>
+        <select id="bw_purpose" name="bw_purpose" style="width:100%;">
+            <?php foreach (bw_cs_purpose_options() as $value => $label): ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($purpose, $value); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
     <p class="bw-cs-help">Content purpose in strategy</p>
     <p class="bw-cs-help" style="margin-top: 6px; padding: 8px; background: #e7f5fe; border-left: 3px solid #00a0d2;">
         <strong>💡 Tip:</strong> Diversifying content types (case studies, resource guides, etc.) within a topic reduces cannibalization risk.

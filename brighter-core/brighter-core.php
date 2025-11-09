@@ -71,6 +71,7 @@ function brighter_get_whitelisted_modules() {
             'class-altc-migration',
             // Content Analysis
             'class-content-analysis',
+            'class-content-analysis-seeder',
             'class-column-toggles',
             'class-field-tooltips',
         ];

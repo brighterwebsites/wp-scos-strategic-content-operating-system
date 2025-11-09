@@ -20,8 +20,9 @@ class BW_Content_Analysis {
      * Initialize content analysis
      */
     public static function init() {
-        // TEMPORARILY DISABLED - Debugging performance issue
-        // add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
+        // Re-enabled: Only runs on individual post save, not on admin list
+        // This analyzes one post at a time when saved, not all posts at once
+        add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
     }
 
     /**

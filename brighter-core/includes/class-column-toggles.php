@@ -43,7 +43,7 @@ class BW_Column_Toggles {
         if (!is_array($hidden_groups)) $hidden_groups = [];
 
         ?>
-        <div class="bw-column-toggles" style="float: left; margin: 0 10px 0 0;">
+        <div class="bw-column-toggles" style="display: block !important; float: left; margin: 10px 10px 10px 0; padding: 10px; background: #f0f0f1; border: 2px solid #0073aa;">
             <button type="button" class="button bw-toggle-group <?php echo in_array('content-opt', $hidden_groups) ? '' : 'button-primary'; ?>" data-group="content-opt" title="Toggle Content Optimization columns">
                 Content Opt
             </button>

@@ -174,6 +174,7 @@ add_action('admin_init', function() {
                     $new['bw_intent']  = 'Intent';
                     $new['bw_purpose'] = 'Purpose';
                     $new['bw_opt']     = 'Optimization';
+                    $new['bw_index']   = 'Index Status';
                     $new['bw_pillar']  = 'Pillar';
                     $new['bw_notes']   = 'Notes';
                 }
@@ -216,7 +217,23 @@ add_action('admin_init', function() {
                         esc_html($cfg['label'])
                     );
                     break;
-                    
+
+                case 'bw_index':
+                    $val = get_post_meta($post_id, 'bw_index_status', true);
+                    $opts = bw_cs_index_status_options();
+                    $label = $opts[$val] ?? 'Not Set';
+                    $colors = [
+                        'indexed' => ['color' => '#047857', 'bg' => '#d1fae5'],
+                        'crawled' => ['color' => '#0369a1', 'bg' => '#e0f2fe'],
+                        'discovered' => ['color' => '#b45309', 'bg' => '#fef3c7'],
+                        'issue' => ['color' => '#dc2626', 'bg' => '#fee2e2'],
+                        '' => ['color' => '#6b7280', 'bg' => '#f3f4f6']
+                    ];
+                    $color = $colors[$val] ?? $colors[''];
+                    echo '<span class="bw-cs-select" data-post="' . esc_attr($post_id) . '" data-field="bw_index_status" style="display:inline-block;border-radius:3px;padding:3px 8px;font-size:11px;font-weight:600;color:' . esc_attr($color['color']) . ';background:' . esc_attr($color['bg']) . ';cursor:pointer;">'
+                         . esc_html($label) . '</span>';
+                    break;
+
 		// LOCATION 1: In the admin column display (around line 160)
 		case 'bw_pillar':
   		  $id = get_post_meta($post_id, 'bw_pillar_page_id', true);
@@ -257,6 +274,7 @@ foreach (['post', 'page'] as $pt) {
         $cols['bw_intent']  = 'bw_intent';
         $cols['bw_purpose'] = 'bw_purpose';
         $cols['bw_opt']     = '_brt_opt_status';
+        $cols['bw_index']   = 'bw_index_status';
         $cols['bw_pillar']  = 'bw_pillar_page_id';
         return $cols;
     });
@@ -265,7 +283,7 @@ foreach (['post', 'page'] as $pt) {
 add_action('pre_get_posts', function($q) {
     if (!is_admin() || !$q->is_main_query()) return;
     $orderby = $q->get('orderby');
-    if (in_array($orderby, ['bw_page_topic', 'bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_pillar_page_id'], true)) {
+    if (in_array($orderby, ['bw_page_topic', 'bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
     }
@@ -572,7 +590,7 @@ add_action('wp_ajax_bw_cs_save_field', function() {
         wp_send_json_error('No permission');
     }
     
-    $allowed = ['bw_notes', 'bw_page_topic', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status'];
+    $allowed = ['bw_notes', 'bw_page_topic', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status', 'bw_index_status'];
     if (!in_array($field, $allowed, true)) {
         wp_send_json_error('Invalid field');
     }
@@ -594,7 +612,7 @@ add_action('quick_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 add_action('bulk_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 
 function bw_cs_quick_bulk_box($col, $post_type) {
-    if (!in_array($col, ['bw_topic', 'bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt'], true)) return;
+    if (!in_array($col, ['bw_topic', 'bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt', 'bw_index'], true)) return;
     if (!in_array($post_type, bw_cs_post_types(), true)) return;
     
     $pillar_pages = get_posts([
@@ -675,6 +693,14 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                         <?php endforeach; ?>
                     </select>
                 </label>
+            <?php elseif ($col === 'bw_index'): ?>
+                <label><span class="title">Index Status</span>
+                    <select name="bw_index_status">
+                        <?php foreach (bw_cs_index_status_options() as $key => $label): ?>
+                            <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
             <?php endif; ?>
         </div>
     </fieldset>
@@ -709,6 +735,11 @@ add_action('admin_footer-edit.php', function() {
             
             var optVal = $row.find('.bw-opt-badge').data('value') || '';
             $('select[name="_brt_opt_status"]', '.inline-edit-row').val(optVal);
+
+            var indexStatus = $row.find('.bw-cs-select[data-field="bw_index_status"]').text().trim();
+            $('select[name="bw_index_status"] option', '.inline-edit-row').filter(function() {
+                return $(this).text() === indexStatus;
+            }).prop('selected', true);
         };
     });
     </script>

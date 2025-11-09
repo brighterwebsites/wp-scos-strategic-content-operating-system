@@ -380,9 +380,10 @@ class BW_ALTC_Admin_Pages {
                     <div class="bw-altc-topic-meta">
                         <?php
                         printf(
-                            esc_html__('Base Risk: %s%% | Purpose Diversity: %d types | Final Risk: %s%%', 'brighterwebsites'),
+                            esc_html__('Base Risk: %s%% | Purpose Diversity: %d types | Intent Diversity: %d types | Final Risk: %s%%', 'brighterwebsites'),
                             number_format($topic['base_risk'], 1),
                             $topic['purpose_diversity_count'],
+                            $topic['intent_diversity_count'],
                             number_format($topic['final_risk'], 1)
                         );
                         ?>
@@ -407,6 +408,21 @@ class BW_ALTC_Admin_Pages {
                             ?>
                             <li class="bw-altc-purpose-item">
                                 <strong><?php echo esc_html($purpose_label); ?>:</strong> <?php echo absint($count); ?> <?php echo absint($count) === 1 ? esc_html__('article', 'brighterwebsites') : esc_html__('articles', 'brighterwebsites'); ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+
+                <div class="bw-altc-purpose-breakdown">
+                    <h4><?php esc_html_e('Intent Breakdown:', 'brighterwebsites'); ?></h4>
+                    <ul class="bw-altc-purpose-list">
+                        <?php foreach ($topic['intent_breakdown'] as $intent => $count): ?>
+                            <?php
+                            $intent_options = bw_cs_intent_options();
+                            $intent_label = isset($intent_options[$intent]) ? $intent_options[$intent] : $intent;
+                            ?>
+                            <li class="bw-altc-purpose-item">
+                                <strong><?php echo esc_html($intent_label); ?>:</strong> <?php echo absint($count); ?> <?php echo absint($count) === 1 ? esc_html__('article', 'brighterwebsites') : esc_html__('articles', 'brighterwebsites'); ?>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -615,11 +631,13 @@ class BW_ALTC_Admin_Pages {
             // Calculate base risk
             $base_risk = $total_count > 0 ? ($post_count / $total_count) * 100 : 0;
 
-            // Get purpose breakdown
+            // Get purpose and intent breakdown
             $purpose_breakdown = [];
+            $intent_breakdown = [];
             $content_data = [];
 
             foreach ($posts as $post) {
+                // Purpose tracking
                 $purpose = get_post_meta($post->ID, 'bw_purpose', true);
                 if (empty($purpose)) {
                     $purpose = 'not_set';
@@ -629,6 +647,17 @@ class BW_ALTC_Admin_Pages {
                     $purpose_breakdown[$purpose] = 0;
                 }
                 $purpose_breakdown[$purpose]++;
+
+                // Intent tracking
+                $intent = get_post_meta($post->ID, 'bw_intent', true);
+                if (empty($intent)) {
+                    $intent = 'not_set';
+                }
+
+                if (!isset($intent_breakdown[$intent])) {
+                    $intent_breakdown[$intent] = 0;
+                }
+                $intent_breakdown[$intent]++;
 
                 // Get pillar info
                 $pillar_id = get_post_meta($post->ID, 'bw_pillar_page_id', true);
@@ -641,23 +670,33 @@ class BW_ALTC_Admin_Pages {
                     'ID' => $post->ID,
                     'post_title' => $post->post_title,
                     'purpose' => $purpose,
-                    'intent' => get_post_meta($post->ID, 'bw_intent', true),
+                    'intent' => $intent,
                     'pillar_title' => $pillar_title,
                 ];
             }
 
-            // Calculate purpose diversity
+            // Calculate purpose diversity modifier
             $purpose_count = count($purpose_breakdown);
-            $diversity_modifier = 1.0;
+            $purpose_modifier = 1.0;
 
             if ($purpose_count >= 4) {
-                $diversity_modifier = 0.6;
+                $purpose_modifier = 0.6;
             } elseif ($purpose_count >= 2) {
-                $diversity_modifier = 0.8;
+                $purpose_modifier = 0.8;
             }
 
-            // Calculate final risk
-            $final_risk = $base_risk * $diversity_modifier;
+            // Calculate intent diversity modifier
+            $intent_count = count($intent_breakdown);
+            $intent_modifier = 1.0;
+
+            if ($intent_count >= 5) {
+                $intent_modifier = 0.8;
+            } elseif ($intent_count >= 3) {
+                $intent_modifier = 0.9;
+            }
+
+            // Calculate final risk with both modifiers
+            $final_risk = $base_risk * $purpose_modifier * $intent_modifier;
 
             // Get ALTC names
             $altc_names = [];
@@ -677,9 +716,12 @@ class BW_ALTC_Admin_Pages {
                 'post_count' => $post_count,
                 'base_risk' => $base_risk,
                 'purpose_diversity_count' => $purpose_count,
-                'diversity_modifier' => $diversity_modifier,
+                'purpose_modifier' => $purpose_modifier,
+                'intent_diversity_count' => $intent_count,
+                'intent_modifier' => $intent_modifier,
                 'final_risk' => $final_risk,
                 'purpose_breakdown' => $purpose_breakdown,
+                'intent_breakdown' => $intent_breakdown,
                 'content' => $content_data,
                 'altc_names' => $altc_names,
             ];

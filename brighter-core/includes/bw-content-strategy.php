@@ -223,8 +223,13 @@ add_action('admin_init', function() {
   		  if ($id) {
     		    	$title = get_the_title($id);
        			$purpose = get_post_meta($id, 'bw_purpose', true);
-        		$type_label = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
-        		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">' 
+        		$type_labels = [
+        		    'service-page' => ' [Service]',
+        		    'product-page' => ' [Product]',
+        		    'pillar' => ' [Pillar]'
+        		];
+        		$type_label = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
+        		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">'
              			. esc_html($title . $type_label) . '</span>';
     	       } else {
         		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;color:#999;">Not Set</span>';
@@ -274,9 +279,9 @@ add_action('admin_enqueue_scripts', function($hook) {
     $screen = get_current_screen();
     if (!$screen || !in_array($screen->post_type, bw_cs_post_types(), true)) return;
     
-    // Get pillar pages for dropdown
+    // Get pillar pages for dropdown (all post types with qualifying purposes)
 $pillar_pages = get_posts([
-    'post_type'      => 'page',
+    'post_type'      => bw_cs_post_types(),
     'posts_per_page' => -1,
     'post_status'    => 'publish',
     'orderby'        => 'title',
@@ -292,6 +297,11 @@ $pillar_pages = get_posts([
             'key'     => 'bw_purpose',
             'value'   => 'service-page',
             'compare' => '='
+        ],
+        [
+            'key'     => 'bw_purpose',
+            'value'   => 'product-page',
+            'compare' => '='
         ]
     ]
 ]);
@@ -299,7 +309,12 @@ $pillar_pages = get_posts([
 $pillar_opts = ['0' => 'Not Set'];
 foreach ($pillar_pages as $p) {
     $purpose = get_post_meta($p->ID, 'bw_purpose', true);
-    $type = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
+    $type_labels = [
+        'service-page' => ' [Service]',
+        'product-page' => ' [Product]',
+        'pillar' => ' [Pillar]'
+    ];
+    $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
     $pillar_opts[$p->ID] = get_the_title($p) . $type;
 }
     
@@ -583,7 +598,7 @@ function bw_cs_quick_bulk_box($col, $post_type) {
     if (!in_array($post_type, bw_cs_post_types(), true)) return;
     
     $pillar_pages = get_posts([
-    'post_type' => 'page',
+    'post_type' => bw_cs_post_types(),
     'posts_per_page' => -1,
     'post_status' => 'publish',
     'orderby' => 'title',
@@ -598,6 +613,11 @@ function bw_cs_quick_bulk_box($col, $post_type) {
         [
             'key' => 'bw_purpose',
             'value' => 'service-page',
+            'compare' => '='
+        ],
+        [
+            'key' => 'bw_purpose',
+            'value' => 'product-page',
             'compare' => '='
         ]
     ]
@@ -632,9 +652,14 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                 <label><span class="title">Pillar Page</span>
                   <select name="bw_pillar_page_id">
     		     <option value="">Not Set</option>
-   		     <?php foreach ($pillar_pages as $p): 
+   		     <?php foreach ($pillar_pages as $p):
     			    $purpose = get_post_meta($p->ID, 'bw_purpose', true);
- 			    $type = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
+    			    $type_labels = [
+        			'service-page' => ' [Service]',
+        			'product-page' => ' [Product]',
+        			'pillar' => ' [Pillar]'
+    			    ];
+ 			    $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
     			?>
         			<option value="<?php echo esc_attr($p->ID); ?>">
            			 <?php echo esc_html(get_the_title($p) . $type); ?>
@@ -739,7 +764,7 @@ function bw_cs_render_metabox($post) {
     $opt = get_post_meta($post->ID, '_brt_opt_status', true);
     
     $pillar_pages = get_posts([
-    	'post_type' => 'page',
+    	'post_type' => bw_cs_post_types(),
     	'posts_per_page' => -1,
     	'post_status' => 'publish',
     	'orderby' => 'title',
@@ -747,9 +772,10 @@ function bw_cs_render_metabox($post) {
     	'meta_query' => [
         	'relation' => 'OR',
         	['key' => 'bw_purpose', 'value' => 'pillar', 'compare' => '='],
-        	['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '=']
+        	['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
+        	['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '=']
     	]
-	]);    
+	]);
 ?>
     <style>
         .bw-cs-field { margin-bottom: 12px; }
@@ -798,9 +824,14 @@ function bw_cs_render_metabox($post) {
         <label for="bw_pillar_page_id">Pillar Page</label>
 	<select id="bw_pillar_page_id" name="bw_pillar_page_id">
     		<option value="">Not Set</option>
-    		<?php foreach ($pillar_pages as $p): 
+    		<?php foreach ($pillar_pages as $p):
         		$purpose = get_post_meta($p->ID, 'bw_purpose', true);
-        		$type = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
+        		$type_labels = [
+        		    'service-page' => ' [Service]',
+        		    'product-page' => ' [Product]',
+        		    'pillar' => ' [Pillar]'
+        		];
+        		$type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
     		?>
         	<option value="<?php echo esc_attr($p->ID); ?>" <?php selected($pillar, $p->ID); ?>>
             <?php echo esc_html(get_the_title($p) . $type); ?>

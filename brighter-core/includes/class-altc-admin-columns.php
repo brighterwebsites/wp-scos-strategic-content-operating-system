@@ -28,6 +28,7 @@ class BW_ALTC_Admin_Columns {
         add_action('quick_edit_custom_box', [__CLASS__, 'quick_edit_fields'], 10, 2);
         add_action('bulk_edit_custom_box', [__CLASS__, 'bulk_edit_fields'], 10, 2);
         add_action('admin_footer-edit.php', [__CLASS__, 'quick_edit_javascript']);
+        add_action('save_post', [__CLASS__, 'save_quick_bulk_edit'], 10, 2);
     }
 
     /**
@@ -663,6 +664,49 @@ class BW_ALTC_Admin_Columns {
         });
         </script>
         <?php
+    }
+
+    /**
+     * Save quick edit and bulk edit values
+     */
+    public static function save_quick_bulk_edit($post_id, $post) {
+        // Check if this is an autosave or revision
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        // Check if this is a quick/bulk edit request
+        if (!isset($_REQUEST['_inline_edit']) && !isset($_REQUEST['bulk_edit'])) {
+            return;
+        }
+
+        // Check post type support
+        if (!in_array($post->post_type, BW_ALTC_Taxonomies::get_supported_post_types(), true)) {
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        // Save ALTC Strategic Lens
+        if (isset($_REQUEST['bw_primary_altc_id'])) {
+            $altc_id = absint($_REQUEST['bw_primary_altc_id']);
+            update_post_meta($post_id, 'bw_primary_altc_id', $altc_id);
+        }
+
+        // Save Primary Topic
+        if (isset($_REQUEST['bw_primary_topic_id'])) {
+            $topic_id = absint($_REQUEST['bw_primary_topic_id']);
+            update_post_meta($post_id, 'bw_primary_topic_id', $topic_id);
+        }
+
+        // Save Content Maturity
+        if (isset($_REQUEST['bw_cont_maturity'])) {
+            $maturity = sanitize_text_field($_REQUEST['bw_cont_maturity']);
+            update_post_meta($post_id, 'bw_cont_maturity', $maturity);
+        }
     }
 }
 

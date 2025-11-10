@@ -88,39 +88,18 @@ class BW_Content_Analysis_Seeder {
      * Get count of posts needing analysis
      */
     public static function get_pending_count() {
-        $count = wp_count_posts_by_meta([
-            'post_type' => bw_cs_post_types(),
-            'post_status' => ['publish', 'draft', 'pending', 'private'],
-            'meta_query' => [
-                'relation' => 'OR',
-                [
-                    'key' => '_bw_last_analyzed',
-                    'compare' => 'NOT EXISTS',
-                ],
-                [
-                    'key' => '_bw_last_analyzed',
-                    'value' => '',
-                    'compare' => '=',
-                ],
-            ],
-        ]);
+        global $wpdb;
+        $post_types = bw_cs_post_types();
+        $placeholders = implode(',', array_fill(0, count($post_types), '%s'));
 
-        // Fallback to slower query if helper doesn't exist
-        if (!function_exists('wp_count_posts_by_meta')) {
-            global $wpdb;
-            $post_types = bw_cs_post_types();
-            $placeholders = implode(',', array_fill(0, count($post_types), '%s'));
+        $sql = "SELECT COUNT(DISTINCT p.ID)
+                FROM {$wpdb->posts} p
+                LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_bw_last_analyzed'
+                WHERE p.post_type IN ($placeholders)
+                AND p.post_status IN ('publish', 'draft', 'pending', 'private')
+                AND (pm.post_id IS NULL OR pm.meta_value = '')";
 
-            $sql = "SELECT COUNT(DISTINCT p.ID)
-                    FROM {$wpdb->posts} p
-                    LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_bw_last_analyzed'
-                    WHERE p.post_type IN ($placeholders)
-                    AND p.post_status IN ('publish', 'draft', 'pending', 'private')
-                    AND (pm.post_id IS NULL OR pm.meta_value = '')";
-
-            $count = $wpdb->get_var($wpdb->prepare($sql, ...$post_types));
-        }
-
+        $count = $wpdb->get_var($wpdb->prepare($sql, ...$post_types));
         return absint($count);
     }
 

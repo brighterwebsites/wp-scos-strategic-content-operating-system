@@ -72,6 +72,7 @@ function brighter_get_whitelisted_modules() {
             // Content Analysis
             'class-content-analysis',
             'class-content-analysis-seeder',
+            'class-content-stats-page',
             'class-column-toggles',
             'class-field-tooltips',
         ];
@@ -177,6 +178,10 @@ function brighter_load_modules() {
         'class-altc-admin-pages',
         'class-altc-ga4-integration',
         'class-altc-migration',
+        // Content Analysis modules
+        'class-content-analysis',
+        'class-content-analysis-seeder',
+        'class-content-stats-page',
     ];
 
     // Admin-only modules (backend only, not frontend)
@@ -191,6 +196,9 @@ function brighter_load_modules() {
         'class-altc-admin-columns',
         'class-altc-admin-pages',
         'class-altc-migration',
+        // Content Analysis (admin-only)
+        'class-content-analysis-seeder',
+        'class-content-stats-page',
        // 'brighter-tweaks',
     ];
     

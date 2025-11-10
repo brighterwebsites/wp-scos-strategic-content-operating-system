@@ -988,8 +988,25 @@ add_action('save_post', function($post_id) {
 }, 10);
 
 /**
- * 
  * Injects content strategy metadata into GA4 tracking
+ *
+ * VERIFICATION: These custom dimensions ARE being sent to GA4
+ * ================================================================
+ * WordPress Meta Field → GA4 Parameter Name → Example Value
+ * ----------------------------------------------------------------
+ * bw_page_topic       → content_topic         → "SEO Services"
+ * bw_intent           → content_intent        → "informational"
+ * bw_purpose          → content_purpose       → "pillar"
+ * _brt_opt_status     → optimization_status   → "cro"
+ * bw_pillar_page_id   → pillar_page           → "About Us"
+ *
+ * These dimensions are automatically included in ALL GA4 events:
+ * - page_view events (brighter-ga4-enhanced.js:277)
+ * - click events (brighter-ga4-enhanced.js:204)
+ * - impression tracking (brighter-ga4-enhanced.js:229)
+ * - form interactions (brighter-ga4-enhanced.js:252, 262)
+ *
+ * The data flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
  */
 
 add_action('wp_head', function() {

@@ -55,7 +55,7 @@ add_filter('register_taxonomy_args', function($args, $taxonomy) {
     $args['show_ui']             = true;
     $args['show_in_menu']        = true;
     $args['show_in_nav_menus']   = false;
-    $args['show_admin_column']   = true;
+    $args['show_admin_column']   = false;
     $args['show_in_quick_edit']  = true;
     $args['show_tagcloud']       = false;
     $args['show_in_rest']        = true;
@@ -130,9 +130,21 @@ if (is_admin()) {
         }
     });
 
-
-	// Note: Admin column is automatically added via 'show_admin_column' => true in taxonomy registration
-	// No manual column registration needed - prevents duplicate column
+    // Admin column
+    add_filter('manage_pages_columns', function($cols) {
+        $cols['pagetype'] = esc_html__('Page Type', 'brighterwebsites');
+        return $cols;
+    });
+    
+    add_action('manage_pages_custom_column', function($col, $post_id) {
+        if ($col !== 'pagetype') return;
+        $terms = get_the_terms($post_id, 'pagetype');
+        if (is_wp_error($terms) || empty($terms)) {
+            echo '�';
+            return;
+        }
+        echo esc_html(join(', ', wp_list_pluck($terms, 'name')));
+    }, 10, 2);
 
     // Default term on new pages
     add_action('save_post_page', function($post_id, $post, $update) {

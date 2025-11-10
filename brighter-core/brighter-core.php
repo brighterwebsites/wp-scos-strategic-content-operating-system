@@ -1,12 +1,20 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.2.1
+ * Version: 4.3.0
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.3.0 - FEATURE: Added ALTC (Authority-Led Topic Clusters) content optimization tracking system
+ *         - New taxonomies: altc_strategic_lens, altc_topic
+ *         - New post meta: bw_primary_altc_id, bw_primary_topic_id, bw_cont_maturity
+ *         - ALTC Content Strategy meta box in post editor
+ *         - Admin columns and filters for ALTC data
+ *         - ALTC Overview Dashboard and Topic Breakdown pages with cannibalization risk analysis
+ *         - GA4 integration for ALTC parameters (altc_primary, altc_topic, content_maturity)
+ *         - Migration tool for bw_page_topic to taxonomy-based system
  * 4.2.1 - FIX: Direct module loading for reliability
  * 4.2.0 - SECURITY: Hardened SQL queries, added capability checks, input validation, XSS protection
  * 4.1.0 - Performance: Lazy loading, conditional module loading, optimized hooks
@@ -21,7 +29,7 @@ if (!defined('ABSPATH')) exit;
 //error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.2.1');
+define('BRIGHTER_CORE_VERSION', '4.3.0');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
@@ -54,6 +62,19 @@ function brighter_get_whitelisted_modules() {
             'bw-ga4-seed-admin',
             'bw-support-cache-dashbrd',
             'bw-faq',
+            // ALTC modules
+            'class-altc-taxonomies',
+            'class-altc-meta-boxes',
+            'class-altc-admin-columns',
+            'class-altc-admin-pages',
+            'class-altc-ga4-integration',
+            'class-altc-migration',
+            // Content Analysis
+            'class-content-analysis',
+            'class-content-analysis-seeder',
+            'class-content-stats-page',
+            'class-column-toggles',
+            'class-field-tooltips',
         ];
     }
 
@@ -150,6 +171,17 @@ function brighter_load_modules() {
  	'bw-ga4-seed-admin',
  	'bw-support-cache-dashbrd',
         'bw-faq',
+        // ALTC modules
+        'class-altc-taxonomies',
+        'class-altc-meta-boxes',
+        'class-altc-admin-columns',
+        'class-altc-admin-pages',
+        'class-altc-ga4-integration',
+        'class-altc-migration',
+        // Content Analysis modules
+        'class-content-analysis',
+        'class-content-analysis-seeder',
+        'class-content-stats-page',
     ];
 
     // Admin-only modules (backend only, not frontend)
@@ -159,6 +191,14 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         'custom-admin',
        	'bw-ga4-seed-admin',
+        // ALTC admin modules
+        'class-altc-meta-boxes',
+        'class-altc-admin-columns',
+        'class-altc-admin-pages',
+        'class-altc-migration',
+        // Content Analysis (admin-only)
+        'class-content-analysis-seeder',
+        'class-content-stats-page',
        // 'brighter-tweaks',
     ];
     

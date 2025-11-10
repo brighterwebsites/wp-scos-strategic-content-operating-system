@@ -51,6 +51,14 @@ add_action('init', function() {
         'show_in_rest'  => false,
         'auth_callback' => function() { return current_user_can('edit_posts'); },
     ]);
+
+    // Index status
+    register_post_meta('', 'bw_index_status', [
+        'type'          => 'string',
+        'single'        => true,
+        'show_in_rest'  => false,
+        'auth_callback' => function() { return current_user_can('edit_posts'); },
+    ]);
 });
 
 
@@ -112,6 +120,16 @@ function bw_cs_purpose_options() {
     ];
 }
 
+function bw_cs_index_status_options() {
+    return [
+        ''            => 'Not Set',
+        'indexed'     => 'Indexed',
+        'crawled'     => 'Crawled',
+        'discovered'  => 'Discovered',
+        'issue'       => 'Issue',
+    ];
+}
+
 function bw_cs_opt_status_options() {
     return [
         ''              => ['label' => '� No status �',	    'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
@@ -156,8 +174,17 @@ add_action('admin_init', function() {
                     $new['bw_intent']  = 'Intent';
                     $new['bw_purpose'] = 'Purpose';
                     $new['bw_opt']     = 'Optimization';
+                    $new['bw_index']   = 'Index Status';
                     $new['bw_pillar']  = 'Pillar';
                     $new['bw_notes']   = 'Notes';
+                    // Stats columns - TEMPORARILY DISABLED for performance testing
+                    // Each column makes get_post_meta() calls which causes query explosion
+                    // TODO: Add proper meta cache priming before re-enabling
+                    // $new['bw_word_count']     = 'Words';
+                    // $new['bw_images']         = 'Images';
+                    // $new['bw_h2s']            = 'H2s';
+                    // $new['bw_internal_links'] = 'Int Links';
+                    // $new['bw_external_links'] = 'Ext Links';
                 }
             }
             return $new;
@@ -198,15 +225,36 @@ add_action('admin_init', function() {
                         esc_html($cfg['label'])
                     );
                     break;
-                    
+
+                case 'bw_index':
+                    $val = get_post_meta($post_id, 'bw_index_status', true);
+                    $opts = bw_cs_index_status_options();
+                    $label = $opts[$val] ?? 'Not Set';
+                    $colors = [
+                        'indexed' => ['color' => '#047857', 'bg' => '#d1fae5'],
+                        'crawled' => ['color' => '#0369a1', 'bg' => '#e0f2fe'],
+                        'discovered' => ['color' => '#b45309', 'bg' => '#fef3c7'],
+                        'issue' => ['color' => '#dc2626', 'bg' => '#fee2e2'],
+                        '' => ['color' => '#6b7280', 'bg' => '#f3f4f6']
+                    ];
+                    $color = $colors[$val] ?? $colors[''];
+                    echo '<span class="bw-cs-select" data-post="' . esc_attr($post_id) . '" data-field="bw_index_status" style="display:inline-block;border-radius:3px;padding:3px 8px;font-size:11px;font-weight:600;color:' . esc_attr($color['color']) . ';background:' . esc_attr($color['bg']) . ';cursor:pointer;">'
+                         . esc_html($label) . '</span>';
+                    break;
+
 		// LOCATION 1: In the admin column display (around line 160)
 		case 'bw_pillar':
   		  $id = get_post_meta($post_id, 'bw_pillar_page_id', true);
   		  if ($id) {
     		    	$title = get_the_title($id);
        			$purpose = get_post_meta($id, 'bw_purpose', true);
-        		$type_label = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
-        		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">' 
+        		$type_labels = [
+        		    'service-page' => ' [Service]',
+        		    'product-page' => ' [Product]',
+        		    'pillar' => ' [Pillar]'
+        		];
+        		$type_label = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
+        		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">'
              			. esc_html($title . $type_label) . '</span>';
     	       } else {
         		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;color:#999;">Not Set</span>';
@@ -218,9 +266,39 @@ add_action('admin_init', function() {
     $display_notes = mb_strlen($notes) > 60 
         ? mb_substr($notes, 0, 60) . '�' 
         : $notes;
-    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">' 
+    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">'
          . esc_html($display_notes) . '</span>';
-    break;            }
+    break;
+
+                // Stats columns - TEMPORARILY DISABLED for performance testing
+                /*
+                case 'bw_word_count':
+                    $count = get_post_meta($post_id, 'bw_word_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . number_format($count) . '</span>' : '<span style="color:#999;">—</span>';
+                    break;
+
+                case 'bw_images':
+                    $count = get_post_meta($post_id, 'bw_image_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">—</span>';
+                    break;
+
+                case 'bw_h2s':
+                    $count = get_post_meta($post_id, 'bw_h2_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">—</span>';
+                    break;
+
+                case 'bw_internal_links':
+                    $count = get_post_meta($post_id, 'bw_internal_link_count', true);
+                    $color = $count > 5 ? '#16a34a' : ($count > 2 ? '#ca8a04' : '#dc2626');
+                    echo $count ? '<span style="color:' . esc_attr($color) . ';font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#dc2626;font-weight:600;">0</span>';
+                    break;
+
+                case 'bw_external_links':
+                    $count = get_post_meta($post_id, 'bw_external_link_count', true);
+                    echo $count ? '<span style="color:#2271b1;font-weight:600;">' . absint($count) . '</span>' : '<span style="color:#999;">0</span>';
+                    break;
+                */
+            }
         }, 10, 2);
     }
 });
@@ -234,7 +312,14 @@ foreach (['post', 'page'] as $pt) {
         $cols['bw_intent']  = 'bw_intent';
         $cols['bw_purpose'] = 'bw_purpose';
         $cols['bw_opt']     = '_brt_opt_status';
+        $cols['bw_index']   = 'bw_index_status';
         $cols['bw_pillar']  = 'bw_pillar_page_id';
+        // Stats columns - TEMPORARILY DISABLED
+        // $cols['bw_word_count']     = 'bw_word_count';
+        // $cols['bw_images']         = 'bw_image_count';
+        // $cols['bw_h2s']            = 'bw_h2_count';
+        // $cols['bw_internal_links'] = 'bw_internal_link_count';
+        // $cols['bw_external_links'] = 'bw_external_link_count';
         return $cols;
     });
 }
@@ -242,10 +327,20 @@ foreach (['post', 'page'] as $pt) {
 add_action('pre_get_posts', function($q) {
     if (!is_admin() || !$q->is_main_query()) return;
     $orderby = $q->get('orderby');
-    if (in_array($orderby, ['bw_page_topic', 'bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_pillar_page_id'], true)) {
+
+    // Text-based meta fields
+    if (in_array($orderby, ['bw_page_topic', 'bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
     }
+
+    // Numeric meta fields (stats) - TEMPORARILY DISABLED
+    /*
+    if (in_array($orderby, ['bw_word_count', 'bw_image_count', 'bw_h2_count', 'bw_internal_link_count', 'bw_external_link_count'], true)) {
+        $q->set('meta_key', $orderby);
+        $q->set('orderby', 'meta_value_num');
+    }
+    */
 });
 
 // ==========================
@@ -256,9 +351,9 @@ add_action('admin_enqueue_scripts', function($hook) {
     $screen = get_current_screen();
     if (!$screen || !in_array($screen->post_type, bw_cs_post_types(), true)) return;
     
-    // Get pillar pages for dropdown
+    // Get pillar pages for dropdown (all post types with qualifying purposes)
 $pillar_pages = get_posts([
-    'post_type'      => 'page',
+    'post_type'      => bw_cs_post_types(),
     'posts_per_page' => -1,
     'post_status'    => 'publish',
     'orderby'        => 'title',
@@ -274,6 +369,11 @@ $pillar_pages = get_posts([
             'key'     => 'bw_purpose',
             'value'   => 'service-page',
             'compare' => '='
+        ],
+        [
+            'key'     => 'bw_purpose',
+            'value'   => 'product-page',
+            'compare' => '='
         ]
     ]
 ]);
@@ -281,16 +381,22 @@ $pillar_pages = get_posts([
 $pillar_opts = ['0' => 'Not Set'];
 foreach ($pillar_pages as $p) {
     $purpose = get_post_meta($p->ID, 'bw_purpose', true);
-    $type = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
+    $type_labels = [
+        'service-page' => ' [Service]',
+        'product-page' => ' [Product]',
+        'pillar' => ' [Pillar]'
+    ];
+    $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
     $pillar_opts[$p->ID] = get_the_title($p) . $type;
 }
     
-    wp_register_script('bw-cs-inline', false, ['jquery'], '1.1', true);
+    wp_register_script('bw-cs-inline', false, ['jquery'], '1.2', true);
     wp_add_inline_script('bw-cs-inline', '(function($){
         const nonce = "' . esc_js(wp_create_nonce('bw_cs_inline')) . '";
         const intentOpts = ' . wp_json_encode(bw_cs_intent_options()) . ';
         const purposeOpts = ' . wp_json_encode(bw_cs_purpose_options()) . ';
         const optOpts = ' . wp_json_encode(bw_cs_opt_status_options()) . ';
+        const indexOpts = ' . wp_json_encode(bw_cs_index_status_options()) . ';
         const pillarOpts = ' . wp_json_encode($pillar_opts) . ';
         
         let activeRequest = null; // Track active AJAX request
@@ -359,13 +465,15 @@ foreach ($pillar_pages as $p) {
             });
         });
         
-        // Select fields (intent, purpose)
+        // Select fields (intent, purpose, index)
         $(document).on("click", ".bw-cs-select", function(e) {
             e.preventDefault();
             const $span = $(this);
             const postId = $span.data("post");
             const field = $span.data("field");
-            const opts = field === "bw_intent" ? intentOpts : purposeOpts;
+            let opts = purposeOpts; // default
+            if (field === "bw_intent") opts = intentOpts;
+            else if (field === "bw_index_status") opts = indexOpts;
             
             const $select = $("<select>", {
                 class: "bw-cs-dropdown",
@@ -539,7 +647,7 @@ add_action('wp_ajax_bw_cs_save_field', function() {
         wp_send_json_error('No permission');
     }
     
-    $allowed = ['bw_notes', 'bw_page_topic', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status'];
+    $allowed = ['bw_notes', 'bw_page_topic', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status', 'bw_index_status'];
     if (!in_array($field, $allowed, true)) {
         wp_send_json_error('Invalid field');
     }
@@ -561,11 +669,11 @@ add_action('quick_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 add_action('bulk_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 
 function bw_cs_quick_bulk_box($col, $post_type) {
-    if (!in_array($col, ['bw_topic', 'bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt'], true)) return;
+    if (!in_array($col, ['bw_topic', 'bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt', 'bw_index'], true)) return;
     if (!in_array($post_type, bw_cs_post_types(), true)) return;
     
     $pillar_pages = get_posts([
-    'post_type' => 'page',
+    'post_type' => bw_cs_post_types(),
     'posts_per_page' => -1,
     'post_status' => 'publish',
     'orderby' => 'title',
@@ -580,6 +688,11 @@ function bw_cs_quick_bulk_box($col, $post_type) {
         [
             'key' => 'bw_purpose',
             'value' => 'service-page',
+            'compare' => '='
+        ],
+        [
+            'key' => 'bw_purpose',
+            'value' => 'product-page',
             'compare' => '='
         ]
     ]
@@ -614,9 +727,14 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                 <label><span class="title">Pillar Page</span>
                   <select name="bw_pillar_page_id">
     		     <option value="">Not Set</option>
-   		     <?php foreach ($pillar_pages as $p): 
+   		     <?php foreach ($pillar_pages as $p):
     			    $purpose = get_post_meta($p->ID, 'bw_purpose', true);
- 			    $type = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
+    			    $type_labels = [
+        			'service-page' => ' [Service]',
+        			'product-page' => ' [Product]',
+        			'pillar' => ' [Pillar]'
+    			    ];
+ 			    $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
     			?>
         			<option value="<?php echo esc_attr($p->ID); ?>">
            			 <?php echo esc_html(get_the_title($p) . $type); ?>
@@ -629,6 +747,14 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                     <select name="_brt_opt_status">
                         <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($cfg['label']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            <?php elseif ($col === 'bw_index'): ?>
+                <label><span class="title">Index Status</span>
+                    <select name="bw_index_status">
+                        <?php foreach (bw_cs_index_status_options() as $key => $label): ?>
+                            <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -666,6 +792,11 @@ add_action('admin_footer-edit.php', function() {
             
             var optVal = $row.find('.bw-opt-badge').data('value') || '';
             $('select[name="_brt_opt_status"]', '.inline-edit-row').val(optVal);
+
+            var indexStatus = $row.find('.bw-cs-select[data-field="bw_index_status"]').text().trim();
+            $('select[name="bw_index_status"] option', '.inline-edit-row').filter(function() {
+                return $(this).text() === indexStatus;
+            }).prop('selected', true);
         };
     });
     </script>
@@ -684,6 +815,7 @@ add_action('save_post', function($post_id) {
         'bw_purpose'        => 'sanitize_text_field',
         'bw_pillar_page_id' => 'absint',
         '_brt_opt_status'   => 'sanitize_text_field',
+        'bw_index_status'   => 'sanitize_text_field',
     ];
     
     foreach ($fields as $key => $sanitizer) {
@@ -720,7 +852,7 @@ function bw_cs_render_metabox($post) {
     $opt = get_post_meta($post->ID, '_brt_opt_status', true);
     
     $pillar_pages = get_posts([
-    	'post_type' => 'page',
+    	'post_type' => bw_cs_post_types(),
     	'posts_per_page' => -1,
     	'post_status' => 'publish',
     	'orderby' => 'title',
@@ -728,9 +860,10 @@ function bw_cs_render_metabox($post) {
     	'meta_query' => [
         	'relation' => 'OR',
         	['key' => 'bw_purpose', 'value' => 'pillar', 'compare' => '='],
-        	['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '=']
+        	['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
+        	['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '=']
     	]
-	]);    
+	]);
 ?>
     <style>
         .bw-cs-field { margin-bottom: 12px; }
@@ -747,38 +880,46 @@ function bw_cs_render_metabox($post) {
         <input type="text" id="bw_page_topic" name="bw_page_topic" value="<?php echo esc_attr($topic); ?>" placeholder="e.g., Web Design, SEO">
         <p class="bw-cs-help">Main topic/theme of this content</p>
     </div>
-    
+
     <div class="bw-cs-field">
         <label for="bw_intent">Intent</label>
-        <select id="bw_intent" name="bw_intent">
-            <?php foreach (bw_cs_intent_options() as $key => $label): ?>
-                <option value="<?php echo esc_attr($key); ?>" <?php selected($intent, $key); ?>>
+        <select id="bw_intent" name="bw_intent" style="width:100%;">
+            <?php foreach (bw_cs_intent_options() as $value => $label): ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($intent, $value); ?>>
                     <?php echo esc_html($label); ?>
                 </option>
             <?php endforeach; ?>
         </select>
-        <p class="bw-cs-help">User search intent</p>
     </div>
-    
+    <p class="bw-cs-help">User search intent</p>
+
     <div class="bw-cs-field">
         <label for="bw_purpose">Purpose</label>
-        <select id="bw_purpose" name="bw_purpose">
-            <?php foreach (bw_cs_purpose_options() as $key => $label): ?>
-                <option value="<?php echo esc_attr($key); ?>" <?php selected($purpose, $key); ?>>
+        <select id="bw_purpose" name="bw_purpose" style="width:100%;">
+            <?php foreach (bw_cs_purpose_options() as $value => $label): ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($purpose, $value); ?>>
                     <?php echo esc_html($label); ?>
                 </option>
             <?php endforeach; ?>
         </select>
-        <p class="bw-cs-help">Content purpose in strategy</p>
     </div>
+    <p class="bw-cs-help">Content purpose in strategy</p>
+    <p class="bw-cs-help" style="margin-top: 6px; padding: 8px; background: #e7f5fe; border-left: 3px solid #00a0d2;">
+        <strong>💡 Tip:</strong> Diversifying content types (case studies, resource guides, etc.) within a topic reduces cannibalization risk.
+    </p>
     
     <div class="bw-cs-field">
         <label for="bw_pillar_page_id">Pillar Page</label>
 	<select id="bw_pillar_page_id" name="bw_pillar_page_id">
     		<option value="">Not Set</option>
-    		<?php foreach ($pillar_pages as $p): 
+    		<?php foreach ($pillar_pages as $p):
         		$purpose = get_post_meta($p->ID, 'bw_purpose', true);
-        		$type = ($purpose === 'service-page') ? ' [Service]' : ' [Pillar]';
+        		$type_labels = [
+        		    'service-page' => ' [Service]',
+        		    'product-page' => ' [Product]',
+        		    'pillar' => ' [Pillar]'
+        		];
+        		$type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
     		?>
         	<option value="<?php echo esc_attr($p->ID); ?>" <?php selected($pillar, $p->ID); ?>>
             <?php echo esc_html(get_the_title($p) . $type); ?>
@@ -798,7 +939,22 @@ function bw_cs_render_metabox($post) {
         </select>
         <p class="bw-cs-help">Internal tracking only</p>
     </div>
-    
+
+    <div class="bw-cs-field">
+        <label for="bw_index_status">Index Status</label>
+        <select id="bw_index_status" name="bw_index_status" style="width:100%;">
+            <?php
+            $index_status = get_post_meta($post->ID, 'bw_index_status', true);
+            foreach (bw_cs_index_status_options() as $key => $label):
+            ?>
+                <option value="<?php echo esc_attr($key); ?>" <?php selected($index_status, $key); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="bw-cs-help">Search engine indexing status</p>
+    </div>
+
     <div class="bw-cs-field">
         <label for="bw_notes">Notes</label>
         <textarea id="bw_notes" name="bw_notes" rows="3" placeholder="Internal notes..."><?php echo esc_textarea($notes); ?></textarea>
@@ -821,6 +977,7 @@ add_action('save_post', function($post_id) {
         'bw_purpose'        => 'sanitize_text_field',
         'bw_pillar_page_id' => 'absint',
         '_brt_opt_status'   => 'sanitize_text_field',
+        'bw_index_status'   => 'sanitize_text_field',
     ];
     
     foreach ($fields as $key => $sanitizer) {

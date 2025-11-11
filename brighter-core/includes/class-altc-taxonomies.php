@@ -36,7 +36,7 @@ class BW_ALTC_Taxonomies {
         ], 'names');
 
         // Exclude post types that shouldn't have ALTC
-        $exclude = ['attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation'];
+        $exclude = ['attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation', 'faq'];
 
         return array_values(array_diff($post_types, $exclude));
     }

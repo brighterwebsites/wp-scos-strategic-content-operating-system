@@ -123,42 +123,39 @@ function bw_cs_purpose_options() {
 function bw_cs_index_status_options() {
     return [
         ''            => 'Not Set',
-        'indexed'     => 'Indexed',
-        'crawled'     => 'Crawled',
-        'discovered'  => 'Discovered',
-        'issue'       => 'Issue',
+        'crawled'     => 'Crawled',      // Amber - Issue
+        'discovered'  => 'Discovered',   // Blue - Waiting
+        'indexed'     => 'Indexed',      // Dark Green
+        'requested'   => 'Requested',    // Teal - Waiting
+        'issue'       => 'Issue',        // Dark Red - Critical
     ];
 }
 
 function bw_cs_opt_status_options() {
     return [
-        ''              => ['label' => '� No status �',	    'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
-        'none'          => ['label' => 'Not Optimised', 'color' => '#9d174d', 'bg' => '#fce7f3'],  // Pink: Queued, low priority start
-         // --- Workflow Stages (In Progress) ---
-        'idea'          => ['label' => 'Idea', 	        	'color' => '#4f46e5', 'bg' => '#eef2ff'],   // Indigo: Planning Phase
-        'draft'         => ['label' => 'Draft', 	         'color' => '#374151', 'bg' => '#e5e7eb'],   // Dark Grey: 
-   	'ok'            => ['label' => 'No Action', 	         'color' => '#16a34a', 'bg' => '#dcfce7'],   // Green: Active Content Production
-                 // --- Performance & Action (Warning/Focus) ---
-        'attention'     => ['label' => 'Audit/Low Perf',	'color' => '#b91c1c', 'bg' => '#fee2e2'],   // Strong Red: High priority warning, something is broken/tanking.
-        'improve'       => ['label' => 'Improve', 	    'color' => '#ca8a04', 'bg' => '#fef9c3'],   // Yellow/Amber: Needs effort/refresh, but not critical
-      
-        
-        // --- Testing & Strategic Action ---
-        'cro'	        => ['label' => 'CRO Testing', 	    'color' => '#0e7490', 'bg' => '#cffafe'],   // Teal: Live A/B testing phase
-        'ctr'	        => ['label' => 'CTR Focus', 	    'color' => '#1d4ed8', 'bg' => '#eff6ff'],   // Blue: Optimising Meta/Title/Excerpts only
-        'seo'	        => ['label' => 'Tech/KW Focus', 	'color' => '#059669', 'bg' => '#d1fae5'],   // Darker Teal: Dedicated keyword/on-page cleanup
-        
-        // --- Performance Status (Green Zone) ---
-        'op90'          => ['label' => 'Optimised 90+', 	'color' => '#047857', 'bg' => '#d1fae5'],   // Deep Green: Top Performer (Neuron score)
-        'op80'          => ['label' => 'Optimised 80+', 	'color' => '#1e40af', 'bg' => '#dbeafe'],   // Dark Blue: Strong Performer
-        'op70'          => ['label' => 'Optimised 70+', 	'color' => '#b45309', 'bg' => '#fcefd5'],   // Orange: Acceptable, but below target - good candidate for 'Improve'
-       
- // --- Content Inventory Decisions (Archival) ---
-        'consolidate'   => ['label' => 'Consolidate', 		'color' => '#6b21a8', 'bg' => '#f3e8ff'],   // Purple: Merging with a stronger page
-        'repurpose'	=> ['label' => 'Repurpose', 		'color' => '#9a3412', 'bg' => '#ffedd5'],   // Brown: Change to social, video, or new post type
-        'leave'         => ['label' => 'Leave', 	        'color' => '#374151', 'bg' => '#e5e7eb'],   // Dark Grey: Zero action, low value/risk
+        ''              => ['label' => '� No status �', 'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
 
-    ];}
+        // --- Workflow Stages (In Progress) ---
+        'idea'          => ['label' => 'ℹ️ Idea', 'color' => '#4338ca', 'bg' => '#e0e7ff'],  // Indigo-700: Early planning / concept
+        'draft'         => ['label' => '🆕 Drafted', 'color' => '#4f46e5', 'bg' => '#eef2ff'],  // Indigo-600: In progress content, not yet ready for publishing
+
+        // --- Testing & Strategic Action ---
+        'cont'          => ['label' => '🧾 Content Only', 'color' => '#be185d', 'bg' => '#fce7f3'],  // Rose-700: Content done is published
+        'seo_basic'     => ['label' => '🚀 SEO Basic', 'color' => '#b45309', 'bg' => '#fef3c7'],  // Amber-700: Basic Onpage SEO is done
+        'cro'           => ['label' => '📲 Conversion', 'color' => '#1d4ed8', 'bg' => '#dbeafe'],  // Blue-700: Analytics/UX optimisation is done
+
+        // --- SEO Optimised Status (Green Zone) ---
+        'op60'          => ['label' => '⭐ Optimised 60+', 'color' => '#15803d', 'bg' => '#dcfce7'],  // Green-700: At or Above target NeuronWriter keyword optimised
+        'op70'          => ['label' => '🎯 Optimised 70+', 'color' => '#065f46', 'bg' => '#a7f3d0'],  // Emerald-800: Tech SEO Implemented
+        'op80'          => ['label' => '💎 Optimised 80+', 'color' => '#7e22ce', 'bg' => '#f3e8ff'],  // Purple-700: Tech SEO + Conversion
+
+        // --- Content Inventory Decisions (Archival) ---
+        'attention'     => ['label' => '📉 Low Perf', 'color' => '#9d174d', 'bg' => '#fbcfe8'],  // Rose-800: Low Performing + Needs investigation
+        'urgent'        => ['label' => '📌 Urgent Attention', 'color' => '#b91c1c', 'bg' => '#fee2e2'],  // Red-700: High Pri Low Performing any status
+        'ctr'           => ['label' => '🚩 Visibility', 'color' => '#0f766e', 'bg' => '#ccfbf1'],  // Teal-700: Pri for Meta and or Tech SEO Needs improvement + is planned
+        'repurpose'     => ['label' => '🔄 Repurpose', 'color' => '#b45309', 'bg' => '#fcefd5'],  // Pri for Content improvement + is planned
+    ];
+}
 
 // ==========================
 // Admin Columns
@@ -231,11 +228,12 @@ add_action('admin_init', function() {
                     $opts = bw_cs_index_status_options();
                     $label = $opts[$val] ?? 'Not Set';
                     $colors = [
-                        'indexed' => ['color' => '#047857', 'bg' => '#d1fae5'],
-                        'crawled' => ['color' => '#0369a1', 'bg' => '#e0f2fe'],
-                        'discovered' => ['color' => '#b45309', 'bg' => '#fef3c7'],
-                        'issue' => ['color' => '#dc2626', 'bg' => '#fee2e2'],
-                        '' => ['color' => '#6b7280', 'bg' => '#f3f4f6']
+                        'crawled' => ['color' => '#b45309', 'bg' => '#fef3c7'],      // Amber - Issue
+                        'discovered' => ['color' => '#1d4ed8', 'bg' => '#dbeafe'],   // Blue - Waiting
+                        'indexed' => ['color' => '#065f46', 'bg' => '#d1fae5'],      // Dark Green
+                        'requested' => ['color' => '#0f766e', 'bg' => '#ccfbf1'],    // Teal - Waiting
+                        'issue' => ['color' => '#991b1b', 'bg' => '#fee2e2'],        // Dark Red - Critical
+                        '' => ['color' => '#6b7280', 'bg' => '#f3f4f6']               // Grey - Not Set
                     ];
                     $color = $colors[$val] ?? $colors[''];
                     echo '<span class="bw-cs-select" data-post="' . esc_attr($post_id) . '" data-field="bw_index_status" style="display:inline-block;border-radius:3px;padding:3px 8px;font-size:11px;font-weight:600;color:' . esc_attr($color['color']) . ';background:' . esc_attr($color['bg']) . ';cursor:pointer;">'

@@ -562,7 +562,9 @@ class BW_ALTC_Admin_Columns {
         $field = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
         $value = isset($_POST['value']) ? wp_unslash($_POST['value']) : '';
 
-        if (!$post_id || !current_user_can('edit_post', $post_id)) {
+        // Verify post type is registered before checking capabilities
+        $post_type = get_post_type($post_id);
+        if (!$post_id || !$post_type || !post_type_exists($post_type) || !current_user_can('edit_post', $post_id)) {
             wp_send_json_error('No permission');
         }
 
@@ -717,6 +719,11 @@ class BW_ALTC_Admin_Columns {
 
         // Check post type support
         if (!in_array($post->post_type, BW_ALTC_Taxonomies::get_supported_post_types(), true)) {
+            return;
+        }
+
+        // Verify post type is registered before checking capabilities
+        if (!post_type_exists($post->post_type)) {
             return;
         }
 

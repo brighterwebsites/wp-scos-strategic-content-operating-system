@@ -661,12 +661,14 @@ foreach ($pillar_pages as $p) {
 // ==========================
 add_action('wp_ajax_bw_cs_save_field', function() {
     check_ajax_referer('bw_cs_inline');
-    
+
     $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
     $field = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
     $value = isset($_POST['value']) ? wp_unslash($_POST['value']) : '';
-    
-    if (!$post_id || !current_user_can('edit_post', $post_id)) {
+
+    // Verify post exists and has a valid registered post type
+    $post_type = get_post_type($post_id);
+    if (!$post_id || !$post_type || !post_type_exists($post_type) || !current_user_can('edit_post', $post_id)) {
         wp_send_json_error('No permission');
     }
     
@@ -851,6 +853,11 @@ add_action('admin_footer-edit.php', function() {
 // Save from Quick Edit / Bulk Edit
 add_action('save_post', function($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+
+    // Verify post type is registered before checking capabilities
+    $post_type = get_post_type($post_id);
+    if (!$post_type || !post_type_exists($post_type)) return;
+
     if (!current_user_can('edit_post', $post_id)) return;
 
     // Check if this is bulk edit (skip empty values for bulk)
@@ -1023,8 +1030,13 @@ function bw_cs_render_metabox($post) {
 add_action('save_post', function($post_id) {
     if (!isset($_POST['bw_cs_nonce']) || !wp_verify_nonce($_POST['bw_cs_nonce'], 'bw_cs_metabox')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
-    if (!current_user_can('edit_post', $post_id)) return;
     if (wp_is_post_revision($post_id)) return;
+
+    // Verify post type is registered before checking capabilities
+    $post_type = get_post_type($post_id);
+    if (!$post_type || !post_type_exists($post_type)) return;
+
+    if (!current_user_can('edit_post', $post_id)) return;
     
     $fields = [
         'bw_notes'          => 'sanitize_textarea_field',

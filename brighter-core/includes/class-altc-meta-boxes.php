@@ -275,13 +275,19 @@ class BW_ALTC_Meta_Boxes {
             return;
         }
 
-        // Check permissions
-        if (!current_user_can('edit_post', $post_id)) {
+        // Check if it's a revision
+        if (wp_is_post_revision($post_id)) {
             return;
         }
 
-        // Check if it's a revision
-        if (wp_is_post_revision($post_id)) {
+        // Verify post type is registered before checking capabilities
+        $post_type = get_post_type($post_id);
+        if (!$post_type || !post_type_exists($post_type)) {
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('edit_post', $post_id)) {
             return;
         }
 

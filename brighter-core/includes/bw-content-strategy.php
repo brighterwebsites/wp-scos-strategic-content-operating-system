@@ -167,13 +167,12 @@ add_action('admin_init', function() {
             foreach ($cols as $k => $v) {
                 $new[$k] = $v;
                 if ($k === 'title') {
-                    $new['bw_topic']   = 'Topic';
+                    $new['bw_pillar']  = 'Pillar';
                     $new['bw_intent']  = 'Intent';
                     $new['bw_purpose'] = 'Purpose';
-                    $new['bw_opt']     = 'Optimization';
                     $new['bw_index']   = 'Index Status';
-                    $new['bw_pillar']  = 'Pillar';
-                    $new['bw_notes']   = 'Notes';
+                    $new['bw_opt']     = 'Optimization';
+                    $new['bw_notes']   = 'Content Notes';
                     // Stats columns - TEMPORARILY DISABLED for performance testing
                     // Each column makes get_post_meta() calls which causes query explosion
                     // TODO: Add proper meta cache priming before re-enabling
@@ -492,17 +491,43 @@ foreach ($pillar_pages as $p) {
             const postId = $select.data("post");
             const field = $select.data("field");
             const value = $select.val();
-            const opts = field === "bw_intent" ? intentOpts : purposeOpts;
-            
+            // Select correct options object based on field
+            let opts = purposeOpts;
+            if (field === "bw_intent") opts = intentOpts;
+            else if (field === "bw_index_status") opts = indexOpts;
+
             $select.prop("disabled", true);
             saveField(postId, field, value).done(function(resp) {
                 if (resp && resp.success) {
+                    // Apply special styling for index status
+                    const spanStyle = { cursor: "pointer" };
+                    if (field === "bw_index_status") {
+                        const indexColors = {
+                            'crawled': { color: '#b45309', bg: '#fef3c7' },
+                            'discovered': { color: '#1d4ed8', bg: '#dbeafe' },
+                            'indexed': { color: '#065f46', bg: '#d1fae5' },
+                            'requested': { color: '#0f766e', bg: '#ccfbf1' },
+                            'issue': { color: '#991b1b', bg: '#fee2e2' },
+                            '': { color: '#6b7280', bg: '#f3f4f6' }
+                        };
+                        const colors = indexColors[value] || indexColors[''];
+                        spanStyle.display = "inline-block";
+                        spanStyle.borderRadius = "3px";
+                        spanStyle.padding = "3px 8px";
+                        spanStyle.fontSize = "11px";
+                        spanStyle.fontWeight = "600";
+                        spanStyle.color = colors.color;
+                        spanStyle.background = colors.bg;
+                    } else {
+                        spanStyle.textDecoration = "underline dotted";
+                    }
+
                     const $span = $("<span>", {
                         class: "bw-cs-select",
                         "data-post": postId,
                         "data-field": field,
                         text: opts[value] || "NA",
-                        css: { cursor: "pointer", textDecoration: "underline dotted" }
+                        css: spanStyle
                     });
                     $select.replaceWith($span);
                 } else {
@@ -669,7 +694,13 @@ add_action('bulk_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 function bw_cs_quick_bulk_box($col, $post_type) {
     if (!in_array($col, ['bw_topic', 'bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt', 'bw_index'], true)) return;
     if (!in_array($post_type, bw_cs_post_types(), true)) return;
-    
+
+    // Detect if this is bulk edit (hide notes field for bulk edit)
+    $is_bulk = (current_filter() === 'bulk_edit_custom_box');
+
+    // Hide notes field in bulk edit
+    if ($is_bulk && $col === 'bw_notes') return;
+
     $pillar_pages = get_posts([
     'post_type' => bw_cs_post_types(),
     'posts_per_page' => -1,
@@ -699,15 +730,18 @@ function bw_cs_quick_bulk_box($col, $post_type) {
         <div class="inline-edit-col">
             <?php if ($col === 'bw_topic'): ?>
                 <label><span class="title">Topic</span>
-                    <input type="text" name="bw_page_topic" value="">
+                    <input type="text" name="bw_page_topic" value="" placeholder="<?php echo $is_bulk ? 'Leave blank = No change' : ''; ?>">
                 </label>
             <?php elseif ($col === 'bw_notes'): ?>
-                <label><span class="title">Notes</span>
+                <label><span class="title">Content Notes</span>
                     <textarea name="bw_notes" rows="2"></textarea>
                 </label>
             <?php elseif ($col === 'bw_intent'): ?>
                 <label><span class="title">Intent</span>
                     <select name="bw_intent">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php endif; ?>
                         <?php foreach (bw_cs_intent_options() as $key => $label): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
                         <?php endforeach; ?>
@@ -716,6 +750,9 @@ function bw_cs_quick_bulk_box($col, $post_type) {
             <?php elseif ($col === 'bw_purpose'): ?>
                 <label><span class="title">Purpose</span>
                     <select name="bw_purpose">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php endif; ?>
                         <?php foreach (bw_cs_purpose_options() as $key => $label): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
                         <?php endforeach; ?>
@@ -724,7 +761,11 @@ function bw_cs_quick_bulk_box($col, $post_type) {
             <?php elseif ($col === 'bw_pillar'): ?>
                 <label><span class="title">Pillar Page</span>
                   <select name="bw_pillar_page_id">
-    		     <option value="">Not Set</option>
+                    <?php if ($is_bulk): ?>
+                        <option value="">-- No Change --</option>
+                    <?php else: ?>
+                        <option value="">Not Set</option>
+                    <?php endif; ?>
    		     <?php foreach ($pillar_pages as $p):
     			    $purpose = get_post_meta($p->ID, 'bw_purpose', true);
     			    $type_labels = [
@@ -738,11 +779,14 @@ function bw_cs_quick_bulk_box($col, $post_type) {
            			 <?php echo esc_html(get_the_title($p) . $type); ?>
         			</option>
     			<?php endforeach; ?>
-		  </select>                
+		  </select>
 		</label>
             <?php elseif ($col === 'bw_opt'): ?>
                 <label><span class="title">Optimization</span>
                     <select name="_brt_opt_status">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php endif; ?>
                         <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($cfg['label']); ?></option>
                         <?php endforeach; ?>
@@ -751,6 +795,9 @@ function bw_cs_quick_bulk_box($col, $post_type) {
             <?php elseif ($col === 'bw_index'): ?>
                 <label><span class="title">Index Status</span>
                     <select name="bw_index_status">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php endif; ?>
                         <?php foreach (bw_cs_index_status_options() as $key => $label): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
                         <?php endforeach; ?>
@@ -805,7 +852,10 @@ add_action('admin_footer-edit.php', function() {
 add_action('save_post', function($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     if (!current_user_can('edit_post', $post_id)) return;
-    
+
+    // Check if this is bulk edit (skip empty values for bulk)
+    $is_bulk_edit = isset($_REQUEST['bulk_edit']);
+
     $fields = [
         'bw_notes'          => 'sanitize_textarea_field',
         'bw_page_topic'     => 'sanitize_text_field',
@@ -815,10 +865,18 @@ add_action('save_post', function($post_id) {
         '_brt_opt_status'   => 'sanitize_text_field',
         'bw_index_status'   => 'sanitize_text_field',
     ];
-    
+
     foreach ($fields as $key => $sanitizer) {
         if (isset($_POST[$key])) {
-            update_post_meta($post_id, $key, call_user_func($sanitizer, $_POST[$key]));
+            $value = call_user_func($sanitizer, $_POST[$key]);
+
+            // For bulk edit: skip empty values (= "No Change")
+            // Exception: bw_page_topic can be intentionally cleared
+            if ($is_bulk_edit && $value === '' && $key !== 'bw_page_topic') {
+                continue;
+            }
+
+            update_post_meta($post_id, $key, $value);
         }
     }
 });
@@ -954,9 +1012,9 @@ function bw_cs_render_metabox($post) {
     </div>
 
     <div class="bw-cs-field">
-        <label for="bw_notes">Notes</label>
+        <label for="bw_notes">Content Notes</label>
         <textarea id="bw_notes" name="bw_notes" rows="3" placeholder="Internal notes..."><?php echo esc_textarea($notes); ?></textarea>
-        <p class="bw-cs-help">Private notes (not displayed)</p>
+        <p class="bw-cs-help">Optional internal note about content strategy</p>
     </div>
     <?php
 }

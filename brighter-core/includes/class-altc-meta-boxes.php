@@ -33,10 +33,10 @@ class BW_ALTC_Meta_Boxes {
         $post_types = BW_ALTC_Taxonomies::get_supported_post_types();
 
         foreach ($post_types as $post_type) {
-            // ALTC Content Strategy meta box
+            // ALTC Topic Cluster Strategy meta box
             add_meta_box(
                 'bw_altc_strategy',
-                __('ALTC Content Strategy', 'brighterwebsites'),
+                __('ALTC Topic Cluster Strategy', 'brighterwebsites'),
                 [__CLASS__, 'render_altc_strategy_metabox'],
                 $post_type,
                 'side',
@@ -189,10 +189,10 @@ class BW_ALTC_Meta_Boxes {
 
         <div class="bw-altc-field">
             <label for="bw_altc_notes">
-                <?php esc_html_e('Topic Notes', 'brighterwebsites'); ?>
+                <?php esc_html_e('Topic & Cluster Notes', 'brighterwebsites'); ?>
             </label>
             <textarea id="bw_altc_notes" name="bw_notes" rows="3" placeholder="<?php esc_attr_e('Note any secondary topics or strategic considerations...', 'brighterwebsites'); ?>"><?php echo esc_textarea($notes); ?></textarea>
-            <p class="bw-altc-help"><?php esc_html_e('Optional notes about secondary topics or strategy', 'brighterwebsites'); ?></p>
+            <p class="bw-altc-help"><?php esc_html_e('Optional internal note about strategy, cluster or secondary topics', 'brighterwebsites'); ?></p>
         </div>
 
         <script>

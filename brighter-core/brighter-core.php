@@ -217,6 +217,11 @@ function brighter_load_modules() {
 // Load modules immediately when this file is included
 brighter_load_modules();
 
+// Load API system (separate from modules due to subdirectory structure)
+if (file_exists(BRIGHTER_CORE_PATH . 'includes/api/class-brighter-api.php')) {
+    require_once BRIGHTER_CORE_PATH . 'includes/api/class-brighter-api.php';
+}
+
 /**
  * Enqueue admin styles (only when needed, deferred loading)
  */

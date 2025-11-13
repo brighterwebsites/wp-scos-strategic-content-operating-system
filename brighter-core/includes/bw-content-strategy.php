@@ -188,11 +188,8 @@ add_action('admin_init', function() {
         
         add_action("manage_{$pt}_posts_custom_column", function($col, $post_id) {
             switch ($col) {
-                case 'bw_topic':
-                    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_page_topic">' 
-                         . esc_html(get_post_meta($post_id, 'bw_page_topic', true)) . '</span>';
-                    break;
-                    
+                // DEPRECATED: bw_topic column removed - use ALTC Topic taxonomy instead
+
                 case 'bw_intent':
                     $val = get_post_meta($post_id, 'bw_intent', true);
                     $opts = bw_cs_intent_options();
@@ -305,7 +302,7 @@ add_action('admin_init', function() {
 // ==========================
 foreach (['post', 'page'] as $pt) {
     add_filter("manage_edit-{$pt}_sortable_columns", function($cols) {
-        $cols['bw_topic']   = 'bw_page_topic';
+        // DEPRECATED: bw_topic removed - use ALTC Topic taxonomy instead
         $cols['bw_intent']  = 'bw_intent';
         $cols['bw_purpose'] = 'bw_purpose';
         $cols['bw_opt']     = '_brt_opt_status';
@@ -326,7 +323,8 @@ add_action('pre_get_posts', function($q) {
     $orderby = $q->get('orderby');
 
     // Text-based meta fields
-    if (in_array($orderby, ['bw_page_topic', 'bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id'], true)) {
+    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
+    if (in_array($orderby, ['bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
     }
@@ -672,7 +670,8 @@ add_action('wp_ajax_bw_cs_save_field', function() {
         wp_send_json_error('No permission');
     }
     
-    $allowed = ['bw_notes', 'bw_page_topic', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status', 'bw_index_status'];
+    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
+    $allowed = ['bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status', 'bw_index_status'];
     if (!in_array($field, $allowed, true)) {
         wp_send_json_error('Invalid field');
     }
@@ -694,7 +693,8 @@ add_action('quick_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 add_action('bulk_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 
 function bw_cs_quick_bulk_box($col, $post_type) {
-    if (!in_array($col, ['bw_topic', 'bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt', 'bw_index'], true)) return;
+    // DEPRECATED: bw_topic removed - use ALTC Topic taxonomy instead
+    if (!in_array($col, ['bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt', 'bw_index'], true)) return;
     if (!in_array($post_type, bw_cs_post_types(), true)) return;
 
     // Detect if this is bulk edit (hide notes field for bulk edit)
@@ -730,11 +730,9 @@ function bw_cs_quick_bulk_box($col, $post_type) {
 ]);    ?>
     <fieldset class="inline-edit-col-left">
         <div class="inline-edit-col">
-            <?php if ($col === 'bw_topic'): ?>
-                <label><span class="title">Topic</span>
-                    <input type="text" name="bw_page_topic" value="" placeholder="<?php echo $is_bulk ? 'Leave blank = No change' : ''; ?>">
-                </label>
-            <?php elseif ($col === 'bw_notes'): ?>
+            <?php
+            // DEPRECATED: bw_topic field removed - use ALTC Topic taxonomy instead
+            if ($col === 'bw_notes'): ?>
                 <label><span class="title">Content Notes</span>
                     <textarea name="bw_notes" rows="2"></textarea>
                 </label>
@@ -823,8 +821,8 @@ add_action('admin_footer-edit.php', function() {
             $qe.apply(this, arguments);
             var postId = (typeof id === 'object') ? this.getId(id) : id;
             var $row = $('#post-' + postId);
-            
-            $('input[name="bw_page_topic"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_page_topic"]').text().trim());
+
+            // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
             $('textarea[name="bw_notes"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_notes"]').text().trim());
             
             var intent = $row.find('.bw-cs-select[data-field="bw_intent"]').text().trim();
@@ -868,9 +866,9 @@ add_action('save_post', function($post_id) {
     // Check if this is bulk edit (skip empty values for bulk)
     $is_bulk_edit = isset($_REQUEST['bulk_edit']);
 
+    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
     $fields = [
         'bw_notes'          => 'sanitize_textarea_field',
-        'bw_page_topic'     => 'sanitize_text_field',
         'bw_intent'         => 'sanitize_text_field',
         'bw_purpose'        => 'sanitize_text_field',
         'bw_pillar_page_id' => 'absint',
@@ -883,8 +881,7 @@ add_action('save_post', function($post_id) {
             $value = call_user_func($sanitizer, $_REQUEST[$key]);
 
             // For bulk edit: skip empty values (= "No Change")
-            // Exception: bw_page_topic can be intentionally cleared
-            if ($is_bulk_edit && $value === '' && $key !== 'bw_page_topic') {
+            if ($is_bulk_edit && $value === '') {
                 continue;
             }
 
@@ -911,8 +908,8 @@ add_action('add_meta_boxes', function() {
 
 function bw_cs_render_metabox($post) {
     wp_nonce_field('bw_cs_metabox', 'bw_cs_nonce');
-    
-    $topic = get_post_meta($post->ID, 'bw_page_topic', true);
+
+    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
     $intent = get_post_meta($post->ID, 'bw_intent', true);
     $purpose = get_post_meta($post->ID, 'bw_purpose', true);
     $pillar = get_post_meta($post->ID, 'bw_pillar_page_id', true);
@@ -942,12 +939,8 @@ function bw_cs_render_metabox($post) {
         .bw-cs-field textarea { min-height: 60px; }
         .bw-cs-help { font-size: 11px; color: #666; margin-top: 2px; }
     </style>
-    
-    <div class="bw-cs-field">
-        <label for="bw_page_topic">Topic</label>
-        <input type="text" id="bw_page_topic" name="bw_page_topic" value="<?php echo esc_attr($topic); ?>" placeholder="e.g., Web Design, SEO">
-        <p class="bw-cs-help">Main topic/theme of this content</p>
-    </div>
+
+    <?php /* DEPRECATED: bw_page_topic field removed - use ALTC Topic taxonomy instead */ ?>
 
     <div class="bw-cs-field">
         <label for="bw_intent">Intent</label>
@@ -1042,10 +1035,10 @@ add_action('save_post', function($post_id) {
     if (!$post_type || !post_type_exists($post_type)) return;
 
     if (!current_user_can('edit_post', $post_id)) return;
-    
+
+    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
     $fields = [
         'bw_notes'          => 'sanitize_textarea_field',
-        'bw_page_topic'     => 'sanitize_text_field',
         'bw_intent'         => 'sanitize_text_field',
         'bw_purpose'        => 'sanitize_text_field',
         'bw_pillar_page_id' => 'absint',
@@ -1067,7 +1060,7 @@ add_action('save_post', function($post_id) {
  * ================================================================
  * WordPress Meta Field → GA4 Parameter Name → Example Value
  * ----------------------------------------------------------------
- * bw_page_topic       → content_topic         → "SEO Services"
+ * bw_page_topic       → content_topic         → "SEO Services" [DEPRECATED - kept for GA4 legacy data]
  * bw_intent           → content_intent        → "informational"
  * bw_purpose          → content_purpose       → "pillar"
  * _brt_opt_status     → optimization_status   → "cro"

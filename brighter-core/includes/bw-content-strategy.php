@@ -503,14 +503,14 @@ foreach ($pillar_pages as $p) {
                     const spanStyle = { cursor: "pointer" };
                     if (field === "bw_index_status") {
                         const indexColors = {
-                            'crawled': { color: '#b45309', bg: '#fef3c7' },
-                            'discovered': { color: '#1d4ed8', bg: '#dbeafe' },
-                            'indexed': { color: '#065f46', bg: '#d1fae5' },
-                            'requested': { color: '#0f766e', bg: '#ccfbf1' },
-                            'issue': { color: '#991b1b', bg: '#fee2e2' },
-                            '': { color: '#6b7280', bg: '#f3f4f6' }
+                            "crawled": { color: "#b45309", bg: "#fef3c7" },
+                            "discovered": { color: "#1d4ed8", bg: "#dbeafe" },
+                            "indexed": { color: "#065f46", bg: "#d1fae5" },
+                            "requested": { color: "#0f766e", bg: "#ccfbf1" },
+                            "issue": { color: "#991b1b", bg: "#fee2e2" },
+                            "": { color: "#6b7280", bg: "#f3f4f6" }
                         };
-                        const colors = indexColors[value] || indexColors[''];
+                        const colors = indexColors[value] || indexColors[""];
                         spanStyle.display = "inline-block";
                         spanStyle.borderRadius = "3px";
                         spanStyle.padding = "3px 8px";

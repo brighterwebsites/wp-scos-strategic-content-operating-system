@@ -428,6 +428,21 @@ class BW_ALTC_Admin_Pages {
                     </ul>
                 </div>
 
+                <div class="bw-altc-purpose-breakdown">
+                    <h4><?php esc_html_e('Post Type Breakdown:', 'brighterwebsites'); ?></h4>
+                    <ul class="bw-altc-purpose-list">
+                        <?php foreach ($topic['post_type_breakdown'] as $post_type => $count): ?>
+                            <?php
+                            $post_type_obj = get_post_type_object($post_type);
+                            $post_type_label = $post_type_obj ? $post_type_obj->labels->singular_name : $post_type;
+                            ?>
+                            <li class="bw-altc-purpose-item">
+                                <strong><?php echo esc_html($post_type_label); ?>:</strong> <?php echo absint($count); ?> <?php echo absint($count) === 1 ? esc_html__('item', 'brighterwebsites') : esc_html__('items', 'brighterwebsites'); ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+
                 <h4><?php esc_html_e('Content:', 'brighterwebsites'); ?></h4>
                 <ul class="bw-altc-content-list">
                     <?php foreach ($topic['content'] as $content): ?>
@@ -439,6 +454,13 @@ class BW_ALTC_Admin_Pages {
                                     </a>
                                 </div>
                                 <div class="bw-altc-content-meta">
+                                    <span>
+                                        <strong><?php esc_html_e('Type:', 'brighterwebsites'); ?></strong>
+                                        <?php
+                                        $post_type_obj = get_post_type_object($content['post_type']);
+                                        echo esc_html($post_type_obj ? $post_type_obj->labels->singular_name : $content['post_type']);
+                                        ?>
+                                    </span>
                                     <span>
                                         <strong><?php esc_html_e('Purpose:', 'brighterwebsites'); ?></strong>
                                         <?php
@@ -631,9 +653,10 @@ class BW_ALTC_Admin_Pages {
             // Calculate base risk
             $base_risk = $total_count > 0 ? ($post_count / $total_count) * 100 : 0;
 
-            // Get purpose and intent breakdown
+            // Get purpose, intent, and post type breakdown
             $purpose_breakdown = [];
             $intent_breakdown = [];
+            $post_type_breakdown = [];
             $content_data = [];
 
             foreach ($posts as $post) {
@@ -659,6 +682,13 @@ class BW_ALTC_Admin_Pages {
                 }
                 $intent_breakdown[$intent]++;
 
+                // Post Type tracking
+                $post_type = $post->post_type;
+                if (!isset($post_type_breakdown[$post_type])) {
+                    $post_type_breakdown[$post_type] = 0;
+                }
+                $post_type_breakdown[$post_type]++;
+
                 // Get pillar info
                 $pillar_id = get_post_meta($post->ID, 'bw_pillar_page_id', true);
                 $pillar_title = '';
@@ -669,6 +699,7 @@ class BW_ALTC_Admin_Pages {
                 $content_data[] = [
                     'ID' => $post->ID,
                     'post_title' => $post->post_title,
+                    'post_type' => $post_type,
                     'purpose' => $purpose,
                     'intent' => $intent,
                     'pillar_title' => $pillar_title,
@@ -722,6 +753,7 @@ class BW_ALTC_Admin_Pages {
                 'final_risk' => $final_risk,
                 'purpose_breakdown' => $purpose_breakdown,
                 'intent_breakdown' => $intent_breakdown,
+                'post_type_breakdown' => $post_type_breakdown,
                 'content' => $content_data,
                 'altc_names' => $altc_names,
             ];

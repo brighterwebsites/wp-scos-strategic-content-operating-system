@@ -854,6 +854,11 @@ add_action('admin_footer-edit.php', function() {
 add_action('save_post', function($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
 
+    // Check if this is a quick/bulk edit request
+    if (!isset($_REQUEST['_inline_edit']) && !isset($_REQUEST['bulk_edit'])) {
+        return;
+    }
+
     // Verify post type is registered before checking capabilities
     $post_type = get_post_type($post_id);
     if (!$post_type || !post_type_exists($post_type)) return;
@@ -874,8 +879,8 @@ add_action('save_post', function($post_id) {
     ];
 
     foreach ($fields as $key => $sanitizer) {
-        if (isset($_POST[$key])) {
-            $value = call_user_func($sanitizer, $_POST[$key]);
+        if (isset($_REQUEST[$key])) {
+            $value = call_user_func($sanitizer, $_REQUEST[$key]);
 
             // For bulk edit: skip empty values (= "No Change")
             // Exception: bw_page_topic can be intentionally cleared

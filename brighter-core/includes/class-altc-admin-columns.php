@@ -550,6 +550,18 @@ class BW_ALTC_Admin_Columns {
 
         })(jQuery);');
         wp_enqueue_script('bw-altc-inline-edit');
+
+        // Hide standard WordPress taxonomy sections from bulk edit
+        wp_add_inline_style('common', '
+            .bulk-edit-row .inline-edit-categories label.inline-edit-tags-label[for*="altc_strategic_lens"],
+            .bulk-edit-row .inline-edit-categories label.inline-edit-tags-label[for*="altc_topic"],
+            .bulk-edit-row .inline-edit-group label.inline-edit-tags-label[for*="altc_strategic_lens"],
+            .bulk-edit-row .inline-edit-group label.inline-edit-tags-label[for*="altc_topic"],
+            .bulk-edit-row fieldset.inline-edit-col-taxonomy-altc_strategic_lens,
+            .bulk-edit-row fieldset.inline-edit-col-taxonomy-altc_topic {
+                display: none !important;
+            }
+        ');
     }
 
     /**

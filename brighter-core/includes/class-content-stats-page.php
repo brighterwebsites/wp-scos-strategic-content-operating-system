@@ -25,24 +25,40 @@ class BW_Content_Stats_Page {
     }
 
     /**
-     * Register admin page
+     * Register admin page under each post type
      */
     public static function register_page() {
-        add_submenu_page(
-            'edit.php',
-            __('Content Statistics', 'brighterwebsites'),
-            __('Content Stats', 'brighterwebsites'),
-            'edit_posts',
-            'bw-content-stats',
-            [__CLASS__, 'render_page']
-        );
+        $post_types = bw_cs_post_types();
+
+        foreach ($post_types as $post_type) {
+            $post_type_obj = get_post_type_object($post_type);
+
+            // Skip if post type doesn't exist
+            if (!$post_type_obj) continue;
+
+            // Determine parent slug
+            $parent_slug = 'edit.php';
+            if ($post_type !== 'post') {
+                $parent_slug = 'edit.php?post_type=' . $post_type;
+            }
+
+            add_submenu_page(
+                $parent_slug,
+                __('Content Statistics', 'brighterwebsites'),
+                __('Content Stats', 'brighterwebsites'),
+                'edit_posts',
+                'bw-content-stats-' . $post_type,
+                [__CLASS__, 'render_page']
+            );
+        }
     }
 
     /**
      * Enqueue page assets
      */
     public static function enqueue_assets($hook) {
-        if ($hook !== 'posts_page_bw-content-stats') return;
+        // Check if this is any of our content stats pages
+        if (strpos($hook, '_page_bw-content-stats-') === false) return;
 
         wp_enqueue_style('bw-content-stats', BRIGHTER_CORE_URL . 'css/content-stats.css', [], BRIGHTER_CORE_VERSION);
     }
@@ -51,8 +67,17 @@ class BW_Content_Stats_Page {
      * Render the stats page
      */
     public static function render_page() {
+        // Detect current post type from page slug
+        $current_page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
+        $default_post_type = 'post';
+
+        // Extract post type from page slug (bw-content-stats-{post_type})
+        if (strpos($current_page, 'bw-content-stats-') === 0) {
+            $default_post_type = str_replace('bw-content-stats-', '', $current_page);
+        }
+
         // Get filter parameters
-        $post_type = isset($_GET['post_type_filter']) ? sanitize_key($_GET['post_type_filter']) : 'post';
+        $post_type = isset($_GET['post_type_filter']) ? sanitize_key($_GET['post_type_filter']) : $default_post_type;
         $post_status = isset($_GET['status_filter']) ? sanitize_key($_GET['status_filter']) : 'publish';
         $orderby = isset($_GET['orderby']) ? sanitize_key($_GET['orderby']) : 'modified';
         $order = isset($_GET['order']) && $_GET['order'] === 'asc' ? 'asc' : 'desc';
@@ -115,7 +140,7 @@ class BW_Content_Stats_Page {
             <!-- Filters -->
             <div class="tablenav top">
                 <form method="get" style="display: inline-flex; gap: 10px; align-items: center;">
-                    <input type="hidden" name="page" value="bw-content-stats">
+                    <input type="hidden" name="page" value="<?php echo esc_attr($current_page); ?>">
 
                     <select name="post_type_filter">
                         <option value="all" <?php selected($post_type, 'all'); ?>>All Post Types</option>

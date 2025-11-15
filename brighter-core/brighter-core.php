@@ -171,6 +171,7 @@ function brighter_load_modules() {
  	'bw-ga4-seed-admin',
  	'bw-support-cache-dashbrd',
         'bw-faq',
+        'privacy-policy-style',
         // ALTC modules
         'class-altc-taxonomies',
         'class-altc-meta-boxes',

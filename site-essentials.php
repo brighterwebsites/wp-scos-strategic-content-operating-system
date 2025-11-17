@@ -35,14 +35,14 @@ define('SITE_ESSENTIALS_VERSION', '1.0.0');
  *
  * @since 1.0.0
  */
-define('SITE_ESSENTIALS_PATH', __DIR__ . '/site-essentials/');
+define('SITE_ESSENTIALS_PATH', plugin_dir_path(__FILE__) . 'site-essentials/');
 
 /**
  * Site Essentials Base URL
  *
  * @since 1.0.0
  */
-define('SITE_ESSENTIALS_URL', plugins_url('site-essentials/', __FILE__));
+define('SITE_ESSENTIALS_URL', plugin_dir_url(__FILE__) . 'site-essentials/');
 
 /**
  * Site Essentials Base File

@@ -167,7 +167,7 @@ class Admin_UI {
 
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'modules';
 
-        include SITE_ESSENTIALS_PATH . 'views/settings-page.php';
+        include SITE_ESSENTIALS_PATH . 'Views/settings-page.php';
     }
 
     /**
@@ -199,7 +199,7 @@ class Admin_UI {
             $tier = $class_name::get_tier();
             $dependencies = $class_name::get_dependencies();
 
-            include SITE_ESSENTIALS_PATH . 'views/module-toggle.php';
+            include SITE_ESSENTIALS_PATH . 'Views/module-toggle.php';
         }
 
         echo '</div>';

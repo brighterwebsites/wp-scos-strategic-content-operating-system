@@ -550,6 +550,18 @@ class BW_ALTC_Admin_Columns {
 
         })(jQuery);');
         wp_enqueue_script('bw-altc-inline-edit');
+
+        // Hide standard WordPress taxonomy sections from bulk edit
+        wp_add_inline_style('common', '
+            .bulk-edit-row .inline-edit-categories label.inline-edit-tags-label[for*="altc_strategic_lens"],
+            .bulk-edit-row .inline-edit-categories label.inline-edit-tags-label[for*="altc_topic"],
+            .bulk-edit-row .inline-edit-group label.inline-edit-tags-label[for*="altc_strategic_lens"],
+            .bulk-edit-row .inline-edit-group label.inline-edit-tags-label[for*="altc_topic"],
+            .bulk-edit-row fieldset.inline-edit-col-taxonomy-altc_strategic_lens,
+            .bulk-edit-row fieldset.inline-edit-col-taxonomy-altc_topic {
+                display: none !important;
+            }
+        ');
     }
 
     /**
@@ -562,7 +574,9 @@ class BW_ALTC_Admin_Columns {
         $field = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
         $value = isset($_POST['value']) ? wp_unslash($_POST['value']) : '';
 
-        if (!$post_id || !current_user_can('edit_post', $post_id)) {
+        // Verify post type is registered before checking capabilities
+        $post_type = get_post_type($post_id);
+        if (!$post_id || !$post_type || !post_type_exists($post_type) || !current_user_can('edit_post', $post_id)) {
             wp_send_json_error('No permission');
         }
 
@@ -585,6 +599,20 @@ class BW_ALTC_Admin_Columns {
      * Add quick edit fields
      */
     public static function quick_edit_fields($column, $post_type) {
+        self::render_edit_fields($column, $post_type, false);
+    }
+
+    /**
+     * Add bulk edit fields
+     */
+    public static function bulk_edit_fields($column, $post_type) {
+        self::render_edit_fields($column, $post_type, true);
+    }
+
+    /**
+     * Render edit fields for quick/bulk edit
+     */
+    private static function render_edit_fields($column, $post_type, $is_bulk = false) {
         if (!in_array($column, ['bw_altc', 'bw_altc_topic', 'bw_altc_maturity'], true)) {
             return;
         }
@@ -605,6 +633,7 @@ class BW_ALTC_Admin_Columns {
         ]);
 
         $maturity_options = BW_ALTC_Taxonomies::get_maturity_options();
+        $no_change_label = $is_bulk ? '-- No Change --' : '-- Select --';
 
         ?>
         <fieldset class="inline-edit-col-left">
@@ -612,7 +641,7 @@ class BW_ALTC_Admin_Columns {
                 <?php if ($column === 'bw_altc'): ?>
                     <label><span class="title">ALTC Strategic Lens</span>
                         <select name="bw_primary_altc_id">
-                            <option value="">-- Select ALTC --</option>
+                            <option value=""><?php echo esc_html($no_change_label); ?></option>
                             <?php if (!is_wp_error($altc_terms)): ?>
                                 <?php foreach ($altc_terms as $term): ?>
                                     <option value="<?php echo esc_attr($term->term_id); ?>">
@@ -625,7 +654,7 @@ class BW_ALTC_Admin_Columns {
                 <?php elseif ($column === 'bw_altc_topic'): ?>
                     <label><span class="title">Primary Topic</span>
                         <select name="bw_primary_topic_id">
-                            <option value="">-- Select Topic --</option>
+                            <option value=""><?php echo esc_html($no_change_label); ?></option>
                             <?php if (!is_wp_error($topic_terms)): ?>
                                 <?php foreach ($topic_terms as $term): ?>
                                     <option value="<?php echo esc_attr($term->term_id); ?>">
@@ -638,6 +667,9 @@ class BW_ALTC_Admin_Columns {
                 <?php elseif ($column === 'bw_altc_maturity'): ?>
                     <label><span class="title">Content Maturity</span>
                         <select name="bw_cont_maturity">
+                            <?php if ($is_bulk): ?>
+                                <option value="">-- No Change --</option>
+                            <?php endif; ?>
                             <?php foreach ($maturity_options as $value => $label): ?>
                                 <option value="<?php echo esc_attr($value); ?>">
                                     <?php echo esc_html($label); ?>
@@ -649,13 +681,6 @@ class BW_ALTC_Admin_Columns {
             </div>
         </fieldset>
         <?php
-    }
-
-    /**
-     * Add bulk edit fields (same as quick edit)
-     */
-    public static function bulk_edit_fields($column, $post_type) {
-        self::quick_edit_fields($column, $post_type);
     }
 
     /**
@@ -709,27 +734,43 @@ class BW_ALTC_Admin_Columns {
             return;
         }
 
+        // Verify post type is registered before checking capabilities
+        if (!post_type_exists($post->post_type)) {
+            return;
+        }
+
         // Check permissions
         if (!current_user_can('edit_post', $post_id)) {
             return;
         }
 
-        // Save ALTC Strategic Lens
+        $is_bulk_edit = isset($_REQUEST['bulk_edit']);
+
+        // Save ALTC Strategic Lens (skip if bulk edit and value is empty = "no change")
         if (isset($_REQUEST['bw_primary_altc_id'])) {
-            $altc_id = absint($_REQUEST['bw_primary_altc_id']);
-            update_post_meta($post_id, 'bw_primary_altc_id', $altc_id);
+            $altc_id = $_REQUEST['bw_primary_altc_id'];
+            // Skip if bulk edit and empty (no change selected)
+            if (!$is_bulk_edit || $altc_id !== '') {
+                update_post_meta($post_id, 'bw_primary_altc_id', absint($altc_id));
+            }
         }
 
-        // Save Primary Topic
+        // Save Primary Topic (skip if bulk edit and value is empty = "no change")
         if (isset($_REQUEST['bw_primary_topic_id'])) {
-            $topic_id = absint($_REQUEST['bw_primary_topic_id']);
-            update_post_meta($post_id, 'bw_primary_topic_id', $topic_id);
+            $topic_id = $_REQUEST['bw_primary_topic_id'];
+            // Skip if bulk edit and empty (no change selected)
+            if (!$is_bulk_edit || $topic_id !== '') {
+                update_post_meta($post_id, 'bw_primary_topic_id', absint($topic_id));
+            }
         }
 
-        // Save Content Maturity
+        // Save Content Maturity (skip if bulk edit and value is empty = "no change")
         if (isset($_REQUEST['bw_cont_maturity'])) {
             $maturity = sanitize_text_field($_REQUEST['bw_cont_maturity']);
-            update_post_meta($post_id, 'bw_cont_maturity', $maturity);
+            // Skip if bulk edit and empty (no change selected)
+            if (!$is_bulk_edit || $maturity !== '') {
+                update_post_meta($post_id, 'bw_cont_maturity', $maturity);
+            }
         }
     }
 }

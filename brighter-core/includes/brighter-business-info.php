@@ -552,3 +552,52 @@ function brighterwebsites_copyright_notice() {
     return $cached_output;
 }
 add_shortcode('site_copyright', 'brighterwebsites_copyright_notice');
+
+/**
+ * SEOPress Schema Mapping
+ * Maps Brighter Business Info fields to SEOPress schema placeholders
+ *
+ * This allows SEOPress to use our custom business info fields in its schema markup
+ * instead of requiring duplicate data entry in SEOPress settings.
+ */
+function sp_schemas_mapping_select($mapping) {
+    // Add Brighter business info fields to SEOPress schema dropdown
+    $mapping['brighter_fields'] = [
+        'label' => __('Brighter Business Info', 'brighterwebsites'),
+        'values' => [
+            // Basic Info
+            'brighter_business_name' => __('Business Name', 'brighterwebsites'),
+            'brighter_contact_name' => __('Contact Name', 'brighterwebsites'),
+            'brighter_abn' => __('ABN', 'brighterwebsites'),
+            'brighter_business_hours' => __('Business Hours', 'brighterwebsites'),
+            'brighter_organisation_type' => __('Organisation Type', 'brighterwebsites'),
+            'brighter_service_description' => __('Service Description', 'brighterwebsites'),
+
+            // Contact Details
+            'brighter_phone_number' => __('Phone Number', 'brighterwebsites'),
+            'brighter_email' => __('Email', 'brighterwebsites'),
+            'brighter_address' => __('Address', 'brighterwebsites'),
+            'brighter_city' => __('City', 'brighterwebsites'),
+            'brighter_state' => __('State', 'brighterwebsites'),
+            'brighter_postcode' => __('Postcode', 'brighterwebsites'),
+            'brighter_country' => __('Country', 'brighterwebsites'),
+            'brighter_lat' => __('Latitude', 'brighterwebsites'),
+            'brighter_long' => __('Longitude', 'brighterwebsites'),
+
+            // Social Links
+            'brighter_social_link_facebook' => __('Facebook URL', 'brighterwebsites'),
+            'brighter_social_link_twitter' => __('Twitter URL', 'brighterwebsites'),
+            'brighter_social_link_instagram' => __('Instagram URL', 'brighterwebsites'),
+            'brighter_social_link_youtube' => __('YouTube URL', 'brighterwebsites'),
+            'brighter_social_link_linkedin' => __('LinkedIn URL', 'brighterwebsites'),
+            'brighter_social_link_google_review' => __('Google Review URL', 'brighterwebsites'),
+
+            // Service Details
+            'brighter_provider_mobility' => __('Provider Mobility', 'brighterwebsites'),
+            'brighter_price_tier' => __('Price Tier', 'brighterwebsites'),
+        ]
+    ];
+
+    return $mapping;
+}
+add_filter('seopress_schemas_mapping_select', 'sp_schemas_mapping_select');

@@ -148,6 +148,13 @@ function brighter_support_render_page() {
             echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=tweaks')) . '" class="nav-tab ' . ($active_tab == 'tweaks' ? 'nav-tab-active' : '') . '">' . esc_html__('Brighter Tweaks', 'brighterwebsites') . '</a>';
         }
     }
+
+    // Allow other modules to add tabs (e.g., API Settings)
+    $custom_tabs = apply_filters('brighter_support_tabs', array(), $email);
+    foreach ($custom_tabs as $tab_key => $tab_label) {
+        echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=' . $tab_key)) . '" class="nav-tab ' . ($active_tab == $tab_key ? 'nav-tab-active' : '') . '">' . esc_html($tab_label) . '</a>';
+    }
+
     echo '</nav>';
 
     // Tab content
@@ -181,9 +188,17 @@ function brighter_support_render_page() {
             echo '<div class="support-page"><p>' . esc_html__('Tweaks module not available.', 'brighterwebsites') . '</p></div>';
         }
     } else {
-        brighter_support_output_main();
+        // Check if a custom tab handler wants to render content
+        $custom_content = apply_filters('brighter_support_tab_content', '', $active_tab);
+
+        if (!empty($custom_content)) {
+            echo $custom_content;
+        } else {
+            // Default to main support page
+            brighter_support_output_main();
+        }
     }
-    
+
     echo '</div>'; // .tab-content
     echo '</div>'; // .wrap
 }

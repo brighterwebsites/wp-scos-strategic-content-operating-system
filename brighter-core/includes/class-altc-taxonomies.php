@@ -36,7 +36,7 @@ class BW_ALTC_Taxonomies {
         ], 'names');
 
         // Exclude post types that shouldn't have ALTC
-        $exclude = ['attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation'];
+        $exclude = ['attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation', 'faq'];
 
         return array_values(array_diff($post_types, $exclude));
     }
@@ -69,6 +69,7 @@ class BW_ALTC_Taxonomies {
             'show_in_nav_menus' => true,
             'show_in_rest'      => true,
             'show_tagcloud'     => false,
+            'meta_box_cb'       => false, // Hide default meta box, use custom one
             'capabilities'      => [
                 'manage_terms' => 'manage_categories',
                 'edit_terms'   => 'manage_categories',
@@ -99,6 +100,7 @@ class BW_ALTC_Taxonomies {
             'show_in_nav_menus' => false,
             'show_in_rest'      => true,
             'show_tagcloud'     => false,
+            'meta_box_cb'       => false, // Hide default meta box, use custom one
             'capabilities'      => [
                 'manage_terms' => 'manage_categories',
                 'edit_terms'   => 'manage_categories',

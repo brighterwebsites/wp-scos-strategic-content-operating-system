@@ -10,7 +10,7 @@
  *
  * Responsibilities:
  * - Enqueue inline CSS only on the Privacy Policy page for consistent formatting.
- * - Inject a “Skip to main content” accessibility link at the top of every page.
+ * - Inject a ï¿½Skip to main contentï¿½ accessibility link at the top of every page.
  * - Apply site-wide accessibility CSS for the skip link, ensuring proper visibility
  *   when focused and accounting for the WordPress admin bar offset.
  *
@@ -63,10 +63,16 @@ CSS;
     wp_add_inline_style('brighter-privacy', $css);
 }, 20);
 
-// Output the link
+// Output the skip link
 add_action('wp_body_open', function () {
     echo '<a class="skip-link screen-reader-text" href="#main-content">Skip to main content</a>';
 });
+
+// Inject #main-content target ID into the page
+// This creates the anchor point for the skip link to jump to
+add_action('wp_body_open', function () {
+    echo '<div id="main-content"></div>';
+}, 5);
 
 // Styles (site-wide)
 add_action('wp_enqueue_scripts', function () {

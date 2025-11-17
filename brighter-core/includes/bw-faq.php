@@ -135,14 +135,15 @@ add_action('save_post_faq', 'save_faq_relationship_meta');
 
 // ============================================
 // 3. CUSTOM URL REWRITE RULES
-// Rewrite: site.com/parent-slug/faq-slug
+// Rewrite: site.com/parent-slug/faq/faq-slug
+// IMPORTANT: Using /faq/ in the middle to avoid conflicts with other post types
 // ============================================
 
 function faq_custom_rewrite_rules() {
-    // Match: any-parent-slug/any-faq-slug
-    // This pattern captures parent slug and FAQ slug
+    // Match: any-parent-slug/faq/any-faq-slug
+    // This pattern is specific enough to not conflict with other post types
     add_rewrite_rule(
-        '^([^/]+)/([^/]+)/?$',
+        '^([^/]+)/faq/([^/]+)/?$',
         'index.php?faq=$matches[2]&parent_slug=$matches[1]',
         'top'
     );
@@ -161,22 +162,23 @@ function faq_custom_permalink($permalink, $post) {
     if ($post->post_type !== 'faq') {
         return $permalink;
     }
-    
+
     $parent_page_id = get_post_meta($post->ID, '_faq_parent_page', true);
-    
+
     if (!$parent_page_id) {
         // No parent set, use default /faq/slug structure
         return home_url('/faq/' . $post->post_name . '/');
     }
-    
+
     $parent_post = get_post($parent_page_id);
-    
+
     if (!$parent_post) {
         return $permalink;
     }
-    
-    // Build URL: site.com/parent-slug/faq-slug
-    return home_url('/' . $parent_post->post_name . '/' . $post->post_name . '/');
+
+    // Build URL: site.com/parent-slug/faq/faq-slug
+    // Note: /faq/ in the middle to avoid conflicts with other post types
+    return home_url('/' . $parent_post->post_name . '/faq/' . $post->post_name . '/');
 }
 add_filter('post_type_link', 'faq_custom_permalink', 10, 2);
 
@@ -491,7 +493,7 @@ function faq_admin_column_content($column, $post_id) {
                 echo '<a href="' . get_edit_post_link($parent_page_id) . '">' . esc_html($parent_post->post_title) . '</a>';
             }
         } else {
-            echo '—';
+            echo 'ï¿½';
         }
     }
 }
@@ -1262,7 +1264,7 @@ function faq_frontend_styles() {
     }
     
     .faq-breadcrumb li:not(:last-child):after {
-        content: "›";
+        content: "ï¿½";
         margin-left: 0.5rem;
         color: #999;
     }

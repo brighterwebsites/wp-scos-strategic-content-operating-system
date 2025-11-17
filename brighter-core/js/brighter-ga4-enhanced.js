@@ -17,23 +17,24 @@
 
   // Universal consent check (same as loader)
   function hasConsent() {
-    const cookie = document.cookie;
-
-    // SEOPress
-    if (cookie.indexOf('seopress-user-consent-accept=1') !== -1) return true;
-    if (cookie.indexOf('seopress-user-consent-accept=true') !== -1) return true;
-
-    // Cookie Notice
-    if (cookie.indexOf('cookie_notice_accepted=true') !== -1) return true;
-
-    // GDPR Cookie Consent
-    if (cookie.indexOf('viewed_cookie_policy=yes') !== -1) return true;
-
-    // Complianz
-    if (cookie.indexOf('cmplz_consented_services') !== -1) return true;
-
-    // CookieYes
-    if (cookie.indexOf('cookieyes-consent=yes') !== -1) return true;
+    // Check for SEOPress consent cookie with multiple possible values
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      // SEOPress - check for various formats
+      if (cookie.startsWith('seopress-user-consent-accept=')) {
+        const value = cookie.split('=')[1];
+        // Accept: "1", "true", or just the presence of the cookie
+        if (value === '1' || value === 'true' || value === '\'1\'' || value === '"1"') {
+          return true;
+        }
+      }
+      // Other consent plugins
+      if (cookie.startsWith('cookie_notice_accepted=true')) return true;
+      if (cookie.startsWith('viewed_cookie_policy=yes')) return true;
+      if (cookie.startsWith('cmplz_consented_services=')) return true;
+      if (cookie.startsWith('cookieyes-consent=yes')) return true;
+    }
 
     // No consent plugin = assume consent (for sites without consent management)
     // Or if brighterGA4 was loaded (means consent was already granted in loader)
@@ -323,8 +324,8 @@
     { s: '.ga-trust-specs', e: 'view_specs', c: 'Trust', l: 'Specifications Viewed', v: 7 },
     { s: '.ga-trust-case', e: 'view_case', c: 'Trust', l: 'Case Study Excerpt Viewed', v: 6 },
     { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 2 },
-    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 7 }
-    
+    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 7 },
+
     // Page hierarchy - sections
     { s: '.ga-hrcy-atf', e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed', v: 1 },  //Primary CTA above the fold (main goal)Measure exposure to your most important CTA (e.g. Get a Quote).High intent, core business outcome
     { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 2 },  //or main content section of page

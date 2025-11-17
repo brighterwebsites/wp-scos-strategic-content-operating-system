@@ -93,55 +93,54 @@ spl_autoload_register(function($class) {
  * @since 1.0.0
  */
 add_action('plugins_loaded', function() {
-    // Initialize Settings Manager (singleton)
-    $settings = \SiteEssentials\Core\Settings_Manager::instance();
+    try {
+        // Initialize Settings Manager (singleton)
+        $settings = \SiteEssentials\Core\Settings_Manager::instance();
 
-    // Register available modules
-    // Add more modules here as they're created
-    \SiteEssentials\Core\Module_Loader::register(
-        'tweaks',
-        \SiteEssentials\Modules\Tweaks\Tweaks_Module::class
-    );
+        // Register available modules
+        // Add more modules here as they're created
+        \SiteEssentials\Core\Module_Loader::register(
+            'tweaks',
+            \SiteEssentials\Modules\Tweaks\Tweaks_Module::class
+        );
 
-    // Load all enabled modules
-    \SiteEssentials\Core\Module_Loader::load_modules();
+        // Load all enabled modules
+        \SiteEssentials\Core\Module_Loader::load_modules();
 
-    // Initialize admin UI if in admin
-    if (is_admin()) {
-        $admin_ui = new \SiteEssentials\Core\Admin_UI();
-        $admin_ui->init();
+        // Initialize admin UI if in admin
+        if (is_admin()) {
+            $admin_ui = new \SiteEssentials\Core\Admin_UI();
+            $admin_ui->init();
+        }
+    } catch (\Exception $e) {
+        // Log error and add admin notice
+        error_log('Site Essentials Error: ' . $e->getMessage());
+        error_log('Site Essentials Stack Trace: ' . $e->getTraceAsString());
+
+        if (is_admin()) {
+            add_action('admin_notices', function() use ($e) {
+                echo '<div class="notice notice-error"><p>';
+                echo '<strong>Site Essentials Error:</strong> ' . esc_html($e->getMessage());
+                echo '</p></div>';
+            });
+        }
     }
 }, 5); // Priority 5 to load early
 
 /**
- * Activation Hook
+ * Initialize default settings on first load
  *
- * Runs when plugin is activated (or MU plugin is first loaded).
+ * Note: MU plugins don't support activation hooks, so we check on every load.
  *
  * @since 1.0.0
  */
-register_activation_hook(__FILE__, function() {
-    // Set default settings
+add_action('init', function() {
     $settings = \SiteEssentials\Core\Settings_Manager::instance();
 
-    // Ensure defaults are set
+    // Set defaults if this is first run
     if (!$settings->get('version')) {
         $settings->set('version', SITE_ESSENTIALS_VERSION);
         $settings->set('first_activated', time());
+        flush_rewrite_rules();
     }
-
-    // Flush rewrite rules
-    flush_rewrite_rules();
-});
-
-/**
- * Deactivation Hook
- *
- * Runs when plugin is deactivated.
- *
- * @since 1.0.0
- */
-register_deactivation_hook(__FILE__, function() {
-    // Flush rewrite rules
-    flush_rewrite_rules();
-});
+}, 20);

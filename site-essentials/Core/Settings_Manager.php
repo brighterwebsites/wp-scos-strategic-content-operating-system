@@ -291,26 +291,58 @@ class Settings_Manager {
             'version'                 => SITE_ESSENTIALS_VERSION,
             'export_date'             => date('Y-m-d H:i:s'),
             'site_url'                => get_site_url(),
-            self::CORE_OPTION         => $this->settings,
+            'se_core'                 => $this->settings,
         ];
+
+        // Get module info for better naming
+        $available_modules = \SiteEssentials\Core\Module_Loader::get_available_modules();
 
         // Get all module settings
         if (empty($module_ids)) {
             // Export all modules
             $enabled_modules = $this->get('enabled_modules', []);
             foreach ($enabled_modules as $module_id) {
-                $option_name = self::MODULE_OPTION_PREFIX . $module_id;
-                $export[$option_name] = $this->get_module_setting($module_id);
+                $export_key = $this->get_export_key($module_id, $available_modules);
+                $export[$export_key] = $this->get_module_setting($module_id);
             }
         } else {
             // Export specific modules
             foreach ($module_ids as $module_id) {
-                $option_name = self::MODULE_OPTION_PREFIX . $module_id;
-                $export[$option_name] = $this->get_module_setting($module_id);
+                $export_key = $this->get_export_key($module_id, $available_modules);
+                $export[$export_key] = $this->get_module_setting($module_id);
             }
         }
 
         return wp_json_encode($export, JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Get export key for module
+     *
+     * Creates readable key like "se_wp_tweaks_basic" instead of "site_essentials_tweaks"
+     *
+     * @since  1.0.0
+     * @param  string $module_id        Module ID
+     * @param  array  $available_modules Available modules
+     * @return string Export key
+     */
+    private function get_export_key($module_id, $available_modules) {
+        // Try to get tier from module class
+        $tier = 'module';
+        if (isset($available_modules[$module_id])) {
+            $class_name = $available_modules[$module_id];
+            if (method_exists($class_name, 'get_tier')) {
+                $tier = $class_name::get_tier();
+            }
+        }
+
+        // Convert module_id to readable format: tweaks -> wp_tweaks
+        $readable_name = str_replace('_', '_', $module_id);
+        if ($module_id === 'tweaks') {
+            $readable_name = 'wp_tweaks';
+        }
+
+        return 'se_' . $readable_name . '_' . $tier;
     }
 
     /**
@@ -334,7 +366,7 @@ class Settings_Manager {
             return new \WP_Error('missing_version', 'Settings export missing version');
         }
 
-        // Import core settings
+        // Import core settings (handle both old and new format)
         if (isset($data[self::CORE_OPTION])) {
             if ($merge) {
                 $this->settings = array_merge($this->settings, $data[self::CORE_OPTION]);
@@ -342,30 +374,59 @@ class Settings_Manager {
                 $this->settings = $data[self::CORE_OPTION];
             }
             update_option(self::CORE_OPTION, $this->settings);
+        } elseif (isset($data['se_core'])) {
+            // New format
+            if ($merge) {
+                $this->settings = array_merge($this->settings, $data['se_core']);
+            } else {
+                $this->settings = $data['se_core'];
+            }
+            update_option(self::CORE_OPTION, $this->settings);
         }
 
         // Import module settings
         foreach ($data as $option_name => $settings) {
-            // Skip non-module options
-            if (strpos($option_name, self::MODULE_OPTION_PREFIX) !== 0) {
+            $module_id = null;
+
+            // Old format: "site_essentials_tweaks"
+            if (strpos($option_name, self::MODULE_OPTION_PREFIX) === 0) {
+                $module_id = str_replace(self::MODULE_OPTION_PREFIX, '', $option_name);
+            }
+            // New format: "se_wp_tweaks_basic"
+            elseif (strpos($option_name, 'se_') === 0 && $option_name !== 'se_core') {
+                // Parse new format: se_{name}_{tier}
+                $parts = explode('_', $option_name);
+                // Remove 'se' prefix and tier suffix
+                array_shift($parts); // Remove 'se'
+                array_pop($parts); // Remove tier (basic/pro/agency)
+
+                // Map back to module ID
+                $name = implode('_', $parts);
+                if ($name === 'wp_tweaks') {
+                    $module_id = 'tweaks';
+                } else {
+                    $module_id = $name;
+                }
+            } else {
+                // Skip non-module options
                 continue;
             }
-
-            // Extract module ID
-            $module_id = str_replace(self::MODULE_OPTION_PREFIX, '', $option_name);
 
             // If specific modules specified, skip others
             if (!empty($module_ids) && !in_array($module_id, $module_ids, true)) {
                 continue;
             }
 
+            // Get the actual option name for storage
+            $storage_option = self::MODULE_OPTION_PREFIX . $module_id;
+
             // Import module settings
             if ($merge) {
                 $current_settings = $this->get_module_setting($module_id);
                 $new_settings = array_merge($current_settings, $settings);
-                update_option($option_name, $new_settings);
+                update_option($storage_option, $new_settings);
             } else {
-                update_option($option_name, $settings);
+                update_option($storage_option, $settings);
             }
 
             // Clear cache for this module

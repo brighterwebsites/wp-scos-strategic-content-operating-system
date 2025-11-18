@@ -16,6 +16,7 @@
         initModuleToggles();
         initImportExport();
         initCacheClear();
+        initModuleSettingsAccordion();
     });
 
     /**
@@ -46,10 +47,14 @@
                         // Update card state
                         if (enabled) {
                             $card.removeClass('disabled').addClass('enabled');
+                            // Show settings card
+                            $('.se-module-settings-card[data-module-id="' + moduleId + '"]').slideDown();
                             showNotice('success', 'Module enabled. Reload the page to see changes.');
                         } else {
                             $card.removeClass('enabled').addClass('disabled');
-                            showNotice('success', 'Module disabled. Reload the page to see changes.');
+                            // Hide settings card
+                            $('.se-module-settings-card[data-module-id="' + moduleId + '"]').slideUp();
+                            showNotice('success', 'Module disabled. Settings hidden but selections saved.');
                         }
                     } else {
                         // Revert toggle on error
@@ -154,6 +159,31 @@
                     $button.prop('disabled', false).text('Import Settings');
                 }
             });
+        });
+    }
+
+    /**
+     * Initialize module settings accordion
+     *
+     * Show/hide settings cards based on module enabled state
+     */
+    function initModuleSettingsAccordion() {
+        // Hide settings for disabled modules on page load
+        $('.se-module-card.disabled').each(function() {
+            const moduleId = $(this).data('module-id');
+            $('.se-module-settings-card[data-module-id="' + moduleId + '"]').hide();
+        });
+
+        // Add click handler to toggle cards for instant show/hide (before AJAX)
+        $('.se-module-toggle').on('click', function() {
+            const moduleId = $(this).data('module-id');
+            const $settingsCard = $('.se-module-settings-card[data-module-id="' + moduleId + '"]');
+
+            if ($(this).is(':checked')) {
+                $settingsCard.slideDown(300);
+            } else {
+                $settingsCard.slideUp(300);
+            }
         });
     }
 

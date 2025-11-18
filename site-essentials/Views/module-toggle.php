@@ -76,7 +76,7 @@ if ($has_failed) {
                 </span>
             <?php else: ?>
                 <span class="status-indicator disabled">
-                    ○ <?php esc_html_e('Disabled', 'site-essentials'); ?>
+                    ⊗ <?php esc_html_e('Toggle On to Load', 'site-essentials'); ?>
                 </span>
             <?php endif; ?>
         </div>

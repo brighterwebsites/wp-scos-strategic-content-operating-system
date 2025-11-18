@@ -55,7 +55,9 @@ if (!defined('ABSPATH')) {
                     <p><?php esc_html_e('Configure settings for each enabled module below.', 'site-essentials'); ?></p>
 
                     <?php foreach ($loaded_modules as $module_id => $module): ?>
-                        <div class="card" style="margin-bottom: 30px;">
+                        <div class="card se-module-settings-card"
+                             data-module-id="<?php echo esc_attr($module_id); ?>"
+                             style="margin-bottom: 30px;">
                             <h3 style="margin-top: 0;">
                                 <?php echo esc_html($module::get_name()); ?>
                                 <span class="se-module-tier tier-<?php echo esc_attr($module::get_tier()); ?>" style="font-size: 11px; margin-left: 10px;">

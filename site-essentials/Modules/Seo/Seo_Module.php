@@ -125,6 +125,9 @@ class Seo_Module implements Module_Interface {
         // Handle sitemap requests
         add_action('template_redirect', [$this, 'serve_sitemap'], 1);
 
+        // Register HTML sitemap shortcode
+        add_shortcode('site_essentials_sitemap', [$this, 'render_html_sitemap_shortcode']);
+
         // Flush rewrite rules on activation
         if (!get_option('se_sitemap_rules_flushed')) {
             flush_rewrite_rules();
@@ -184,7 +187,12 @@ class Seo_Module implements Module_Interface {
         if ($sitemap === 'index') {
             $this->render_sitemap_index($settings);
         } else {
-            $this->render_post_type_sitemap($sitemap, $settings);
+            // Check if it's a taxonomy or post type
+            if (taxonomy_exists($sitemap)) {
+                $this->render_taxonomy_sitemap($sitemap, $settings);
+            } else {
+                $this->render_post_type_sitemap($sitemap, $settings);
+            }
         }
 
         exit;
@@ -210,9 +218,11 @@ class Seo_Module implements Module_Interface {
         return [
             'enabled'         => true,
             'post_types'      => ['post', 'page'],
+            'taxonomies'      => ['category'], // Categories ON by default, tags and custom tax OFF
             'include_images'  => true,
             'exclude_ids'     => [],
             'entries_per_sitemap' => 2000,
+            'html_sitemap_enabled' => false,
         ];
     }
 
@@ -226,6 +236,8 @@ class Seo_Module implements Module_Interface {
     private function render_sitemap_index($settings) {
         $cache_key = 'sitemap_index';
         $xml = Cache_Helper::remember($cache_key, function() use ($settings) {
+            // Track cache generation time
+            set_transient('se_sitemap_cache_time', current_time('timestamp'), DAY_IN_SECONDS);
             return $this->generate_sitemap_index($settings);
         }, 3600, 'seo');
 
@@ -244,8 +256,8 @@ class Seo_Module implements Module_Interface {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
+        // Add post type sitemaps
         $post_types = $settings['post_types'];
-
         foreach ($post_types as $post_type) {
             $post_type_obj = get_post_type_object($post_type);
             if (!$post_type_obj) {
@@ -257,6 +269,25 @@ class Seo_Module implements Module_Interface {
 
             $xml .= "\t<sitemap>\n";
             $xml .= "\t\t<loc>" . esc_url(home_url("/sitemap-{$post_type}.xml")) . "</loc>\n";
+            if ($last_modified) {
+                $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
+            }
+            $xml .= "\t</sitemap>\n";
+        }
+
+        // Add taxonomy sitemaps
+        $taxonomies = !empty($settings['taxonomies']) ? $settings['taxonomies'] : [];
+        foreach ($taxonomies as $taxonomy) {
+            $taxonomy_obj = get_taxonomy($taxonomy);
+            if (!$taxonomy_obj) {
+                continue;
+            }
+
+            // Get last modified date
+            $last_modified = $this->get_taxonomy_last_modified($taxonomy);
+
+            $xml .= "\t<sitemap>\n";
+            $xml .= "\t\t<loc>" . esc_url(home_url("/sitemap-{$taxonomy}.xml")) . "</loc>\n";
             if ($last_modified) {
                 $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
             }
@@ -341,7 +372,12 @@ class Seo_Module implements Module_Interface {
             'post__not_in'   => $settings['exclude_ids'],
         ];
 
-        return get_posts($args);
+        $posts = get_posts($args);
+
+        // Filter out noindex posts
+        return array_filter($posts, function($post) {
+            return !$this->is_noindex($post->ID);
+        });
     }
 
     /**
@@ -487,6 +523,166 @@ class Seo_Module implements Module_Interface {
     }
 
     /**
+     * Render taxonomy sitemap
+     *
+     * @since 1.0.0
+     * @param string $taxonomy Taxonomy name
+     * @param array  $settings Sitemap settings
+     * @return void
+     */
+    private function render_taxonomy_sitemap($taxonomy, $settings) {
+        // Validate taxonomy
+        if (!in_array($taxonomy, $settings['taxonomies'], true)) {
+            status_header(404);
+            return;
+        }
+
+        $cache_key = 'sitemap_tax_' . $taxonomy;
+        $xml = Cache_Helper::remember($cache_key, function() use ($taxonomy, $settings) {
+            return $this->generate_taxonomy_sitemap($taxonomy, $settings);
+        }, 3600, 'seo');
+
+        header('Content-Type: application/xml; charset=utf-8');
+        echo $xml;
+    }
+
+    /**
+     * Generate taxonomy sitemap XML
+     *
+     * @since  1.0.0
+     * @param  string $taxonomy Taxonomy name
+     * @param  array  $settings Sitemap settings
+     * @return string XML content
+     */
+    private function generate_taxonomy_sitemap($taxonomy, $settings) {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+        // Get terms
+        $terms = $this->get_taxonomy_terms($taxonomy, $settings);
+
+        foreach ($terms as $term) {
+            $xml .= $this->generate_taxonomy_url_entry($term);
+        }
+
+        $xml .= '</urlset>';
+
+        return $xml;
+    }
+
+    /**
+     * Get terms for taxonomy sitemap
+     *
+     * Excludes empty terms (0 posts) to prevent 404 errors.
+     *
+     * @since  1.0.0
+     * @param  string $taxonomy Taxonomy name
+     * @param  array  $settings Sitemap settings
+     * @return array  Terms
+     */
+    private function get_taxonomy_terms($taxonomy, $settings) {
+        $args = [
+            'taxonomy'   => $taxonomy,
+            'hide_empty' => true, // Exclude empty terms
+            'number'     => $settings['entries_per_sitemap'],
+            'orderby'    => 'name',
+            'order'      => 'ASC',
+        ];
+
+        return get_terms($args);
+    }
+
+    /**
+     * Generate URL entry for taxonomy term
+     *
+     * @since  1.0.0
+     * @param  WP_Term $term Term object
+     * @return string  XML URL entry
+     */
+    private function generate_taxonomy_url_entry($term) {
+        $xml = "\t<url>\n";
+        $xml .= "\t\t<loc>" . esc_url(get_term_link($term)) . "</loc>\n";
+        $xml .= "\t\t<changefreq>weekly</changefreq>\n";
+        $xml .= "\t\t<priority>0.5</priority>\n";
+        $xml .= "\t</url>\n";
+
+        return $xml;
+    }
+
+    /**
+     * Get last modified date for taxonomy
+     *
+     * Gets the most recent post modification date for posts in this taxonomy.
+     *
+     * @since  1.0.0
+     * @param  string $taxonomy Taxonomy name
+     * @return string|false Last modified date or false
+     */
+    private function get_taxonomy_last_modified($taxonomy) {
+        global $wpdb;
+
+        $last_modified = $wpdb->get_var($wpdb->prepare(
+            "SELECT p.post_modified_gmt
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
+            INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+            WHERE tt.taxonomy = %s
+            AND p.post_status = 'publish'
+            ORDER BY p.post_modified_gmt DESC
+            LIMIT 1",
+            $taxonomy
+        ));
+
+        return $last_modified;
+    }
+
+    /**
+     * Check if post should be noindexed
+     *
+     * Checks multiple sources for noindex directives.
+     *
+     * @since  1.0.0
+     * @param  int $post_id Post ID
+     * @return bool True if noindex, false otherwise
+     */
+    private function is_noindex($post_id) {
+        // Check Yoast SEO meta
+        $yoast_noindex = get_post_meta($post_id, '_yoast_wpseo_meta-robots-noindex', true);
+        if ($yoast_noindex === '1' || $yoast_noindex === 'noindex') {
+            return true;
+        }
+
+        // Check Rank Math meta
+        $rankmath_robots = get_post_meta($post_id, 'rank_math_robots', true);
+        if (is_array($rankmath_robots) && in_array('noindex', $rankmath_robots, true)) {
+            return true;
+        }
+
+        // Check SEOPress meta
+        $seopress_noindex = get_post_meta($post_id, '_seopress_robots_index', true);
+        if ($seopress_noindex === 'yes') {
+            return true;
+        }
+
+        // Check generic custom field (for custom implementations)
+        $custom_noindex = get_post_meta($post_id, '_robots_noindex', true);
+        if ($custom_noindex === '1' || $custom_noindex === 'yes') {
+            return true;
+        }
+
+        // Check via wp_robots filter (WordPress core)
+        // This is a bit tricky since wp_robots is context-dependent
+        // We'll apply a simplified check using the filter
+        $robots = apply_filters('wp_robots', []);
+        if (isset($robots['noindex']) && $robots['noindex'] === true) {
+            // Note: This checks global setting, not per-post
+            // For per-post, SEO plugins usually handle via their own meta
+        }
+
+        return false;
+    }
+
+    /**
      * Check for conflicting plugins
      *
      * @since 1.0.0
@@ -527,7 +723,148 @@ class Seo_Module implements Module_Interface {
     public function render_settings() {
         $sitemap_settings = $this->get_sitemap_settings();
         $all_post_types = get_post_types(['public' => true], 'objects');
+        $all_taxonomies = $this->get_available_taxonomies();
 
         include __DIR__ . '/views/settings.php';
+    }
+
+    /**
+     * Get available taxonomies for sitemap
+     *
+     * Only returns taxonomies with public => true AND show_ui => true
+     *
+     * @since  1.0.0
+     * @return array Taxonomies
+     */
+    private function get_available_taxonomies() {
+        $taxonomies = get_taxonomies([
+            'public'  => true,
+            'show_ui' => true,
+        ], 'objects');
+
+        return $taxonomies;
+    }
+
+    /**
+     * Render HTML sitemap shortcode
+     *
+     * @since  1.0.0
+     * @param  array $atts Shortcode attributes
+     * @return string HTML sitemap output
+     */
+    public function render_html_sitemap_shortcode($atts = []) {
+        $settings = $this->get_sitemap_settings();
+
+        // Check if HTML sitemap is enabled
+        if (empty($settings['html_sitemap_enabled'])) {
+            return '<p><em>' . esc_html__('HTML sitemap is not enabled.', 'site-essentials') . '</em></p>';
+        }
+
+        // Cache the HTML sitemap
+        $cache_key = 'html_sitemap';
+        $html = Cache_Helper::remember($cache_key, function() use ($settings) {
+            return $this->generate_html_sitemap($settings);
+        }, 3600, 'seo');
+
+        return $html;
+    }
+
+    /**
+     * Generate HTML sitemap
+     *
+     * Groups posts by post type with headings, sorted by menu order then A-Z.
+     * Shows both published and last modified dates.
+     *
+     * @since  1.0.0
+     * @param  array $settings Sitemap settings
+     * @return string HTML output
+     */
+    private function generate_html_sitemap($settings) {
+        $html = '<div class="site-essentials-html-sitemap">';
+
+        $post_types = $settings['post_types'];
+
+        foreach ($post_types as $post_type) {
+            $post_type_obj = get_post_type_object($post_type);
+            if (!$post_type_obj) {
+                continue;
+            }
+
+            // Get posts for this post type
+            $all_posts = get_posts([
+                'post_type'      => $post_type,
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'orderby'        => ['menu_order' => 'ASC', 'title' => 'ASC'],
+                'post__not_in'   => $settings['exclude_ids'],
+            ]);
+
+            // Filter out noindex posts
+            $posts = array_filter($all_posts, function($post) {
+                return !$this->is_noindex($post->ID);
+            });
+
+            if (empty($posts)) {
+                continue;
+            }
+
+            // Post type heading
+            $html .= '<div class="sitemap-section">';
+            $html .= '<h2>' . esc_html($post_type_obj->labels->name) . '</h2>';
+            $html .= '<ul class="sitemap-list">';
+
+            foreach ($posts as $post) {
+                $published = get_the_date('F j, Y', $post);
+                $modified = get_the_modified_date('F j, Y', $post);
+
+                $html .= '<li>';
+                $html .= '<a href="' . esc_url(get_permalink($post)) . '">' . esc_html(get_the_title($post)) . '</a>';
+                $html .= ' <span class="sitemap-dates">';
+                $html .= '<span class="published">Published: ' . esc_html($published) . '</span>';
+                if ($published !== $modified) {
+                    $html .= ' | <span class="modified">Updated: ' . esc_html($modified) . '</span>';
+                }
+                $html .= '</span>';
+                $html .= '</li>';
+            }
+
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+
+        $html .= '</div>';
+
+        // Add basic styling
+        $html .= '<style>
+            .site-essentials-html-sitemap {
+                margin: 20px 0;
+            }
+            .site-essentials-html-sitemap .sitemap-section {
+                margin-bottom: 30px;
+            }
+            .site-essentials-html-sitemap h2 {
+                border-bottom: 2px solid #ddd;
+                padding-bottom: 10px;
+                margin-bottom: 15px;
+            }
+            .site-essentials-html-sitemap .sitemap-list {
+                list-style: none;
+                padding-left: 0;
+            }
+            .site-essentials-html-sitemap .sitemap-list li {
+                margin-bottom: 10px;
+                padding: 8px;
+                background: #f9f9f9;
+                border-left: 3px solid #0073aa;
+            }
+            .site-essentials-html-sitemap .sitemap-dates {
+                display: block;
+                font-size: 0.9em;
+                color: #666;
+                margin-top: 4px;
+            }
+        </style>';
+
+        return $html;
     }
 }

@@ -34,13 +34,97 @@ if (!defined('ABSPATH')) {
             </p>
         </div>
 
+        <!-- Sitemap Stats Widget -->
+        <?php
+        // Calculate sitemap stats
+        $total_posts = 0;
+        $post_type_counts = [];
+
+        foreach ($sitemap_settings['post_types'] as $post_type) {
+            $count = wp_count_posts($post_type);
+            if (isset($count->publish)) {
+                $post_type_obj = get_post_type_object($post_type);
+                $post_type_counts[$post_type] = [
+                    'label' => $post_type_obj ? $post_type_obj->labels->name : $post_type,
+                    'count' => $count->publish,
+                ];
+                $total_posts += $count->publish;
+            }
+        }
+
+        $cache_time = get_transient('se_sitemap_cache_time');
+        $cache_age = $cache_time ? human_time_diff($cache_time, current_time('timestamp')) : 'Never';
+        ?>
+        <div class="card" style="margin: 0 0 20px 0; max-width: 400px;">
+            <h3 style="margin-top: 0;">📊 Sitemap Stats</h3>
+            <table class="widefat" style="border: none;">
+                <tbody>
+                    <tr>
+                        <td style="border: none; padding: 5px 0;"><strong>Total URLs:</strong></td>
+                        <td style="border: none; padding: 5px 0;"><?php echo number_format($total_posts); ?></td>
+                    </tr>
+                    <?php foreach ($post_type_counts as $data): ?>
+                    <tr>
+                        <td style="border: none; padding: 5px 0; padding-left: 20px;">↳ <?php echo esc_html($data['label']); ?>:</td>
+                        <td style="border: none; padding: 5px 0;"><?php echo number_format($data['count']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <tr>
+                        <td style="border: none; padding: 5px 0;"><strong>Last Generated:</strong></td>
+                        <td style="border: none; padding: 5px 0;"><?php echo esc_html($cache_age); ?> ago</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <?php if (!empty($sitemap_settings['html_sitemap_enabled'])): ?>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                <p style="margin: 0 0 10px;"><strong>HTML Sitemap Shortcode:</strong></p>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text"
+                           id="se-html-sitemap-shortcode"
+                           value="[site_essentials_sitemap]"
+                           readonly
+                           style="flex: 1; font-family: monospace; font-size: 13px;"
+                           onclick="this.select()">
+                    <button type="button"
+                            class="button button-secondary"
+                            id="se-copy-shortcode"
+                            style="white-space: nowrap;">
+                        Copy
+                    </button>
+                </div>
+                <p class="description" style="margin-top: 5px;">
+                    Paste this shortcode on any page to display an HTML sitemap.
+                </p>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <script>
+        jQuery(document).ready(function($) {
+            $('#se-copy-shortcode').on('click', function() {
+                var $input = $('#se-html-sitemap-shortcode');
+                $input.select();
+                document.execCommand('copy');
+
+                var $button = $(this);
+                var originalText = $button.text();
+                $button.text('Copied!');
+
+                setTimeout(function() {
+                    $button.text(originalText);
+                }, 2000);
+            });
+        });
+        </script>
+
         <table class="form-table" role="presentation">
             <tbody>
-                <!-- Enable Sitemaps -->
+                <!-- Enable XML Sitemaps -->
                 <tr>
                     <th scope="row">
                         <label for="sitemap_enabled">
-                            <?php esc_html_e('Enable Sitemaps', 'site-essentials'); ?>
+                            <?php esc_html_e('Enable XML Sitemaps', 'site-essentials'); ?>
                         </label>
                     </th>
                     <td>
@@ -54,6 +138,31 @@ if (!defined('ABSPATH')) {
                         </label>
                         <p class="description">
                             <?php esc_html_e('Automatically generates XML sitemaps for your site content.', 'site-essentials'); ?>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Enable HTML Sitemap -->
+                <tr>
+                    <th scope="row">
+                        <label for="html_sitemap_enabled">
+                            <?php esc_html_e('Enable HTML Sitemap', 'site-essentials'); ?>
+                        </label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox"
+                                   id="html_sitemap_enabled"
+                                   name="sitemap[html_sitemap_enabled]"
+                                   value="1"
+                                   <?php checked(!empty($sitemap_settings['html_sitemap_enabled'])); ?>>
+                            <?php esc_html_e('Enable HTML sitemap with shortcode', 'site-essentials'); ?>
+                        </label>
+                        <p class="description">
+                            <?php esc_html_e('Use shortcode:', 'site-essentials'); ?>
+                            <code>[site_essentials_sitemap]</code>
+                            <br>
+                            <?php esc_html_e('Displays a user-friendly sitemap grouped by post type with published and updated dates.', 'site-essentials'); ?>
                         </p>
                     </td>
                 </tr>
@@ -75,7 +184,29 @@ if (!defined('ABSPATH')) {
                             </label>
                         <?php endforeach; ?>
                         <p class="description">
-                            <?php esc_html_e('Select which post types to include in sitemaps.', 'site-essentials'); ?>
+                            <?php esc_html_e('Select which post types to include in sitemaps. Posts & Pages are ON by default.', 'site-essentials'); ?>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Taxonomies -->
+                <tr>
+                    <th scope="row">
+                        <?php esc_html_e('Include Taxonomies', 'site-essentials'); ?>
+                    </th>
+                    <td>
+                        <?php foreach ($all_taxonomies as $taxonomy => $taxonomy_obj): ?>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox"
+                                       name="sitemap[taxonomies][]"
+                                       value="<?php echo esc_attr($taxonomy); ?>"
+                                       <?php checked(in_array($taxonomy, !empty($sitemap_settings['taxonomies']) ? $sitemap_settings['taxonomies'] : [], true)); ?>>
+                                <?php echo esc_html($taxonomy_obj->labels->name); ?>
+                                <small>(<?php echo esc_html($taxonomy); ?>)</small>
+                            </label>
+                        <?php endforeach; ?>
+                        <p class="description">
+                            <?php esc_html_e('Select which taxonomies to include in sitemaps. Categories are ON by default. Empty terms (0 posts) are automatically excluded to prevent 404 errors.', 'site-essentials'); ?>
                         </p>
                     </td>
                 </tr>

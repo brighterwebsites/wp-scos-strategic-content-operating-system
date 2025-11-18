@@ -35,12 +35,14 @@ class Admin_UI {
     private $settings;
 
     /**
-     * Page slug
+     * Page slugs
      *
      * @since 1.0.0
      * @var   string
      */
     const PAGE_SLUG = 'site-essentials';
+    const SEO_PAGE_SLUG = 'site-essentials-seo';
+    const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
 
     /**
      * Constructor
@@ -72,19 +74,47 @@ class Admin_UI {
     }
 
     /**
-     * Add admin menu item
+     * Add admin menu items
+     *
+     * Creates top-level menu with submenu items for Settings and SEO.
      *
      * @since 1.0.0
      * @return void
      */
     public function add_admin_menu() {
-        add_options_page(
-            __('Site Essentials', 'site-essentials'),
-            __('Site Essentials', 'site-essentials'),
-            'manage_options',
-            self::PAGE_SLUG,
-            [$this, 'render_settings_page']
+        // Top-level menu
+        add_menu_page(
+            __('Site Essentials', 'site-essentials'),           // Page title
+            __('Site Essentials', 'site-essentials'),           // Menu title
+            'manage_options',                                    // Capability
+            self::PAGE_SLUG,                                     // Menu slug
+            [$this, 'render_settings_page'],                    // Callback
+            'dashicons-admin-generic',                           // Icon
+            30                                                   // Position
         );
+
+        // Settings submenu (default/first item)
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Settings', 'site-essentials'),                   // Page title
+            __('Settings', 'site-essentials'),                   // Menu title
+            'manage_options',                                    // Capability
+            self::SETTINGS_PAGE_SLUG,                           // Menu slug
+            [$this, 'render_settings_page']                     // Callback
+        );
+
+        // SEO submenu
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('SEO & Sitemaps', 'site-essentials'),            // Page title
+            __('SEO', 'site-essentials'),                        // Menu title
+            'manage_options',                                    // Capability
+            self::SEO_PAGE_SLUG,                                // Menu slug
+            [$this, 'render_seo_page']                          // Callback
+        );
+
+        // Remove duplicate first submenu item (WordPress auto-adds parent as first submenu)
+        remove_submenu_page(self::PAGE_SLUG, self::PAGE_SLUG);
     }
 
     /**
@@ -170,6 +200,26 @@ class Admin_UI {
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'modules';
 
         include SITE_ESSENTIALS_PATH . 'Views/settings-page.php';
+    }
+
+    /**
+     * Render SEO page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_seo_page() {
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'sitemaps';
+
+        // Get SEO module if loaded
+        $seo_module = Module_Loader::get_module('seo');
+
+        include SITE_ESSENTIALS_PATH . 'Views/seo-page.php';
     }
 
     /**
@@ -379,17 +429,24 @@ class Admin_UI {
             ? array_map('sanitize_key', $sitemap['post_types'])
             : [];
 
+        // Process taxonomies
+        $taxonomies = isset($sitemap['taxonomies']) && is_array($sitemap['taxonomies'])
+            ? array_map('sanitize_key', $sitemap['taxonomies'])
+            : [];
+
         // Process exclude IDs
         $exclude_ids_string = isset($sitemap['exclude_ids']) ? sanitize_text_field($sitemap['exclude_ids']) : '';
         $exclude_ids = array_filter(array_map('intval', explode(',', $exclude_ids_string)));
 
         // Build settings array
         $sitemap_settings = [
-            'enabled'             => isset($sitemap['enabled']),
-            'post_types'          => $post_types,
-            'include_images'      => isset($sitemap['include_images']),
-            'entries_per_sitemap' => isset($sitemap['entries_per_sitemap']) ? absint($sitemap['entries_per_sitemap']) : 2000,
-            'exclude_ids'         => $exclude_ids,
+            'enabled'              => isset($sitemap['enabled']),
+            'html_sitemap_enabled' => isset($sitemap['html_sitemap_enabled']),
+            'post_types'           => $post_types,
+            'taxonomies'           => $taxonomies,
+            'include_images'       => isset($sitemap['include_images']),
+            'entries_per_sitemap'  => isset($sitemap['entries_per_sitemap']) ? absint($sitemap['entries_per_sitemap']) : 2000,
+            'exclude_ids'          => $exclude_ids,
         ];
 
         // Save settings

@@ -104,6 +104,11 @@ add_action('plugins_loaded', function() {
             \SiteEssentials\Modules\Tweaks\Tweaks_Module::class
         );
 
+        \SiteEssentials\Core\Module_Loader::register(
+            'seo',
+            \SiteEssentials\Modules\Seo\Seo_Module::class
+        );
+
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();
 

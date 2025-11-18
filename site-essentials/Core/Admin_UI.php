@@ -66,7 +66,9 @@ class Admin_UI {
         add_action('wp_ajax_site_essentials_toggle_module', [$this, 'ajax_toggle_module']);
         add_action('wp_ajax_site_essentials_export_settings', [$this, 'ajax_export_settings']);
         add_action('wp_ajax_site_essentials_import_settings', [$this, 'ajax_import_settings']);
+        add_action('wp_ajax_site_essentials_clear_sitemap_cache', [$this, 'ajax_clear_sitemap_cache']);
         add_action('admin_post_site_essentials_save_tweaks', [$this, 'save_tweaks_settings']);
+        add_action('admin_post_site_essentials_save_seo', [$this, 'save_seo_settings']);
     }
 
     /**
@@ -349,5 +351,83 @@ class Admin_UI {
 
         wp_safe_redirect($redirect_url);
         exit;
+    }
+
+    /**
+     * Save SEO settings
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function save_seo_settings() {
+        // Check nonce
+        if (!isset($_POST['site_essentials_seo_nonce']) ||
+            !wp_verify_nonce($_POST['site_essentials_seo_nonce'], 'site_essentials_seo')) {
+            wp_die(__('Security check failed', 'site-essentials'));
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'site-essentials'));
+        }
+
+        // Get sitemap settings
+        $sitemap = isset($_POST['sitemap']) && is_array($_POST['sitemap']) ? $_POST['sitemap'] : [];
+
+        // Process post types
+        $post_types = isset($sitemap['post_types']) && is_array($sitemap['post_types'])
+            ? array_map('sanitize_key', $sitemap['post_types'])
+            : [];
+
+        // Process exclude IDs
+        $exclude_ids_string = isset($sitemap['exclude_ids']) ? sanitize_text_field($sitemap['exclude_ids']) : '';
+        $exclude_ids = array_filter(array_map('intval', explode(',', $exclude_ids_string)));
+
+        // Build settings array
+        $sitemap_settings = [
+            'enabled'             => isset($sitemap['enabled']),
+            'post_types'          => $post_types,
+            'include_images'      => isset($sitemap['include_images']),
+            'entries_per_sitemap' => isset($sitemap['entries_per_sitemap']) ? absint($sitemap['entries_per_sitemap']) : 2000,
+            'exclude_ids'         => $exclude_ids,
+        ];
+
+        // Save settings
+        $this->settings->update_module_settings('seo', ['sitemap' => $sitemap_settings]);
+
+        // Clear sitemap cache
+        Cache_Helper::flush('seo');
+
+        // Flush rewrite rules since sitemap rules may have changed
+        flush_rewrite_rules();
+
+        // Redirect back with success message
+        $redirect_url = add_query_arg([
+            'page'    => self::PAGE_SLUG,
+            'tab'     => 'modules',
+            'updated' => 'true',
+        ], admin_url('options-general.php'));
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    /**
+     * AJAX: Clear sitemap cache
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function ajax_clear_sitemap_cache() {
+        check_ajax_referer('site_essentials_seo', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Insufficient permissions']);
+        }
+
+        // Clear sitemap cache
+        Cache_Helper::flush('seo');
+
+        wp_send_json_success(['message' => 'Sitemap cache cleared successfully']);
     }
 }

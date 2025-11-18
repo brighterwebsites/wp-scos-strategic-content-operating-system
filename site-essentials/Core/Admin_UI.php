@@ -225,15 +225,25 @@ class Admin_UI {
             wp_send_json_error(['message' => 'Module ID required']);
         }
 
+        $result = false;
         if ($enabled) {
-            $this->settings->enable_module($module_id);
+            $result = $this->settings->enable_module($module_id);
         } else {
-            $this->settings->disable_module($module_id);
+            $result = $this->settings->disable_module($module_id);
         }
+
+        // Verify the change was made
+        $is_now_enabled = $this->settings->is_module_enabled($module_id);
+
+        // Get current enabled modules for debugging
+        $enabled_modules = $this->settings->get('enabled_modules', []);
 
         wp_send_json_success([
             'message' => $enabled ? 'Module enabled' : 'Module disabled',
             'enabled' => $enabled,
+            'verified' => $is_now_enabled === $enabled,
+            'db_update_result' => $result,
+            'enabled_modules' => $enabled_modules, // For debugging
         ]);
     }
 

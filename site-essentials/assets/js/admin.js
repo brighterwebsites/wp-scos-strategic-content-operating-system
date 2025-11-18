@@ -43,18 +43,30 @@
                     enabled: enabled
                 },
                 success: function(response) {
+                    // Debug logging
+                    console.log('Toggle response:', response);
+
                     if (response.success) {
+                        // Verify the toggle worked
+                        if (response.data.verified !== true) {
+                            console.error('Toggle verification failed!', response.data);
+                            $toggle.prop('checked', !enabled);
+                            showNotice('error', 'Module toggle failed verification. Please refresh and try again.');
+                            $toggle.prop('disabled', false);
+                            return;
+                        }
+
                         // Update card state
                         if (enabled) {
                             $card.removeClass('disabled').addClass('enabled');
                             // Show settings card
                             $('.se-module-settings-card[data-module-id="' + moduleId + '"]').slideDown();
-                            showNotice('success', 'Module enabled. Reload the page to see changes.');
+                            showNotice('success', 'Module enabled successfully.');
                         } else {
                             $card.removeClass('enabled').addClass('disabled');
                             // Hide settings card
                             $('.se-module-settings-card[data-module-id="' + moduleId + '"]').slideUp();
-                            showNotice('success', 'Module disabled. Settings hidden but selections saved.');
+                            showNotice('success', 'Module disabled. Settings saved and hidden.');
                         }
                     } else {
                         // Revert toggle on error

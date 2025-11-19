@@ -509,8 +509,11 @@ class Admin_UI {
         // Save settings
         $this->settings->update_module_settings('seo', ['sitemap' => $sitemap_settings]);
 
-        // Clear sitemap cache
+        // Clear sitemap cache (internal)
         Cache_Helper::flush('seo');
+
+        // Clear page caches (LiteSpeed, WP Super Cache, etc.)
+        $this->clear_page_cache();
 
         // Flush rewrite rules since sitemap rules may have changed
         flush_rewrite_rules();
@@ -539,9 +542,46 @@ class Admin_UI {
             wp_send_json_error(['message' => 'Insufficient permissions']);
         }
 
-        // Clear sitemap cache
+        // Clear our internal sitemap cache
         Cache_Helper::flush('seo');
 
-        wp_send_json_success(['message' => 'Sitemap cache cleared successfully']);
+        // Clear page caches
+        $this->clear_page_cache();
+
+        wp_send_json_success([
+            'message' => 'Sitemap cache cleared successfully (internal + page cache)'
+        ]);
+    }
+
+    /**
+     * Clear all page caches
+     *
+     * Detects and clears LiteSpeed, WP Super Cache, W3 Total Cache, and WP Rocket.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function clear_page_cache() {
+        // Clear LiteSpeed Cache if active
+        if (function_exists('litespeed_purge_all')) {
+            litespeed_purge_all();
+        } elseif (class_exists('LiteSpeed_Cache_API') && method_exists('LiteSpeed_Cache_API', 'purge_all')) {
+            \LiteSpeed_Cache_API::purge_all();
+        }
+
+        // Clear WP Super Cache if active
+        if (function_exists('wp_cache_clear_cache')) {
+            wp_cache_clear_cache();
+        }
+
+        // Clear W3 Total Cache if active
+        if (function_exists('w3tc_flush_all')) {
+            w3tc_flush_all();
+        }
+
+        // Clear WP Rocket cache if active
+        if (function_exists('rocket_clean_domain')) {
+            rocket_clean_domain();
+        }
     }
 }

@@ -369,7 +369,7 @@
 
 ### Module 10: FAQ System
 **Current State:** ✅ Active
-**Tier:** Pro (or Basic?)
+**Tier:** Pro
 
 **Features (Current):**
 - Custom post type
@@ -784,29 +784,66 @@ analytics/
 
 ---
 
-## Open Questions
+## Confirmed Decisions
 
-1. **Should Support Portal be always on or agency-only?**
-   - Current thinking: Toggle it (show for agency clients, hide for white-label)
+### 1. Support Portal
+**Decision:** Keep it (yes)
+- Toggle: Show for agency clients, hide for white-label
+- Tier: Agency
 
-2. **Should FAQ system be Basic or Pro tier?**
-   - Current thinking: Pro (it's a content tool)
-   - Alternative: Basic (it's structural)
+### 2. FAQ System Tier
+**Decision:** Pro tier
+- Confirmed as content tool
+- Not included in Basic tier
 
-3. **Performance testing - what tools?**
-   - Query Monitor (installed?)
-   - New Relic? (overkill?)
-   - Custom performance dashboard?
+### 3. Performance Monitoring Approach
+**Tools:**
+- Query Monitor (installed and actively used)
+- Chrome DevTools
+- PageSpeed Insights
 
-4. **Object cache - expand to other features?**
-   - Yes! Standardize cache helper across all modules
-   - Per-module cache toggles
-   - Cache invalidation hooks
+**Approach:**
+- Skip building custom performance dashboard
+- Prefer performance checklist with best practices and recommendations
+- Consider building CustomGPT tool off-site for performance analysis
+- Keep monitoring simple and actionable
 
-5. **Module dependencies - how to handle?**
-   - Example: Analytics module depends on Business Info for region
-   - Solution: Check dependencies, show error if missing
-   - Alternative: Make all modules independent
+### 4. Object Cache Standardization
+**Decision:** Yes! Standardize Cache_Helper across all modules
+
+**Implementation:**
+- Single Cache_Helper class all modules use
+- Consistent "remember" pattern for all caching
+- Cache invalidation hooks standardized across modules (clear cache when data changes)
+- Per-module cache toggles: Start with global on/off, add per-module toggles later if needed for debugging
+
+**Cache Invalidation Example:**
+```php
+// When business info changes, clear cache immediately
+add_action('update_option', function($option_name) {
+    if (strpos($option_name, 'site_essentials_business_info') === 0) {
+        Cache_Helper::flush('business_info');
+    }
+});
+```
+
+### 5. Module Dependencies
+**Approach:** Handle as we encounter them during refactor
+
+**Guidelines:**
+- Avoid duplication where possible
+- Related modules may be packaged together but individually toggleable
+- Example: Analytics, Content Strategy, Privacy, and Cookie modules are related but can toggle on/off independently
+- For standalone extraction: Modules should be 80% standalone to minimize additional work for full extraction
+- Check dependencies at load time, show clear error if missing required module
+
+**Example Dependency Chain:**
+```
+Analytics Module
+├── Can use Business Info (optional, for region data)
+├── Can use Content Strategy (optional, for dimensions)
+└── Works standalone with reduced features
+```
 
 ---
 
@@ -817,9 +854,10 @@ analytics/
 **Key Principles:**
 1. Performance first - disabled = not loaded
 2. Modular - each feature independent
-3. Extractable - modules become products
+3. Extractable - modules become products (80% standalone)
 4. User-friendly - settings are clear
 5. Well-documented - for users and developers
+6. Admin design - Material Design, professional, accessibility-friendly colors
 
 **Success = Client sites run better + You have a product to sell**
 

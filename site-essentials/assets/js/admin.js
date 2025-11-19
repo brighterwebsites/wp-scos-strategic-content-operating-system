@@ -56,22 +56,22 @@
                             return;
                         }
 
-                        // Update card state
+                        // Show success message and reload page to reflect changes
                         if (enabled) {
-                            $card.removeClass('disabled').addClass('enabled');
-                            // Show settings card
-                            $('.se-module-settings-card[data-module-id="' + moduleId + '"]').slideDown();
-                            showNotice('success', 'Module enabled successfully.');
+                            showNotice('success', 'Module enabled. Reloading page...');
                         } else {
-                            $card.removeClass('enabled').addClass('disabled');
-                            // Hide settings card
-                            $('.se-module-settings-card[data-module-id="' + moduleId + '"]').slideUp();
-                            showNotice('success', 'Module disabled. Settings saved and hidden.');
+                            showNotice('success', 'Module disabled. Reloading page...');
                         }
+
+                        // Reload page after 800ms to show correct module state
+                        setTimeout(function() {
+                            location.reload();
+                        }, 800);
                     } else {
                         // Revert toggle on error
                         $toggle.prop('checked', !enabled);
                         showNotice('error', response.data.message || 'Failed to toggle module');
+                        $toggle.prop('disabled', false);
                     }
                 },
                 error: function() {

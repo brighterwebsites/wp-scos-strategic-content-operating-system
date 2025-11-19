@@ -94,27 +94,31 @@ class Admin_UI {
             30                                                   // Position
         );
 
-        // SEO submenu
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('SEO Basics', 'site-essentials'),                // Page title
-            __('SEO', 'site-essentials'),                        // Menu title
-            'manage_options',                                    // Capability
-            self::SEO_PAGE_SLUG,                                // Menu slug
-            [$this, 'render_seo_page']                          // Callback
-        );
+        // SEO submenu (only if SEO module is enabled)
+        if ($this->settings->is_module_enabled('seo')) {
+            add_submenu_page(
+                self::PAGE_SLUG,                                     // Parent slug
+                __('SEO Basics', 'site-essentials'),                // Page title
+                __('SEO', 'site-essentials'),                        // Menu title
+                'manage_options',                                    // Capability
+                self::SEO_PAGE_SLUG,                                // Menu slug
+                [$this, 'render_seo_page']                          // Callback
+            );
+        }
 
-        // Essentials submenu
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Essentials', 'site-essentials'),                // Page title
-            __('Essentials', 'site-essentials'),                // Menu title
-            'manage_options',                                    // Capability
-            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
-            [$this, 'render_essentials_page']                   // Callback
-        );
+        // Essentials submenu (only if tweaks module is enabled)
+        if ($this->settings->is_module_enabled('tweaks')) {
+            add_submenu_page(
+                self::PAGE_SLUG,                                     // Parent slug
+                __('Essentials', 'site-essentials'),                // Page title
+                __('Essentials', 'site-essentials'),                // Menu title
+                'manage_options',                                    // Capability
+                self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
+                [$this, 'render_essentials_page']                   // Callback
+            );
+        }
 
-        // Settings submenu
+        // Settings submenu (always visible)
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
             __('Plugin Settings', 'site-essentials'),           // Page title

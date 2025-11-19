@@ -319,6 +319,12 @@ class Admin_UI {
             wp_send_json_error(['message' => 'Module ID required']);
         }
 
+        // Get state BEFORE toggle
+        $before_memory = $this->settings->get('enabled_modules', []);
+        $before_db = get_option(Settings_Manager::CORE_OPTION, []);
+        $before_db_modules = isset($before_db['enabled_modules']) ? $before_db['enabled_modules'] : [];
+
+        // Perform the toggle
         $result = false;
         if ($enabled) {
             $result = $this->settings->enable_module($module_id);
@@ -326,18 +332,27 @@ class Admin_UI {
             $result = $this->settings->disable_module($module_id);
         }
 
-        // Verify the change was made
-        $is_now_enabled = $this->settings->is_module_enabled($module_id);
+        // Get state AFTER toggle
+        $after_memory = $this->settings->get('enabled_modules', []);
+        $after_db = get_option(Settings_Manager::CORE_OPTION, []);
+        $after_db_modules = isset($after_db['enabled_modules']) ? $after_db['enabled_modules'] : [];
 
-        // Get current enabled modules for debugging
-        $enabled_modules = $this->settings->get('enabled_modules', []);
+        // Verify the change in DB (not just memory)
+        $is_now_enabled_in_db = in_array($module_id, $after_db_modules, true);
+        $verified = $is_now_enabled_in_db === $enabled;
 
         wp_send_json_success([
             'message' => $enabled ? 'Module enabled' : 'Module disabled',
             'enabled' => $enabled,
-            'verified' => $is_now_enabled === $enabled,
+            'verified' => $verified,
             'db_update_result' => $result,
-            'enabled_modules' => $enabled_modules, // For debugging
+            'debug' => [
+                'before_memory' => $before_memory,
+                'before_db' => $before_db_modules,
+                'after_memory' => $after_memory,
+                'after_db' => $after_db_modules,
+                'option_name' => Settings_Manager::CORE_OPTION,
+            ],
         ]);
     }
 

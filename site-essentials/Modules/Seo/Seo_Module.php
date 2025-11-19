@@ -362,6 +362,9 @@ class Seo_Module implements Module_Interface {
      * @return array  Posts
      */
     private function get_sitemap_posts($post_type, $settings) {
+        // Temporarily remove any query filters that might limit posts_per_page
+        add_filter('post_limits', [$this, 'remove_query_limit'], 999);
+
         $args = [
             'post_type'      => $post_type,
             'post_status'    => 'publish',
@@ -370,14 +373,31 @@ class Seo_Module implements Module_Interface {
             'order'          => 'DESC',
             'no_found_rows'  => true,
             'post__not_in'   => $settings['exclude_ids'],
+            'nopaging'       => true, // Ensure no paging
         ];
 
         $posts = get_posts($args);
+
+        // Remove the filter after query
+        remove_filter('post_limits', [$this, 'remove_query_limit'], 999);
 
         // Filter out noindex posts
         return array_filter($posts, function($post) {
             return !$this->is_noindex($post->ID);
         });
+    }
+
+    /**
+     * Remove SQL LIMIT clause for sitemap queries
+     *
+     * Ensures all posts are retrieved for sitemaps.
+     *
+     * @since  1.0.0
+     * @param  string $limits SQL LIMIT clause
+     * @return string Empty string to remove limit
+     */
+    public function remove_query_limit($limits) {
+        return ''; // Remove LIMIT clause entirely
     }
 
     /**
@@ -746,6 +766,9 @@ class Seo_Module implements Module_Interface {
             'taxonomies' => [],
         ];
 
+        // Temporarily remove any query filters that might limit posts_per_page
+        add_filter('post_limits', [$this, 'remove_query_limit'], 999);
+
         // Count post types (matching sitemap generation logic)
         foreach ($settings['post_types'] as $post_type) {
             $posts = get_posts([
@@ -754,6 +777,7 @@ class Seo_Module implements Module_Interface {
                 'posts_per_page' => -1,
                 'fields'         => 'ids',
                 'post__not_in'   => $settings['exclude_ids'],
+                'nopaging'       => true,
             ]);
 
             // Filter out noindex posts
@@ -773,6 +797,9 @@ class Seo_Module implements Module_Interface {
                 $stats['total_urls'] += $count;
             }
         }
+
+        // Remove the filter after queries
+        remove_filter('post_limits', [$this, 'remove_query_limit'], 999);
 
         // Count taxonomies
         $taxonomies = !empty($settings['taxonomies']) ? $settings['taxonomies'] : [];

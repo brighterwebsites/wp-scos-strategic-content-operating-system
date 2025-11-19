@@ -83,13 +83,13 @@ class Admin_UI {
      * @return void
      */
     public function add_admin_menu() {
-        // Top-level menu (blank for now)
+        // Top-level menu (welcome page)
         add_menu_page(
             __('Site Essentials', 'site-essentials'),           // Page title
             __('Site Essentials', 'site-essentials'),           // Menu title
             'manage_options',                                    // Capability
             self::PAGE_SLUG,                                     // Menu slug
-            '__return_null',                                     // Blank callback
+            [$this, 'render_welcome_page'],                     // Callback
             'dashicons-admin-generic',                           // Icon
             30                                                   // Position
         );
@@ -205,6 +205,21 @@ class Admin_UI {
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce'   => wp_create_nonce('site_essentials_admin'),
         ]);
+    }
+
+    /**
+     * Render welcome page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_welcome_page() {
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        include SITE_ESSENTIALS_PATH . 'Views/welcome-page.php';
     }
 
     /**

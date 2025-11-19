@@ -167,8 +167,15 @@ class Admin_UI {
      * @return void
      */
     public function enqueue_assets($hook) {
-        // Only load on our settings page
-        if ($hook !== 'settings_page_' . self::PAGE_SLUG) {
+        // Only load on Site Essentials pages
+        $allowed_hooks = [
+            'toplevel_page_' . self::SEO_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SEO_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
+        ];
+
+        if (!in_array($hook, $allowed_hooks, true)) {
             return;
         }
 
@@ -425,10 +432,10 @@ class Admin_UI {
 
         // Redirect back with success message
         $redirect_url = add_query_arg([
-            'page' => self::PAGE_SLUG,
-            'tab' => 'modules',
+            'page'    => self::ESSENTIALS_PAGE_SLUG,
+            'tab'     => 'tweaks',
             'updated' => 'true',
-        ], admin_url('options-general.php'));
+        ], admin_url('admin.php'));
 
         wp_safe_redirect($redirect_url);
         exit;
@@ -491,10 +498,10 @@ class Admin_UI {
 
         // Redirect back with success message
         $redirect_url = add_query_arg([
-            'page'    => self::PAGE_SLUG,
-            'tab'     => 'modules',
+            'page'    => self::SEO_PAGE_SLUG,
+            'tab'     => 'sitemaps',
             'updated' => 'true',
-        ], admin_url('options-general.php'));
+        ], admin_url('admin.php'));
 
         wp_safe_redirect($redirect_url);
         exit;
@@ -507,7 +514,7 @@ class Admin_UI {
      * @return void
      */
     public function ajax_clear_sitemap_cache() {
-        check_ajax_referer('site_essentials_seo', 'nonce');
+        check_ajax_referer('site_essentials_admin', 'nonce');
 
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => 'Insufficient permissions']);

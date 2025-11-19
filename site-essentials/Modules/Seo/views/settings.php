@@ -298,16 +298,26 @@ if (!defined('ABSPATH')) {
             const $button = $(this);
             $button.prop('disabled', true).text('Clearing...');
 
-            $.post(ajaxurl, {
-                action: 'site_essentials_clear_sitemap_cache',
-                nonce: '<?php echo wp_create_nonce('site_essentials_seo'); ?>'
-            }, function(response) {
-                if (response.success) {
-                    alert('Sitemap cache cleared successfully!');
-                } else {
-                    alert('Failed to clear cache: ' + (response.data || 'Unknown error'));
+            $.ajax({
+                url: siteEssentials.ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'site_essentials_clear_sitemap_cache',
+                    nonce: siteEssentials.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('Sitemap cache cleared successfully!');
+                    } else {
+                        alert('Failed to clear cache: ' + (response.data.message || 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    alert('Failed to communicate with server');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).text('Clear Sitemap Cache');
                 }
-                $button.prop('disabled', false).text('Clear Sitemap Cache');
             });
         });
     });

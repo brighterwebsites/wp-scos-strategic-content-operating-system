@@ -19,19 +19,19 @@ if (!defined('ABSPATH')) {
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
     <h2 class="nav-tab-wrapper">
-        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::PAGE_SLUG); ?>&tab=modules"
+        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=modules"
            class="nav-tab <?php echo $active_tab === 'modules' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Modules', 'site-essentials'); ?>
         </a>
-        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::PAGE_SLUG); ?>&tab=import-export"
+        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=import-export"
            class="nav-tab <?php echo $active_tab === 'import-export' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Import/Export', 'site-essentials'); ?>
         </a>
-        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::PAGE_SLUG); ?>&tab=cache"
+        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=cache"
            class="nav-tab <?php echo $active_tab === 'cache' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Cache', 'site-essentials'); ?>
         </a>
-        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::PAGE_SLUG); ?>&tab=debug"
+        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=debug"
            class="nav-tab <?php echo $active_tab === 'debug' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Debug', 'site-essentials'); ?>
         </a>
@@ -39,36 +39,13 @@ if (!defined('ABSPATH')) {
 
     <div class="site-essentials-content">
         <?php if ($active_tab === 'modules'): ?>
+            <p><?php esc_html_e('Enable or disable modules below. Module settings are available on their respective pages (SEO, Essentials, etc.).', 'site-essentials'); ?></p>
+
             <!-- Module Toggle Cards -->
             <?php
             settings_fields('site_essentials');
             do_settings_sections(\SiteEssentials\Core\Admin_UI::PAGE_SLUG);
             ?>
-
-            <!-- Individual Module Settings -->
-            <?php
-            $loaded_modules = \SiteEssentials\Core\Module_Loader::get_loaded_modules();
-            if (!empty($loaded_modules)):
-            ?>
-                <div class="site-essentials-module-settings" style="margin-top: 40px;">
-                    <h2><?php esc_html_e('Module Settings', 'site-essentials'); ?></h2>
-                    <p><?php esc_html_e('Configure settings for each enabled module below.', 'site-essentials'); ?></p>
-
-                    <?php foreach ($loaded_modules as $module_id => $module): ?>
-                        <div class="card se-module-settings-card"
-                             data-module-id="<?php echo esc_attr($module_id); ?>"
-                             style="margin-bottom: 30px;">
-                            <h3 style="margin-top: 0;">
-                                <?php echo esc_html($module::get_name()); ?>
-                                <span class="se-module-tier tier-<?php echo esc_attr($module::get_tier()); ?>" style="font-size: 11px; margin-left: 10px;">
-                                    <?php echo esc_html(ucfirst($module::get_tier())); ?>
-                                </span>
-                            </h3>
-                            <?php $module->render_settings(); ?>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
 
         <?php elseif ($active_tab === 'import-export'): ?>
             <div class="site-essentials-import-export">

@@ -42,6 +42,7 @@ class Admin_UI {
      */
     const PAGE_SLUG = 'site-essentials';
     const SEO_PAGE_SLUG = 'site-essentials-seo';
+    const ESSENTIALS_PAGE_SLUG = 'site-essentials-essentials';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
 
     /**
@@ -76,41 +77,51 @@ class Admin_UI {
     /**
      * Add admin menu items
      *
-     * Creates top-level menu with submenu items for Settings and SEO.
+     * Creates top-level menu with submenu items for SEO, Essentials, and Settings.
      *
      * @since 1.0.0
      * @return void
      */
     public function add_admin_menu() {
-        // Top-level menu
+        // Top-level menu (blank for now)
         add_menu_page(
             __('Site Essentials', 'site-essentials'),           // Page title
             __('Site Essentials', 'site-essentials'),           // Menu title
             'manage_options',                                    // Capability
             self::PAGE_SLUG,                                     // Menu slug
-            [$this, 'render_settings_page'],                    // Callback
+            '__return_null',                                     // Blank callback
             'dashicons-admin-generic',                           // Icon
             30                                                   // Position
-        );
-
-        // Settings submenu (default/first item)
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Settings', 'site-essentials'),                   // Page title
-            __('Settings', 'site-essentials'),                   // Menu title
-            'manage_options',                                    // Capability
-            self::SETTINGS_PAGE_SLUG,                           // Menu slug
-            [$this, 'render_settings_page']                     // Callback
         );
 
         // SEO submenu
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
-            __('SEO & Sitemaps', 'site-essentials'),            // Page title
+            __('SEO Basics', 'site-essentials'),                // Page title
             __('SEO', 'site-essentials'),                        // Menu title
             'manage_options',                                    // Capability
             self::SEO_PAGE_SLUG,                                // Menu slug
             [$this, 'render_seo_page']                          // Callback
+        );
+
+        // Essentials submenu
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Essentials', 'site-essentials'),                // Page title
+            __('Essentials', 'site-essentials'),                // Menu title
+            'manage_options',                                    // Capability
+            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
+            [$this, 'render_essentials_page']                   // Callback
+        );
+
+        // Settings submenu
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Plugin Settings', 'site-essentials'),           // Page title
+            __('Settings', 'site-essentials'),                   // Menu title
+            'manage_options',                                    // Capability
+            self::SETTINGS_PAGE_SLUG,                           // Menu slug
+            [$this, 'render_settings_page']                     // Callback
         );
 
         // Remove duplicate first submenu item (WordPress auto-adds parent as first submenu)
@@ -220,6 +231,26 @@ class Admin_UI {
         $seo_module = Module_Loader::get_module('seo');
 
         include SITE_ESSENTIALS_PATH . 'Views/seo-page.php';
+    }
+
+    /**
+     * Render Essentials page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_essentials_page() {
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'tweaks';
+
+        // Get WordPress Tweaks module if loaded
+        $tweaks_module = Module_Loader::get_module('tweaks');
+
+        include SITE_ESSENTIALS_PATH . 'Views/essentials-page.php';
     }
 
     /**

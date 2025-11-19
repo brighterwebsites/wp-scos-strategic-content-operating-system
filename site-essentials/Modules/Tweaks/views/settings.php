@@ -101,6 +101,9 @@ $tweak_definitions = [
         <p>
             <strong><?php esc_html_e('Note:', 'site-essentials'); ?></strong>
             <?php esc_html_e('Changes take effect immediately. If something breaks, simply uncheck the problematic tweak.', 'site-essentials'); ?>
+            <br><br>
+            <strong><?php esc_html_e('Important:', 'site-essentials'); ?></strong>
+            <?php esc_html_e('You only need to enable each tweak once. If another plugin or theme is already handling a particular optimization, you don\'t need to enable it here - doing so would just add redundant code attempting to disable something that\'s already disabled.', 'site-essentials'); ?>
         </p>
     </div>
 </div>

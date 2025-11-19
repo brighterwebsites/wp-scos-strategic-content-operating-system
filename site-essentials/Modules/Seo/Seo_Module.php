@@ -774,6 +774,7 @@ class Seo_Module implements Module_Interface {
      *
      * Groups posts by post type with headings, sorted by menu order then A-Z.
      * Shows both published and last modified dates.
+     * Post types ordered: Pages first, Posts second, CPTs alphabetically.
      *
      * @since  1.0.0
      * @param  array $settings Sitemap settings
@@ -782,9 +783,26 @@ class Seo_Module implements Module_Interface {
     private function generate_html_sitemap($settings) {
         $html = '<div class="site-essentials-html-sitemap">';
 
+        // Sort post types: Pages first, Posts second, CPTs alphabetically
         $post_types = $settings['post_types'];
+        $ordered_types = [];
 
-        foreach ($post_types as $post_type) {
+        // Add page first
+        if (in_array('page', $post_types, true)) {
+            $ordered_types[] = 'page';
+        }
+
+        // Add post second
+        if (in_array('post', $post_types, true)) {
+            $ordered_types[] = 'post';
+        }
+
+        // Add remaining CPTs alphabetically
+        $remaining = array_diff($post_types, ['page', 'post']);
+        sort($remaining);
+        $ordered_types = array_merge($ordered_types, $remaining);
+
+        foreach ($ordered_types as $post_type) {
             $post_type_obj = get_post_type_object($post_type);
             if (!$post_type_obj) {
                 continue;

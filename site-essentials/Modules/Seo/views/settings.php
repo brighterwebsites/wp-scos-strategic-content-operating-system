@@ -37,9 +37,11 @@ if (!defined('ABSPATH')) {
         <!-- Sitemap Stats Widget -->
         <?php
         // Calculate sitemap stats
-        $total_posts = 0;
+        $total_urls = 0;
         $post_type_counts = [];
+        $taxonomy_counts = [];
 
+        // Count post types
         foreach ($sitemap_settings['post_types'] as $post_type) {
             $count = wp_count_posts($post_type);
             if (isset($count->publish)) {
@@ -48,7 +50,27 @@ if (!defined('ABSPATH')) {
                     'label' => $post_type_obj ? $post_type_obj->labels->name : $post_type,
                     'count' => $count->publish,
                 ];
-                $total_posts += $count->publish;
+                $total_urls += $count->publish;
+            }
+        }
+
+        // Count taxonomies
+        $taxonomies = !empty($sitemap_settings['taxonomies']) ? $sitemap_settings['taxonomies'] : [];
+        foreach ($taxonomies as $taxonomy) {
+            $terms = get_terms([
+                'taxonomy'   => $taxonomy,
+                'hide_empty' => true,
+                'fields'     => 'count',
+            ]);
+            $term_count = is_numeric($terms) ? $terms : 0;
+
+            if ($term_count > 0) {
+                $taxonomy_obj = get_taxonomy($taxonomy);
+                $taxonomy_counts[$taxonomy] = [
+                    'label' => $taxonomy_obj ? $taxonomy_obj->labels->name : $taxonomy,
+                    'count' => $term_count,
+                ];
+                $total_urls += $term_count;
             }
         }
 
@@ -61,9 +83,15 @@ if (!defined('ABSPATH')) {
                 <tbody>
                     <tr>
                         <td style="border: none; padding: 5px 0;"><strong>Total URLs:</strong></td>
-                        <td style="border: none; padding: 5px 0;"><?php echo number_format($total_posts); ?></td>
+                        <td style="border: none; padding: 5px 0;"><?php echo number_format($total_urls); ?></td>
                     </tr>
                     <?php foreach ($post_type_counts as $data): ?>
+                    <tr>
+                        <td style="border: none; padding: 5px 0; padding-left: 20px;">↳ <?php echo esc_html($data['label']); ?>:</td>
+                        <td style="border: none; padding: 5px 0;"><?php echo number_format($data['count']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php foreach ($taxonomy_counts as $data): ?>
                     <tr>
                         <td style="border: none; padding: 5px 0; padding-left: 20px;">↳ <?php echo esc_html($data['label']); ?>:</td>
                         <td style="border: none; padding: 5px 0;"><?php echo number_format($data['count']); ?></td>
@@ -94,7 +122,7 @@ if (!defined('ABSPATH')) {
                     </button>
                 </div>
                 <p class="description" style="margin-top: 5px;">
-                    Paste this shortcode on any page to display an HTML sitemap.
+                    Paste this shortcode on any page to display an HTML sitemap (mirrors XML sitemap).
                 </p>
             </div>
             <?php endif; ?>
@@ -228,7 +256,7 @@ if (!defined('ABSPATH')) {
                             <?php esc_html_e('Include images in sitemaps (image sitemap)', 'site-essentials'); ?>
                         </label>
                         <p class="description">
-                            <?php esc_html_e('Adds featured images and content images to sitemap for better image SEO.', 'site-essentials'); ?>
+                            <?php esc_html_e('Adds featured images and content images to sitemap for better image SEO. Does not show in HTML sitemap.', 'site-essentials'); ?>
                         </p>
                     </td>
                 </tr>
@@ -270,7 +298,7 @@ if (!defined('ABSPATH')) {
                                class="regular-text"
                                placeholder="123,456,789">
                         <p class="description">
-                            <?php esc_html_e('Comma-separated list of post IDs to exclude from sitemaps.', 'site-essentials'); ?>
+                            <?php esc_html_e('Comma-separated list of post IDs to exclude from HTML & XML sitemaps.', 'site-essentials'); ?>
                         </p>
                     </td>
                 </tr>

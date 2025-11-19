@@ -365,7 +365,7 @@ class Seo_Module implements Module_Interface {
         $args = [
             'post_type'      => $post_type,
             'post_status'    => 'publish',
-            'posts_per_page' => $settings['entries_per_sitemap'],
+            'posts_per_page' => -1, // Get ALL posts for sitemap
             'orderby'        => 'modified',
             'order'          => 'DESC',
             'no_found_rows'  => true,
@@ -724,8 +724,77 @@ class Seo_Module implements Module_Interface {
         $sitemap_settings = $this->get_sitemap_settings();
         $all_post_types = get_post_types(['public' => true], 'objects');
         $all_taxonomies = $this->get_available_taxonomies();
+        $sitemap_stats = $this->calculate_sitemap_stats($sitemap_settings);
 
         include __DIR__ . '/views/settings.php';
+    }
+
+    /**
+     * Calculate accurate sitemap stats
+     *
+     * Counts posts and taxonomies exactly as they appear in sitemaps.
+     * Excludes noindex posts and excluded IDs.
+     *
+     * @since  1.0.0
+     * @param  array $settings Sitemap settings
+     * @return array Stats data
+     */
+    private function calculate_sitemap_stats($settings) {
+        $stats = [
+            'total_urls' => 0,
+            'post_types' => [],
+            'taxonomies' => [],
+        ];
+
+        // Count post types (matching sitemap generation logic)
+        foreach ($settings['post_types'] as $post_type) {
+            $posts = get_posts([
+                'post_type'      => $post_type,
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+                'post__not_in'   => $settings['exclude_ids'],
+            ]);
+
+            // Filter out noindex posts
+            $count = 0;
+            foreach ($posts as $post_id) {
+                if (!$this->is_noindex($post_id)) {
+                    $count++;
+                }
+            }
+
+            if ($count > 0) {
+                $post_type_obj = get_post_type_object($post_type);
+                $stats['post_types'][$post_type] = [
+                    'label' => $post_type_obj ? $post_type_obj->labels->name : $post_type,
+                    'count' => $count,
+                ];
+                $stats['total_urls'] += $count;
+            }
+        }
+
+        // Count taxonomies
+        $taxonomies = !empty($settings['taxonomies']) ? $settings['taxonomies'] : [];
+        foreach ($taxonomies as $taxonomy) {
+            $terms = get_terms([
+                'taxonomy'   => $taxonomy,
+                'hide_empty' => true,
+                'fields'     => 'count',
+            ]);
+            $term_count = is_numeric($terms) ? $terms : 0;
+
+            if ($term_count > 0) {
+                $taxonomy_obj = get_taxonomy($taxonomy);
+                $stats['taxonomies'][$taxonomy] = [
+                    'label' => $taxonomy_obj ? $taxonomy_obj->labels->name : $taxonomy,
+                    'count' => $term_count,
+                ];
+                $stats['total_urls'] += $term_count;
+            }
+        }
+
+        return $stats;
     }
 
     /**

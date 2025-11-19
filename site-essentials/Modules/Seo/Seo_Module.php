@@ -341,6 +341,24 @@ class Seo_Module implements Module_Interface {
 
         $xml .= '>' . "\n";
 
+        // Add CPT archive URL if it exists and has_archive is enabled
+        $post_type_obj = get_post_type_object($post_type);
+        if ($post_type_obj && $post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
+            $archive_url = get_post_type_archive_link($post_type);
+            if ($archive_url) {
+                $last_modified = $this->get_post_type_last_modified($post_type);
+
+                $xml .= "\t<url>\n";
+                $xml .= "\t\t<loc>" . esc_url($archive_url) . "</loc>\n";
+                if ($last_modified) {
+                    $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
+                }
+                $xml .= "\t\t<changefreq>weekly</changefreq>\n";
+                $xml .= "\t\t<priority>0.8</priority>\n";
+                $xml .= "\t</url>\n";
+            }
+        }
+
         // Get posts
         $posts = $this->get_sitemap_posts($post_type, $settings);
 
@@ -788,8 +806,16 @@ class Seo_Module implements Module_Interface {
                 }
             }
 
+            // Add 1 for CPT archive if it exists
+            $post_type_obj = get_post_type_object($post_type);
+            if ($post_type_obj && $post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
+                $archive_url = get_post_type_archive_link($post_type);
+                if ($archive_url) {
+                    $count++; // Add archive page to count
+                }
+            }
+
             if ($count > 0) {
-                $post_type_obj = get_post_type_object($post_type);
                 $stats['post_types'][$post_type] = [
                     'label' => $post_type_obj ? $post_type_obj->labels->name : $post_type,
                     'count' => $count,
@@ -924,7 +950,17 @@ class Seo_Module implements Module_Interface {
 
             // Post type heading
             $html .= '<div class="sitemap-section">';
-            $html .= '<h2>' . esc_html($post_type_obj->labels->name) . '</h2>';
+            $html .= '<h2>' . esc_html($post_type_obj->labels->name);
+
+            // Add archive link for CPTs (not for posts/pages)
+            if ($post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
+                $archive_url = get_post_type_archive_link($post_type);
+                if ($archive_url) {
+                    $html .= ' <a href="' . esc_url($archive_url) . '" class="archive-link" title="View ' . esc_attr($post_type_obj->labels->name) . ' Archive">&rarr;</a>';
+                }
+            }
+
+            $html .= '</h2>';
             $html .= '<ul class="sitemap-list">';
 
             foreach ($posts as $post) {
@@ -960,6 +996,22 @@ class Seo_Module implements Module_Interface {
                 border-bottom: 2px solid #ddd;
                 padding-bottom: 10px;
                 margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .site-essentials-html-sitemap .archive-link {
+                font-size: 0.8em;
+                color: #0073aa;
+                text-decoration: none;
+                padding: 4px 8px;
+                background: #e5f2ff;
+                border-radius: 3px;
+                transition: all 0.2s;
+            }
+            .site-essentials-html-sitemap .archive-link:hover {
+                background: #0073aa;
+                color: white;
             }
             .site-essentials-html-sitemap .sitemap-list {
                 list-style: none;

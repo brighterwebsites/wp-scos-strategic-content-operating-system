@@ -83,38 +83,42 @@ class Admin_UI {
      * @return void
      */
     public function add_admin_menu() {
-        // Top-level menu (blank for now)
+        // Top-level menu (welcome page)
         add_menu_page(
             __('Site Essentials', 'site-essentials'),           // Page title
             __('Site Essentials', 'site-essentials'),           // Menu title
             'manage_options',                                    // Capability
             self::PAGE_SLUG,                                     // Menu slug
-            '__return_null',                                     // Blank callback
+            [$this, 'render_welcome_page'],                     // Callback
             'dashicons-admin-generic',                           // Icon
             30                                                   // Position
         );
 
-        // SEO submenu
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('SEO Basics', 'site-essentials'),                // Page title
-            __('SEO', 'site-essentials'),                        // Menu title
-            'manage_options',                                    // Capability
-            self::SEO_PAGE_SLUG,                                // Menu slug
-            [$this, 'render_seo_page']                          // Callback
-        );
+        // SEO submenu (only if SEO module is enabled)
+        if ($this->settings->is_module_enabled('seo')) {
+            add_submenu_page(
+                self::PAGE_SLUG,                                     // Parent slug
+                __('SEO Basics', 'site-essentials'),                // Page title
+                __('SEO', 'site-essentials'),                        // Menu title
+                'manage_options',                                    // Capability
+                self::SEO_PAGE_SLUG,                                // Menu slug
+                [$this, 'render_seo_page']                          // Callback
+            );
+        }
 
-        // Essentials submenu
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Essentials', 'site-essentials'),                // Page title
-            __('Essentials', 'site-essentials'),                // Menu title
-            'manage_options',                                    // Capability
-            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
-            [$this, 'render_essentials_page']                   // Callback
-        );
+        // Essentials submenu (only if tweaks module is enabled)
+        if ($this->settings->is_module_enabled('tweaks')) {
+            add_submenu_page(
+                self::PAGE_SLUG,                                     // Parent slug
+                __('Essentials', 'site-essentials'),                // Page title
+                __('Essentials', 'site-essentials'),                // Menu title
+                'manage_options',                                    // Capability
+                self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
+                [$this, 'render_essentials_page']                   // Callback
+            );
+        }
 
-        // Settings submenu
+        // Settings submenu (always visible)
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
             __('Plugin Settings', 'site-essentials'),           // Page title
@@ -201,6 +205,21 @@ class Admin_UI {
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce'   => wp_create_nonce('site_essentials_admin'),
         ]);
+    }
+
+    /**
+     * Render welcome page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_welcome_page() {
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        include SITE_ESSENTIALS_PATH . 'Views/welcome-page.php';
     }
 
     /**
@@ -315,6 +334,12 @@ class Admin_UI {
             wp_send_json_error(['message' => 'Module ID required']);
         }
 
+        // Get state BEFORE toggle
+        $before_memory = $this->settings->get('enabled_modules', []);
+        $before_db = get_option(Settings_Manager::CORE_OPTION, []);
+        $before_db_modules = isset($before_db['enabled_modules']) ? $before_db['enabled_modules'] : [];
+
+        // Perform the toggle
         $result = false;
         if ($enabled) {
             $result = $this->settings->enable_module($module_id);
@@ -322,18 +347,27 @@ class Admin_UI {
             $result = $this->settings->disable_module($module_id);
         }
 
-        // Verify the change was made
-        $is_now_enabled = $this->settings->is_module_enabled($module_id);
+        // Get state AFTER toggle
+        $after_memory = $this->settings->get('enabled_modules', []);
+        $after_db = get_option(Settings_Manager::CORE_OPTION, []);
+        $after_db_modules = isset($after_db['enabled_modules']) ? $after_db['enabled_modules'] : [];
 
-        // Get current enabled modules for debugging
-        $enabled_modules = $this->settings->get('enabled_modules', []);
+        // Verify the change in DB (not just memory)
+        $is_now_enabled_in_db = in_array($module_id, $after_db_modules, true);
+        $verified = $is_now_enabled_in_db === $enabled;
 
         wp_send_json_success([
             'message' => $enabled ? 'Module enabled' : 'Module disabled',
             'enabled' => $enabled,
-            'verified' => $is_now_enabled === $enabled,
+            'verified' => $verified,
             'db_update_result' => $result,
-            'enabled_modules' => $enabled_modules, // For debugging
+            'debug' => [
+                'before_memory' => $before_memory,
+                'before_db' => $before_db_modules,
+                'after_memory' => $after_memory,
+                'after_db' => $after_db_modules,
+                'option_name' => Settings_Manager::CORE_OPTION,
+            ],
         ]);
     }
 
@@ -490,8 +524,11 @@ class Admin_UI {
         // Save settings
         $this->settings->update_module_settings('seo', ['sitemap' => $sitemap_settings]);
 
-        // Clear sitemap cache
+        // Clear sitemap cache (internal)
         Cache_Helper::flush('seo');
+
+        // Clear page caches (LiteSpeed, WP Super Cache, etc.)
+        $this->clear_page_cache();
 
         // Flush rewrite rules since sitemap rules may have changed
         flush_rewrite_rules();
@@ -520,9 +557,46 @@ class Admin_UI {
             wp_send_json_error(['message' => 'Insufficient permissions']);
         }
 
-        // Clear sitemap cache
+        // Clear our internal sitemap cache
         Cache_Helper::flush('seo');
 
-        wp_send_json_success(['message' => 'Sitemap cache cleared successfully']);
+        // Clear page caches
+        $this->clear_page_cache();
+
+        wp_send_json_success([
+            'message' => 'Sitemap cache cleared successfully (internal + page cache)'
+        ]);
+    }
+
+    /**
+     * Clear all page caches
+     *
+     * Detects and clears LiteSpeed, WP Super Cache, W3 Total Cache, and WP Rocket.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function clear_page_cache() {
+        // Clear LiteSpeed Cache if active
+        if (function_exists('litespeed_purge_all')) {
+            litespeed_purge_all();
+        } elseif (class_exists('LiteSpeed_Cache_API') && method_exists('LiteSpeed_Cache_API', 'purge_all')) {
+            \LiteSpeed_Cache_API::purge_all();
+        }
+
+        // Clear WP Super Cache if active
+        if (function_exists('wp_cache_clear_cache')) {
+            wp_cache_clear_cache();
+        }
+
+        // Clear W3 Total Cache if active
+        if (function_exists('w3tc_flush_all')) {
+            w3tc_flush_all();
+        }
+
+        // Clear WP Rocket cache if active
+        if (function_exists('rocket_clean_domain')) {
+            rocket_clean_domain();
+        }
     }
 }

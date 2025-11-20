@@ -234,6 +234,9 @@ class Seo_Module implements Module_Interface {
      * @return void
      */
     private function render_sitemap_index($settings) {
+        // Disable ALL caching for sitemaps (LiteSpeed-specific)
+        $this->disable_litespeed_cache();
+
         $cache_key = 'sitemap_index';
         $xml = Cache_Helper::remember($cache_key, function() use ($settings) {
             // Track cache generation time
@@ -317,6 +320,9 @@ class Seo_Module implements Module_Interface {
             status_header(404);
             return;
         }
+
+        // Disable ALL caching for sitemaps (LiteSpeed-specific)
+        $this->disable_litespeed_cache();
 
         $cache_key = 'sitemap_' . $post_type;
         $xml = Cache_Helper::remember($cache_key, function() use ($post_type, $settings) {
@@ -582,6 +588,9 @@ class Seo_Module implements Module_Interface {
             status_header(404);
             return;
         }
+
+        // Disable ALL caching for sitemaps (LiteSpeed-specific)
+        $this->disable_litespeed_cache();
 
         $cache_key = 'sitemap_tax_' . $taxonomy;
         $xml = Cache_Helper::remember($cache_key, function() use ($taxonomy, $settings) {
@@ -1044,5 +1053,38 @@ class Seo_Module implements Module_Interface {
         </style>';
 
         return $html;
+    }
+
+    /**
+     * Disable LiteSpeed Cache for sitemap requests
+     *
+     * Uses LiteSpeed-specific methods to prevent caching at all levels.
+     *
+     * @since  1.0.0
+     * @return void
+     */
+    private function disable_litespeed_cache() {
+        // Method 1: Use litespeed_control() if available (LiteSpeed Cache plugin)
+        if (function_exists('litespeed_control')) {
+            litespeed_control('no-cache');
+        }
+
+        // Method 2: Set do_not_cache constant
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        if (!defined('LSCACHE_NO_CACHE')) {
+            define('LSCACHE_NO_CACHE', true);
+        }
+
+        // Method 3: Use LiteSpeed Cache API if available
+        if (class_exists('\LiteSpeed\API') && method_exists('\LiteSpeed\API', 'set_nocache')) {
+            \LiteSpeed\API::set_nocache('sitemap');
+        }
+
+        // Method 4: Send cache control header early
+        if (!headers_sent()) {
+            header('X-LiteSpeed-Cache-Control: no-cache');
+        }
     }
 }

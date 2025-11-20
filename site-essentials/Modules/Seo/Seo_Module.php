@@ -261,7 +261,10 @@ class Seo_Module implements Module_Interface {
      */
     private function generate_sitemap_index($settings) {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        $xml .= '<sitemapindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/siteindex.xsd">' . "\n";
 
         // Add post type sitemaps
         $post_types = $settings['post_types'];
@@ -347,13 +350,15 @@ class Seo_Module implements Module_Interface {
      */
     private function generate_post_type_sitemap($post_type, $settings) {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"';
+        $xml .= '<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
 
         if ($settings['include_images']) {
-            $xml .= ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"';
+            $xml .= 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" ';
         }
 
-        $xml .= '>' . "\n";
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">' . "\n";
 
         // Add CPT archive URL if it exists and has_archive is enabled
         $post_type_obj = get_post_type_object($post_type);
@@ -615,7 +620,10 @@ class Seo_Module implements Module_Interface {
      */
     private function generate_taxonomy_sitemap($taxonomy, $settings) {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        $xml .= '<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">' . "\n";
 
         // Get terms
         $terms = $this->get_taxonomy_terms($taxonomy, $settings);

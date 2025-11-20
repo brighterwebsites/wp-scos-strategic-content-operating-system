@@ -119,8 +119,8 @@ class Seo_Module implements Module_Interface {
      * @return void
      */
     public function init() {
-        // Disable WordPress core sitemaps (Site Essentials replaces them)
-        add_filter('wp_sitemaps_enabled', '__return_false');
+        // Note: WordPress core sitemaps are disabled in main plugin file (site-essentials.php)
+        // to ensure the filter runs early enough before WP core registers sitemaps
 
         // Add rewrite rules for sitemaps
         add_action('init', [$this, 'register_sitemap_rewrites']);

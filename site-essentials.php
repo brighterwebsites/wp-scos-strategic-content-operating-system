@@ -109,6 +109,12 @@ add_action('plugins_loaded', function() {
             \SiteEssentials\Modules\Seo\Seo_Module::class
         );
 
+        // CRITICAL: Disable WordPress core sitemaps EARLY if SEO module is enabled
+        // Must happen BEFORE WP core registers sitemaps (which happens on 'init' hook)
+        if ($settings->is_module_enabled('seo')) {
+            add_filter('wp_sitemaps_enabled', '__return_false', 1);
+        }
+
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();
 

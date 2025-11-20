@@ -418,6 +418,15 @@ class Seo_Module implements Module_Interface {
         // Remove the filter after query
         remove_filter('post_limits', [$this, 'remove_query_limit'], 999);
 
+        if (empty($posts)) {
+            return [];
+        }
+
+        // PERFORMANCE OPTIMIZATION: Batch-load all noindex meta for all posts at once
+        // This reduces N queries (where N = number of posts) down to 4 queries total
+        $post_ids = wp_list_pluck($posts, 'ID');
+        $this->preload_noindex_meta($post_ids);
+
         // Filter out noindex posts
         return array_filter($posts, function($post) {
             return !$this->is_noindex($post->ID);
@@ -704,9 +713,33 @@ class Seo_Module implements Module_Interface {
     }
 
     /**
+     * Preload all noindex meta for multiple posts at once (performance optimization)
+     *
+     * Uses WordPress update_meta_cache() to batch-load all meta in 1-4 queries instead of N×4 queries.
+     * For 30 posts, this reduces 120 queries down to 4 queries total, dramatically improving performance.
+     *
+     * @since  1.0.0
+     * @param  array $post_ids Array of post IDs to preload meta for
+     * @return void
+     */
+    private function preload_noindex_meta($post_ids) {
+        if (empty($post_ids)) {
+            return;
+        }
+
+        // Prime the meta cache for all posts at once
+        // This loads ALL meta for these posts in just a few queries
+        update_meta_cache('post', $post_ids);
+    }
+
+    /**
      * Check if post should be noindexed
      *
      * Checks multiple sources for noindex directives.
+     *
+     * NOTE: For optimal performance, preload_noindex_meta() should be called first
+     * with all post IDs to batch-load meta. This function will still work without
+     * preloading, but will generate individual queries for each post.
      *
      * @since  1.0.0
      * @param  int $post_id Post ID
@@ -967,6 +1000,12 @@ class Seo_Module implements Module_Interface {
                 'orderby'        => ['menu_order' => 'ASC', 'title' => 'ASC'],
                 'post__not_in'   => $settings['exclude_ids'],
             ]);
+
+            // PERFORMANCE: Batch-load noindex meta before filtering
+            if (!empty($all_posts)) {
+                $post_ids = wp_list_pluck($all_posts, 'ID');
+                $this->preload_noindex_meta($post_ids);
+            }
 
             // Filter out noindex posts
             $posts = array_filter($all_posts, function($post) {

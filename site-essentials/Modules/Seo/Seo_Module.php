@@ -242,6 +242,10 @@ class Seo_Module implements Module_Interface {
         }, 3600, 'seo');
 
         header('Content-Type: application/xml; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('X-LiteSpeed-Cache-Control: no-cache');
         echo $xml;
     }
 
@@ -320,6 +324,10 @@ class Seo_Module implements Module_Interface {
         }, 3600, 'seo');
 
         header('Content-Type: application/xml; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('X-LiteSpeed-Cache-Control: no-cache');
         echo $xml;
     }
 
@@ -581,6 +589,10 @@ class Seo_Module implements Module_Interface {
         }, 3600, 'seo');
 
         header('Content-Type: application/xml; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('X-LiteSpeed-Cache-Control: no-cache');
         echo $xml;
     }
 

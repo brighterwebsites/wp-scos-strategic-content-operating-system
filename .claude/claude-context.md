@@ -349,6 +349,8 @@ find site-essentials/ -name "*.php" -exec wc -l {} + | sort -n
 ---
 
 ## Development Workflow
+Git Repo is on https://github.com/ not local
+Before starting new updates suggest whether or or not to pull previous commits to main, avoid mulitple unpulled branches unless a strategic need for it.  
 
 ### Making Changes
 

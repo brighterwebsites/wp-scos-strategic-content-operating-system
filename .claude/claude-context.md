@@ -579,6 +579,12 @@ Settings_Manager::instance()->is_module_enabled('analytics');
 // Cache operations
 Cache_Helper::remember('key', callable, 3600, 'module');
 ```
+### Deployment Helpers
+*alias createdfor both but Vanessa cant remember them 
+Create similar for other sites on VPS if needed 
+current code in script pulls from main brance
+/root/scripts/deploy-guerilla.sh
+/root/scripts/deploy-brighterwebsites.sh
 
 ---
 

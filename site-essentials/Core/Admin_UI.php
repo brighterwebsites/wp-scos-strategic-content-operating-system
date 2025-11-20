@@ -343,8 +343,28 @@ class Admin_UI {
         $result = false;
         if ($enabled) {
             $result = $this->settings->enable_module($module_id);
+
+            // Flush rewrite rules when enabling SEO module to register sitemap endpoints
+            if ($module_id === 'seo') {
+                flush_rewrite_rules();
+            }
         } else {
             $result = $this->settings->disable_module($module_id);
+
+            // CRITICAL: Clear caches and rewrite rules when disabling modules
+            // This ensures sitemap URLs and other module functionality is properly removed
+            if ($module_id === 'seo') {
+                // Clear sitemap cache
+                Cache_Helper::clear_by_group('seo');
+                // Flush rewrite rules to remove sitemap endpoints
+                flush_rewrite_rules();
+                // Clear LiteSpeed cache if active
+                if (function_exists('litespeed_purge_all')) {
+                    litespeed_purge_all();
+                }
+                // Clear standard WordPress cache
+                wp_cache_flush();
+            }
         }
 
         // Get state AFTER toggle
@@ -361,6 +381,7 @@ class Admin_UI {
             'enabled' => $enabled,
             'verified' => $verified,
             'db_update_result' => $result,
+            'reload_required' => true, // Always require page reload to see changes
             'debug' => [
                 'before_memory' => $before_memory,
                 'before_db' => $before_db_modules,

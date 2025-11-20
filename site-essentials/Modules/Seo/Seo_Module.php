@@ -234,6 +234,9 @@ class Seo_Module implements Module_Interface {
      * @return void
      */
     private function render_sitemap_index($settings) {
+        // Disable ALL caching for sitemaps (LiteSpeed-specific)
+        $this->disable_litespeed_cache();
+
         $cache_key = 'sitemap_index';
         $xml = Cache_Helper::remember($cache_key, function() use ($settings) {
             // Track cache generation time
@@ -258,7 +261,10 @@ class Seo_Module implements Module_Interface {
      */
     private function generate_sitemap_index($settings) {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        $xml .= '<sitemapindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/siteindex.xsd">' . "\n";
 
         // Add post type sitemaps
         $post_types = $settings['post_types'];
@@ -318,6 +324,9 @@ class Seo_Module implements Module_Interface {
             return;
         }
 
+        // Disable ALL caching for sitemaps (LiteSpeed-specific)
+        $this->disable_litespeed_cache();
+
         $cache_key = 'sitemap_' . $post_type;
         $xml = Cache_Helper::remember($cache_key, function() use ($post_type, $settings) {
             return $this->generate_post_type_sitemap($post_type, $settings);
@@ -341,13 +350,15 @@ class Seo_Module implements Module_Interface {
      */
     private function generate_post_type_sitemap($post_type, $settings) {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"';
+        $xml .= '<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
 
         if ($settings['include_images']) {
-            $xml .= ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"';
+            $xml .= 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" ';
         }
 
-        $xml .= '>' . "\n";
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">' . "\n";
 
         // Add CPT archive URL if it exists and has_archive is enabled
         $post_type_obj = get_post_type_object($post_type);
@@ -406,6 +417,15 @@ class Seo_Module implements Module_Interface {
 
         // Remove the filter after query
         remove_filter('post_limits', [$this, 'remove_query_limit'], 999);
+
+        if (empty($posts)) {
+            return [];
+        }
+
+        // PERFORMANCE OPTIMIZATION: Batch-load all noindex meta for all posts at once
+        // This reduces N queries (where N = number of posts) down to 4 queries total
+        $post_ids = wp_list_pluck($posts, 'ID');
+        $this->preload_noindex_meta($post_ids);
 
         // Filter out noindex posts
         return array_filter($posts, function($post) {
@@ -583,6 +603,9 @@ class Seo_Module implements Module_Interface {
             return;
         }
 
+        // Disable ALL caching for sitemaps (LiteSpeed-specific)
+        $this->disable_litespeed_cache();
+
         $cache_key = 'sitemap_tax_' . $taxonomy;
         $xml = Cache_Helper::remember($cache_key, function() use ($taxonomy, $settings) {
             return $this->generate_taxonomy_sitemap($taxonomy, $settings);
@@ -606,7 +629,10 @@ class Seo_Module implements Module_Interface {
      */
     private function generate_taxonomy_sitemap($taxonomy, $settings) {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        $xml .= '<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">' . "\n";
 
         // Get terms
         $terms = $this->get_taxonomy_terms($taxonomy, $settings);
@@ -687,9 +713,33 @@ class Seo_Module implements Module_Interface {
     }
 
     /**
+     * Preload all noindex meta for multiple posts at once (performance optimization)
+     *
+     * Uses WordPress update_meta_cache() to batch-load all meta in 1-4 queries instead of N×4 queries.
+     * For 30 posts, this reduces 120 queries down to 4 queries total, dramatically improving performance.
+     *
+     * @since  1.0.0
+     * @param  array $post_ids Array of post IDs to preload meta for
+     * @return void
+     */
+    private function preload_noindex_meta($post_ids) {
+        if (empty($post_ids)) {
+            return;
+        }
+
+        // Prime the meta cache for all posts at once
+        // This loads ALL meta for these posts in just a few queries
+        update_meta_cache('post', $post_ids);
+    }
+
+    /**
      * Check if post should be noindexed
      *
      * Checks multiple sources for noindex directives.
+     *
+     * NOTE: For optimal performance, preload_noindex_meta() should be called first
+     * with all post IDs to batch-load meta. This function will still work without
+     * preloading, but will generate individual queries for each post.
      *
      * @since  1.0.0
      * @param  int $post_id Post ID
@@ -951,6 +1001,12 @@ class Seo_Module implements Module_Interface {
                 'post__not_in'   => $settings['exclude_ids'],
             ]);
 
+            // PERFORMANCE: Batch-load noindex meta before filtering
+            if (!empty($all_posts)) {
+                $post_ids = wp_list_pluck($all_posts, 'ID');
+                $this->preload_noindex_meta($post_ids);
+            }
+
             // Filter out noindex posts
             $posts = array_filter($all_posts, function($post) {
                 return !$this->is_noindex($post->ID);
@@ -1044,5 +1100,38 @@ class Seo_Module implements Module_Interface {
         </style>';
 
         return $html;
+    }
+
+    /**
+     * Disable LiteSpeed Cache for sitemap requests
+     *
+     * Uses LiteSpeed-specific methods to prevent caching at all levels.
+     *
+     * @since  1.0.0
+     * @return void
+     */
+    private function disable_litespeed_cache() {
+        // Method 1: Use litespeed_control() if available (LiteSpeed Cache plugin)
+        if (function_exists('litespeed_control')) {
+            litespeed_control('no-cache');
+        }
+
+        // Method 2: Set do_not_cache constant
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        if (!defined('LSCACHE_NO_CACHE')) {
+            define('LSCACHE_NO_CACHE', true);
+        }
+
+        // Method 3: Use LiteSpeed Cache API if available
+        if (class_exists('\LiteSpeed\API') && method_exists('\LiteSpeed\API', 'set_nocache')) {
+            \LiteSpeed\API::set_nocache('sitemap');
+        }
+
+        // Method 4: Send cache control header early
+        if (!headers_sent()) {
+            header('X-LiteSpeed-Cache-Control: no-cache');
+        }
     }
 }

@@ -155,9 +155,7 @@ class Admin_UI {
             add_settings_section(
                 'site_essentials_module_' . $module_id,
                 $module::get_name(),
-                function() use ($module) {
-                    echo '<p>' . esc_html($module::get_description()) . '</p>';
-                },
+                '__return_false', // No description callback
                 self::PAGE_SLUG
             );
         }

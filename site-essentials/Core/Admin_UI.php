@@ -367,6 +367,9 @@ class Admin_UI {
             }
         }
 
+        // CRITICAL: Clear WordPress object cache to ensure fresh read for verification
+        wp_cache_delete(Settings_Manager::CORE_OPTION, 'options');
+
         // Get state AFTER toggle
         $after_memory = $this->settings->get('enabled_modules', []);
         $after_db = get_option(Settings_Manager::CORE_OPTION, []);

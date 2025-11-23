@@ -367,8 +367,8 @@ class Admin_UI {
             }
         }
 
-        // CRITICAL: Clear WordPress object cache to ensure fresh read for verification
-        wp_cache_delete(Settings_Manager::CORE_OPTION, 'options');
+        // CRITICAL: Reload settings from DB to clear internal singleton cache
+        $this->settings->reload();
 
         // Get state AFTER toggle
         $after_memory = $this->settings->get('enabled_modules', []);

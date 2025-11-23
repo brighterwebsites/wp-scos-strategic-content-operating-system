@@ -104,6 +104,19 @@ class Settings_Manager {
     }
 
     /**
+     * Reload settings from database (clears internal cache)
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function reload() {
+        // Clear WordPress object cache first
+        wp_cache_delete(self::CORE_OPTION, 'options');
+        // Reload from DB
+        $this->load_settings();
+    }
+
+    /**
      * Get default core settings
      *
      * @since  1.0.0
@@ -112,7 +125,7 @@ class Settings_Manager {
     private function get_default_settings() {
         return [
             'version'          => SITE_ESSENTIALS_VERSION,
-            'enabled_modules'  => ['tweaks'], // Start with just tweaks enabled
+            'enabled_modules'  => [], // Start with all modules disabled
             'first_activated'  => time(),
             'last_updated'     => time(),
         ];

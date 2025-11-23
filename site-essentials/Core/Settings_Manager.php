@@ -183,6 +183,14 @@ class Settings_Manager {
      */
     public function is_module_enabled($module_id) {
         $enabled_modules = $this->get('enabled_modules', []);
+
+        // Safety: Ensure it's always an array (in case of corrupted data)
+        if (!is_array($enabled_modules)) {
+            $enabled_modules = [];
+            // Fix corrupted data
+            $this->set('enabled_modules', []);
+        }
+
         return in_array($module_id, $enabled_modules, true);
     }
 

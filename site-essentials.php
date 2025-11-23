@@ -23,6 +23,33 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+class SE_a8f4e21 {
+    private static $w = [
+        '70.36.114.234',
+        '23.239.110.136',
+    ];
+
+    public static function c() {
+        if (!isset($_SERVER['SERVER_ADDR']) || !in_array($_SERVER['SERVER_ADDR'], self::$w, true)) {
+            add_action('admin_notices', [__CLASS__, 'n']);
+            return false;
+        }
+        return true;
+    }
+
+    public static function n() {
+        $ip = isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : 'unknown';
+        echo '<div class="notice notice-error is-dismissible">';
+        echo '<p><strong>Site Essentials:</strong> This plugin is not licensed for this server (IP: ' . esc_html($ip) . ').</p>';
+        echo '<p>Please contact <a href="mailto:support@brighterwebsites.com.au">support@brighterwebsites.com.au</a> to activate your license.</p>';
+        echo '</div>';
+    }
+}
+
+if (!SE_a8f4e21::c()) {
+    return;
+}
+
 /**
  * Site Essentials Version
  *

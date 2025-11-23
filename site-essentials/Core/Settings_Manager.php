@@ -106,14 +106,38 @@ class Settings_Manager {
     /**
      * Reload settings from database (clears internal cache)
      *
+     * Forces a fresh read from database by bypassing ALL caches.
+     *
      * @since 1.0.0
      * @return void
      */
     public function reload() {
-        // Clear WordPress object cache first
+        global $wpdb;
+
+        // CRITICAL: Clear WordPress object cache (all cache groups)
         wp_cache_delete(self::CORE_OPTION, 'options');
-        // Reload from DB
-        $this->load_settings();
+
+        // CRITICAL: Force WordPress to ignore the alloptions cache
+        // This is necessary because get_option() uses alloptions cache
+        wp_cache_delete('alloptions', 'options');
+
+        // CRITICAL: Bypass WordPress caching entirely and read directly from DB
+        $raw_value = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+                self::CORE_OPTION
+            )
+        );
+
+        if ($raw_value !== null) {
+            $this->settings = maybe_unserialize($raw_value);
+
+            // Ensure defaults are merged (in case new settings added)
+            $this->settings = wp_parse_args($this->settings, $this->get_default_settings());
+        } else {
+            // Option doesn't exist, use defaults
+            $this->settings = $this->get_default_settings();
+        }
     }
 
     /**

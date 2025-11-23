@@ -16,7 +16,17 @@ if (!defined('ABSPATH')) {
 ?>
 
 <div class="wrap site-essentials-wrap">
-    <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+    <h1>
+        <?php echo esc_html(get_admin_page_title()); ?>
+        <?php
+        $deploy_info = \SiteEssentials\Core\Admin_UI::get_deployment_info();
+        ?>
+        <span style="font-size: 14px; font-weight: normal; color: #666; margin-left: 15px;">
+            v<?php echo esc_html($deploy_info['version']); ?> |
+            Commit: <code><?php echo esc_html($deploy_info['git_commit']); ?></code> |
+            Branch: <code><?php echo esc_html($deploy_info['git_branch']); ?></code>
+        </span>
+    </h1>
 
     <h2 class="nav-tab-wrapper">
         <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=modules"

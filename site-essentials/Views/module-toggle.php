@@ -52,8 +52,6 @@ if ($has_failed) {
     </div>
 
     <div class="se-module-body">
-        <p class="se-module-description"><?php echo esc_html($description); ?></p>
-
         <?php if (!empty($dependencies)): ?>
             <p class="se-module-dependencies">
                 <strong><?php esc_html_e('Dependencies:', 'site-essentials'); ?></strong>

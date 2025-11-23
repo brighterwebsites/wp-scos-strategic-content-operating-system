@@ -631,28 +631,19 @@ class Admin_UI {
     public static function get_deployment_info() {
         $info = [
             'version' => SITE_ESSENTIALS_VERSION,
-            'git_commit' => 'unknown',
-            'git_branch' => 'unknown',
-            'deployed_at' => get_option('site_essentials_last_deployed', 'unknown'),
+            'commit' => 'unknown',
+            'branch' => 'unknown',
+            'deployed_at' => 'unknown',
         ];
 
-        // Try to read Git HEAD file
-        $git_head_file = SITE_ESSENTIALS_PATH . '.git/HEAD';
-        if (file_exists($git_head_file)) {
-            $head_content = file_get_contents($git_head_file);
-            if (preg_match('#ref: refs/heads/(.+)#', trim($head_content), $matches)) {
-                $info['git_branch'] = $matches[1];
-
-                // Try to get commit hash
-                $ref_file = SITE_ESSENTIALS_PATH . '.git/refs/heads/' . $matches[1];
-                if (file_exists($ref_file)) {
-                    $info['git_commit'] = substr(trim(file_get_contents($ref_file)), 0, 7);
-                }
+        // Try to read version file (created by deploy script)
+        $version_file = dirname(SITE_ESSENTIALS_PATH) . '/site-essentials-version.php';
+        if (file_exists($version_file)) {
+            $version_data = include $version_file;
+            if (is_array($version_data)) {
+                $info = array_merge($info, $version_data);
             }
         }
-
-        // Update last deployed time
-        update_option('site_essentials_last_deployed', current_time('mysql'));
 
         return $info;
     }

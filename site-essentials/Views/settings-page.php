@@ -23,8 +23,8 @@ if (!defined('ABSPATH')) {
         ?>
         <span style="font-size: 14px; font-weight: normal; color: #666; margin-left: 15px;">
             v<?php echo esc_html($deploy_info['version']); ?> |
-            Commit: <code><?php echo esc_html($deploy_info['git_commit']); ?></code> |
-            Branch: <code><?php echo esc_html($deploy_info['git_branch']); ?></code>
+            <code><?php echo esc_html($deploy_info['commit']); ?></code> |
+            Deployed: <?php echo esc_html($deploy_info['deployed_at']); ?>
         </span>
     </h1>
 

@@ -314,16 +314,24 @@ class Admin_UI {
      * @return void
      */
     public function ajax_toggle_module() {
+        error_log("========== AJAX TOGGLE START ==========");
+        error_log("[Admin_UI] ajax_toggle_module() called");
+        error_log("[Admin_UI] POST data: " . json_encode($_POST));
+
         check_ajax_referer('site_essentials_admin', 'nonce');
 
         if (!current_user_can('manage_options')) {
+            error_log("[Admin_UI] FAILED: Insufficient permissions");
             wp_send_json_error(['message' => 'Insufficient permissions']);
         }
 
         $module_id = isset($_POST['module_id']) ? sanitize_key($_POST['module_id']) : '';
         $enabled = isset($_POST['enabled']) ? (bool) $_POST['enabled'] : false;
 
+        error_log("[Admin_UI] Module: {$module_id}, Action: " . ($enabled ? 'ENABLE' : 'DISABLE'));
+
         if (empty($module_id)) {
+            error_log("[Admin_UI] FAILED: Module ID required");
             wp_send_json_error(['message' => 'Module ID required']);
         }
 
@@ -332,9 +340,13 @@ class Admin_UI {
         $before_db = get_option(Settings_Manager::CORE_OPTION, []);
         $before_db_modules = isset($before_db['enabled_modules']) ? $before_db['enabled_modules'] : [];
 
+        error_log("[Admin_UI] State BEFORE toggle - Memory: " . json_encode($before_memory));
+        error_log("[Admin_UI] State BEFORE toggle - DB: " . json_encode($before_db_modules));
+
         // Perform the toggle
         $result = false;
         if ($enabled) {
+            error_log("[Admin_UI] Calling enable_module({$module_id})");
             $result = $this->settings->enable_module($module_id);
 
             // Flush rewrite rules when enabling SEO module to register sitemap endpoints
@@ -342,6 +354,7 @@ class Admin_UI {
                 flush_rewrite_rules();
             }
         } else {
+            error_log("[Admin_UI] Calling disable_module({$module_id})");
             $result = $this->settings->disable_module($module_id);
 
             // CRITICAL: Clear caches and rewrite rules when disabling modules
@@ -398,8 +411,17 @@ class Admin_UI {
         $is_now_enabled_in_db = in_array($module_id, $after_db_modules_direct, true);
         $verified = $is_now_enabled_in_db === $enabled;
 
+        error_log("[Admin_UI] State AFTER toggle - Memory: " . json_encode($after_memory));
+        error_log("[Admin_UI] State AFTER toggle - DB (get_option): " . json_encode($after_db_modules_getoption));
+        error_log("[Admin_UI] State AFTER toggle - DB (direct query): " . json_encode($after_db_modules_direct));
+        error_log("[Admin_UI] Verification: " . ($verified ? 'PASSED' : 'FAILED'));
+        error_log("[Admin_UI] Expected: {$module_id} should be " . ($enabled ? 'ENABLED' : 'DISABLED'));
+        error_log("[Admin_UI] Actual in DB: {$module_id} is " . ($is_now_enabled_in_db ? 'ENABLED' : 'DISABLED'));
+
         // Check if there's a cache mismatch
         $cache_mismatch = ($after_db_modules_getoption !== $after_db_modules_direct);
+        error_log("[Admin_UI] Cache mismatch: " . ($cache_mismatch ? 'YES' : 'NO'));
+        error_log("========== AJAX TOGGLE END ==========");
 
         wp_send_json_success([
             'message' => $enabled ? 'Module enabled' : 'Module disabled',

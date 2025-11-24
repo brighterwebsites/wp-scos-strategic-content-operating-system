@@ -85,11 +85,21 @@ class Module_Loader {
      * @return void
      */
     public static function load_modules() {
+        error_log("========== MODULE_LOADER START ==========");
         $settings = Settings_Manager::instance();
+
+        // Log what modules are enabled according to settings
+        $enabled_modules = $settings->get('enabled_modules', []);
+        error_log("[Module_Loader] Enabled modules from settings: " . json_encode($enabled_modules));
+        error_log("[Module_Loader] Available modules: " . json_encode(array_keys(self::$available_modules)));
 
         foreach (self::$available_modules as $module_id => $class_name) {
             // Check if module is enabled in settings
-            if (!$settings->is_module_enabled($module_id)) {
+            $is_enabled = $settings->is_module_enabled($module_id);
+            error_log("[Module_Loader] Checking {$module_id}: " . ($is_enabled ? 'ENABLED' : 'DISABLED'));
+
+            if (!$is_enabled) {
+                error_log("[Module_Loader] Skipping {$module_id} - not enabled");
                 continue; // Skip disabled modules (don't load their code)
             }
 
@@ -118,9 +128,12 @@ class Module_Loader {
 
             // All checks passed - instantiate and initialize
             try {
+                error_log("[Module_Loader] Loading {$module_id} - all checks passed");
                 self::$modules[$module_id] = new $class_name();
                 self::$modules[$module_id]->init();
+                error_log("[Module_Loader] Successfully loaded {$module_id}");
             } catch (\Exception $e) {
+                error_log("[Module_Loader] FAILED to load {$module_id}: " . $e->getMessage());
                 self::$failed_modules[$module_id] = "Init failed: " . $e->getMessage();
 
                 // Add admin notice for init failures
@@ -134,6 +147,10 @@ class Module_Loader {
                 }
             }
         }
+
+        error_log("[Module_Loader] Loaded modules: " . json_encode(array_keys(self::$modules)));
+        error_log("[Module_Loader] Failed modules: " . json_encode(self::$failed_modules));
+        error_log("========== MODULE_LOADER END ==========");
     }
 
     /**

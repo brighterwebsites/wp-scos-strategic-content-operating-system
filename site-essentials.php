@@ -109,17 +109,13 @@ spl_autoload_register(function($class) {
 });
 
 /**
- * Bootstrap Site Essentials
+ * Bootstrap Site Essentials - Module Registration
  *
- * Initializes the plugin:
- * 1. Load core classes
- * 2. Initialize Settings Manager
- * 3. Register modules
- * 4. Load enabled modules
+ * Register modules early so they're available.
  *
  * @since 1.0.0
  */
-add_action('plugins_loaded', function() {
+add_action('init', function() {
     try {
         // Initialize Settings Manager (singleton)
         $settings = \SiteEssentials\Core\Settings_Manager::instance();
@@ -138,12 +134,6 @@ add_action('plugins_loaded', function() {
 
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();
-
-        // Initialize admin UI if in admin
-        if (is_admin()) {
-            $admin_ui = new \SiteEssentials\Core\Admin_UI();
-            $admin_ui->init();
-        }
     } catch (\Exception $e) {
         // Log error and add admin notice
         error_log('Site Essentials Error: ' . $e->getMessage());
@@ -158,6 +148,30 @@ add_action('plugins_loaded', function() {
         }
     }
 }, 5); // Priority 5 to load early
+
+/**
+ * Initialize Admin UI
+ *
+ * CRITICAL: Must run AFTER init to ensure WordPress admin hooks are available.
+ * MU plugins load BEFORE plugins_loaded, so we use init hook.
+ *
+ * @since 1.0.0
+ */
+add_action('init', function() {
+    if (is_admin()) {
+        try {
+            $admin_ui = new \SiteEssentials\Core\Admin_UI();
+            $admin_ui->init();
+        } catch (\Exception $e) {
+            error_log('Site Essentials Admin UI Error: ' . $e->getMessage());
+            add_action('admin_notices', function() use ($e) {
+                echo '<div class="notice notice-error"><p>';
+                echo '<strong>Site Essentials Admin UI Error:</strong> ' . esc_html($e->getMessage());
+                echo '</p></div>';
+            });
+        }
+    }
+}, 10); // Priority 10, after modules are loaded
 
 /**
  * Initialize default settings on first load

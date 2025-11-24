@@ -183,11 +183,13 @@ function faq_custom_permalink($permalink, $post) {
 add_filter('post_type_link', 'faq_custom_permalink', 10, 2);
 
 // Verify FAQ belongs to parent in URL
-function faq_validate_parent_slug($wp_query) {
+function faq_validate_parent_slug() {
+    global $wp_query;
+
     if (!is_singular('faq')) {
         return;
     }
-    
+
     $parent_slug = get_query_var('parent_slug');
     $faq = $wp_query->get_queried_object();
     

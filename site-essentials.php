@@ -152,16 +152,16 @@ add_action('init', function() {
 /**
  * Initialize Admin UI
  *
- * CRITICAL: Must run AFTER init to ensure WordPress admin hooks are available.
- * MU plugins load BEFORE plugins_loaded, so we use init hook.
+ * CRITICAL: Just instantiate - all hooks register in __construct() automatically.
+ * This ensures hooks are registered before WordPress processes admin_menu and admin_init.
  *
  * @since 1.0.0
  */
 add_action('init', function() {
     if (is_admin()) {
         try {
-            $admin_ui = new \SiteEssentials\Core\Admin_UI();
-            $admin_ui->init();
+            // Just instantiate - constructor registers all hooks immediately
+            new \SiteEssentials\Core\Admin_UI();
         } catch (\Exception $e) {
             error_log('Site Essentials Admin UI Error: ' . $e->getMessage());
             add_action('admin_notices', function() use ($e) {

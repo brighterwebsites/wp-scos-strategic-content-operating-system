@@ -48,21 +48,16 @@ class Admin_UI {
     /**
      * Constructor
      *
+     * CRITICAL: Registers all hooks in constructor so they work regardless of when object is created.
+     * This is essential for MU plugins which load before plugins_loaded hook.
+     *
      * @since 1.0.0
      */
     public function __construct() {
         $this->settings = Settings_Manager::instance();
-    }
 
-    /**
-     * Initialize admin UI
-     *
-     * Registers hooks for admin menu, assets, etc.
-     *
-     * @since 1.0.0
-     * @return void
-     */
-    public function init() {
+        // Register all hooks immediately in constructor
+        // This ensures hooks are registered before WordPress processes them
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);

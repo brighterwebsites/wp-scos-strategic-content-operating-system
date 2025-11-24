@@ -326,9 +326,13 @@ class Admin_UI {
         }
 
         $module_id = isset($_POST['module_id']) ? sanitize_key($_POST['module_id']) : '';
-        $enabled = isset($_POST['enabled']) ? (bool) $_POST['enabled'] : false;
+
+        // CRITICAL: filter_var() properly handles string "false" and "true" from AJAX
+        // (bool) "false" would incorrectly evaluate to true!
+        $enabled = isset($_POST['enabled']) ? filter_var($_POST['enabled'], FILTER_VALIDATE_BOOLEAN) : false;
 
         error_log("[Admin_UI] Module: {$module_id}, Action: " . ($enabled ? 'ENABLE' : 'DISABLE'));
+        error_log("[Admin_UI] Raw POST enabled value: " . var_export($_POST['enabled'], true) . " (type: " . gettype($_POST['enabled']) . ")");
 
         if (empty($module_id)) {
             error_log("[Admin_UI] FAILED: Module ID required");

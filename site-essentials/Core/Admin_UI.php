@@ -365,7 +365,7 @@ class Admin_UI {
             // This ensures sitemap URLs and other module functionality is properly removed
             if ($module_id === 'seo') {
                 // Clear sitemap cache
-                Cache_Helper::clear_by_group('seo');
+                Cache_Helper::flush('seo');
                 // Flush rewrite rules to remove sitemap endpoints
                 flush_rewrite_rules();
                 // Clear LiteSpeed cache if active

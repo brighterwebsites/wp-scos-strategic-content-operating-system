@@ -210,9 +210,10 @@ class Settings_Manager {
 
         // Safety: Ensure it's always an array (in case of corrupted data)
         if (!is_array($enabled_modules)) {
-            $enabled_modules = [];
-            // Fix corrupted data
-            $this->set('enabled_modules', []);
+            error_log("[Settings_Manager] WARNING: enabled_modules is not an array! Type: " . gettype($enabled_modules));
+            // Don't try to fix during read operations - just return false
+            // This prevents database writes during WP-CLI or early initialization
+            return false;
         }
 
         return in_array($module_id, $enabled_modules, true);

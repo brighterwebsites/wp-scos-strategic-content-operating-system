@@ -365,30 +365,64 @@ class Admin_UI {
             }
         }
 
+        // CRITICAL: Nuclear cache clearing - clear EVERYTHING
+        global $wpdb;
+
+        // Clear WordPress object cache
+        wp_cache_flush();
+
+        // Clear LiteSpeed Cache if present
+        if (defined('LSCWP_V')) {
+            do_action('litespeed_purge_all');
+        }
+
+        // Force LiteSpeed to drop this specific option from cache
+        if (function_exists('litespeed_purge_all')) {
+            litespeed_purge_all();
+        }
+
         // CRITICAL: Reload settings from DB to clear internal singleton cache
         $this->settings->reload();
 
-        // Get state AFTER toggle
+        // Get state AFTER toggle - use BOTH get_option AND direct DB query
         $after_memory = $this->settings->get('enabled_modules', []);
-        $after_db = get_option(Settings_Manager::CORE_OPTION, []);
-        $after_db_modules = isset($after_db['enabled_modules']) ? $after_db['enabled_modules'] : [];
+        $after_db_via_getoption = get_option(Settings_Manager::CORE_OPTION, []);
+        $after_db_modules_getoption = isset($after_db_via_getoption['enabled_modules']) ? $after_db_via_getoption['enabled_modules'] : [];
+
+        // CRITICAL: Bypass ALL caches - read directly from database
+        $raw_db_value = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+                Settings_Manager::CORE_OPTION
+            )
+        );
+        $after_db_direct = maybe_unserialize($raw_db_value);
+        $after_db_modules_direct = isset($after_db_direct['enabled_modules']) ? $after_db_direct['enabled_modules'] : [];
 
         // Verify the change in DB (not just memory)
-        $is_now_enabled_in_db = in_array($module_id, $after_db_modules, true);
+        $is_now_enabled_in_db = in_array($module_id, $after_db_modules_direct, true);
         $verified = $is_now_enabled_in_db === $enabled;
+
+        // Check if there's a cache mismatch
+        $cache_mismatch = ($after_db_modules_getoption !== $after_db_modules_direct);
 
         wp_send_json_success([
             'message' => $enabled ? 'Module enabled' : 'Module disabled',
             'enabled' => $enabled,
             'verified' => $verified,
             'db_update_result' => $result,
-            'reload_required' => true, // Always require page reload to see changes
+            'reload_required' => true,
+            'cache_mismatch' => $cache_mismatch,
+            'litespeed_active' => defined('LSCWP_V'),
+            'wp_cache_active' => defined('WP_CACHE') && WP_CACHE,
             'debug' => [
                 'before_memory' => $before_memory,
                 'before_db' => $before_db_modules,
                 'after_memory' => $after_memory,
-                'after_db' => $after_db_modules,
+                'after_db_via_getoption' => $after_db_modules_getoption,
+                'after_db_direct_query' => $after_db_modules_direct,
                 'option_name' => Settings_Manager::CORE_OPTION,
+                'cache_layer_mismatch' => $cache_mismatch ? 'YES - get_option() returned different data than direct DB query!' : 'NO - both match',
             ],
         ]);
     }

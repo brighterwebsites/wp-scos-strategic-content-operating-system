@@ -1,7 +1,8 @@
 /**
  * Brighter GA4 Enhanced Tracking
- * Version: 5.0.0 - Lead Hierarchy System
+ * Version: 5.0.1 - Lead Hierarchy System
  * Size Target: <15KB
+ * Date Last Update: 25/11/2025
  *
  * Features:
  * - Selector-based attribution
@@ -52,19 +53,19 @@
 
     // Exit if no consent
     if (!hasConsent()) {
-      console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
+      console.log('ðŸ›‘ GA4 Enhanced: Waiting for cookie consent');
       return;
     }
 
     // Wait for gtag to be loaded
     if (typeof window.gtag !== 'function') {
-      console.log('⏳ GA4 Enhanced: Waiting for gtag.js to load...');
+      console.log('â³ GA4 Enhanced: Waiting for gtag.js to load...');
       setTimeout(initializeEnhanced, 100);
       return;
     }
 
     enhancedInitialized = true;
-    console.log('✅ GA4 Enhanced v5.0.0: Lead Hierarchy System Active');
+    console.log('âœ… GA4 Enhanced v5.0.0: Lead Hierarchy System Active');
   
   const region = new URLSearchParams(location.search).get('region') || 'zone4-remote';
   
@@ -74,13 +75,13 @@
   // Base parameters to include in ALL events
   function getBaseParams() {
     return {
-      region_id: region,
+      region_id: region,  //I dont think this was set up as I intended or might have been misunterstood this was to do with Merchant center region for shipping not sure how it is relevant now when refactoring please bring this up
       page_title: document.title,
       page_path: location.pathname,
       content_intent: contentStrategy.content_intent || 'not_set',
       content_purpose: contentStrategy.content_purpose || 'not_set',
-      content_topic: contentStrategy.content_topic || 'not_set',
-      optimization_status: contentStrategy.optimization_status || 'not_set',
+      content_topic: contentStrategy.content_topic || 'not_set',  //**PRO**  Need to change this to the altc topic and add altc cluster both are pro for tracking. 
+      optimization_status: contentStrategy.optimization_status || 'not_set',  //**PRO**
       pillar_page: contentStrategy.pillar_page || document.title,
       pillar_type: contentStrategy.pillar_type || 'none',
       post_type: contentStrategy.post_type || 'page'
@@ -88,7 +89,7 @@
   }
 
   // ============================================
-  // LEAD TIER DETECTION SYSTEM
+  // LEAD TIER DETECTION SYSTEM  **PRO**
   // ============================================
 
   // Map form type classes to lead data
@@ -202,7 +203,7 @@
   }
 
   // ============================================
-  // AD TAG DETECTION SYSTEM
+  // AD TAG DETECTION SYSTEM    //**PRO** need to add a way to turn this on or off with a toggle, and use input for "Please coordinate with SEO before adding paid tracking tags."
   // ============================================
   
   const knownAdTags = [
@@ -287,27 +288,31 @@
   });
   
   // ============================================
-  // SELECTOR ATTRIBUTION RULES
+  // SELECTOR ATTRIBUTION RULES  //do more of these have a performance impact? is there a way to add more custom selector attributes in a repeater or too performance heavy? 
+  //    its only worth adding a selector attribute if you are going to use it x many times... so ideally the built in attributes do the heavy lifing and you can still add manual cat/labels etc. 
   // ============================================
   
   const RULES = [
+
+	//**Tagged for PRO Version** = **PRO**
     // Meetings
     { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'Meetings', l: 'Meeting CTA', v: 25 },
     
     // CTAs
-    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 30 },  //Primary Conversion CTA High intent, core business outcome
+    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 30 },  //**PRO**Primary Conversion CTA High intent, core business outcome
     { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 30 },  //Primary Conversion CTA High intent, core business outcome
     { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 15 },  //Soft Conversion  Medium intent, lead warming
-    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 15 },  //Assisted Conversion Alternate path to same business goal
-    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 10 },
-    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 10 },
+    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 15 },  //**PRO**Assisted Conversion Alternate path to same business goal
+    { s: '.ga-cta-phone, [href^="tel:"]', e: 'CTA', c: 'CTA', l: 'Phone CTA', v: 10 },
+    { s: '.ga-cta-email, [href^="mailto:"]', e: 'CTA', c: 'CTA', l: 'Email CTA', v: 10 },
+    { s: '.ga-cta-end', e: 'click_main_cta', c: 'CTA', l: 'Final CTA', v: 35 },  //Primary Conversion CTA High intent, core business outcome end or final push
 
     
     // Downloads & Lead Magnets
-    { s: '.ga-lead_magnet', e: 'get_lead_magnet', c: 'Lead Magnet', l: 'Access LM', v: 20 },
-    { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 5 },
-    
-    // Navigation - Conversion Pathways
+    { s: '.ga-lead_magnet', e: 'get_lead_magnet', c: 'Lead Magnet', l: 'Access LM', v: 20 },  //**PRO**
+    { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 5 }, //**PRO**
+    //
+    // **PRO** Navigation - Conversion Pathways
     { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog Path', v: 1 },
     { s: '.ga-nav-project', e: 'nav_project', c: 'Navigation', l: 'Portfolio Path', v: 1 },
     { s: '.ga-nav-product', e: 'nav_product', c: 'Navigation', l: 'Product Path', v: 2 },
@@ -318,35 +323,44 @@
     { s: '.ga-nav-path', e: 'nav_path', c: 'Navigation', l: 'Conversion Path', v: 8 }, //Navigational Engagement Low intent, user path continuation
 
     
-    // Specific Trust signals
+    // Specific Trust signals - usually elements on the page can be sections when relevant
     { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed', v: 5 },
     { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed', v: 8 },
     { s: '.ga-trust-specs', e: 'view_specs', c: 'Trust', l: 'Specifications Viewed', v: 7 },
     { s: '.ga-trust-case', e: 'view_case', c: 'Trust', l: 'Case Study Excerpt Viewed', v: 6 },
-    { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 2 },
-    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 7 },
+    { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 2 },  //**PRO**
+    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 7 },  //**PRO**
 
-    // Page hierarchy - sections
+    // Page hierarchy - usually as full sections
     { s: '.ga-hrcy-atf', e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed', v: 1 },  //Primary CTA above the fold (main goal)Measure exposure to your most important CTA (e.g. Get a Quote).High intent, core business outcome
     { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 2 },  //or main content section of page
+   
+    { s: '.ga-hrcy-ppd', e: 'view_section', c: 'Hierarchy', l: 'Position Promise Dif Viewed', v: 3 },  //**PRO** Core positioning + promise + differentiation.
+    { s: '.ga-hrcy-method', e: 'view_section', c: 'Hierarchy', l: 'Method Viewed', v: 3 }, //**PRO**our process
+    { s: '.ga-hrcy-specs', e: 'view_section', c: 'Hierarchy', l: 'Specifications Viewed', v: 7 }, //**PRO**specs inclussions what you get
+    { s: '.ga-hrcy-pricing', e: 'view_section', c: 'Hierarchy', l: 'Pricing Viewed', v: 8 },  //**PRO** pricing boxes if separate from specs
+
     { s: '.ga-hrcy-aut', e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed', v: 3 },  //Specific Authority section ie Case Studies/blog articles
     { s: '.ga-hrcy-tac', e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed', v: 4 },  // Specific Trust section ie Reviews
     { s: '.ga-hrcy-faq', e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed', v: 3 },
 
-    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 3 },  //Secondary Soft CTA (low-friction micro-conversion) Tracks mid-page intent lead warming (e.g. Download Guide, Learn More, Ask a Question).
-    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 5 },  // Main CTA Repeat / Final Push CTA Reinforced Measures whether re-presenting your main offer at bottom helps lift conversions.
-    { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 5 },  // Assist CTA Section Alternate path to same business goal
-    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 5 },  // Convenience / Alternate Path CTAs Captures users preferring contact by phone/chat/specialist rather than a form.
+   
+  // Page hierarchy - usually as full sections or global block CTA sections
+    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 3 },        // MID CTA — Soft, mid-page micro conversion. warm interest: downloads, learn more, watch video, view pricing.
+    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 5 },  // Main business conversion (hero CTA repeated) at the end of a service/sales page.    
+    { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 5 },  //**PRO** Assist CTA Alternate path to same business main CTA - email, message, request quote, or use a form.
+    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 5 },         // Convenience / Alternate Path CTAs Captures users preferring contact by phone/chat/specialist rather than a form.
 
-    
+
+
     // Forms
     { s: '.ga-form', e: 'form', c: 'Forms', l: 'General Form', v: 20 },
     { s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 20 },
     { s: '.ga-quote', e: 'quote_form', c: 'Forms', l: 'Quote Form', v: 30 },
 
-    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Forms', l: 'View Subscribe Form', v: 2 },
-    { s: '.ga-vquote', e: 'view_quote_form', c: 'Forms', l: 'View Quote Form', v: 5 },
-    { s: '.ga-vcontact', e: 'view_contact_form', c: 'Forms', l: 'View Contact Form', v: 4 }
+    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Forms', l: 'View Subscribe Form', v: 2 }, //**PRO**
+    { s: '.ga-vquote', e: 'view_quote_form', c: 'Forms', l: 'View Quote Form', v: 5 }, //**PRO**
+    { s: '.ga-vcontact', e: 'view_contact_form', c: 'Forms', l: 'View Contact Form', v: 4 } //**PRO**
   ];
   
   // Apply data attributes to matching elements
@@ -492,7 +506,7 @@
   }
   
   // ============================================
-  // ENHANCED FORM TRACKING WITH LEAD HIERARCHY
+  // ENHANCED FORM TRACKING WITH LEAD HIERARCHY  **PRO**
   // ============================================
 
   const started = new WeakSet();
@@ -571,7 +585,7 @@
       gtag('event', 'generate_lead', payload);
 
       console.info(
-        '%c📊 Lead Generated',
+        '%cðŸ“Š Lead Generated',
         'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 3px;',
         `\nTier: ${leadData.tier} | Type: ${leadData.type}`,
         `\nFields: ${fieldCount} | Form: ${payload.form_id}`,
@@ -602,13 +616,13 @@
 
   // Listen for SEOPress consent event (fires when user clicks "accept")
   document.addEventListener('seopress_analytics_cookies_accepted', function() {
-    console.log('🍪 SEOPress consent granted - initializing enhanced tracking');
+    console.log('ðŸª SEOPress consent granted - initializing enhanced tracking');
     initializeEnhanced();
   });
 
   // Also listen for generic consent events from other plugins
   document.addEventListener('cookie_consent_accepted', function() {
-    console.log('🍪 Cookie consent granted - initializing enhanced tracking');
+    console.log('ðŸª Cookie consent granted - initializing enhanced tracking');
     initializeEnhanced();
   });
 

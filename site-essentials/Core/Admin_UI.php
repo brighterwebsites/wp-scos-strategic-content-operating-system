@@ -89,29 +89,25 @@ class Admin_UI {
             30                                                   // Position
         );
 
-        // SEO submenu (only if SEO module is enabled)
-        if ($this->settings->is_module_enabled('seo')) {
-            add_submenu_page(
-                self::PAGE_SLUG,                                     // Parent slug
-                __('SEO Basics', 'site-essentials'),                // Page title
-                __('SEO', 'site-essentials'),                        // Menu title
-                'manage_options',                                    // Capability
-                self::SEO_PAGE_SLUG,                                // Menu slug
-                [$this, 'render_seo_page']                          // Callback
-            );
-        }
+        // SEO submenu (always visible, shows notice if disabled)
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('SEO Basics', 'site-essentials'),                // Page title
+            __('SEO', 'site-essentials'),                        // Menu title
+            'manage_options',                                    // Capability
+            self::SEO_PAGE_SLUG,                                // Menu slug
+            [$this, 'render_seo_page']                          // Callback
+        );
 
-        // Essentials submenu (only if tweaks module is enabled)
-        if ($this->settings->is_module_enabled('tweaks')) {
-            add_submenu_page(
-                self::PAGE_SLUG,                                     // Parent slug
-                __('Essentials', 'site-essentials'),                // Page title
-                __('Essentials', 'site-essentials'),                // Menu title
-                'manage_options',                                    // Capability
-                self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
-                [$this, 'render_essentials_page']                   // Callback
-            );
-        }
+        // Essentials submenu (always visible, shows notice if disabled)
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Essentials', 'site-essentials'),                // Page title
+            __('Essentials', 'site-essentials'),                // Menu title
+            'manage_options',                                    // Capability
+            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
+            [$this, 'render_essentials_page']                   // Callback
+        );
 
         // Settings submenu (always visible)
         add_submenu_page(
@@ -244,6 +240,12 @@ class Admin_UI {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
 
+        // Check if SEO module is enabled
+        if (!$this->settings->is_module_enabled('seo')) {
+            $this->render_module_disabled_notice('SEO', 'seo');
+            return;
+        }
+
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'sitemaps';
 
         // Get SEO module if loaded
@@ -264,12 +266,71 @@ class Admin_UI {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
 
+        // Check if Tweaks module is enabled
+        if (!$this->settings->is_module_enabled('tweaks')) {
+            $this->render_module_disabled_notice('Essentials', 'tweaks');
+            return;
+        }
+
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'tweaks';
 
         // Get WordPress Tweaks module if loaded
         $tweaks_module = Module_Loader::get_module('tweaks');
 
         include SITE_ESSENTIALS_PATH . 'Views/essentials-page.php';
+    }
+
+    /**
+     * Render module disabled notice
+     *
+     * Shows a friendly notice when trying to access a disabled module,
+     * with option to enable it or go back to settings.
+     *
+     * @since 1.0.0
+     * @param string $module_name Display name of the module (e.g., "SEO", "Essentials")
+     * @param string $module_id   Module ID slug (e.g., "seo", "tweaks")
+     * @return void
+     */
+    private function render_module_disabled_notice($module_name, $module_id) {
+        $settings_url = admin_url('admin.php?page=' . self::SETTINGS_PAGE_SLUG . '&tab=modules');
+        $enable_url = wp_nonce_url(
+            add_query_arg([
+                'action' => 'enable_module',
+                'module' => $module_id
+            ], admin_url('admin.php?page=' . self::PAGE_SLUG)),
+            'enable_module_' . $module_id
+        );
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html($module_name); ?></h1>
+
+            <div class="notice notice-warning" style="margin-top: 20px; padding: 20px; max-width: 800px;">
+                <h2 style="margin-top: 0;">
+                    <?php
+                    /* translators: %s: module name */
+                    printf(esc_html__('⚠️ %s Module Disabled', 'site-essentials'), esc_html($module_name));
+                    ?>
+                </h2>
+                <p>
+                    <?php
+                    /* translators: %s: module name */
+                    printf(
+                        esc_html__('The %s module is currently turned off. Enable it to access its features.', 'site-essentials'),
+                        '<strong>' . esc_html($module_name) . '</strong>'
+                    );
+                    ?>
+                </p>
+                <p style="margin-bottom: 0;">
+                    <a href="<?php echo esc_url($settings_url); ?>" class="button button-primary">
+                        <?php esc_html_e('Go to Module Settings', 'site-essentials'); ?>
+                    </a>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=' . self::PAGE_SLUG)); ?>" class="button">
+                        <?php esc_html_e('← Back to Dashboard', 'site-essentials'); ?>
+                    </a>
+                </p>
+            </div>
+        </div>
+        <?php
     }
 
     /**

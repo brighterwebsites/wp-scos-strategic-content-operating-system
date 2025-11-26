@@ -718,6 +718,122 @@ paths:
                           type: string
         '401':
           description: Unauthorized
+
+  /post:
+    get:
+      operationId: getBlogPost
+      summary: Get blog post (singular)
+      description: Retrieve single or paginated blog posts - GS format
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [publish, draft, any]
+            default: publish
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Unauthorized
+
+  /page:
+    get:
+      operationId: getPage
+      summary: Get page (singular)
+      description: Retrieve single or paginated pages - GS format
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [publish, draft, any]
+            default: publish
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Unauthorized
+
+  /project:
+    get:
+      operationId: getProject
+      summary: Get project (singular)
+      description: Retrieve single or paginated projects - GS format
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [publish, draft, any]
+            default: publish
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Unauthorized
+
+  /faq:
+    get:
+      operationId: getFAQ
+      summary: Get FAQ (singular)
+      description: Retrieve single or paginated FAQs - GS format
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [publish, draft, any]
+            default: publish
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          description: Unauthorized
         <?php
         return ob_get_clean();
     }

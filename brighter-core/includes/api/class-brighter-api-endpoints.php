@@ -41,13 +41,20 @@ class Brighter_API_Endpoints {
      * Register all REST API routes
      */
     public function register_routes() {
-        // Content endpoints (posts, our-work, kb, news, faqs)
+        // Content endpoints for BW sites (plural) and GS sites (singular)
         $content_endpoints = array(
+            // BW endpoints (plural - existing)
             'posts' => 'post',
             'our-work' => 'folio',
             'kb' => 'kb',
             'news' => 'news',
-            'faqs' => 'faq'
+            'faqs' => 'faq',
+
+            // GS endpoints (singular - new)
+            'post' => 'post',           // GS: single blog post
+            'page' => 'page',           // GS: single page
+            'project' => 'projects',    // GS: single project (note: post type is 'projects')
+            'faq' => 'faq'              // GS: single FAQ
         );
 
         foreach ($content_endpoints as $route => $post_type) {
@@ -64,7 +71,7 @@ class Brighter_API_Endpoints {
             }
         }
 
-        // Pages endpoint (special handling)
+        // Pages endpoint (special handling - BW only, for configured pages)
         register_rest_route(self::NAMESPACE, '/pages', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_pages'),

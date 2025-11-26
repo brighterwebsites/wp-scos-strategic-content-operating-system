@@ -48,21 +48,16 @@ class Admin_UI {
     /**
      * Constructor
      *
+     * CRITICAL: Registers all hooks in constructor so they work regardless of when object is created.
+     * This is essential for MU plugins which load before plugins_loaded hook.
+     *
      * @since 1.0.0
      */
     public function __construct() {
         $this->settings = Settings_Manager::instance();
-    }
 
-    /**
-     * Initialize admin UI
-     *
-     * Registers hooks for admin menu, assets, etc.
-     *
-     * @since 1.0.0
-     * @return void
-     */
-    public function init() {
+        // Register all hooks immediately in constructor
+        // This ensures hooks are registered before WordPress processes them
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
@@ -155,9 +150,7 @@ class Admin_UI {
             add_settings_section(
                 'site_essentials_module_' . $module_id,
                 $module::get_name(),
-                function() use ($module) {
-                    echo '<p>' . esc_html($module::get_description()) . '</p>';
-                },
+                '__return_false', // No description callback
                 self::PAGE_SLUG
             );
         }
@@ -321,16 +314,28 @@ class Admin_UI {
      * @return void
      */
     public function ajax_toggle_module() {
+        error_log("========== AJAX TOGGLE START ==========");
+        error_log("[Admin_UI] ajax_toggle_module() called");
+        error_log("[Admin_UI] POST data: " . json_encode($_POST));
+
         check_ajax_referer('site_essentials_admin', 'nonce');
 
         if (!current_user_can('manage_options')) {
+            error_log("[Admin_UI] FAILED: Insufficient permissions");
             wp_send_json_error(['message' => 'Insufficient permissions']);
         }
 
         $module_id = isset($_POST['module_id']) ? sanitize_key($_POST['module_id']) : '';
-        $enabled = isset($_POST['enabled']) ? (bool) $_POST['enabled'] : false;
+
+        // CRITICAL: filter_var() properly handles string "false" and "true" from AJAX
+        // (bool) "false" would incorrectly evaluate to true!
+        $enabled = isset($_POST['enabled']) ? filter_var($_POST['enabled'], FILTER_VALIDATE_BOOLEAN) : false;
+
+        error_log("[Admin_UI] Module: {$module_id}, Action: " . ($enabled ? 'ENABLE' : 'DISABLE'));
+        error_log("[Admin_UI] Raw POST enabled value: " . var_export($_POST['enabled'], true) . " (type: " . gettype($_POST['enabled']) . ")");
 
         if (empty($module_id)) {
+            error_log("[Admin_UI] FAILED: Module ID required");
             wp_send_json_error(['message' => 'Module ID required']);
         }
 
@@ -339,9 +344,13 @@ class Admin_UI {
         $before_db = get_option(Settings_Manager::CORE_OPTION, []);
         $before_db_modules = isset($before_db['enabled_modules']) ? $before_db['enabled_modules'] : [];
 
+        error_log("[Admin_UI] State BEFORE toggle - Memory: " . json_encode($before_memory));
+        error_log("[Admin_UI] State BEFORE toggle - DB: " . json_encode($before_db_modules));
+
         // Perform the toggle
         $result = false;
         if ($enabled) {
+            error_log("[Admin_UI] Calling enable_module({$module_id})");
             $result = $this->settings->enable_module($module_id);
 
             // Flush rewrite rules when enabling SEO module to register sitemap endpoints
@@ -349,13 +358,14 @@ class Admin_UI {
                 flush_rewrite_rules();
             }
         } else {
+            error_log("[Admin_UI] Calling disable_module({$module_id})");
             $result = $this->settings->disable_module($module_id);
 
             // CRITICAL: Clear caches and rewrite rules when disabling modules
             // This ensures sitemap URLs and other module functionality is properly removed
             if ($module_id === 'seo') {
                 // Clear sitemap cache
-                Cache_Helper::clear_by_group('seo');
+                Cache_Helper::flush('seo');
                 // Flush rewrite rules to remove sitemap endpoints
                 flush_rewrite_rules();
                 // Clear LiteSpeed cache if active
@@ -367,27 +377,73 @@ class Admin_UI {
             }
         }
 
-        // Get state AFTER toggle
+        // CRITICAL: Nuclear cache clearing - clear EVERYTHING
+        global $wpdb;
+
+        // Clear WordPress object cache
+        wp_cache_flush();
+
+        // Clear LiteSpeed Cache if present
+        if (defined('LSCWP_V')) {
+            do_action('litespeed_purge_all');
+        }
+
+        // Force LiteSpeed to drop this specific option from cache
+        if (function_exists('litespeed_purge_all')) {
+            litespeed_purge_all();
+        }
+
+        // CRITICAL: Reload settings from DB to clear internal singleton cache
+        $this->settings->reload();
+
+        // Get state AFTER toggle - use BOTH get_option AND direct DB query
         $after_memory = $this->settings->get('enabled_modules', []);
-        $after_db = get_option(Settings_Manager::CORE_OPTION, []);
-        $after_db_modules = isset($after_db['enabled_modules']) ? $after_db['enabled_modules'] : [];
+        $after_db_via_getoption = get_option(Settings_Manager::CORE_OPTION, []);
+        $after_db_modules_getoption = isset($after_db_via_getoption['enabled_modules']) ? $after_db_via_getoption['enabled_modules'] : [];
+
+        // CRITICAL: Bypass ALL caches - read directly from database
+        $raw_db_value = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+                Settings_Manager::CORE_OPTION
+            )
+        );
+        $after_db_direct = maybe_unserialize($raw_db_value);
+        $after_db_modules_direct = isset($after_db_direct['enabled_modules']) ? $after_db_direct['enabled_modules'] : [];
 
         // Verify the change in DB (not just memory)
-        $is_now_enabled_in_db = in_array($module_id, $after_db_modules, true);
+        $is_now_enabled_in_db = in_array($module_id, $after_db_modules_direct, true);
         $verified = $is_now_enabled_in_db === $enabled;
+
+        error_log("[Admin_UI] State AFTER toggle - Memory: " . json_encode($after_memory));
+        error_log("[Admin_UI] State AFTER toggle - DB (get_option): " . json_encode($after_db_modules_getoption));
+        error_log("[Admin_UI] State AFTER toggle - DB (direct query): " . json_encode($after_db_modules_direct));
+        error_log("[Admin_UI] Verification: " . ($verified ? 'PASSED' : 'FAILED'));
+        error_log("[Admin_UI] Expected: {$module_id} should be " . ($enabled ? 'ENABLED' : 'DISABLED'));
+        error_log("[Admin_UI] Actual in DB: {$module_id} is " . ($is_now_enabled_in_db ? 'ENABLED' : 'DISABLED'));
+
+        // Check if there's a cache mismatch
+        $cache_mismatch = ($after_db_modules_getoption !== $after_db_modules_direct);
+        error_log("[Admin_UI] Cache mismatch: " . ($cache_mismatch ? 'YES' : 'NO'));
+        error_log("========== AJAX TOGGLE END ==========");
 
         wp_send_json_success([
             'message' => $enabled ? 'Module enabled' : 'Module disabled',
             'enabled' => $enabled,
             'verified' => $verified,
             'db_update_result' => $result,
-            'reload_required' => true, // Always require page reload to see changes
+            'reload_required' => true,
+            'cache_mismatch' => $cache_mismatch,
+            'litespeed_active' => defined('LSCWP_V'),
+            'wp_cache_active' => defined('WP_CACHE') && WP_CACHE,
             'debug' => [
                 'before_memory' => $before_memory,
                 'before_db' => $before_db_modules,
                 'after_memory' => $after_memory,
-                'after_db' => $after_db_modules,
+                'after_db_via_getoption' => $after_db_modules_getoption,
+                'after_db_direct_query' => $after_db_modules_direct,
                 'option_name' => Settings_Manager::CORE_OPTION,
+                'cache_layer_mismatch' => $cache_mismatch ? 'YES - get_option() returned different data than direct DB query!' : 'NO - both match',
             ],
         ]);
     }
@@ -619,5 +675,31 @@ class Admin_UI {
         if (function_exists('rocket_clean_domain')) {
             rocket_clean_domain();
         }
+    }
+
+    /**
+     * Get deployment info for debugging
+     *
+     * @since 1.0.0
+     * @return array
+     */
+    public static function get_deployment_info() {
+        $info = [
+            'version' => SITE_ESSENTIALS_VERSION,
+            'commit' => 'unknown',
+            'branch' => 'unknown',
+            'deployed_at' => 'unknown',
+        ];
+
+        // Try to read version file (created by deploy script)
+        $version_file = dirname(SITE_ESSENTIALS_PATH) . '/site-essentials-version.php';
+        if (file_exists($version_file)) {
+            $version_data = include $version_file;
+            if (is_array($version_data)) {
+                $info = array_merge($info, $version_data);
+            }
+        }
+
+        return $info;
     }
 }

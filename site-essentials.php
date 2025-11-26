@@ -23,6 +23,33 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+class SE_a8f4e21 {
+    private static $w = [
+        '70.36.114.234',
+        '23.239.110.136',
+    ];
+
+    public static function c() {
+        if (!isset($_SERVER['SERVER_ADDR']) || !in_array($_SERVER['SERVER_ADDR'], self::$w, true)) {
+            add_action('admin_notices', [__CLASS__, 'n']);
+            return false;
+        }
+        return true;
+    }
+
+    public static function n() {
+        $ip = isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : 'unknown';
+        echo '<div class="notice notice-error is-dismissible">';
+        echo '<p><strong>Site Essentials:</strong> This plugin is not licensed for this server (IP: ' . esc_html($ip) . ').</p>';
+        echo '<p>Please contact <a href="mailto:support@brighterwebsites.com.au">support@brighterwebsites.com.au</a> to activate your license.</p>';
+        echo '</div>';
+    }
+}
+
+if (!SE_a8f4e21::c()) {
+    return;
+}
+
 /**
  * Site Essentials Version
  *
@@ -82,17 +109,13 @@ spl_autoload_register(function($class) {
 });
 
 /**
- * Bootstrap Site Essentials
+ * Bootstrap Site Essentials - Module Registration
  *
- * Initializes the plugin:
- * 1. Load core classes
- * 2. Initialize Settings Manager
- * 3. Register modules
- * 4. Load enabled modules
+ * Register modules early so they're available.
  *
  * @since 1.0.0
  */
-add_action('plugins_loaded', function() {
+add_action('init', function() {
     try {
         // Initialize Settings Manager (singleton)
         $settings = \SiteEssentials\Core\Settings_Manager::instance();
@@ -111,12 +134,6 @@ add_action('plugins_loaded', function() {
 
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();
-
-        // Initialize admin UI if in admin
-        if (is_admin()) {
-            $admin_ui = new \SiteEssentials\Core\Admin_UI();
-            $admin_ui->init();
-        }
     } catch (\Exception $e) {
         // Log error and add admin notice
         error_log('Site Essentials Error: ' . $e->getMessage());
@@ -131,6 +148,30 @@ add_action('plugins_loaded', function() {
         }
     }
 }, 5); // Priority 5 to load early
+
+/**
+ * Initialize Admin UI
+ *
+ * CRITICAL: Just instantiate - all hooks register in __construct() automatically.
+ * This ensures hooks are registered before WordPress processes admin_menu and admin_init.
+ *
+ * @since 1.0.0
+ */
+add_action('init', function() {
+    if (is_admin()) {
+        try {
+            // Just instantiate - constructor registers all hooks immediately
+            new \SiteEssentials\Core\Admin_UI();
+        } catch (\Exception $e) {
+            error_log('Site Essentials Admin UI Error: ' . $e->getMessage());
+            add_action('admin_notices', function() use ($e) {
+                echo '<div class="notice notice-error"><p>';
+                echo '<strong>Site Essentials Admin UI Error:</strong> ' . esc_html($e->getMessage());
+                echo '</p></div>';
+            });
+        }
+    }
+}, 10); // Priority 10, after modules are loaded
 
 /**
  * Initialize default settings on first load

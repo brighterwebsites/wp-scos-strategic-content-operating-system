@@ -104,6 +104,43 @@ class Settings_Manager {
     }
 
     /**
+     * Reload settings from database (clears internal cache)
+     *
+     * Forces a fresh read from database by bypassing ALL caches.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function reload() {
+        global $wpdb;
+
+        // CRITICAL: Clear WordPress object cache (all cache groups)
+        wp_cache_delete(self::CORE_OPTION, 'options');
+
+        // CRITICAL: Force WordPress to ignore the alloptions cache
+        // This is necessary because get_option() uses alloptions cache
+        wp_cache_delete('alloptions', 'options');
+
+        // CRITICAL: Bypass WordPress caching entirely and read directly from DB
+        $raw_value = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+                self::CORE_OPTION
+            )
+        );
+
+        if ($raw_value !== null) {
+            $this->settings = maybe_unserialize($raw_value);
+
+            // Ensure defaults are merged (in case new settings added)
+            $this->settings = wp_parse_args($this->settings, $this->get_default_settings());
+        } else {
+            // Option doesn't exist, use defaults
+            $this->settings = $this->get_default_settings();
+        }
+    }
+
+    /**
      * Get default core settings
      *
      * @since  1.0.0
@@ -112,7 +149,7 @@ class Settings_Manager {
     private function get_default_settings() {
         return [
             'version'          => SITE_ESSENTIALS_VERSION,
-            'enabled_modules'  => ['tweaks'], // Start with just tweaks enabled
+            'enabled_modules'  => [], // Start with all modules disabled
             'first_activated'  => time(),
             'last_updated'     => time(),
         ];
@@ -170,6 +207,15 @@ class Settings_Manager {
      */
     public function is_module_enabled($module_id) {
         $enabled_modules = $this->get('enabled_modules', []);
+
+        // Safety: Ensure it's always an array (in case of corrupted data)
+        if (!is_array($enabled_modules)) {
+            error_log("[Settings_Manager] WARNING: enabled_modules is not an array! Type: " . gettype($enabled_modules));
+            // Don't try to fix during read operations - just return false
+            // This prevents database writes during WP-CLI or early initialization
+            return false;
+        }
+
         return in_array($module_id, $enabled_modules, true);
     }
 
@@ -181,13 +227,30 @@ class Settings_Manager {
      * @return bool True on success
      */
     public function enable_module($module_id) {
+        error_log("[Settings_Manager] enable_module() called for: {$module_id}");
+
         $enabled_modules = $this->get('enabled_modules', []);
+        error_log("[Settings_Manager] Current enabled_modules BEFORE: " . json_encode($enabled_modules));
 
         if (!in_array($module_id, $enabled_modules, true)) {
             $enabled_modules[] = $module_id;
-            return $this->set('enabled_modules', $enabled_modules);
+            error_log("[Settings_Manager] Adding {$module_id} to enabled_modules: " . json_encode($enabled_modules));
+            $result = $this->set('enabled_modules', $enabled_modules);
+            error_log("[Settings_Manager] update_option() result: " . ($result ? 'SUCCESS' : 'FAILED'));
+
+            // Verify it was actually saved
+            global $wpdb;
+            $verify = $wpdb->get_var($wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+                self::CORE_OPTION
+            ));
+            $verify_data = maybe_unserialize($verify);
+            error_log("[Settings_Manager] DB verification after enable: " . json_encode($verify_data['enabled_modules']));
+
+            return $result;
         }
 
+        error_log("[Settings_Manager] Module {$module_id} already enabled, skipping");
         return true; // Already enabled
     }
 
@@ -199,15 +262,33 @@ class Settings_Manager {
      * @return bool True on success
      */
     public function disable_module($module_id) {
+        error_log("[Settings_Manager] disable_module() called for: {$module_id}");
+
         $enabled_modules = $this->get('enabled_modules', []);
+        error_log("[Settings_Manager] Current enabled_modules BEFORE: " . json_encode($enabled_modules));
+
         $key = array_search($module_id, $enabled_modules, true);
 
         if ($key !== false) {
             unset($enabled_modules[$key]);
             $enabled_modules = array_values($enabled_modules); // Re-index array
-            return $this->set('enabled_modules', $enabled_modules);
+            error_log("[Settings_Manager] Removing {$module_id} from enabled_modules: " . json_encode($enabled_modules));
+            $result = $this->set('enabled_modules', $enabled_modules);
+            error_log("[Settings_Manager] update_option() result: " . ($result ? 'SUCCESS' : 'FAILED'));
+
+            // Verify it was actually saved
+            global $wpdb;
+            $verify = $wpdb->get_var($wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+                self::CORE_OPTION
+            ));
+            $verify_data = maybe_unserialize($verify);
+            error_log("[Settings_Manager] DB verification after disable: " . json_encode($verify_data['enabled_modules']));
+
+            return $result;
         }
 
+        error_log("[Settings_Manager] Module {$module_id} already disabled, skipping");
         return true; // Already disabled
     }
 

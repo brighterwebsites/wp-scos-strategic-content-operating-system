@@ -19,6 +19,7 @@ class BW_Talking_Points {
     public function init() {
         add_action('init', array($this, 'register_post_type'));
         add_action('init', array($this, 'register_taxonomy'));
+        add_action('admin_menu', array($this, 'add_admin_menus'), 20);
         add_action('add_meta_boxes', array($this, 'add_meta_boxes'));
         add_action('save_post_bw_talking_point', array($this, 'save_meta_boxes'), 10, 2);
     }
@@ -45,7 +46,7 @@ class BW_Talking_Points {
             'labels'                => $labels,
             'public'                => false,
             'show_ui'               => true,
-            'show_in_menu'          => 'brighter_support',
+            'show_in_menu'          => false,  // We'll add it manually as a submenu
             'show_in_rest'          => true,
             'capability_type'       => 'post',
             'hierarchical'          => false,
@@ -56,6 +57,29 @@ class BW_Talking_Points {
         );
 
         register_post_type('bw_talking_point', $args);
+    }
+
+    /**
+     * Add admin menu items manually
+     */
+    public function add_admin_menus() {
+        // Add Talking Points submenu
+        add_submenu_page(
+            'brighter_support',
+            __('Talking Points', 'brighterwebsites'),
+            __('Talking Points', 'brighterwebsites'),
+            'edit_posts',
+            'edit.php?post_type=bw_talking_point'
+        );
+
+        // Add Content Types submenu
+        add_submenu_page(
+            'brighter_support',
+            __('Content Types', 'brighterwebsites'),
+            __('Content Types', 'brighterwebsites'),
+            'manage_categories',
+            'edit-tags.php?taxonomy=bw_content_type&post_type=bw_talking_point'
+        );
     }
 
     /**

@@ -85,6 +85,8 @@ class Brighter_API {
         require_once $social_path . 'class-social-amplification-api.php';
         require_once $social_path . 'class-webhook-trigger.php';
         require_once $social_path . 'class-webhook-settings.php';
+        require_once $social_path . 'class-breadcrumbs-meta.php';
+        require_once $social_path . 'class-content-type-helper.php';
     }
 
     /**
@@ -109,8 +111,11 @@ class Brighter_API {
         $this->webhook_trigger = new BW_Social_Webhook_Trigger();
         $this->webhook_trigger->init();
 
-        // Initialize webhook settings (admin only)
+        // Initialize breadcrumbs meta (admin only)
         if (is_admin()) {
+            $breadcrumbs_meta = new BW_Breadcrumbs_Meta();
+            $breadcrumbs_meta->init();
+
             $webhook_settings = new BW_Social_Webhook_Settings();
             $webhook_settings->init();
         }

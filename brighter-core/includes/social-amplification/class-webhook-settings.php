@@ -25,6 +25,9 @@ class BW_Social_Webhook_Settings {
 
         // Handle form submission
         add_action('admin_post_bw_save_webhook_settings', array($this, 'handle_save'));
+
+        // Handle migration
+        add_action('admin_post_bw_migrate_breadcrumbs', array($this, 'handle_migration'));
     }
 
     /**
@@ -162,6 +165,39 @@ class BW_Social_Webhook_Settings {
                 <li><?php _e('Check Make.com to see if the webhook was received', 'brighterwebsites'); ?></li>
                 <li><?php _e('Check WordPress error logs for webhook activity', 'brighterwebsites'); ?></li>
             </ol>
+
+            <hr style="margin: 40px 0;" />
+
+            <h2><?php _e('Migration Tools', 'brighterwebsites'); ?></h2>
+
+            <?php if (isset($_GET['migrated'])): ?>
+                <div class="notice notice-success is-dismissible">
+                    <p>
+                        <?php printf(
+                            __('Successfully migrated %d breadcrumbs from SEOPress!', 'brighterwebsites'),
+                            intval($_GET['migrated'])
+                        ); ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <div class="card" style="max-width: 600px;">
+                <h3><?php _e('Migrate from SEOPress Breadcrumbs', 'brighterwebsites'); ?></h3>
+                <p><?php _e('If you have been using SEOPress breadcrumbs, you can migrate them to the new Breadcrumb field.', 'brighterwebsites'); ?></p>
+                <p><?php _e('This will copy values from:', 'brighterwebsites'); ?>
+                    <code>_seopress_robots_breadcrumbs</code> →
+                    <code>_bw_breadcrumb</code>
+                </p>
+                <p class="description">
+                    <?php _e('Only posts without existing breadcrumbs will be migrated. Existing values will not be overwritten.', 'brighterwebsites'); ?>
+                </p>
+
+                <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" onsubmit="return confirm('<?php esc_attr_e('Migrate breadcrumbs from SEOPress? This will not overwrite existing values.', 'brighterwebsites'); ?>');">
+                    <?php wp_nonce_field('bw_migrate_breadcrumbs', 'bw_migrate_nonce'); ?>
+                    <input type="hidden" name="action" value="bw_migrate_breadcrumbs" />
+                    <?php submit_button(__('Migrate SEOPress Breadcrumbs', 'brighterwebsites'), 'secondary', 'submit', false); ?>
+                </form>
+            </div>
         </div>
         <?php
     }
@@ -191,6 +227,31 @@ class BW_Social_Webhook_Settings {
         wp_redirect(add_query_arg(array(
             'page' => 'bw-social-amplification',
             'updated' => 'true'
+        ), admin_url('admin.php')));
+        exit;
+    }
+
+    /**
+     * Handle migration from SEOPress
+     */
+    public function handle_migration() {
+        // Check nonce
+        if (!isset($_POST['bw_migrate_nonce']) || !wp_verify_nonce($_POST['bw_migrate_nonce'], 'bw_migrate_breadcrumbs')) {
+            wp_die(__('Security check failed', 'brighterwebsites'));
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions', 'brighterwebsites'));
+        }
+
+        // Run migration
+        $migrated = BW_Breadcrumbs_Meta::migrate_from_seopress();
+
+        // Redirect back with success message
+        wp_redirect(add_query_arg(array(
+            'page' => 'bw-social-amplification',
+            'migrated' => $migrated
         ), admin_url('admin.php')));
         exit;
     }

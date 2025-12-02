@@ -82,6 +82,10 @@ class BW_Social_Webhook_Trigger {
             return;
         }
 
+        // Get breadcrumb and content type
+        $breadcrumb = BW_Breadcrumbs_Meta::get_breadcrumb($post_id);
+        $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
+
         // Prepare payload
         $payload = array(
             'post_id' => $post_id,
@@ -91,6 +95,8 @@ class BW_Social_Webhook_Trigger {
             'post_excerpt' => get_the_excerpt($post_id),
             'post_date' => get_the_date('c', $post_id),
             'post_modified' => get_the_modified_date('c', $post_id),
+            'breadcrumb' => $breadcrumb,
+            'content_type' => $content_type,
             'site_url' => get_site_url(),
             'trigger_time' => current_time('mysql'),
         );

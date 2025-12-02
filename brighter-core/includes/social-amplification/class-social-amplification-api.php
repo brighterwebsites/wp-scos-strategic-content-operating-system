@@ -71,15 +71,31 @@ class BW_Social_Amplification_API {
             'permission_callback' => array($this->auth, 'verify_token'),
             'args' => array(
                 'post_id' => array(
-                    'description' => 'Post ID (required if url not provided)',
-                    'type'        => 'integer',
-                    'required'    => false
+                    'description'       => 'Post ID (required if url not provided)',
+                    'type'              => 'integer',
+                    'required'          => false,
+                    'validate_callback' => function($value, $request, $key) {
+                        // Allow empty if url is provided
+                        if (empty($value) && !empty($request->get_param('url'))) {
+                            return true;
+                        }
+                        // Otherwise validate as integer
+                        return empty($value) || is_numeric($value);
+                    }
                 ),
                 'url' => array(
-                    'description' => 'Post URL (required if post_id not provided)',
-                    'type'        => 'string',
-                    'format'      => 'uri',
-                    'required'    => false
+                    'description'       => 'Post URL (required if post_id not provided)',
+                    'type'              => 'string',
+                    'format'            => 'uri',
+                    'required'          => false,
+                    'validate_callback' => function($value, $request, $key) {
+                        // Allow empty if post_id is provided
+                        if (empty($value) && !empty($request->get_param('post_id'))) {
+                            return true;
+                        }
+                        // Otherwise validate as URL
+                        return empty($value) || filter_var($value, FILTER_VALIDATE_URL);
+                    }
                 ),
                 'talking_point_id' => array(
                     'description' => 'Talking point ID',

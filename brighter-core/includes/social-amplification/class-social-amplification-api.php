@@ -114,6 +114,14 @@ class BW_Social_Amplification_API {
      * Returns all published content that can be amplified
      */
     public function get_content_inventory($request) {
+        // Try cache first
+        $cache_key = 'bw_social_inventory';
+        $cached = get_transient($cache_key);
+
+        if ($cached !== false) {
+            return rest_ensure_response($cached);
+        }
+
         $inventory = array();
 
         // Define post types to include
@@ -154,11 +162,16 @@ class BW_Social_Amplification_API {
             }
         }
 
-        return rest_ensure_response(array(
+        $response = array(
             'success' => true,
             'count'   => count($inventory),
             'items'   => $inventory
-        ));
+        );
+
+        // Cache for 5 minutes
+        set_transient($cache_key, $response, 300);
+
+        return rest_ensure_response($response);
     }
 
     /**

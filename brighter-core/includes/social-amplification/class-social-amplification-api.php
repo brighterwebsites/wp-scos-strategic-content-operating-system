@@ -336,12 +336,15 @@ class BW_Social_Amplification_API {
             $prompt .= "- CTA examples: " . $tp_cta_example . "\n";
         }
 
+        $prompt .= "- IMPORTANT: Include [SHORTLINK] as a placeholder at the end of your CTA where the URL should go\n";
+        $prompt .= "- Example: \"Learn more: [SHORTLINK]\" or \"Discover how: [SHORTLINK]\"\n";
+
         $prompt .= "\n## OUTPUT FORMAT\n";
         $prompt .= "Provide ONLY the social media post text. Do NOT include:\n";
         $prompt .= "- Meta labels like 'Facebook Post:' or 'LinkedIn Post:'\n";
         $prompt .= "- Explanations or commentary\n";
         $prompt .= "- Multiple versions\n\n";
-        $prompt .= "Just the post text itself, ready to publish.\n";
+        $prompt .= "Just the post text itself with [SHORTLINK] placeholder, ready to publish.\n";
 
         return $prompt;
     }

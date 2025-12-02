@@ -45,7 +45,7 @@ class BW_Talking_Points {
             'labels'                => $labels,
             'public'                => false,
             'show_ui'               => true,
-            'show_in_menu'          => 'brighter-support',
+            'show_in_menu'          => 'brighter_support',
             'show_in_rest'          => true,
             'capability_type'       => 'post',
             'hierarchical'          => false,

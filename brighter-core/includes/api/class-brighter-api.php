@@ -39,6 +39,11 @@ class Brighter_API {
     private $social_amplification_api;
 
     /**
+     * @var BW_Social_Webhook_Trigger Webhook trigger
+     */
+    private $webhook_trigger;
+
+    /**
      * @var Brighter_API Singleton instance
      */
     private static $instance = null;
@@ -78,6 +83,8 @@ class Brighter_API {
         // Social amplification components
         require_once $social_path . 'class-talking-points.php';
         require_once $social_path . 'class-social-amplification-api.php';
+        require_once $social_path . 'class-webhook-trigger.php';
+        require_once $social_path . 'class-webhook-settings.php';
     }
 
     /**
@@ -98,6 +105,15 @@ class Brighter_API {
         $this->talking_points->init();
 
         $this->social_amplification_api = new BW_Social_Amplification_API($this->auth, $this->talking_points);
+
+        $this->webhook_trigger = new BW_Social_Webhook_Trigger();
+        $this->webhook_trigger->init();
+
+        // Initialize webhook settings (admin only)
+        if (is_admin()) {
+            $webhook_settings = new BW_Social_Webhook_Settings();
+            $webhook_settings->init();
+        }
     }
 
     /**

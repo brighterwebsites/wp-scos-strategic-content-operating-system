@@ -71,9 +71,15 @@ class BW_Social_Amplification_API {
             'permission_callback' => array($this->auth, 'verify_token'),
             'args' => array(
                 'post_id' => array(
-                    'description' => 'Post ID',
+                    'description' => 'Post ID (required if url not provided)',
                     'type'        => 'integer',
-                    'required'    => true
+                    'required'    => false
+                ),
+                'url' => array(
+                    'description' => 'Post URL (required if post_id not provided)',
+                    'type'        => 'string',
+                    'format'      => 'uri',
+                    'required'    => false
                 ),
                 'talking_point_id' => array(
                     'description' => 'Talking point ID',
@@ -206,10 +212,24 @@ class BW_Social_Amplification_API {
      */
     public function generate_prompt($request) {
         $post_id = $request->get_param('post_id');
+        $url = $request->get_param('url');
         $talking_point_id = $request->get_param('talking_point_id');
         $cta_focus = $request->get_param('cta_focus');
         $platform = $request->get_param('platform');
         $word_count = $request->get_param('word_count') ?: 90;
+
+        // Validate that we have either post_id or url
+        if (!$post_id && !$url) {
+            return new WP_Error('missing_parameter', 'Either post_id or url is required', array('status' => 400));
+        }
+
+        // If URL provided, look up the post ID
+        if ($url && !$post_id) {
+            $post_id = url_to_postid($url);
+            if (!$post_id) {
+                return new WP_Error('invalid_url', 'Could not find post for URL: ' . $url, array('status' => 404));
+            }
+        }
 
         // Get post content
         $post = get_post($post_id);

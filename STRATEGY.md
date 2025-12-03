@@ -214,18 +214,19 @@
 **Tier:** Basic → Pro features
 
 **Phase 1: Sitemaps (URGENT)**
-**Status:** Not started
+**Status:** Production Ready
 **Tier:** Basic
 **Purpose:** Fix SEOPress sitemap issues on a few sites
 
 **Features:**
 - XML sitemap generation
 - Image sitemap
-- Video sitemap (if applicable)
 - Sitemap index
-- Submit to Google Search Console via API
 - Toggle: On/Off
 
+**Features:** Not Built yet
+- Submit to Google Search Console via API
+- Video sitemap (if applicable - N)
 ---
 
 **Phase 2: Meta Management**
@@ -238,6 +239,7 @@
 - Meta keywords (optional, mostly deprecated)
 - Robots meta (index/noindex, follow/nofollow)
 - Canonical URLs
+- Breadcrumbs field( Partially Implemented with social amplication) 
 - OG tags (already partially implemented)
 - Twitter cards
 - Toggle: On/Off
@@ -432,6 +434,26 @@
 
 **Toggle:** On/Off
 
+---
+## Phase 2B: Social Amplification Foundation (COMPLETED - Dec 2025)
+
+**Status:** Testing in Production, MCP integration planned for future
+
+**What We Built:**
+- REST API endpoints for Make.com automation
+- Talking points management system
+- Content type classification
+- YOURLS shortlink integration
+- Webhook triggers for "just published" workflow
+- Breadcrumbs field (Planned for SEO Module) with SEOPress migration
+
+**Architecture:**
+- Foundation layer: reusable for both REST API and future MCP
+- Prompt generation with full content embedding (eliminates hallucinations)
+- Platform-specific rules (Facebook, LinkedIn, Twitter, Instagram, GMB)
+- UTM parameter automation
+
+**Future:** Add MCP server layer on top (reuses same classes)
 ---
 
 ## Technical Requirements

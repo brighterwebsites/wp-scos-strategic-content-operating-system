@@ -29,6 +29,21 @@ class Brighter_API {
     private $admin;
 
     /**
+     * @var BW_Talking_Points Talking points manager
+     */
+    private $talking_points;
+
+    /**
+     * @var BW_Social_Amplification_API Social amplification API
+     */
+    private $social_amplification_api;
+
+    /**
+     * @var BW_Social_Webhook_Trigger Webhook trigger
+     */
+    private $webhook_trigger;
+
+    /**
      * @var Brighter_API Singleton instance
      */
     private static $instance = null;
@@ -59,10 +74,19 @@ class Brighter_API {
      */
     private function load_dependencies() {
         $api_path = BRIGHTER_CORE_PATH . 'includes/api/';
+        $social_path = BRIGHTER_CORE_PATH . 'includes/social-amplification/';
 
         require_once $api_path . 'class-brighter-api-auth.php';
         require_once $api_path . 'class-brighter-api-endpoints.php';
         require_once $api_path . 'class-brighter-api-admin.php';
+
+        // Social amplification components
+        require_once $social_path . 'class-talking-points.php';
+        require_once $social_path . 'class-social-amplification-api.php';
+        require_once $social_path . 'class-webhook-trigger.php';
+        require_once $social_path . 'class-webhook-settings.php';
+        require_once $social_path . 'class-breadcrumbs-meta.php';
+        require_once $social_path . 'class-content-type-helper.php';
     }
 
     /**
@@ -77,6 +101,24 @@ class Brighter_API {
 
         // Initialize admin interface with auth dependency
         $this->admin = new Brighter_API_Admin($this->auth);
+
+        // Initialize social amplification
+        $this->talking_points = new BW_Talking_Points();
+        $this->talking_points->init();
+
+        $this->social_amplification_api = new BW_Social_Amplification_API($this->auth, $this->talking_points);
+
+        $this->webhook_trigger = new BW_Social_Webhook_Trigger();
+        $this->webhook_trigger->init();
+
+        // Initialize breadcrumbs meta (admin only)
+        if (is_admin()) {
+            $breadcrumbs_meta = new BW_Breadcrumbs_Meta();
+            $breadcrumbs_meta->init();
+
+            $webhook_settings = new BW_Social_Webhook_Settings();
+            $webhook_settings->init();
+        }
     }
 
     /**
@@ -85,6 +127,7 @@ class Brighter_API {
     private function register_hooks() {
         // Register REST routes
         add_action('rest_api_init', array($this->endpoints, 'register_routes'));
+        add_action('rest_api_init', array($this->social_amplification_api, 'register_routes'));
 
         // Initialize admin interface
         if (is_admin()) {

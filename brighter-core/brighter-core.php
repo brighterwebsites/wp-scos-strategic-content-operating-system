@@ -47,6 +47,7 @@ function brighter_get_whitelisted_modules() {
             'brighter-admin-branding',
             'brighter-support-image-settings',
             'bw-admin-tweaks',
+            'login-styling',
             'image-optimisation',
             'bw-custposts',
             'brighter-tweaks',

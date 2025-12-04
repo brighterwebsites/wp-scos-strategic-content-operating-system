@@ -1,6 +1,6 @@
 (function(wp) {
     const { registerBlockType } = wp.blocks;
-    const { InspectorControls } = wp.blockEditor || wp.editor;
+    const { InspectorControls } = wp.blockEditor;
     const { PanelBody, CheckboxControl, SelectControl, ToggleControl } = wp.components;
     const { createElement: el, Fragment, useState, useEffect } = wp.element;
     const { __ } = wp.i18n;

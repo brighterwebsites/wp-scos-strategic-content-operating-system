@@ -309,7 +309,7 @@ function register_faq_selector_block() {
     wp_register_script(
         'faq-selector-block',
         BRIGHTER_CORE_URL . 'js/faq-selector-block.js',
-        array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-i18n', 'wp-api-fetch'),
+        array('wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-i18n', 'wp-api-fetch'),
         BRIGHTER_CORE_VERSION,
         true
     );

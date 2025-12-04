@@ -1,6 +1,6 @@
 # Site Essentials - Long-Term Strategy
 
-**Last Updated:** 2025-11-17
+**Last Updated:** 2025-12-04
 **Product Name:** Site Essentials (formerly "Brighter Core")
 **Vision:** Modular MU Plugin → Premium Product
 
@@ -12,6 +12,51 @@
 **Modular Architecture** - Each feature can be toggled on/off for performance
 **Premium Tiers** - Basic → Pro → Agency features
 **Extractable Modules** - Module groups can become standalone plugins
+
+---
+
+## Ways of Working
+
+These guidelines help us collaborate effectively and build sustainably:
+
+### 1. Clarify Before Building
+**Always check use case and requirements before starting new functionality or major expansions.**
+
+- Don't assume what's needed - ask questions first
+- Get baseline requirements clear before coding
+- Ensure I've explained the use case well
+- Confirm we're on the same page about goals
+- Result: Efficient coding with less rework
+
+**Example Questions:**
+- "What's the primary use case for this feature?"
+- "Should this work for all content types or just specific ones?"
+- "Are there any constraints I should know about?"
+
+---
+
+### 2. Debug When Stuck
+**If something is broken after 3-4 "This is the exact solution" attempts, stop and debug.**
+
+- Add logging/debugging output
+- Look at the problem with fresh eyes
+- Check assumptions and validate inputs
+- Review error logs and stack traces
+- Consider if the approach itself needs changing
+
+**Why?** Repeatedly trying similar solutions wastes time. Better to gather data first, then solve with clarity.
+
+---
+
+### 3. MCP-First Architecture
+**Build all new features with MCP compatibility in mind.**
+
+- Separate business logic from interface layer
+- Make classes reusable across REST API and future MCP
+- No duplication - one source of truth for logic
+- Think: "Could an AI agent use this directly?"
+
+**Why?** Phase 7 (MCP Integration) will be much easier if we design for it from the start.
 
 ---
 
@@ -803,6 +848,60 @@ analytics/
 - Schema markup
 - Canonical URLs
 - SEOPress replacement complete
+
+---
+
+### Phase 7: MCP (Model Context Protocol) Integration
+**Status:** 🔄 Future - Major Architectural Evolution
+**Timeline:** TBD (after core refactor complete)
+
+**What is MCP?**
+- Anthropic's Model Context Protocol for AI agent integration
+- Enables AI agents to directly call tools and receive responses
+- Bidirectional communication (AI → WordPress → AI)
+- Real-time updates via Server-Sent Events (SSE)
+- Replaces need for middleware like Make.com for AI workflows
+
+**Architecture Approach:**
+- **Foundation Reuse:** All current classes and logic remain
+- **New Interface Layer:** Add MCP server layer on top of existing REST API foundation
+- **Tool-Based Architecture:** Convert endpoints to tools AI can invoke
+- **Same Business Logic:** No duplication - MCP layer calls existing classes
+
+**Example Transformation:**
+```
+Current: Make.com → REST API → generate_prompt() → ChatGPT
+Future:  Claude → MCP Tool: generate_social_post() → WordPress → Response
+```
+
+**MCP Tools to Build:**
+- `generate_social_post()` - Generate post for specific platform
+- `create_shortlink()` - Create YOURLS shortlink with UTM
+- `get_content_inventory()` - List publishable content
+- `get_talking_points()` - Retrieve talking points by type
+- `schedule_posts()` - Schedule to Postly (future)
+- `get_faq_data()` - Export FAQ for AI training
+- `analyze_content()` - Content strategy analysis
+- `get_business_info()` - Retrieve business data for context
+
+**Benefits:**
+- AI agents can work autonomously (no human in the loop for routine tasks)
+- Eliminate Make.com complexity for AI-driven workflows
+- Real-time bidirectional communication
+- Better error handling and retry logic
+- Structured JSON responses from AI (not just text)
+
+**MCP-First Design Principle:**
+> **IMPORTANT:** All new features should be built with MCP compatibility in mind. Separate business logic from interface layer so MCP can easily be added later without refactoring.
+
+**Implementation Order:**
+1. Core MCP server setup (authentication, tool registration)
+2. Social amplification tools (highest value, already built)
+3. Content strategy tools (ALTC, analysis)
+4. FAQ system tools (export, search, suggestions)
+5. Analytics tools (reporting, insights)
+
+**Reference:** Phase 2B (Social Amplification) was intentionally built as MCP-ready foundation
 
 ---
 

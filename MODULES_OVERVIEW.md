@@ -1,7 +1,7 @@
 # Content & Analytics Automation - Module Overview
 
 **For:** Claude AI Agent Integration
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-04
 **Status:** REST API ✅ Production | MCP Server 🚧 Planned
 
 ---
@@ -122,6 +122,84 @@ A **WordPress MU Plugin** that enables **AI-powered content strategy automation*
 **Triggers:** On post save (only if content changed)
 
 **Use case:** Content quality scoring, identify thin content
+
+---
+
+### 6. **Social Amplification Module** ✅
+**Status:** Active, Make.com integration live
+**Purpose:** Automate social media post generation from WordPress content
+
+**Features:**
+- **Talking Points System:** Reusable prompts per content type (Blog, Project, Product)
+- **Content Type Classification:** Auto-detect content type for UTM parameters
+- **Webhook Triggers:** Fire on post publish/update
+- **Breadcrumbs Field:** Short titles for YOURLS shortlinks
+- **Prompt Generation:** Full content embedding (eliminates GPT hallucinations)
+
+**REST API Endpoints:**
+```
+GET /wp-json/brighter-core/v1/social-amplification/inventory
+GET /wp-json/brighter-core/v1/social-amplification/talking-points?type=blog
+GET /wp-json/brighter-core/v1/social-amplification/content-types
+POST /wp-json/brighter-core/v1/social-amplification/generate-prompt
+```
+
+**Workflow:**
+```
+WordPress Post Published
+    ↓ (webhook)
+Make.com receives payload
+    ↓
+Generate prompt with full content
+    ↓
+ChatGPT creates platform-specific posts
+    ↓
+YOURLS creates shortlink (breadcrumb-platform)
+    ↓
+Text replace [SHORTLINK] placeholder
+    ↓
+Output to Google Sheets for review
+```
+
+**YOURLS Integration:**
+- Shortlink format: `{breadcrumb}-{platform}` (e.g., `seo-signals-fb`)
+- UTM parameters: `utm_source={platform}&utm_medium=social&utm_content={content_type}_link`
+
+**Use case:** Generate 144+ social posts in one day without daily review
+
+---
+
+### 7. **FAQ System** ✅
+**Status:** Refactored to content library model
+**Purpose:** Reusable FAQ snippets for multiple pages
+
+**Features:**
+- **Content Library Approach:** FAQs not tied to specific pages
+- **Schema Control:** Per-FAQ schema toggle + separate schema_answer field
+- **Manual Selection:** Gutenberg block for choosing specific FAQs
+- **Display Formats:** Accordion or Plain (H2/H3/H4/P)
+- **Character Counter:** Warns if schema answer >300 chars
+- **HTML Stripping:** Auto-strip HTML from schema output
+
+**Gutenberg Block:** `brighter/faq-selector`
+- Multi-select FAQ picker with drag/drop reordering
+- Display format toggle
+- Heading level selector
+- Block-level schema override
+
+**REST API Endpoints:**
+```
+GET /wp-json/brighter-core/v1/faqs
+GET /wp-json/brighter-core/v1/faqs/search?q=keyword
+GET /wp-json/brighter-core/v1/faqs/export (admin only)
+```
+
+**Shortcode:**
+```
+[faqs ids="123,456" format="plain" heading="h2" schema="true"]
+```
+
+**Use case:** Maintain FAQ library, reuse across pages, control schema output
 
 ---
 

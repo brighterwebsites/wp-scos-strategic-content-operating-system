@@ -30,12 +30,13 @@ function register_faq_cpt() {
 
     $args = array(
         'labels'                => $labels,
-        'public'                => false,              // Not publicly queryable
-        'publicly_queryable'    => false,              // No single pages needed
+        'public'                => true,               // Needed for admin editing
+        'publicly_queryable'    => false,              // No front-end single pages
         'show_ui'               => true,               // Show in admin
         'show_in_menu'          => true,
-        'query_var'             => false,
-        'rewrite'               => false,              // No custom URLs needed
+        'query_var'             => true,               // Needed for admin edit screen
+        'rewrite'               => false,              // No front-end URLs
+        'exclude_from_search'   => true,               // Exclude from search results
         'capability_type'       => 'post',
         'has_archive'           => false,
         'hierarchical'          => false,

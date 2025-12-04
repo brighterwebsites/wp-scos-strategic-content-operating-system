@@ -308,9 +308,10 @@ function register_faq_selector_block() {
     // Enqueue block editor script
     wp_register_script(
         'faq-selector-block',
-        plugins_url('js/faq-selector-block.js', dirname(__FILE__)),
+        BRIGHTER_CORE_URL . 'js/faq-selector-block.js',
         array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-i18n', 'wp-api-fetch'),
-        filemtime(dirname(__FILE__) . '/../js/faq-selector-block.js')
+        BRIGHTER_CORE_VERSION,
+        true
     );
 
     register_block_type('brighter/faq-selector', array(

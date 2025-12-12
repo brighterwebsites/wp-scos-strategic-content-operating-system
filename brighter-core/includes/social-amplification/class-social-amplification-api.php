@@ -500,8 +500,8 @@ class BW_Social_Amplification_API {
             return $result;
         }
 
-        // Return success response
-        return rest_ensure_response(array(
+        // Build response
+        $response = array(
             'success' => true,
             'shorturl' => $result['shorturl'],
             'keyword' => $result['keyword'],
@@ -515,6 +515,17 @@ class BW_Social_Amplification_API {
                 'content_type' => $content_type,
                 'format' => $format
             )
-        ));
+        );
+
+        // Add warning if YOURLS modified the keyword
+        if (isset($result['keyword_modified']) && $result['keyword_modified']) {
+            $response['warning'] = array(
+                'message' => 'YOURLS modified the keyword (likely stripped hyphens or special characters)',
+                'keyword_requested' => $result['keyword_requested'],
+                'keyword_actual' => $result['keyword']
+            );
+        }
+
+        return rest_ensure_response($response);
     }
 }

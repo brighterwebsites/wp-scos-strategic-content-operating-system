@@ -73,12 +73,18 @@ class BW_YOURLS_Helper {
         $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
 
+        // Log raw response for debugging
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('YOURLS Raw Response Body: ' . $body);
+        }
+
         // Parse JSON response
         $data = json_decode($body, true);
 
-        // Log the response for debugging
+        // Log the parsed response for debugging
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('YOURLS API Response: ' . print_r($data, true));
+            error_log('YOURLS Parsed Response: ' . print_r($data, true));
+            error_log('YOURLS Requested Keyword: ' . $keyword);
         }
 
         // Check for API errors
@@ -87,7 +93,7 @@ class BW_YOURLS_Helper {
         }
 
         if (!is_array($data)) {
-            return new WP_Error('invalid_response', 'YOURLS API returned invalid JSON');
+            return new WP_Error('invalid_response', 'YOURLS API returned invalid JSON. Raw body: ' . substr($body, 0, 200));
         }
 
         // YOURLS returns status in different ways
@@ -99,10 +105,15 @@ class BW_YOURLS_Helper {
         if ($status === 'success' || $status_code === 200) {
             // Success - return the shorturl
             if (isset($data['shorturl'])) {
+                // Get the actual keyword YOURLS used (might differ from requested if YOURLS modified it)
+                $actual_keyword = isset($data['url']['keyword']) ? $data['url']['keyword'] : $keyword;
+
                 return array(
                     'success' => true,
                     'shorturl' => $data['shorturl'],
-                    'keyword' => $keyword,
+                    'keyword' => $actual_keyword,
+                    'keyword_requested' => $keyword,
+                    'keyword_modified' => ($actual_keyword !== $keyword),
                     'message' => isset($data['message']) ? $data['message'] : 'Shortlink created'
                 );
             }
@@ -110,14 +121,17 @@ class BW_YOURLS_Helper {
 
         // If keyword already exists, YOURLS might return it anyway
         if (isset($data['url']) && !empty($data['url']['keyword'])) {
-            // Extract short URL from keyword
+            // Extract short URL from keyword that YOURLS actually used
+            $actual_keyword = $data['url']['keyword'];
             $base_url = preg_replace('/yourls-api\.php$/i', '', $api_url);
-            $shorturl = rtrim($base_url, '/') . '/' . $data['url']['keyword'];
+            $shorturl = rtrim($base_url, '/') . '/' . $actual_keyword;
 
             return array(
                 'success' => true,
                 'shorturl' => $shorturl,
-                'keyword' => $keyword,
+                'keyword' => $actual_keyword,
+                'keyword_requested' => $keyword,
+                'keyword_modified' => ($actual_keyword !== $keyword),
                 'message' => 'Shortlink already exists'
             );
         }

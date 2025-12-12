@@ -55,6 +55,23 @@ class BW_Social_Webhook_Settings {
         register_setting('bw_social_amplification', 'bw_social_webhook_enabled', array(
             'sanitize_callback' => 'absint'
         ));
+
+        // YOURLS settings
+        register_setting('bw_social_amplification', 'bw_yourls_api_url', array(
+            'sanitize_callback' => 'esc_url_raw'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_yourls_signature', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_yourls_username', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_yourls_password', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
     }
 
     /**
@@ -67,6 +84,12 @@ class BW_Social_Webhook_Settings {
 
         $webhook_url = get_option('bw_social_webhook_url', 'https://hook.us2.make.com/uokkbphdfvfdf7anyvmejmfi5nh47grq');
         $enabled = get_option('bw_social_webhook_enabled', 0);
+
+        // YOURLS settings
+        $yourls_api_url = get_option('bw_yourls_api_url', 'http://bweb1.com.au/yourls-api.php');
+        $yourls_signature = get_option('bw_yourls_signature', '');
+        $yourls_username = get_option('bw_yourls_username', '');
+        $yourls_password = get_option('bw_yourls_password', '');
 
         ?>
         <div class="wrap">
@@ -118,7 +141,72 @@ class BW_Social_Webhook_Settings {
                             </p>
                         </td>
                     </tr>
+                </table>
 
+                <hr style="margin: 30px 0;" />
+
+                <h2><?php _e('YOURLS Shortlink Settings', 'brighterwebsites'); ?></h2>
+                <p><?php _e('Configure your YOURLS shortlink service for social media posts.', 'brighterwebsites'); ?></p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_yourls_api_url"><?php _e('YOURLS API URL', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="url"
+                                   id="bw_yourls_api_url"
+                                   name="bw_yourls_api_url"
+                                   value="<?php echo esc_attr($yourls_api_url); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;" />
+                            <p class="description">
+                                <?php _e('Your YOURLS API endpoint (e.g., http://bweb1.com.au/yourls-api.php)', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_yourls_signature"><?php _e('Signature Token', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_yourls_signature"
+                                   name="bw_yourls_signature"
+                                   value="<?php echo esc_attr($yourls_signature); ?>"
+                                   class="regular-text code" />
+                            <p class="description">
+                                <?php _e('Secret signature token from YOURLS (preferred method)', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row"><?php _e('Alternative: Username/Password', 'brighterwebsites'); ?></th>
+                        <td>
+                            <p class="description" style="margin-bottom: 10px;">
+                                <?php _e('Only needed if signature token is not available', 'brighterwebsites'); ?>
+                            </p>
+                            <label for="bw_yourls_username"><?php _e('Username:', 'brighterwebsites'); ?></label><br>
+                            <input type="text"
+                                   id="bw_yourls_username"
+                                   name="bw_yourls_username"
+                                   value="<?php echo esc_attr($yourls_username); ?>"
+                                   class="regular-text"
+                                   style="margin-bottom: 10px;" />
+                            <br>
+                            <label for="bw_yourls_password"><?php _e('Password:', 'brighterwebsites'); ?></label><br>
+                            <input type="text"
+                                   id="bw_yourls_password"
+                                   name="bw_yourls_password"
+                                   value="<?php echo esc_attr($yourls_password); ?>"
+                                   class="regular-text" />
+                        </td>
+                    </tr>
+                </table>
+
+                <table class="form-table">
                     <tr>
                         <th scope="row"><?php _e('Webhook Payload', 'brighterwebsites'); ?></th>
                         <td>
@@ -222,6 +310,17 @@ class BW_Social_Webhook_Settings {
 
         update_option('bw_social_webhook_url', $webhook_url);
         update_option('bw_social_webhook_enabled', $enabled);
+
+        // Save YOURLS settings
+        $yourls_api_url = isset($_POST['bw_yourls_api_url']) ? esc_url_raw($_POST['bw_yourls_api_url']) : '';
+        $yourls_signature = isset($_POST['bw_yourls_signature']) ? sanitize_text_field($_POST['bw_yourls_signature']) : '';
+        $yourls_username = isset($_POST['bw_yourls_username']) ? sanitize_text_field($_POST['bw_yourls_username']) : '';
+        $yourls_password = isset($_POST['bw_yourls_password']) ? sanitize_text_field($_POST['bw_yourls_password']) : '';
+
+        update_option('bw_yourls_api_url', $yourls_api_url);
+        update_option('bw_yourls_signature', $yourls_signature);
+        update_option('bw_yourls_username', $yourls_username);
+        update_option('bw_yourls_password', $yourls_password);
 
         // Redirect back with success message
         wp_redirect(add_query_arg(array(

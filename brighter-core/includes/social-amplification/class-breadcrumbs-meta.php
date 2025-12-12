@@ -56,7 +56,7 @@ class BW_Breadcrumbs_Meta {
         <div class="bw-breadcrumb-field">
             <p>
                 <label for="bw_breadcrumb" style="font-weight: 600;">
-                    <?php _e('Short Title for URLs', 'brighterwebsites'); ?>
+                    <?php _e('Breadcrumb (Short Title)', 'brighterwebsites'); ?>
                 </label>
             </p>
             <input type="text"
@@ -64,21 +64,27 @@ class BW_Breadcrumbs_Meta {
                    name="bw_breadcrumb"
                    value="<?php echo esc_attr($breadcrumb); ?>"
                    class="widefat"
-                   placeholder="e.g., seo-signals" />
+                   placeholder="e.g., SEO Signals" />
             <p class="description">
-                <?php _e('Used for breadcrumbs and YOURLS shortlinks. Keep it short and SEO-friendly.', 'brighterwebsites'); ?>
+                <?php _e('Enter a short version of this page title (e.g., "SEO Signals" instead of the full title). Auto-converts to lowercase with hyphens.', 'brighterwebsites'); ?>
             </p>
             <p class="description">
-                <strong><?php _e('Example shortlink:', 'brighterwebsites'); ?></strong>
-                <code>https://bweb1.com.au/<span id="breadcrumb-preview"><?php echo esc_html($breadcrumb ?: 'example'); ?></span>-fb</code>
+                <strong><?php _e('Used for:', 'brighterwebsites'); ?></strong><br>
+                • Schema breadcrumbs: <code>Home > Blog > <span id="breadcrumb-text-preview"><?php echo esc_html($breadcrumb ?: 'SEO Signals'); ?></span></code><br>
+                • Social shortlinks: <code>https://bweb1.com.au/<span id="breadcrumb-preview"><?php echo esc_html($breadcrumb ?: 'seo-signals'); ?></span>-fb</code>
             </p>
         </div>
 
         <script>
         jQuery(document).ready(function($) {
             $('#bw_breadcrumb').on('input', function() {
-                var value = $(this).val() || 'example';
-                $('#breadcrumb-preview').text(value);
+                var rawValue = $(this).val() || 'SEO Signals';
+                var sanitizedValue = rawValue.toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '');
+
+                $('#breadcrumb-text-preview').text(rawValue);
+                $('#breadcrumb-preview').text(sanitizedValue || 'seo-signals');
             });
         });
         </script>

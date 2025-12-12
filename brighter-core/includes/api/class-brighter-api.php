@@ -87,6 +87,7 @@ class Brighter_API {
         require_once $social_path . 'class-webhook-settings.php';
         require_once $social_path . 'class-breadcrumbs-meta.php';
         require_once $social_path . 'class-content-type-helper.php';
+        require_once $social_path . 'class-yourls-helper.php';
     }
 
     /**

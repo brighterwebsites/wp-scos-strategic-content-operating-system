@@ -185,6 +185,7 @@ function brighter_load_modules() {
         'class-content-analysis-seeder',
         'class-content-stats-page',
         'migrate-reading-time-fields', // One-time migration (admin only)
+        'reading-time-shortcode', // Reading time shortcode (frontend + backend)
     ];
 
     // Admin-only modules (backend only, not frontend)

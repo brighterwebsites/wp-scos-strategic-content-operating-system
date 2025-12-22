@@ -292,19 +292,31 @@ class BW_Social_Webhook_Manual {
             wp_send_json_error(array('message' => 'Post must be published'));
         }
         
+        // Check if webhook URL is configured
+        $webhook_url = get_option('bw_social_webhook_url', '');
+        if (empty($webhook_url)) {
+            wp_send_json_error(array('message' => 'Webhook URL not configured in settings'));
+        }
+        
         // Trigger webhook via the BW_Social_Webhook_Trigger class
         global $bw_social_webhook_trigger;
-        if ($bw_social_webhook_trigger && method_exists($bw_social_webhook_trigger, 'manual_trigger')) {
-            $bw_social_webhook_trigger->manual_trigger($post_id);
-            
+        if (!$bw_social_webhook_trigger || !method_exists($bw_social_webhook_trigger, 'manual_trigger')) {
+            wp_send_json_error(array('message' => 'Webhook trigger not available'));
+        }
+        
+        // Call manual trigger
+        $success = $bw_social_webhook_trigger->manual_trigger($post_id);
+        
+        if ($success) {
             // Update last trigger time
             update_post_meta($post_id, '_bw_social_last_trigger', current_time('mysql'));
             
             wp_send_json_success(array(
-                'message' => 'Social post created! Check Make.com for processing.'
+                'message' => 'Social post sent to Make.com! Check your scenario for processing.',
+                'timestamp' => current_time('mysql')
             ));
         } else {
-            wp_send_json_error(array('message' => 'Webhook trigger not available'));
+            wp_send_json_error(array('message' => 'Failed to trigger webhook. Check error logs for details.'));
         }
     }
 }

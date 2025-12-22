@@ -137,14 +137,61 @@ class BW_Social_Webhook_Trigger {
     }
 
     /**
-     * Manual trigger via button (for future enhancement)
+     * Manual trigger via button
+     * Bypasses the "webhook enabled" check - manual triggers always work
      *
      * @param int $post_id Post ID
+     * @return bool Success status
      */
     public function manual_trigger($post_id) {
         $post = get_post($post_id);
-        if ($post) {
-            $this->trigger_webhook($post_id, $post);
+        if (!$post) {
+            error_log("BW Social Amplification: Manual trigger failed - post $post_id not found");
+            return false;
         }
+
+        // Don't trigger for revisions or autosaves
+        if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+            error_log("BW Social Amplification: Manual trigger skipped - revision or autosave");
+            return false;
+        }
+
+        // Only trigger for published posts
+        if ($post->post_status !== 'publish') {
+            error_log("BW Social Amplification: Manual trigger failed - post not published (status: {$post->post_status})");
+            return false;
+        }
+
+        // Get breadcrumb and content type
+        $breadcrumb = BW_Breadcrumbs_Meta::get_breadcrumb($post_id);
+        $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
+
+        // Prepare payload (same as automatic trigger)
+        $payload = array(
+            'post_id' => $post_id,
+            'post_url' => get_permalink($post_id),
+            'post_title' => get_the_title($post_id),
+            'post_type' => $post->post_type,
+            'post_excerpt' => get_the_excerpt($post_id),
+            'post_date' => get_the_date('c', $post_id),
+            'post_modified' => get_the_modified_date('c', $post_id),
+            'breadcrumb' => $breadcrumb,
+            'content_type' => $content_type,
+            'site_url' => get_site_url(),
+            'trigger_time' => current_time('mysql'),
+            'trigger_type' => 'manual', // Flag to distinguish from automatic triggers
+        );
+
+        // Send webhook (bypasses enabled check)
+        $this->send_webhook($payload);
+        
+        error_log(sprintf(
+            'BW Social Amplification: MANUAL trigger sent for "%s" (ID: %d, Type: %s)',
+            $payload['post_title'],
+            $payload['post_id'],
+            $payload['post_type']
+        ));
+        
+        return true;
     }
 }

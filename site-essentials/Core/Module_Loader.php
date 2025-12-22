@@ -5,9 +5,16 @@
  * Dynamically loads modules based on settings and checks dependencies.
  * Disabled modules don't load their code at all (performance first).
  *
+ * DEBUG MODE:
+ * To enable module debug logging, add this to wp-config.php:
+ * define('SCOS_MODULE_DEBUG', true);
+ * 
+ * This logs module loading details without spamming WP_DEBUG logs.
+ * Remember to remove it after debugging!
+ *
  * @package    SiteEssentials
  * @subpackage Core
- * @version    1.0.0
+ * @version    1.0.1
  * @since      1.0.0
  */
 
@@ -85,21 +92,36 @@ class Module_Loader {
      * @return void
      */
     public static function load_modules() {
-        error_log("========== MODULE_LOADER START ==========");
+        // Module debug logging - only when specifically enabled
+        // To enable: Add define('SCOS_MODULE_DEBUG', true); to wp-config.php
+        $debug = defined('SCOS_MODULE_DEBUG') && SCOS_MODULE_DEBUG;
+        
+        if ($debug) {
+            error_log("========== MODULE_LOADER START ==========");
+        }
+        
         $settings = Settings_Manager::instance();
 
         // Log what modules are enabled according to settings
         $enabled_modules = $settings->get('enabled_modules', []);
-        error_log("[Module_Loader] Enabled modules from settings: " . json_encode($enabled_modules));
-        error_log("[Module_Loader] Available modules: " . json_encode(array_keys(self::$available_modules)));
+        
+        if ($debug) {
+            error_log("[Module_Loader] Enabled modules from settings: " . json_encode($enabled_modules));
+            error_log("[Module_Loader] Available modules: " . json_encode(array_keys(self::$available_modules)));
+        }
 
         foreach (self::$available_modules as $module_id => $class_name) {
             // Check if module is enabled in settings
             $is_enabled = $settings->is_module_enabled($module_id);
-            error_log("[Module_Loader] Checking {$module_id}: " . ($is_enabled ? 'ENABLED' : 'DISABLED'));
+            
+            if ($debug) {
+                error_log("[Module_Loader] Checking {$module_id}: " . ($is_enabled ? 'ENABLED' : 'DISABLED'));
+            }
 
             if (!$is_enabled) {
-                error_log("[Module_Loader] Skipping {$module_id} - not enabled");
+                if ($debug) {
+                    error_log("[Module_Loader] Skipping {$module_id} - not enabled");
+                }
                 continue; // Skip disabled modules (don't load their code)
             }
 
@@ -128,11 +150,18 @@ class Module_Loader {
 
             // All checks passed - instantiate and initialize
             try {
-                error_log("[Module_Loader] Loading {$module_id} - all checks passed");
+                if ($debug) {
+                    error_log("[Module_Loader] Loading {$module_id} - all checks passed");
+                }
+                
                 self::$modules[$module_id] = new $class_name();
                 self::$modules[$module_id]->init();
-                error_log("[Module_Loader] Successfully loaded {$module_id}");
+                
+                if ($debug) {
+                    error_log("[Module_Loader] Successfully loaded {$module_id}");
+                }
             } catch (\Exception $e) {
+                // Always log failures (even without debug mode)
                 error_log("[Module_Loader] FAILED to load {$module_id}: " . $e->getMessage());
                 self::$failed_modules[$module_id] = "Init failed: " . $e->getMessage();
 
@@ -148,9 +177,11 @@ class Module_Loader {
             }
         }
 
-        error_log("[Module_Loader] Loaded modules: " . json_encode(array_keys(self::$modules)));
-        error_log("[Module_Loader] Failed modules: " . json_encode(self::$failed_modules));
-        error_log("========== MODULE_LOADER END ==========");
+        if ($debug) {
+            error_log("[Module_Loader] Loaded modules: " . json_encode(array_keys(self::$modules)));
+            error_log("[Module_Loader] Failed modules: " . json_encode(self::$failed_modules));
+            error_log("========== MODULE_LOADER END ==========");
+        }
     }
 
     /**

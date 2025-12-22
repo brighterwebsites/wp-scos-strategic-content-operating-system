@@ -9,14 +9,17 @@ WordPress MU Plugin implementing the Website-First Blueprint and ALTC Framework.
 
 ## 📚 Documentation
 
-**Start Here**: [SCOS Development Library Index](000-SCOS-Development-Library-Index.md)
+### For Developers
 
-The index contains:
-- Where to find all framework documents
-- Where to find all implementation documents  
-- What each document covers and when to use it
+**Local Development**: See `000-SCOS-Development-Library-Index.md` (in your local repo, excluded from Git)
+- Comprehensive index of all documentation
+- Where to find framework & implementation docs
 - Quick reference guide for common tasks
-- Repository structure and SSOT locations
+
+**Getting Started**:
+- [Git Setup Guide](GIT_SETUP_GUIDE.md) - Repository setup and deployment
+- [Deployment Guide](DEPLOYMENT.md) - Deploy to production servers
+- [Framework Documentation](https://github.com/brighterwebsites/brighter-frameworks-docs) - ALTC, WFB, SCOS architecture (separate repo)
 
 ---
 

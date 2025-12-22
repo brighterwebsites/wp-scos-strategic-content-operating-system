@@ -33,7 +33,12 @@ add_shortcode('reading_time', function($atts) {
         }
     }
     
-    // Calculate reading time (200 words per minute)
+    // Return empty if no content (don't show "0 min read" or "1 min read (0 words)")
+    if ($word_count === 0) {
+        return '';
+    }
+    
+    // Calculate reading time (200 words per minute, minimum 1 minute)
     $reading_time = max(1, ceil($word_count / 200));
     $reading_iso = 'PT' . $reading_time . 'M';
     

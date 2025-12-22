@@ -85,7 +85,12 @@ class Brighter_API {
         require_once $social_path . 'class-social-amplification-api.php';
         require_once $social_path . 'class-webhook-trigger.php';
         require_once $social_path . 'class-webhook-settings.php';
-        require_once $social_path . 'class-webhook-manual.php'; // Manual trigger UI (buttons)
+        
+        // Manual trigger UI (buttons) - check if file exists to prevent fatal errors
+        if (file_exists($social_path . 'class-social-webhook-manual.php')) {
+            require_once $social_path . 'class-social-webhook-manual.php';
+        }
+        
         require_once $social_path . 'class-breadcrumbs-meta.php';
         require_once $social_path . 'class-content-type-helper.php';
     }

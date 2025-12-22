@@ -28,13 +28,14 @@ class BW_Social_Webhook_Trigger {
      */
     public function init() {
         // Get webhook URL from settings (or use default for now)
-        $this->webhook_url = get_option('bw_social_webhook_url', 'https://hook.us2.make.com/uokkbphdfvfdf7anyvmejmfi5nh47grq');
+        $this->webhook_url = get_option('bw_social_webhook_url', '');
 
-        // Hook into post publish/update
-        add_action('publish_post', array($this, 'trigger_webhook'), 10, 2);
-        add_action('publish_page', array($this, 'trigger_webhook'), 10, 2);
-        add_action('publish_folio', array($this, 'trigger_webhook'), 10, 2);
-        add_action('publish_projects', array($this, 'trigger_webhook'), 10, 2);
+        // DISABLED: Automatic webhook trigger on publish (now manual only)
+        // Too many Make.com calls - use manual "Create Social Post" button instead
+        // add_action('publish_post', array($this, 'trigger_webhook'), 10, 2);
+        // add_action('publish_page', array($this, 'trigger_webhook'), 10, 2);
+        // add_action('publish_folio', array($this, 'trigger_webhook'), 10, 2);
+        // add_action('publish_projects', array($this, 'trigger_webhook'), 10, 2);
 
         // Add settings page hook
         add_action('admin_init', array($this, 'register_settings'));

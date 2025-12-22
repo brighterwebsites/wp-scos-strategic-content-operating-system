@@ -65,7 +65,7 @@ class BW_Social_Webhook_Settings {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
 
-        $webhook_url = get_option('bw_social_webhook_url', 'https://hook.us2.make.com/uokkbphdfvfdf7anyvmejmfi5nh47grq');
+        $webhook_url = get_option('bw_social_webhook_url', '');
         $enabled = get_option('bw_social_webhook_enabled', 0);
 
         ?>

@@ -26,6 +26,10 @@ class BW_Content_Analysis {
         
         // Track post views on frontend
         add_action('wp_head', [__CLASS__, 'track_post_views']);
+        
+        // Register shortcodes
+        add_shortcode('reading_time', [__CLASS__, 'reading_time_shortcode']);
+        add_shortcode('post_views', [__CLASS__, 'post_views_shortcode']);
     }
 
     /**
@@ -436,6 +440,79 @@ class BW_Content_Analysis {
         
         // Track last viewed timestamp
         update_post_meta($post_id, 'bw_last_viewed', current_time('mysql'));
+    }
+    
+    /**
+     * Reading time shortcode
+     * Usage: [reading_time] or [reading_time format="minutes"]
+     */
+    public static function reading_time_shortcode($atts) {
+        $atts = shortcode_atts([
+            'format' => 'full',
+        ], $atts, 'reading_time');
+        
+        $post_id = get_the_ID();
+        if (!$post_id) {
+            return '';
+        }
+        
+        // Use module data (bw_ prefix)
+        $word_count = (int) get_post_meta($post_id, 'bw_word_count', true);
+        $reading_time = (int) get_post_meta($post_id, 'bw_reading_time', true);
+        $reading_iso = get_post_meta($post_id, 'bw_reading_time_iso', true);
+        
+        // Fallback: compute if not yet analyzed
+        if (!$word_count) {
+            $content = get_post_field('post_content', $post_id);
+            if ($content) {
+                $content = strip_shortcodes($content);
+                $content = wp_strip_all_tags($content);
+                $word_count = str_word_count($content);
+                $reading_time = max(1, ceil($word_count / 200));
+                $reading_iso = 'PT' . $reading_time . 'M';
+            }
+        }
+        
+        switch (strtolower($atts['format'])) {
+            case 'minutes':
+                return sprintf('%d min read', $reading_time);
+            case 'words':
+                return sprintf('%d words', number_format($word_count));
+            case 'iso':
+                return esc_html($reading_iso);
+            case 'full':
+            default:
+                return sprintf(
+                    '%d min read (%s words)',
+                    $reading_time,
+                    number_format($word_count)
+                );
+        }
+    }
+    
+    /**
+     * Post views shortcode
+     * Usage: [post_views] or [post_views format="text"]
+     */
+    public static function post_views_shortcode($atts) {
+        $atts = shortcode_atts([
+            'format' => 'count',
+        ], $atts, 'post_views');
+        
+        $post_id = get_the_ID();
+        if (!$post_id) {
+            return '';
+        }
+        
+        $views = (int) get_post_meta($post_id, 'bw_views_count', true);
+        
+        switch (strtolower($atts['format'])) {
+            case 'text':
+                return sprintf('%s views', number_format($views));
+            case 'count':
+            default:
+                return number_format($views);
+        }
     }
 }
 

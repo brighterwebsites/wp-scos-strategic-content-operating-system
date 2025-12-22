@@ -76,6 +76,7 @@ function brighter_get_whitelisted_modules() {
             'class-column-toggles',
             'class-field-tooltips',
             'migrate-reading-time-fields', // One-time migration
+            'reading-time-shortcode', // Reading time shortcode (frontend + backend)
         ];
     }
 

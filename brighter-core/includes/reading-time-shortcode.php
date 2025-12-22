@@ -37,6 +37,11 @@ add_shortcode('reading_time', function($atts) {
     $reading_time = max(1, ceil($word_count / 200));
     $reading_iso = 'PT' . $reading_time . 'M';
     
+    // DEBUG (remove after testing)
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log(sprintf('Reading Time Debug - Post ID: %d, Word Count: %d, Reading Time: %d', $post_id, $word_count, $reading_time));
+    }
+    
     // Format output
     switch (strtolower($atts['format'])) {
         case 'minutes':

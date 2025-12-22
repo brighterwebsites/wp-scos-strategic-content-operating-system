@@ -1,0 +1,86 @@
+# WordPress MU Plugin - Git Ignore
+# Excludes documentation and development files from deployment
+
+# ============================================
+# DOCUMENTATION (Excluded from Deployment)
+# ============================================
+# All documentation is now in brighter-frameworks-docs repo
+# These files are for local development reference only
+
+# Main documentation files
+*.md
+!README.md
+!LICENSE
+!GIT_SETUP_GUIDE.md
+!DOCUMENTATION_REFERENCE.md
+!DEPLOYMENT.md
+
+# Documentation directories
+/docs/
+/high level strategy/
+/docs/history/
+
+# Development documentation
+IMPLEMENTATION_ROADMAP.md
+MODULE_REFERENCE.md
+TECHNICAL_ARCHITECTURE.md
+DEVELOPMENT_GUIDE.md
+PRODUCT_STRATEGY.md
+DOCUMENTATION_UPDATES_*.md
+000-SCOS-Development-Library-Index.md
+READING_TIME_IMPLEMENTATION.md
+Shortcodes.md
+FIND_LOGS_CYBERPANEL.md
+
+# ============================================
+# DEVELOPMENT FILES
+# ============================================
+# Temporary and development-only files
+
+# Temporary files
+temp-*.php
+*-drop-in-*.php
+*.tmp
+*.bak
+*.swp
+*~
+
+# Development scripts (keep deploy scripts)
+# deploy.sh - KEEP (needed for deployment)
+# deploy-cleanup.sh - KEEP (needed for deployment)
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# ============================================
+# SENSITIVE DATA
+# ============================================
+# Never commit these
+
+.env
+.env.local
+*.log
+*.sql
+config.local.php
+
+# ============================================
+# CACHE & TEMP
+# ============================================
+# WordPress and system cache
+
+cache/
+tmp/
+*.cache
+
+# ============================================
+# NOTES
+# ============================================
+# - All technical documentation is in: brighter-frameworks-docs/
+# - Only code and essential files should be in this repo
+# - README.md and LICENSE are kept for GitHub visibility
+

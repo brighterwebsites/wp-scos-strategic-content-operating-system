@@ -1,0 +1,9 @@
+/*
+ * Frontend CSS
+ *
+ * This file was previously used for LiteSpeed lazy-load CSS.
+ * That CSS is now conditionally loaded in includes/image-optimisation.php
+ * to improve performance (only loads when LiteSpeed Cache is active).
+ *
+ * Keeping this file empty to avoid breaking the enqueue script.
+ */

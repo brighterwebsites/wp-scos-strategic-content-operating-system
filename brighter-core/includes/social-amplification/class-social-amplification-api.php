@@ -128,6 +128,38 @@ class BW_Social_Amplification_API {
             'callback' => array($this, 'get_content_types'),
             'permission_callback' => array($this->auth, 'verify_token')
         ));
+
+        // Create YOURLS shortlink
+        register_rest_route(self::NAMESPACE, '/social-amplification/create-shortlink', array(
+            'methods'  => 'POST',
+            'callback' => array($this, 'create_shortlink'),
+            'permission_callback' => array($this->auth, 'verify_token'),
+            'args' => array(
+                'post_id' => array(
+                    'description' => 'Post ID (required if url not provided)',
+                    'type'        => 'integer',
+                    'required'    => false
+                ),
+                'url' => array(
+                    'description' => 'Post URL (required if post_id not provided)',
+                    'type'        => 'string',
+                    'format'      => 'uri',
+                    'required'    => false
+                ),
+                'platform' => array(
+                    'description' => 'Social platform',
+                    'type'        => 'string',
+                    'enum'        => array('facebook', 'linkedin', 'twitter', 'instagram', 'gmb'),
+                    'required'    => true
+                ),
+                'format' => array(
+                    'description' => 'Content format for UTM',
+                    'type'        => 'string',
+                    'enum'        => array('link', 'img', 'reel', 'video'),
+                    'default'     => 'link'
+                )
+            )
+        ));
     }
 
     /**
@@ -410,5 +442,90 @@ class BW_Social_Amplification_API {
         }
 
         return $content_type;
+    }
+
+    /**
+     * Create YOURLS shortlink
+     *
+     * @param WP_REST_Request $request Request object
+     * @return WP_REST_Response|WP_Error Response or error
+     */
+    public function create_shortlink($request) {
+        $post_id = $request->get_param('post_id');
+        $url = $request->get_param('url');
+        $platform = $request->get_param('platform');
+        $format = $request->get_param('format') ?: 'link';
+
+        // Validate that we have either post_id or url
+        if (!$post_id && !$url) {
+            return new WP_Error('missing_parameter', 'Either post_id or url is required', array('status' => 400));
+        }
+
+        // If URL provided, look up the post ID
+        if ($url && !$post_id) {
+            $post_id = url_to_postid($url);
+            if (!$post_id) {
+                return new WP_Error('invalid_url', 'Could not find post for URL: ' . $url, array('status' => 404));
+            }
+        }
+
+        // Get post
+        $post = get_post($post_id);
+        if (!$post) {
+            return new WP_Error('invalid_post', 'Post not found', array('status' => 404));
+        }
+
+        // Get breadcrumb
+        $breadcrumb = get_post_meta($post_id, '_bw_breadcrumb', true);
+        if (empty($breadcrumb)) {
+            // Fallback to sanitized title
+            $breadcrumb = sanitize_title(substr($post->post_title, 0, 50));
+        }
+
+        // Build shortlink keyword
+        $keyword = BW_YOURLS_Helper::build_keyword($breadcrumb, $platform);
+
+        // Get content type for UTM
+        $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
+
+        // Build destination URL with UTM parameters
+        $post_url = get_permalink($post_id);
+        $destination_url = BW_YOURLS_Helper::build_destination_url($post_url, $platform, $content_type, $format);
+
+        // Create shortlink via YOURLS
+        $result = BW_YOURLS_Helper::create_shortlink($destination_url, $keyword, $post->post_title);
+
+        // Check for errors
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        // Build response
+        $response = array(
+            'success' => true,
+            'shorturl' => $result['shorturl'],
+            'keyword' => $result['keyword'],
+            'destination_url' => $destination_url,
+            'meta' => array(
+                'post_id' => $post_id,
+                'post_title' => $post->post_title,
+                'post_url' => $post_url,
+                'breadcrumb' => $breadcrumb,
+                'platform' => $platform,
+                'content_type' => $content_type,
+                'format' => $format
+            )
+        );
+
+        // Add warning if YOURLS modified the keyword
+        if (isset($result['keyword_modified']) && $result['keyword_modified']) {
+            $response['warning'] = array(
+                'message' => 'YOURLS modified the keyword (likely stripped hyphens or special characters)',
+                'keyword_requested' => $result['keyword_requested'],
+                'keyword_actual' => $result['keyword']
+            );
+        }
+
+        return rest_ensure_response($response);
     }
 }

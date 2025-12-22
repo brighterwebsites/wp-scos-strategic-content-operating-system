@@ -23,6 +23,9 @@ class BW_Content_Analysis {
         // Re-enabled: Only runs on individual post save, not on admin list
         // This analyzes one post at a time when saved, not all posts at once
         add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
+        
+        // Track post views on frontend
+        add_action('wp_head', [__CLASS__, 'track_post_views']);
     }
 
     /**
@@ -57,7 +60,10 @@ class BW_Content_Analysis {
         // 4. Calculate content statistics
         $stats = self::calculate_stats($clean_content);
 
-        // 5. Save all data
+        // 5. Calculate reading time (based on word count)
+        $reading_time = self::calculate_reading_time($stats['word_count']);
+
+        // 6. Save all data
         update_post_meta($post_id, 'bw_internal_link_count', $link_data['internal_count']);
         update_post_meta($post_id, 'bw_external_link_count', $link_data['external_count']);
         update_post_meta($post_id, 'bw_internal_links', $link_data['internal_links']);
@@ -66,6 +72,10 @@ class BW_Content_Analysis {
         update_post_meta($post_id, 'bw_word_count', $stats['word_count']);
         update_post_meta($post_id, 'bw_image_count', $stats['image_count']);
         update_post_meta($post_id, 'bw_h2_count', $stats['h2_count']);
+        
+        // Reading time fields (NEW - consolidates post_reading_minutes, post_reading_iso)
+        update_post_meta($post_id, 'bw_reading_time', $reading_time['minutes']);
+        update_post_meta($post_id, 'bw_reading_time_iso', $reading_time['iso']);
 
         update_post_meta($post_id, '_bw_last_analyzed', $post->post_modified);
     }
@@ -246,6 +256,24 @@ class BW_Content_Analysis {
     }
 
     /**
+     * Calculate reading time based on word count
+     * Average reading speed: 200 words per minute
+     *
+     * @param int $word_count Word count
+     * @return array Reading time data
+     */
+    private static function calculate_reading_time($word_count) {
+        $minutes = max(1, ceil($word_count / 200)); // 200 wpm average
+        $iso = 'PT' . $minutes . 'M'; // ISO 8601 duration format
+        
+        return array(
+            'minutes' => $minutes,
+            'iso' => $iso,
+            'formatted' => $minutes . ' min read'
+        );
+    }
+
+    /**
      * Calculate content statistics
      */
     private static function calculate_stats($html) {
@@ -371,6 +399,43 @@ class BW_Content_Analysis {
         }
 
         return '';
+    }
+
+    /**
+     * Track post views (privacy-friendly, no cookies)
+     * Runs on wp_head for singular posts
+     * 
+     * Replaces old ACF-based post_views_count (KB only)
+     * Now works on all post types with consistent bw_ naming
+     */
+    public static function track_post_views() {
+        // Only track on singular posts (not archives, home, admin)
+        if (!is_singular() || is_admin()) {
+            return;
+        }
+        
+        // Skip AJAX requests
+        if (defined('DOING_AJAX') && DOING_AJAX) {
+            return;
+        }
+        
+        // Filter out bots
+        if (isset($_SERVER['HTTP_USER_AGENT']) && 
+            stripos($_SERVER['HTTP_USER_AGENT'], 'bot') !== false) {
+            return;
+        }
+        
+        $post_id = get_the_ID();
+        if (!$post_id) {
+            return;
+        }
+        
+        // Increment view count
+        $views = (int) get_post_meta($post_id, 'bw_views_count', true);
+        update_post_meta($post_id, 'bw_views_count', $views + 1);
+        
+        // Track last viewed timestamp
+        update_post_meta($post_id, 'bw_last_viewed', current_time('mysql'));
     }
 }
 

@@ -12,6 +12,9 @@
 
 if (!defined('ABSPATH')) exit;
 
+// DEBUG: Log that this file is loaded
+error_log('BW Social Webhook Manual: Class file loaded');
+
 class BW_Social_Webhook_Manual {
     
     /**
@@ -23,6 +26,8 @@ class BW_Social_Webhook_Manual {
      * Initialize hooks
      */
     public function init() {
+        error_log('BW Social Webhook Manual: init() method called');
+        
         // Add meta box to post editor
         add_action('add_meta_boxes', array($this, 'add_meta_box'));
         
@@ -34,6 +39,7 @@ class BW_Social_Webhook_Manual {
         
         // AJAX handler for manual trigger
         add_action('wp_ajax_bw_trigger_social_webhook', array($this, 'ajax_trigger_webhook'));
+        error_log('BW Social Webhook Manual: AJAX action wp_ajax_bw_trigger_social_webhook registered');
         
         // Enqueue admin scripts
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
@@ -177,10 +183,15 @@ class BW_Social_Webhook_Manual {
      * Enqueue admin scripts
      */
     public function enqueue_scripts($hook) {
+        error_log('BW Social Webhook Manual: enqueue_scripts() called on hook: ' . $hook);
+        
         // Only load on post edit and list screens
         if (!in_array($hook, array('post.php', 'post-new.php', 'edit.php'))) {
+            error_log('BW Social Webhook Manual: Scripts NOT enqueued (wrong hook)');
             return;
         }
+        
+        error_log('BW Social Webhook Manual: Scripts enqueued - JavaScript will be loaded');
         
         ?>
         <script type="text/javascript">

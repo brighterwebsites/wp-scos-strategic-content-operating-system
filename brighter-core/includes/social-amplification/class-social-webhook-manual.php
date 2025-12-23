@@ -61,27 +61,22 @@ class BW_Social_Webhook_Manual {
     public function render_meta_box($post) {
         // Check if webhook is configured
         $webhook_url = get_option('bw_social_webhook_url', '');
-        $webhook_enabled = get_option('bw_social_webhook_enabled', 0);
         
         if (empty($webhook_url)) {
             ?>
             <p style="color: #d63638;">
                 ⚠️ <strong>Webhook not configured</strong><br>
-                <small>Go to Social Amplification settings to configure.</small>
+                <small>Go to Social Amplification settings to configure URL:</small>
+                <code style="display: block; margin-top: 5px; font-size: 11px;">
+                    https://hook.us2.make.com/j0ajwegj6uftmc5j4gwxm9p42epfiopk
+                </code>
             </p>
             <?php
             return;
         }
         
-        if (!$webhook_enabled) {
-            ?>
-            <p style="color: #d63638;">
-                ⚠️ <strong>Webhook disabled</strong><br>
-                <small>Enable in Social Amplification settings.</small>
-            </p>
-            <?php
-            return;
-        }
+        // Note: Manual triggers work regardless of "Enable Webhook" setting
+        // That setting only controls automatic triggers on post publish
         
         // Check if post is published
         if ($post->post_status !== 'publish') {
@@ -186,16 +181,25 @@ class BW_Social_Webhook_Manual {
         ?>
         <script type="text/javascript">
         jQuery(document).ready(function($) {
+            console.log('BW Social: JavaScript loaded');
+            console.log('BW Social: Button exists?', $('#bw-trigger-social-webhook').length > 0);
+            
             // Handle meta box button click
             $(document).on('click', '#bw-trigger-social-webhook', function(e) {
+                console.log('BW Social: Button clicked!');
                 e.preventDefault();
                 var $btn = $(this);
                 var postId = $btn.data('post-id');
                 var $status = $('#bw-social-webhook-status');
                 
+                console.log('BW Social: Post ID:', postId);
+                console.log('BW Social: ajaxurl:', ajaxurl);
+                
                 // Disable button
                 $btn.prop('disabled', true).text('Sending...');
                 $status.html('');
+                
+                console.log('BW Social: Sending AJAX request...');
                 
                 // Send AJAX request
                 $.post(ajaxurl, {
@@ -203,6 +207,7 @@ class BW_Social_Webhook_Manual {
                     post_id: postId,
                     nonce: '<?php echo wp_create_nonce('bw_social_webhook'); ?>'
                 }, function(response) {
+                    console.log('BW Social: AJAX response received:', response);
                     if (response.success) {
                         $status.html('<p style="color: #00a32a; margin: 0;">✅ ' + response.data.message + '</p>');
                         $btn.html('<span class="dashicons dashicons-yes" style="vertical-align: middle;"></span> Sent!');
@@ -212,11 +217,16 @@ class BW_Social_Webhook_Manual {
                             $btn.prop('disabled', false).html('<span class="dashicons dashicons-megaphone" style="vertical-align: middle;"></span> Create Social Post');
                         }, 3000);
                     } else {
+                        console.log('BW Social: AJAX error:', response.data.message);
                         $status.html('<p style="color: #d63638; margin: 0;">❌ Error: ' + response.data.message + '</p>');
                         $btn.prop('disabled', false).html('<span class="dashicons dashicons-megaphone" style="vertical-align: middle;"></span> Create Social Post');
                     }
-                }).fail(function() {
-                    $status.html('<p style="color: #d63638; margin: 0;">❌ Request failed</p>');
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    console.log('BW Social: AJAX request failed!');
+                    console.log('BW Social: Status:', textStatus);
+                    console.log('BW Social: Error:', errorThrown);
+                    console.log('BW Social: Response:', jqXHR.responseText);
+                    $status.html('<p style="color: #d63638; margin: 0;">❌ Request failed: ' + textStatus + '</p>');
                     $btn.prop('disabled', false).html('<span class="dashicons dashicons-megaphone" style="vertical-align: middle;"></span> Create Social Post');
                 });
             });

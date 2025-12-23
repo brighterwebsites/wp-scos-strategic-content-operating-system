@@ -82,6 +82,7 @@ class Brighter_API {
 
         // Social amplification components
         require_once $social_path . 'class-talking-points.php';
+        require_once $social_path . 'class-yourls-helper.php'; // YOURLS API helper (required by API)
         require_once $social_path . 'class-social-amplification-api.php';
         require_once $social_path . 'class-webhook-trigger.php';
         require_once $social_path . 'class-webhook-settings.php';

@@ -35,8 +35,8 @@ class BW_Social_Webhook_Manual {
         // AJAX handler for manual trigger
         add_action('wp_ajax_bw_trigger_social_webhook', array($this, 'ajax_trigger_webhook'));
         
-        // Enqueue admin scripts
-        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        // Output inline JavaScript in footer (works on all admin pages)
+        add_action('admin_footer', array($this, 'output_inline_script'));
     }
     
     /**
@@ -169,15 +169,10 @@ class BW_Social_Webhook_Manual {
     }
     
     /**
-     * Enqueue admin scripts
+     * Output inline JavaScript in admin footer
      */
-    public function enqueue_scripts($hook) {
-        // Load on ALL admin pages for now (debugging)
-        // TODO: Restrict back to specific hooks after confirming it works
-        // if (!in_array($hook, array('post.php', 'post-new.php', 'edit.php'))) {
-        //     return;
-        // }
-        
+    public function output_inline_script() {
+        // Output on all admin pages (button may appear in meta box or admin columns)
         ?>
         <script type="text/javascript">
         jQuery(document).ready(function($) {

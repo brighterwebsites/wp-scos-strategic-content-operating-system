@@ -88,14 +88,12 @@ class Brighter_API {
         
         // Manual trigger UI (buttons) - check if file exists to prevent fatal errors
         $manual_file = $social_path . 'class-social-webhook-manual.php';
-        error_log('BW Social: Checking for manual webhook file: ' . $manual_file);
-        error_log('BW Social: File exists? ' . (file_exists($manual_file) ? 'YES' : 'NO'));
         
         if (file_exists($manual_file)) {
-            error_log('BW Social: Loading class-social-webhook-manual.php');
             require_once $manual_file;
         } else {
-            error_log('BW Social: WARNING - class-social-webhook-manual.php NOT FOUND!');
+            // Only log if file is missing (error condition)
+            error_log('BW Social: ERROR - class-social-webhook-manual.php NOT FOUND at: ' . $manual_file);
         }
         
         require_once $social_path . 'class-breadcrumbs-meta.php';

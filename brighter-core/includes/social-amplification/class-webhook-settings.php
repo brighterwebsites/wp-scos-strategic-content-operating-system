@@ -55,6 +55,23 @@ class BW_Social_Webhook_Settings {
         register_setting('bw_social_amplification', 'bw_social_webhook_enabled', array(
             'sanitize_callback' => 'absint'
         ));
+
+        // YOURLS settings
+        register_setting('bw_social_amplification', 'bw_yourls_api_url', array(
+            'sanitize_callback' => 'esc_url_raw'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_yourls_signature', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_yourls_username', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_yourls_password', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
     }
 
     /**
@@ -119,6 +136,87 @@ class BW_Social_Webhook_Settings {
                         </td>
                     </tr>
 
+                    <!-- YOURLS Configuration -->
+                    <tr>
+                        <th colspan="2" style="background: #f5f5f5; padding: 10px;">
+                            <h3 style="margin: 0;"><?php _e('YOURLS Shortlink Configuration', 'brighterwebsites'); ?></h3>
+                            <p style="margin: 5px 0 0 0; font-weight: normal;">
+                                <?php _e('Configure YOURLS integration for social media shortlinks', 'brighterwebsites'); ?>
+                            </p>
+                        </th>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_yourls_api_url"><?php _e('YOURLS API URL', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="url"
+                                   id="bw_yourls_api_url"
+                                   name="bw_yourls_api_url"
+                                   value="<?php echo esc_attr(get_option('bw_yourls_api_url', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;"
+                                   placeholder="https://bweb1.com.au/yourls-api.php" />
+                            <p class="description">
+                                <?php _e('Your YOURLS installation API URL (e.g., https://bweb1.com.au/yourls-api.php)', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_yourls_signature"><?php _e('YOURLS Signature', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_yourls_signature"
+                                   name="bw_yourls_signature"
+                                   value="<?php echo esc_attr(get_option('bw_yourls_signature', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;" />
+                            <p class="description">
+                                <?php _e('Recommended: Get this from YOURLS Admin → Tools → Signature Token', 'brighterwebsites'); ?>
+                                <br>
+                                <strong><?php _e('OR', 'brighterwebsites'); ?></strong> <?php _e('use username and password below (less secure)', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_yourls_username"><?php _e('YOURLS Username', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_yourls_username"
+                                   name="bw_yourls_username"
+                                   value="<?php echo esc_attr(get_option('bw_yourls_username', '')); ?>"
+                                   class="regular-text"
+                                   autocomplete="off" />
+                            <p class="description">
+                                <?php _e('Only needed if not using signature token above', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_yourls_password"><?php _e('YOURLS Password', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="password"
+                                   id="bw_yourls_password"
+                                   name="bw_yourls_password"
+                                   value="<?php echo esc_attr(get_option('bw_yourls_password', '')); ?>"
+                                   class="regular-text"
+                                   autocomplete="off" />
+                            <p class="description">
+                                <?php _e('Only needed if not using signature token above', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
                     <tr>
                         <th scope="row"><?php _e('Webhook Payload', 'brighterwebsites'); ?></th>
                         <td>
@@ -132,8 +230,13 @@ class BW_Social_Webhook_Settings {
   "post_excerpt": "Brief excerpt...",
   "post_date": "2025-12-02T10:30:00+00:00",
   "post_modified": "2025-12-02T11:00:00+00:00",
+  "breadcrumb": "seo-signals",
+  "content_type": "Article",
+  "featured_image_url": "https://.../image.jpg",
+  "featured_image_caption": "Image caption",
   "site_url": "https://example.com",
-  "trigger_time": "2025-12-02 11:00:00"
+  "trigger_time": "2025-12-02 11:00:00",
+  "trigger_type": "manual"
 }</pre>
                         </td>
                     </tr>

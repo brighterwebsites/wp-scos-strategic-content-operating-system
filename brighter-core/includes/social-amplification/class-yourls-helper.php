@@ -89,10 +89,17 @@ class BW_YOURLS_Helper {
 
         // Check for API errors
         if ($response_code !== 200) {
-            return new WP_Error('api_error', 'YOURLS API returned status ' . $response_code);
+            // Log detailed error for debugging
+            error_log('YOURLS API Error - Status: ' . $response_code);
+            error_log('YOURLS API Error - Response: ' . $body);
+            error_log('YOURLS API Error - URL: ' . $long_url);
+            error_log('YOURLS API Error - Keyword: ' . $keyword);
+            
+            return new WP_Error('api_error', 'YOURLS API returned status ' . $response_code . '. Response: ' . substr($body, 0, 200));
         }
 
         if (!is_array($data)) {
+            error_log('YOURLS Invalid JSON Response: ' . $body);
             return new WP_Error('invalid_response', 'YOURLS API returned invalid JSON. Raw body: ' . substr($body, 0, 200));
         }
 

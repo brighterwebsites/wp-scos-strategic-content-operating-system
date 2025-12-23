@@ -182,6 +182,15 @@ class BW_Social_Webhook_Trigger {
         $breadcrumb = BW_Breadcrumbs_Meta::get_breadcrumb($post_id);
         $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
 
+        // Get featured image data
+        $featured_image_url = '';
+        $featured_image_caption = '';
+        if (has_post_thumbnail($post_id)) {
+            $thumbnail_id = get_post_thumbnail_id($post_id);
+            $featured_image_url = get_the_post_thumbnail_url($post_id, 'full');
+            $featured_image_caption = get_the_post_thumbnail_caption($post_id);
+        }
+
         // Prepare payload (same as automatic trigger)
         $payload = array(
             'post_id' => $post_id,
@@ -193,6 +202,8 @@ class BW_Social_Webhook_Trigger {
             'post_modified' => get_the_modified_date('c', $post_id),
             'breadcrumb' => $breadcrumb,
             'content_type' => $content_type,
+            'featured_image_url' => $featured_image_url,
+            'featured_image_caption' => $featured_image_caption,
             'site_url' => get_site_url(),
             'trigger_time' => current_time('mysql'),
             'trigger_type' => 'manual', // Flag to distinguish from automatic triggers

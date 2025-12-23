@@ -185,13 +185,14 @@ class BW_Social_Webhook_Manual {
     public function enqueue_scripts($hook) {
         error_log('BW Social Webhook Manual: enqueue_scripts() called on hook: ' . $hook);
         
-        // Only load on post edit and list screens
-        if (!in_array($hook, array('post.php', 'post-new.php', 'edit.php'))) {
-            error_log('BW Social Webhook Manual: Scripts NOT enqueued (wrong hook)');
-            return;
-        }
+        // Load on ALL admin pages for now (debugging)
+        // TODO: Restrict back to specific hooks after confirming it works
+        // if (!in_array($hook, array('post.php', 'post-new.php', 'edit.php'))) {
+        //     error_log('BW Social Webhook Manual: Scripts NOT enqueued (wrong hook)');
+        //     return;
+        // }
         
-        error_log('BW Social Webhook Manual: Scripts enqueued - JavaScript will be loaded');
+        error_log('BW Social Webhook Manual: Scripts enqueued - JavaScript will be loaded on ALL admin pages');
         
         ?>
         <script type="text/javascript">

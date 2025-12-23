@@ -360,24 +360,25 @@ add_action('admin_notices', function() {
  * Performance monitoring (only in debug mode)
  * 
  * SECURITY: Restricted to super admins only
+ * NOTE: Commented out - too noisy for production. Uncomment if needed for debugging.
  */
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    add_action('shutdown', function() {
-        // SECURITY: Only log for super admins
-        if (!is_super_admin()) return;
-        
-        $queries = get_num_queries();
-        $timer = timer_stop(0, 3);
-        $memory = size_format(memory_get_peak_usage());
-        
-        error_log(sprintf(
-            'Brighter Core Performance: %d queries in %s seconds using %s memory',
-            absint($queries),
-            esc_html($timer),
-            esc_html($memory)
-        ));
-    });
-}
+// if (defined('WP_DEBUG') && WP_DEBUG) {
+//     add_action('shutdown', function() {
+//         // SECURITY: Only log for super admins
+//         if (!is_super_admin()) return;
+//         
+//         $queries = get_num_queries();
+//         $timer = timer_stop(0, 3);
+//         $memory = size_format(memory_get_peak_usage());
+//         
+//         error_log(sprintf(
+//             'Brighter Core Performance: %d queries in %s seconds using %s memory',
+//             absint($queries),
+//             esc_html($timer),
+//             esc_html($memory)
+//         ));
+//     });
+// }
 
 /**
  * Heartbeat optimization - reduce frequency

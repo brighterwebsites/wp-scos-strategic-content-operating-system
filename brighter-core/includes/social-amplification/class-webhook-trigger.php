@@ -117,8 +117,13 @@ class BW_Social_Webhook_Trigger {
             return;
         }
 
+        // DEBUG: Log webhook details
+        error_log('=== BW SOCIAL WEBHOOK DEBUG START ===');
+        error_log('Webhook URL: ' . $this->webhook_url);
+        error_log('Payload: ' . json_encode($payload, JSON_PRETTY_PRINT));
+        
         // Send async request (don't wait for response)
-        wp_remote_post($this->webhook_url, array(
+        $response = wp_remote_post($this->webhook_url, array(
             'body' => json_encode($payload),
             'headers' => array(
                 'Content-Type' => 'application/json'
@@ -127,6 +132,14 @@ class BW_Social_Webhook_Trigger {
             'blocking' => false, // Don't wait for response
             'sslverify' => true
         ));
+
+        // DEBUG: Log response
+        if (is_wp_error($response)) {
+            error_log('Webhook ERROR: ' . $response->get_error_message());
+        } else {
+            error_log('Webhook sent successfully (non-blocking)');
+        }
+        error_log('=== BW SOCIAL WEBHOOK DEBUG END ===');
 
         // Log for debugging
         error_log(sprintf(

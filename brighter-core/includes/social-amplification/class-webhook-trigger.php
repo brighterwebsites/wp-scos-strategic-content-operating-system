@@ -185,10 +185,12 @@ class BW_Social_Webhook_Trigger {
         // Get featured image data
         $featured_image_url = '';
         $featured_image_caption = '';
+        $featured_image_social_url = '';
         if (has_post_thumbnail($post_id)) {
             $thumbnail_id = get_post_thumbnail_id($post_id);
             $featured_image_url = get_the_post_thumbnail_url($post_id, 'full');
             $featured_image_caption = get_the_post_thumbnail_caption($post_id);
+            $featured_image_social_url = get_the_post_thumbnail_url($post_id, 'social-square'); // 1080x1080 for Instagram/Facebook
         }
 
         // Prepare payload (same as automatic trigger)
@@ -204,6 +206,7 @@ class BW_Social_Webhook_Trigger {
             'content_type' => $content_type,
             'featured_image_url' => $featured_image_url,
             'featured_image_caption' => $featured_image_caption,
+            'featured_image_social_url' => $featured_image_social_url, // 1080x1080 square for social media
             'site_url' => get_site_url(),
             'trigger_time' => current_time('mysql'),
             'trigger_type' => 'manual', // Flag to distinguish from automatic triggers

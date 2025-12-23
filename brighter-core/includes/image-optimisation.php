@@ -88,6 +88,7 @@ add_action('init', function () {
         'custom_768w'   => [768, 0, false],
         'custom_1200w'  => [1200, 0, false],
         'og-image'      => [1200, 630, true],
+        'social-square' => [1080, 1080, true],  // Social media square (Instagram/Facebook)
         '1536x1536'     => [1536, 1536, false],
         '2048x2048'     => [2048, 2048, false],
     ];
@@ -121,6 +122,20 @@ add_action('init', function () {
         }
     }
 }, 10);
+
+// ==========================================
+// ✅ Custom Quality for Social Square (85% for external platforms)
+// ==========================================
+add_filter('wp_editor_set_quality', function($quality, $mime_type) {
+    // Set 85% quality for social-square size (optimized for social media)
+    if (doing_filter('wp_generate_attachment_metadata')) {
+        $size_being_generated = apply_filters('intermediate_image_sizes_advanced', []);
+        if (isset($size_being_generated['social-square'])) {
+            return 85;
+        }
+    }
+    return $quality;
+}, 10, 2);
 
 // ==========================================
 // ✅ Filter: remove disabled sizes during generation

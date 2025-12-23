@@ -319,12 +319,23 @@ class BW_Social_Webhook_Settings {
             wp_die(__('You do not have sufficient permissions', 'brighterwebsites'));
         }
 
-        // Save settings
+        // Save webhook settings
         $webhook_url = isset($_POST['bw_social_webhook_url']) ? esc_url_raw($_POST['bw_social_webhook_url']) : '';
         $enabled = isset($_POST['bw_social_webhook_enabled']) ? 1 : 0;
 
         update_option('bw_social_webhook_url', $webhook_url);
         update_option('bw_social_webhook_enabled', $enabled);
+        
+        // Save YOURLS settings
+        $yourls_api_url = isset($_POST['bw_yourls_api_url']) ? esc_url_raw($_POST['bw_yourls_api_url']) : '';
+        $yourls_signature = isset($_POST['bw_yourls_signature']) ? sanitize_text_field($_POST['bw_yourls_signature']) : '';
+        $yourls_username = isset($_POST['bw_yourls_username']) ? sanitize_text_field($_POST['bw_yourls_username']) : '';
+        $yourls_password = isset($_POST['bw_yourls_password']) ? sanitize_text_field($_POST['bw_yourls_password']) : '';
+        
+        update_option('bw_yourls_api_url', $yourls_api_url);
+        update_option('bw_yourls_signature', $yourls_signature);
+        update_option('bw_yourls_username', $yourls_username);
+        update_option('bw_yourls_password', $yourls_password);
 
         // Redirect back with success message
         wp_redirect(add_query_arg(array(

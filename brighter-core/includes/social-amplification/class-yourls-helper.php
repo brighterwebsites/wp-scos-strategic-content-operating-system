@@ -89,7 +89,28 @@ class BW_YOURLS_Helper {
 
         // Check for API errors
         if ($response_code !== 200) {
-            // Log detailed error for debugging
+            // Special case: YOURLS returns 400 when URL already exists but still provides the shorturl
+            if (is_array($data) && 
+                isset($data['code']) && 
+                $data['code'] === 'error:url' && 
+                isset($data['shorturl'])) {
+                
+                error_log('YOURLS: URL already exists, returning existing shortlink: ' . $data['shorturl']);
+                
+                // Extract keyword from existing shortlink
+                $actual_keyword = isset($data['url']['keyword']) ? $data['url']['keyword'] : $keyword;
+                
+                return array(
+                    'success' => true,
+                    'shorturl' => $data['shorturl'],
+                    'keyword' => $actual_keyword,
+                    'keyword_requested' => $keyword,
+                    'keyword_modified' => ($actual_keyword !== $keyword),
+                    'message' => 'Shortlink already exists (reused existing)'
+                );
+            }
+            
+            // For other errors, log and return error
             error_log('YOURLS API Error - Status: ' . $response_code);
             error_log('YOURLS API Error - Response: ' . $body);
             error_log('YOURLS API Error - URL: ' . $long_url);

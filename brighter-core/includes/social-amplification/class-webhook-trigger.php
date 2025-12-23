@@ -112,18 +112,21 @@ class BW_Social_Webhook_Trigger {
      * @param array $payload Data to send
      */
     private function send_webhook($payload) {
-        if (empty($this->webhook_url)) {
-            error_log('BW Social Amplification: Webhook URL not configured');
+        // Always get fresh webhook URL from settings
+        $webhook_url = get_option('bw_social_webhook_url', '');
+        
+        if (empty($webhook_url)) {
+            error_log('BW Social Amplification: Webhook URL not configured (checked in send_webhook)');
             return;
         }
 
         // DEBUG: Log webhook details
         error_log('=== BW SOCIAL WEBHOOK DEBUG START ===');
-        error_log('Webhook URL: ' . $this->webhook_url);
+        error_log('Webhook URL: ' . $webhook_url);
         error_log('Payload: ' . json_encode($payload, JSON_PRETTY_PRINT));
         
         // Send async request (don't wait for response)
-        $response = wp_remote_post($this->webhook_url, array(
+        $response = wp_remote_post($webhook_url, array(
             'body' => json_encode($payload),
             'headers' => array(
                 'Content-Type' => 'application/json'

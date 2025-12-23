@@ -26,11 +26,11 @@ class BW_Social_Webhook_Manual {
         // Add meta box to post editor
         add_action('add_meta_boxes', array($this, 'add_meta_box'));
         
-        // Add admin column
-        add_action('manage_posts_columns', array($this, 'add_admin_column'));
-        add_action('manage_pages_columns', array($this, 'add_admin_column'));
-        add_action('manage_posts_custom_column', array($this, 'render_admin_column'), 10, 2);
-        add_action('manage_pages_custom_column', array($this, 'render_admin_column'), 10, 2);
+        // Add admin column for all post types
+        foreach ($this->post_types as $post_type) {
+            add_action("manage_{$post_type}_posts_columns", array($this, 'add_admin_column'));
+            add_action("manage_{$post_type}_posts_custom_column", array($this, 'render_admin_column'), 10, 2);
+        }
         
         // AJAX handler for manual trigger
         add_action('wp_ajax_bw_trigger_social_webhook', array($this, 'ajax_trigger_webhook'));

@@ -96,6 +96,11 @@ add_action('init', function () {
     global $_wp_additional_image_sizes;
 
     foreach ($sizes as $name => [$w, $h, $crop]) {
+        // Enable social-square by default on first run
+        if ($name === 'social-square' && get_option("enable_size_social-square") === false) {
+            update_option("enable_size_social-square", 1);
+        }
+        
         if (get_option("enable_size_$name", 1)) {
             add_image_size($name, $w, $h, $crop);
         } else {

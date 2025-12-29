@@ -1075,50 +1075,21 @@ add_action('save_post', function($post_id) {
  * The data flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
  */
 
-add_action('wp_head', function() {
-    // Only run on singular posts/pages
-    if (!is_singular()) return;
-    
-    $post_id = get_the_ID();
-    
-    // Get content strategy metadata
-    $intent = get_post_meta($post_id, 'bw_intent', true);
-    $purpose = get_post_meta($post_id, 'bw_purpose', true);
-    $topic = get_post_meta($post_id, 'bw_page_topic', true);
-    $opt_status = get_post_meta($post_id, '_brt_opt_status', true);
-    $pillar_id = get_post_meta($post_id, 'bw_pillar_page_id', true);
-    
-    // Get pillar info
-    $pillar_name = '';
-    $pillar_type = 'none';
-    if ($pillar_id) {
-        $pillar_name = get_the_title($pillar_id);
-        $pillar_purpose = get_post_meta($pillar_id, 'bw_purpose', true);
-        $pillar_type = ($pillar_purpose === 'service-page') ? 'service' : 'pillar';
-    }
-    
-    // RECOMMENDED: Option 1 - "not_set" for everything
-    $defaults = [
-        'intent'     => $intent ?: 'not_set',
-        'purpose'    => $purpose ?: 'not_set',
-        'topic'      => $topic ?: 'not_set',
-        'opt_status' => $opt_status ?: 'not_set',
-        'pillar'     => $pillar_name ?: 'not_set', // Could use site name instead
-        'pillar_type' => $pillar_type
-    ];
-    
-    // Inject into window object for GA4 to pick up
-    ?>
-    <script>
-    window.brighterContentStrategy = {
-        content_intent: <?php echo json_encode($intent); ?>,
-        content_purpose: <?php echo json_encode($purpose); ?>,
-        content_topic: <?php echo json_encode($topic); ?>,
-        optimization_status: <?php echo json_encode($opt_status); ?>,
-        pillar_page: <?php echo json_encode($pillar_name); ?>,
-        pillar_type: <?php echo json_encode($pillar_type); ?>,
-        post_type: <?php echo json_encode(get_post_type()); ?>
-    };
-    </script>
-    <?php
-}, 5); // Priority 5 to load before GA4 script
+/**
+ * DATA INJECTION MOVED TO scos-car-injection.php
+ * 
+ * The window.brighterContentStrategy object is now injected by
+ * brighter-core/includes/scos-car-injection.php as part of the 
+ * consolidated SCOS CAR (Content Architecture Record) structure.
+ * 
+ * This consolidation provides:
+ * - Single source of truth for content metadata
+ * - Better AI agent readability (window.brighterSCOS)
+ * - Backwards compatibility maintained
+ * - Reduced code complexity
+ * 
+ * The data still flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
+ * But now it's generated from the SCOS CAR structure.
+ * 
+ * See: brighter-core/includes/scos-car-injection.php
+ */

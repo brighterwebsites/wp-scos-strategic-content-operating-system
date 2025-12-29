@@ -117,10 +117,16 @@ function brighter_analytics_render_page() {
 
                 <h4>Tracking Files:</h4>
                 <ul>
-                    <li><code>/mu-plugins/brighter-ga4-tracking.php</code> - Loader</li>
-                    <li><code>/mu-plugins/brighter-core/js/brighter-ga4-enhanced.js</code> - Event tracking</li>
-                    <li><code>/mu-plugins/brighter-core/includes/bw-content-strategy.php</code> - Metadata injection</li>
+                    <li><code>/mu-plugins/brighter-ga4-tracking.php</code> - GA4 loader & consent handling</li>
+                    <li><code>/mu-plugins/brighter-core/js/brighter-ga4-enhanced.js</code> - Event tracking logic</li>
+                    <li><code>/mu-plugins/brighter-core/includes/scos-car-injection.php</code> - SCOS CAR metadata injection ⭐ NEW</li>
                 </ul>
+
+                <div class="notice notice-info inline" style="margin-top: 20px;">
+                    <p><strong>🆕 Recent Update:</strong> Content metadata injection has been consolidated into a single
+                    <code>scos-car-injection.php</code> file for better AI readability and maintainability. This creates
+                    a machine-readable Content Architecture Record (CAR) that both GA4 and AI agents can parse.</p>
+                </div>
 
             <?php elseif ($current_tab === 'content-strategy'): ?>
                 <!-- TAB 2: Content Strategy Tracking -->
@@ -183,8 +189,29 @@ function brighter_analytics_render_page() {
                             <td>User region (from URL param)</td>
                             <td>zone4-remote, brisbane, sydney, etc.</td>
                         </tr>
+                        <tr style="background-color: #e8f5e9;">
+                            <td><code>altc_primary</code></td>
+                            <td><strong>ALTC Strategic Lens</strong> (Authority cluster)</td>
+                            <td>AI-First SEO, Conversion Optimization, etc.</td>
+                        </tr>
+                        <tr style="background-color: #e8f5e9;">
+                            <td><code>altc_topic</code></td>
+                            <td><strong>ALTC Topic</strong> (Specific focus area)</td>
+                            <td>Content Strategy, Technical SEO, UX Design, etc.</td>
+                        </tr>
+                        <tr style="background-color: #e8f5e9;">
+                            <td><code>content_maturity</code></td>
+                            <td><strong>Content Maturity Level</strong></td>
+                            <td>beginner, intermediate, expert, advanced</td>
+                        </tr>
                     </tbody>
                 </table>
+
+                <div class="notice notice-success inline" style="margin-top: 20px;">
+                    <p><strong>🆕 ALTC Dimensions (Green Rows):</strong> Authority-Led Topic Clusters (ALTC) parameters 
+                    help track how your strategic content clusters perform. These allow you to measure the effectiveness
+                    of your authority positioning and topic targeting strategy.</p>
+                </div>
 
                 <hr style="margin: 30px 0;">
 
@@ -200,8 +227,14 @@ function brighter_analytics_render_page() {
                             <li><strong>Event parameter:</strong> content_intent (exact parameter name)</li>
                         </ul>
                     </li>
-                    <li>Repeat for all 8 parameters</li>
+                    <li>Repeat for all 11 parameters (8 core + 3 ALTC dimensions)</li>
                 </ol>
+
+                <div class="notice notice-info inline" style="margin-top: 15px;">
+                    <p><strong>💡 Pro Tip:</strong> Prioritize the ALTC dimensions (altc_primary, altc_topic, content_maturity)
+                    if you're using the Authority-Led Topic Clusters strategy. These provide powerful insights into how your
+                    strategic positioning affects conversions and engagement.</p>
+                </div>
 
                 <h4>2. Use in Reports & Explorations</h4>
                 <ul style="line-height: 1.8;">
@@ -217,6 +250,9 @@ function brighter_analytics_render_page() {
                     <li>Engagement by <code>content_topic</code> (which topics are most popular?)</li>
                     <li>Form submissions by <code>pillar_page</code> (which pillar drives leads?)</li>
                     <li>CTA clicks by <code>optimization_status</code> (do optimized pages perform better?)</li>
+                    <li><strong>🆕 ALTC Cluster ROI:</strong> Conversion rate by <code>altc_primary</code> (which authority clusters convert?)</li>
+                    <li><strong>🆕 Topic Performance:</strong> Engagement by <code>altc_topic</code> (which topics resonate most?)</li>
+                    <li><strong>🆕 Maturity Targeting:</strong> Bounce rate by <code>content_maturity</code> (are expert articles engaging?)</li>
                 </ul>
 
                 <div class="notice notice-warning inline" style="margin-top: 20px;">

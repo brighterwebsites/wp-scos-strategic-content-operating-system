@@ -1,9 +1,195 @@
 /*
- * Frontend CSS
- *
- * This file was previously used for LiteSpeed lazy-load CSS.
- * That CSS is now conditionally loaded in includes/image-optimisation.php
- * to improve performance (only loads when LiteSpeed Cache is active).
- *
- * Keeping this file empty to avoid breaking the enqueue script.
+ * Brighter Core - Frontend CSS
+ * Version: 1.0.0
+ * 
+ * Consolidated frontend styles for performance optimization.
+ * Previously loaded as inline styles, now cached as single CSS file.
  */
+
+/* ============================================
+ * ACCESSIBILITY - Skip Link
+ * ============================================ */
+
+/* Base: keep it hidden but focusable */
+a.skip-link.screen-reader-text {
+    position: fixed;         /* sit above layout */
+    top: 0; 
+    left: 0;
+    transform: translateY(-120%);   /* visually hide, better than clip for overrides */
+    background: var(--bde-button-primary-background-color);
+    color: var(--bde-button-text-text-color);
+    padding: 8px 16px;
+    z-index: 999999;         /* above sticky header */
+    text-decoration: none;
+}
+
+/* Reveal on keyboard focus */
+a.skip-link.screen-reader-text:focus,
+a.skip-link.screen-reader-text:focus-visible {
+    transform: none;
+    /* force-undo typical screen-reader-text rules */
+    clip: auto !important;
+    -webkit-clip-path: none !important;
+    clip-path: none !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    outline: 2px solid #fff !important;
+    outline-offset: 2px !important;
+}
+
+/* Logged-in admin bar offset (desktop) */
+body.admin-bar a.skip-link.screen-reader-text {
+    top: 32px;
+}
+
+/* Admin bar on mobile */
+@media (max-width: 782px) {
+    body.admin-bar a.skip-link.screen-reader-text { 
+        top: 46px; 
+    }
+}
+
+/* ============================================
+ * PRIVACY POLICY PAGE STYLES
+ * Only apply on .page-slug-privacy-policy
+ * ============================================ */
+
+.page-slug-privacy-policy .terms-tocs > li a {
+    text-decoration: none;
+    font-family: "Noto Sans", sans-serif;
+    font-weight: 500;
+}
+
+.page-slug-privacy-policy p, 
+.page-slug-privacy-policy .terms-text, 
+.page-slug-privacy-policy ul, 
+.page-slug-privacy-policy li {
+    list-style-type: none;
+    line-height: 1.5;
+    font-family: "Noto Sans", sans-serif !important;
+    color: #2b2b2b;
+}
+
+.page-slug-privacy-policy li { 
+    padding-bottom: 10px; 
+}
+
+.page-slug-privacy-policy h2, 
+.page-slug-privacy-policy h3, 
+.page-slug-privacy-policy h4 {
+    font-size: 1.1em !important;
+    margin: 10px 0;
+    line-height: 1;
+    font-weight: 500;
+    font-family: "Noto Sans", sans-serif !important;
+}
+
+.page-slug-privacy-policy .c01 { padding-left: 20px; }
+.page-slug-privacy-policy .c02 { padding-left: 40px; }
+.page-slug-privacy-policy .c03 { padding-left: 60px; }
+.page-slug-privacy-policy .c04 { padding-left: 90px; }
+.page-slug-privacy-policy .c05 { padding-left: 100px; }
+
+/* ============================================
+ * TLDR SHORTCODE STYLES
+ * ============================================ */
+
+.tldr-summary {
+    background: #f8f9fa;
+    border-left: 4px solid #0073aa;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    border-radius: 4px;
+}
+
+.tldr-summary .tldr-heading {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2em;
+    color: #0073aa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tldr-summary .tldr-content {
+    line-height: 1.6;
+}
+
+.tldr-summary .tldr-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* ============================================
+ * FAQ SHORTCODE STYLES
+ * ============================================ */
+
+.bw-faq-section {
+    margin: 2rem 0;
+}
+
+.bw-faq-item {
+    margin-bottom: 1.5rem;
+}
+
+/* Accordion styles */
+.bw-faq-accordion {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.bw-faq-accordion summary {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.1em;
+    background: #f9f9f9;
+    border-radius: 4px;
+    user-select: none;
+}
+
+.bw-faq-accordion summary:hover {
+    background: #f0f0f0;
+}
+
+.bw-faq-accordion[open] summary {
+    border-bottom: 1px solid #e0e0e0;
+    border-radius: 4px 4px 0 0;
+}
+
+.bw-faq-accordion .bw-faq-answer {
+    padding: 1.5rem;
+}
+
+/* Plain styles */
+.bw-faq-section[data-format="plain"] .bw-faq-question {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.bw-faq-section[data-format="plain"] .bw-faq-answer {
+    margin-bottom: 1.5rem;
+    padding-left: 1rem;
+    border-left: 3px solid #0073aa;
+}
+
+/* ============================================
+ * LITESPEED LAZY LOAD ANIMATION
+ * Only applies when LiteSpeed Cache is active
+ * ============================================ */
+
+/* PART 1 - Before Lazy Load */
+img[data-lazyloaded] {
+    opacity: 0;
+}
+
+/* PART 2 - Upon Lazy Load */
+img.litespeed-loaded {
+    -webkit-transition: opacity .5s linear 0.2s;
+    -moz-transition: opacity .5s linear 0.2s;
+    transition: opacity .5s linear 0.2s;
+    opacity: 1;
+}

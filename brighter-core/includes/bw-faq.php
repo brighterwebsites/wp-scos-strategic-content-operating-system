@@ -571,66 +571,13 @@ add_filter('wpseo_sitemap_exclude_post_type', 'exclude_faq_from_sitemap');
 // 9. FRONTEND STYLES
 // ============================================
 
-function faq_frontend_styles() {
-    if (!has_block('brighter/faq-selector') && !has_shortcode(get_post_field('post_content'), 'faqs')) {
-        return;
-    }
-    ?>
-    <style>
-    .bw-faq-section {
-        margin: 2rem 0;
-    }
-
-    .bw-faq-item {
-        margin-bottom: 1.5rem;
-    }
-
-    /* Accordion styles */
-    .bw-faq-accordion {
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        padding: 0;
-        margin-bottom: 1rem;
-    }
-
-    .bw-faq-accordion summary {
-        padding: 1rem 1.5rem;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 1.1em;
-        background: #f9f9f9;
-        border-radius: 4px;
-        user-select: none;
-    }
-
-    .bw-faq-accordion summary:hover {
-        background: #f0f0f0;
-    }
-
-    .bw-faq-accordion[open] summary {
-        border-bottom: 1px solid #e0e0e0;
-        border-radius: 4px 4px 0 0;
-    }
-
-    .bw-faq-accordion .bw-faq-answer {
-        padding: 1.5rem;
-    }
-
-    /* Plain styles */
-    .bw-faq-section[data-format="plain"] .bw-faq-question {
-        margin-bottom: 0.5rem;
-        font-weight: 600;
-    }
-
-    .bw-faq-section[data-format="plain"] .bw-faq-answer {
-        margin-bottom: 1.5rem;
-        padding-left: 1rem;
-        border-left: 3px solid #0073aa;
-    }
-    </style>
-    <?php
-}
-add_action('wp_head', 'faq_frontend_styles');
+/**
+ * FAQ styles are now in frontend.css
+ * No inline styles needed - CSS is cached and loaded via brighter-frontend.css
+ * 
+ * Note: Conditional loading logic removed as CSS file size is minimal (~4KB total)
+ * and browser caching provides better performance than conditional checks.
+ */
 
 // ============================================
 // 10. ADMIN DASHBOARD WIDGET

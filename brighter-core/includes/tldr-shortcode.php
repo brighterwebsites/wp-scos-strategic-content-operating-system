@@ -70,36 +70,7 @@ add_shortcode('tldr', function($atts) {
 });
 
 /**
- * Add basic TLDR styles (can be overridden by theme)
+ * TLDR styles are now in frontend.css
+ * No inline styles needed - CSS is cached and loaded via brighter-frontend.css
  */
-add_action('wp_head', function() {
-    ?>
-    <style>
-        .tldr-summary {
-            background: #f8f9fa;
-            border-left: 4px solid #0073aa;
-            padding: 1.5rem;
-            margin: 2rem 0;
-            border-radius: 4px;
-        }
-        
-        .tldr-summary .tldr-heading {
-            margin-top: 0;
-            margin-bottom: 1rem;
-            font-size: 1.2em;
-            color: #0073aa;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .tldr-summary .tldr-content {
-            line-height: 1.6;
-        }
-        
-        .tldr-summary .tldr-content p:last-child {
-            margin-bottom: 0;
-        }
-    </style>
-    <?php
-}, 100);
 

@@ -189,28 +189,14 @@ add_filter('comments_open', function ($open, $post_id) {
  * Inline CSS for lazy-loaded image fade-in
  * Only loads if LiteSpeed Cache plugin is active
  */
-function brighterwebsites_lazyload_css() {
-    // Only load if LiteSpeed Cache is active
-    if (!defined('LSCWP_V') && !class_exists('LiteSpeed\Core')) {
-        return;
-    }
-    ?>
-    <style>
-    /* PART 1 - Before Lazy Load */
-    img[data-lazyloaded] {
-        opacity: 0;
-    }
-    /* PART 2 - Upon Lazy Load */
-    img.litespeed-loaded {
-        -webkit-transition: opacity .5s linear 0.2s;
-        -moz-transition: opacity .5s linear 0.2s;
-        transition: opacity .5s linear 0.2s;
-        opacity: 1;
-    }
-    </style>
-    <?php
-}
-add_action('wp_head', 'brighterwebsites_lazyload_css'); // frontend
+/**
+ * LiteSpeed lazy load styles are now in frontend.css
+ * No inline styles needed - CSS is cached and loaded via brighter-frontend.css
+ * 
+ * Note: Styles only apply when LiteSpeed Cache is active (via CSS selectors)
+ * Removed conditional check as CSS impact is minimal (~5 lines) and only activates
+ * when LiteSpeed adds the data-lazyloaded attribute.
+ */
 
 
 // ==========================================

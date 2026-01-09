@@ -22,7 +22,11 @@ class BW_TLDR_Meta_Box {
      * Add meta box to post types
      */
     public static function add_meta_box() {
-        $post_types = ['post', 'page', 'kb', 'news', 'folio'];
+        // Get all public post types dynamically
+        $post_types = get_post_types(['public' => true], 'names');
+        
+        // Remove attachment (media) - doesn't need TLDR
+        unset($post_types['attachment']);
         
         foreach ($post_types as $post_type) {
             add_meta_box(

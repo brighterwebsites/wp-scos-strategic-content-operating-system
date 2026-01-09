@@ -30,6 +30,7 @@ class Schema_Meta_Box {
 
     /**
      * Post types to add meta box to
+     * Populated dynamically in register_meta_box() when CPTs are available
      *
      * @since 1.0.0
      * @var array
@@ -42,12 +43,6 @@ class Schema_Meta_Box {
      * @since 1.0.0
      */
     public function __construct() {
-        // Get all public post types dynamically
-        $this->post_types = get_post_types(['public' => true], 'names');
-        
-        // Remove attachment (media) - doesn't need schema
-        unset($this->post_types['attachment']);
-        
         add_action('add_meta_boxes', [$this, 'register_meta_box']);
         add_action('save_post', [$this, 'save_meta'], 10, 2);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
@@ -70,6 +65,12 @@ class Schema_Meta_Box {
      * @return void
      */
     public function register_meta_box() {
+        // Get all public post types NOW (when CPTs are registered)
+        $this->post_types = get_post_types(['public' => true], 'names');
+        
+        // Remove attachment (media) - doesn't need schema
+        unset($this->post_types['attachment']);
+        
         foreach ($this->post_types as $post_type) {
             add_meta_box(
                 'bw_schema_settings',

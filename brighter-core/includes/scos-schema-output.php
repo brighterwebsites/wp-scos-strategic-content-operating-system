@@ -154,13 +154,22 @@ function bw_render_schema_graph() {
     $graph[] = $webpage;
     
     // ============================================
-    // ARCHIVE PAGES - CollectionPage
+    // ARCHIVE PAGES - CollectionPage (includes blog home)
     // ============================================
     
-    if (is_archive()) {
+    // is_home() = blog posts page (when using static front page)
+    // is_archive() = category, tag, CPT archive, date archive, etc.
+    if (is_home() || is_archive()) {
         $post_type = get_post_type() ?: 'post';
         $archive_url = get_post_type_archive_link($post_type) ?: $current_url;
-        $archive_title = post_type_archive_title('', false) ?: single_term_title('', false) ?: 'Archive';
+        
+        // Get archive title
+        if (is_home()) {
+            $archive_title = 'Blog';
+        } else {
+            $archive_title = post_type_archive_title('', false) ?: single_term_title('', false) ?: 'Archive';
+        }
+        
         $archive_description = term_description() ?: get_the_archive_description() ?: '';
         
         $posts = get_posts([
@@ -196,15 +205,71 @@ function bw_render_schema_graph() {
     }
     
     // ============================================
-    // SINGLE POSTS - Article
+    // SINGLE POSTS - Article (enhanced)
     // ============================================
     
     if (is_singular('post')) {
-        $graph[] = [
+        // Get TLDR for description (fallback to excerpt)
+        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'tldr', true); // ACF fallback
+        }
+        $description = !empty($tldr) ? wp_strip_all_tags($tldr) : (get_the_excerpt() ?: wp_trim_words(get_the_content(), 30));
+        
+        // Get SEOPress meta title for alternativeHeadline
+        $meta_title = get_post_meta($post_id, '_seopress_titles_title', true);
+        
+        // Get primary topic for "about"
+        $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
+        $about = null;
+        if ($topic_id) {
+            $topic_term = get_term($topic_id, 'altc_topic');
+            if ($topic_term && !is_wp_error($topic_term)) {
+                $topic_sameas = get_term_meta($topic_id, 'topic_sameas_url', true); // Future: add this field
+                $about = [
+                    "@type" => "Thing",
+                    "name" => $topic_term->name
+                ];
+                if (!empty($topic_term->description)) {
+                    $about["description"] = wp_strip_all_tags($topic_term->description);
+                }
+                if (!empty($topic_sameas)) {
+                    $about["sameAs"] = $topic_sameas;
+                }
+            }
+        }
+        
+        // Build image object (prefer OG image size 1200x630)
+        $image_obj = null;
+        if (has_post_thumbnail($post_id)) {
+            $thumbnail_id = get_post_thumbnail_id($post_id);
+            // Try to get 1200x630 OG size, fallback to large
+            $image_url = wp_get_attachment_image_url($thumbnail_id, 'og-image'); // Custom OG size if registered
+            if (!$image_url) {
+                $image_url = get_the_post_thumbnail_url($post_id, 'large');
+            }
+            $image_caption = get_the_post_thumbnail_caption($post_id);
+            $image_alt = get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true);
+            
+            $image_obj = [
+                "@type" => "ImageObject",
+                "url" => $image_url,
+                "width" => 1200,
+                "height" => 630
+            ];
+            if (!empty($image_caption)) {
+                $image_obj["caption"] = $image_caption;
+            } elseif (!empty($image_alt)) {
+                $image_obj["caption"] = $image_alt;
+            }
+        }
+        
+        // Build Article schema
+        $article = [
             "@type" => "Article",
             "@id" => get_permalink() . '#article',
             "headline" => get_the_title(),
-            "description" => get_the_excerpt() ?: wp_trim_words(get_the_content(), 30),
+            "description" => $description,
             "url" => get_permalink(),
             "datePublished" => get_the_date('c'),
             "dateModified" => get_the_modified_date('c'),
@@ -219,8 +284,31 @@ function bw_render_schema_graph() {
             "mainEntityOfPage" => [
                 "@id" => get_permalink()
             ],
-            "image" => has_post_thumbnail() ? get_the_post_thumbnail_url($post_id, 'large') : null
+            "isAccessibleForFree" => true,
+            "speakable" => [
+                "@type" => "SpeakableSpecification",
+                "cssSelector" => [".speakthis", ".tldr-content", "h1", "h2"]
+            ]
         ];
+        
+        // Add optional fields if available
+        if (!empty($meta_title) && $meta_title !== get_the_title()) {
+            $article["alternativeHeadline"] = $meta_title;
+        }
+        
+        if ($image_obj) {
+            $article["image"] = $image_obj;
+        }
+        
+        if ($about) {
+            $article["about"] = $about;
+        }
+        
+        // TODO: Future enhancements
+        // - "about" array from bw_supporting_topics (multiple topics)
+        // - "mentions" for Place (Ballarat) - could be site-wide or per-post
+        
+        $graph[] = $article;
     }
     
     // ============================================

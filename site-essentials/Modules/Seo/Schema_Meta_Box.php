@@ -153,7 +153,7 @@ class Schema_Meta_Box {
                     placeholder='{"@type": "FAQPage", "mainEntity": [...]}'
                 ><?php echo esc_textarea($custom_schema); ?></textarea>
                 <p class="description">
-                    <?php esc_html_e('Enter raw JSON-LD without <script> tags. This will be merged into the @graph. Supports single block or array of blocks.', 'site-essentials'); ?>
+                    <?php esc_html_e('Enter raw JSON-LD without <script> tags. This will be merged into the @graph. Supports single block or array of blocks. Mulitple blocks can be added like [{"@type": "FAQPage"}, {"@type": "HowTo"}] ', 'site-essentials'); ?>
                 </p>
                 <div id="bw-schema-validation" class="bw-schema-validation"></div>
             </div>

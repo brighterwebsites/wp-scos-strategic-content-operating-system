@@ -61,6 +61,7 @@ function brighter_get_whitelisted_modules() {
             'bw-ga4-seeder',
             'bw-ga4-seed-admin',
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
+            'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
             'bw-faq',
             // ALTC modules
@@ -175,6 +176,7 @@ function brighter_load_modules() {
  	'bw-ga4-seeder',
  	'bw-ga4-seed-admin',
 	'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
+	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
         'bw-faq',
         'privacy-policy-style',

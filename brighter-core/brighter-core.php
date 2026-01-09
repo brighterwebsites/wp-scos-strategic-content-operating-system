@@ -82,6 +82,7 @@ function brighter_get_whitelisted_modules() {
             'class-tldr-meta-box', // TLDR field meta box (admin only)
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
+            'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
         ];
     }
 
@@ -196,6 +197,7 @@ function brighter_load_modules() {
         'class-tldr-meta-box', // TLDR field meta box (admin only)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
         'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
+        'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
     ];
 
     // Admin-only modules (backend only, not frontend)

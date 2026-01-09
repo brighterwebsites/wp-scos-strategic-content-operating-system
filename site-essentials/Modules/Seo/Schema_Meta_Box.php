@@ -34,7 +34,7 @@ class Schema_Meta_Box {
      * @since 1.0.0
      * @var array
      */
-    private $post_types = ['post', 'page', 'project'];
+    private $post_types = [];
 
     /**
      * Constructor
@@ -42,6 +42,12 @@ class Schema_Meta_Box {
      * @since 1.0.0
      */
     public function __construct() {
+        // Get all public post types dynamically
+        $this->post_types = get_post_types(['public' => true], 'names');
+        
+        // Remove attachment (media) - doesn't need schema
+        unset($this->post_types['attachment']);
+        
         add_action('add_meta_boxes', [$this, 'register_meta_box']);
         add_action('save_post', [$this, 'save_meta'], 10, 2);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);

@@ -224,15 +224,17 @@ function bw_render_schema_graph() {
     }
     
     // ============================================
-    // SERVICE PAGES - Service
+    // SERVICE PAGES - Service (only if no custom schema)
     // ============================================
     
     if (is_singular('page')) {
         $purpose = get_post_meta($post_id, 'bw_purpose', true);
+        $has_custom_schema = !empty(get_post_meta($post_id, 'bw_custom_schema', true));
         
-        if ($purpose === 'service-page') {
+        // Only auto-generate Service schema if it's a service page AND no custom schema
+        if ($purpose === 'service-page' && !$has_custom_schema) {
             $description = get_post_meta($post_id, 'bw_service_description', true) ?: get_the_excerpt();
-            
+          
             $graph[] = [
                 "@type" => "Service",
                 "@id" => get_permalink() . '#service',
@@ -275,7 +277,7 @@ function bw_render_schema_graph() {
     $breadcrumbs = [];
     $position = 1;
     
-    // Home
+    // Home - always first
     $breadcrumbs[] = [
         "@type" => "ListItem",
         "position" => $position++,
@@ -283,23 +285,38 @@ function bw_render_schema_graph() {
         "item" => home_url('/')
     ];
     
-    // Archives
-    if (is_archive()) {
+    // FRONT PAGE - just Home, nothing else
+    if (is_front_page()) {
+        // Only Home breadcrumb for front page
+    }
+    
+    // BLOG ARCHIVE (is_home() = true for blog posts page)
+    elseif (is_home()) {
+        $breadcrumbs[] = [
+            "@type" => "ListItem",
+            "position" => $position,
+            "name" => "Blog",
+            "item" => get_post_type_archive_link('post') ?: home_url('/blog/')
+        ];
+    }
+    
+    // OTHER ARCHIVES (categories, tags, CPT archives, date archives)
+    elseif (is_archive()) {
         $post_type = get_post_type() ?: 'post';
         $post_type_obj = get_post_type_object($post_type);
         
         if ($post_type_obj) {
             $breadcrumbs[] = [
                 "@type" => "ListItem",
-                "position" => $position++,
+                "position" => $position,
                 "name" => $post_type_obj->labels->name,
                 "item" => get_post_type_archive_link($post_type)
             ];
         }
     }
     
-    // Singles
-    if (is_singular()) {
+    // SINGLES (posts, pages, CPTs)
+    elseif (is_singular()) {
         $post_type = get_post_type();
         
         // Add post type archive for posts
@@ -312,7 +329,20 @@ function bw_render_schema_graph() {
             ];
         }
         
-        // Add parent pages for hierarchical post types
+        // Add CPT archive for custom post types (not pages)
+        if ($post_type !== 'post' && $post_type !== 'page') {
+            $post_type_obj = get_post_type_object($post_type);
+            if ($post_type_obj && $post_type_obj->has_archive) {
+                $breadcrumbs[] = [
+                    "@type" => "ListItem",
+                    "position" => $position++,
+                    "name" => $post_type_obj->labels->name,
+                    "item" => get_post_type_archive_link($post_type)
+                ];
+            }
+        }
+        
+        // Add parent pages for hierarchical post types (pages)
         if (is_page()) {
             $ancestors = get_post_ancestors($post_id);
             $ancestors = array_reverse($ancestors);

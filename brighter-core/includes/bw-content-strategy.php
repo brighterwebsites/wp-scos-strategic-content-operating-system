@@ -84,17 +84,15 @@ function bw_cs_intent_options() {
     return [
         ''              => 'NA',
         'informational' => 'Informational',
-        'commercial' => 'Commercial',
-        'transactional' => 'Transactional',
+        'commercial' => 'Commercial', //Service / Project Pages
+        'transactional' => 'Transactional', //Conversion End Points Offline Sales Conversion End-of-funnel Quote, Contact, Thank You  
         'navigational'  => 'Navigational',
-        'retention'     => 'Retention',
-        'support'    => 'Support',  //Content designed to guide a new customer (post-sale) or a user of a tool.
-        'trust'         => 'E-E-A-T/Trust', //measures content focused on building authority 
-        'functional'    => 'System/Functional',
-
+        'support'    => 'Content Support',  //Content designed to guide a new customer (post-sale) or a user of a tool.
+        'trust'         => 'E-E-A-T/Trust', //Trust authority Brand Validation 
+        'functional'    => 'Policy/Functional',  //Sitemap, Maintenance, Privacy, Terms, Access
         'informational_p' => 'Informational (Problem)', 
         'informational_s' => 'Informational (Solution)',
-        'commercial_ds' => 'Commercial (Decision Support)', // Replaces commercial_c and commercial_r
+        'commercial_ds' => 'Commercial (Decision Support)', // Compare / Pricing Pages
         
 
 

@@ -34,6 +34,52 @@ function bw_output_schema_graph() {
 }
 
 /**
+ * Get author schema @id from user data
+ * 
+ * @param int|null $user_id User ID (defaults to post author)
+ * @return string Author @id URL (e.g., home_url('/#vanessa-wood'))
+ */
+function bw_get_author_schema_id($user_id = null) {
+    if (!$user_id && is_singular()) {
+        $user_id = get_post_field('post_author', get_the_ID());
+    }
+    
+    if (!$user_id) {
+        return home_url('/#vanessa-wood'); // Fallback
+    }
+    
+    $user = get_userdata($user_id);
+    if (!$user) {
+        return home_url('/#vanessa-wood'); // Fallback
+    }
+    
+    // Build slug from first-last name
+    $first = sanitize_title($user->first_name ?: 'vanessa');
+    $last = sanitize_title($user->last_name ?: 'wood');
+    
+    return home_url('/#' . $first . '-' . $last);
+}
+
+/**
+ * Get author name from user data
+ * 
+ * @param int|null $user_id User ID
+ * @return string Author display name
+ */
+function bw_get_author_name($user_id = null) {
+    if (!$user_id && is_singular()) {
+        $user_id = get_post_field('post_author', get_the_ID());
+    }
+    
+    if (!$user_id) {
+        return 'Vanessa Wood';
+    }
+    
+    $user = get_userdata($user_id);
+    return $user ? $user->display_name : 'Vanessa Wood';
+}
+
+/**
  * Render the actual schema JSON-LD
  */
 function bw_render_schema_graph() {
@@ -112,7 +158,11 @@ function bw_render_schema_graph() {
             "@type" => "Person",
             "@id" => home_url('/#vanessa-wood'),
             "name" => "Vanessa Wood",
-            "url" => home_url('/author/vanessa-wood/')
+            "url" => home_url('/author/vanessa-wood/'),
+            "sameAs" => [
+                "https://www.facebook.com/vanessarosewoodau",
+                "https://www.linkedin.com/in/vanessarosewood/"
+            ]
         ],
         "foundingDate" => "2016",
         "foundingLocation" => [
@@ -138,12 +188,17 @@ function bw_render_schema_graph() {
         ]
     ];
     
-    // Add author for singles, publisher for archives
-    if (is_singular()) {
+    // Add author for singles (posts, projects), publisher for archives/pages
+    // Author: articles, projects, news
+    // Publisher only: service pages, Legal/Terms, Conversion Hub, Landing Page
+    $post_type = is_singular() ? get_post_type() : '';
+    $author_post_types = ['post', 'project', 'news']; // Post types that get author
+    
+    if (is_singular() && in_array($post_type, $author_post_types)) {
         $webpage["author"] = [
             "@type" => "Person",
-            "@id" => home_url('/#vanessa-wood'),
-            "name" => get_the_author() ?: "Vanessa Wood"
+            "@id" => bw_get_author_schema_id(),
+            "name" => bw_get_author_name()
         ];
     } else {
         $webpage["publisher"] = [
@@ -264,6 +319,10 @@ function bw_render_schema_graph() {
             }
         }
         
+        // Get word count and reading time
+        $word_count = (int) get_post_meta($post_id, 'bw_word_count', true);
+        $reading_time = (int) get_post_meta($post_id, 'bw_reading_time', true);
+        
         // Build Article schema
         $article = [
             "@type" => "Article",
@@ -275,8 +334,8 @@ function bw_render_schema_graph() {
             "dateModified" => get_the_modified_date('c'),
             "author" => [
                 "@type" => "Person",
-                "@id" => home_url('/#vanessa-wood'),
-                "name" => get_the_author()
+                "@id" => bw_get_author_schema_id(),
+                "name" => bw_get_author_name()
             ],
             "publisher" => [
                 "@id" => home_url('/#organization')
@@ -290,6 +349,21 @@ function bw_render_schema_graph() {
                 "cssSelector" => [".speakthis", ".tldr-content", "h1", "h2"]
             ]
         ];
+        
+        // Add word count if available
+        if ($word_count > 0) {
+            $article["wordCount"] = $word_count;
+        }
+        
+        // Add reading time if available (ISO 8601 duration format)
+        if ($reading_time > 0) {
+            $article["timeRequired"] = "PT{$reading_time}M"; // e.g., PT7M
+            $article["additionalProperty"] = [
+                "@type" => "PropertyValue",
+                "name" => "reading_time_minutes",
+                "value" => $reading_time
+            ];
+        }
         
         // Add optional fields if available
         if (!empty($meta_title) && $meta_title !== get_the_title()) {
@@ -309,6 +383,131 @@ function bw_render_schema_graph() {
         // - "mentions" for Place (Ballarat) - could be site-wide or per-post
         
         $graph[] = $article;
+    }
+    
+    // ============================================
+    // NEWS - NewsArticle (same as Article + news-specific fields)
+    // ============================================
+    
+    if (is_singular('news')) {
+        // Get TLDR for description (fallback to excerpt)
+        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'tldr', true); // ACF fallback
+        }
+        $description = !empty($tldr) ? wp_strip_all_tags($tldr) : (get_the_excerpt() ?: wp_trim_words(get_the_content(), 30));
+        
+        // Get SEOPress meta title for alternativeHeadline
+        $meta_title = get_post_meta($post_id, '_seopress_titles_title', true);
+        
+        // Get word count and reading time
+        $word_count = (int) get_post_meta($post_id, 'bw_word_count', true);
+        $reading_time = (int) get_post_meta($post_id, 'bw_reading_time', true);
+        
+        // Get primary topic for "about"
+        $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
+        $about = null;
+        if ($topic_id) {
+            $topic_term = get_term($topic_id, 'altc_topic');
+            if ($topic_term && !is_wp_error($topic_term)) {
+                $topic_sameas = get_term_meta($topic_id, 'topic_sameas_url', true);
+                $about = [
+                    "@type" => "Thing",
+                    "name" => $topic_term->name
+                ];
+                if (!empty($topic_term->description)) {
+                    $about["description"] = wp_strip_all_tags($topic_term->description);
+                }
+                if (!empty($topic_sameas)) {
+                    $about["sameAs"] = $topic_sameas;
+                }
+            }
+        }
+        
+        // Build image object
+        $image_obj = null;
+        if (has_post_thumbnail($post_id)) {
+            $thumbnail_id = get_post_thumbnail_id($post_id);
+            $image_url = wp_get_attachment_image_url($thumbnail_id, 'og-image') ?: get_the_post_thumbnail_url($post_id, 'large');
+            $image_caption = get_the_post_thumbnail_caption($post_id);
+            $image_alt = get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true);
+            
+            $image_obj = [
+                "@type" => "ImageObject",
+                "url" => $image_url,
+                "width" => 1200,
+                "height" => 630
+            ];
+            if (!empty($image_caption)) {
+                $image_obj["caption"] = $image_caption;
+            } elseif (!empty($image_alt)) {
+                $image_obj["caption"] = $image_alt;
+            }
+        }
+        
+        // Build NewsArticle schema
+        $news_article = [
+            "@type" => "NewsArticle",
+            "@id" => get_permalink() . '#news-article',
+            "headline" => get_the_title(),
+            "description" => $description,
+            "url" => get_permalink(),
+            "datePublished" => get_the_date('c'),
+            "dateModified" => get_the_modified_date('c'),
+            "coverageStartTime" => get_the_date('c'), // Same as published for news
+            "author" => [
+                "@type" => "Person",
+                "@id" => bw_get_author_schema_id(),
+                "name" => bw_get_author_name()
+            ],
+            "publisher" => [
+                "@id" => home_url('/#organization')
+            ],
+            "mainEntityOfPage" => [
+                "@id" => get_permalink()
+            ],
+            "articleSection" => "AI & Digital Marketing News",
+            "dateline" => "Ballarat, Australia",
+            "locationCreated" => [
+                "@type" => "Place",
+                "name" => "Ballarat, Victoria, Australia"
+            ],
+            "isAccessibleForFree" => true,
+            "speakable" => [
+                "@type" => "SpeakableSpecification",
+                "cssSelector" => [".speakthis", ".tldr-content", "h1", "h2"]
+            ]
+        ];
+        
+        // Add word count if available
+        if ($word_count > 0) {
+            $news_article["wordCount"] = $word_count;
+        }
+        
+        // Add reading time if available
+        if ($reading_time > 0) {
+            $news_article["timeRequired"] = "PT{$reading_time}M";
+            $news_article["additionalProperty"] = [
+                "@type" => "PropertyValue",
+                "name" => "reading_time_minutes",
+                "value" => $reading_time
+            ];
+        }
+        
+        // Add optional fields
+        if (!empty($meta_title) && $meta_title !== get_the_title()) {
+            $news_article["alternativeHeadline"] = $meta_title;
+        }
+        
+        if ($image_obj) {
+            $news_article["image"] = $image_obj;
+        }
+        
+        if ($about) {
+            $news_article["about"] = $about;
+        }
+        
+        $graph[] = $news_article;
     }
     
     // ============================================

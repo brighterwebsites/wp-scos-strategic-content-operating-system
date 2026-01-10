@@ -64,8 +64,6 @@ add_action('wp_head', function() {
         }
         (function track(){
             if(typeof window.gtag!=='function'){setTimeout(track,100);return;}
-            var region=new URLSearchParams(location.search).get('region')||'zone4-remote';
-            gtag('set','user_properties',{region_id:region});
             document.addEventListener('click',function(e){
                 var el=e.target.closest('a,button');
                 if(!el||el.dataset.gaSkip==='1')return;
@@ -75,13 +73,13 @@ add_action('wp_head', function() {
                 if(href.startsWith('tel:'))ev='click_phone';
                 else if(href.startsWith('mailto:'))ev='click_email';
                 else if(/\.(pdf|docx?|xlsx?|zip)$/i.test(href))ev='download';
-                gtag('event',ev,{event_category:'Engagement',event_label:el.textContent?.trim()||href,page_title:document.title,page_path:location.pathname,region_id:region});
+                gtag('event',ev,{event_category:'Engagement',event_label:el.textContent?.trim()||href,page_title:document.title,page_path:location.pathname});
             },true);
             var scrolled=false;
             window.addEventListener('scroll',function(){
                 if(scrolled)return;
                 var depth=(window.scrollY+window.innerHeight)/Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
-                if(depth>=0.5){scrolled=true;gtag('event','scroll',{event_category:'Engagement',event_label:'Scrolled 50%',depth_percent:50,page_title:document.title,page_path:location.pathname,region_id:region});}
+                if(depth>=0.5){scrolled=true;gtag('event','scroll',{event_category:'Engagement',event_label:'Scrolled 50%',depth_percent:50,page_title:document.title,page_path:location.pathname});}
             },{passive:true});
         })();
     }

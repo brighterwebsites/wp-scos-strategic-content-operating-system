@@ -26,12 +26,10 @@
     if (typeof window.gtag !== 'function') { setTimeout(initializeEnhanced, 100); return; }
     enhancedInitialized = true;
   
-  const region = new URLSearchParams(location.search).get('region') || 'zone4-remote';
   const contentStrategy = window.brighterContentStrategy || {};
   
   function getBaseParams() {
     return {
-      region_id: region,
       page_title: document.title,
       page_path: location.pathname,
       content_intent: contentStrategy.content_intent || 'not_set',

@@ -32,160 +32,65 @@ add_action('wp_head', function() {
     <?php
 }, 5); // Priority 5 = loads early
 
-/**
- * PART 1: Inline Core Script (Essential tracking)
- * Only runs if consent given
- *
- * PERFORMANCE NOTES:
- * - Inline = No HTTP request (FAST)
- * - Not minified = Readable for debugging (comments add ~1KB, negligible)
- * - Excluded from optimization plugins for reliability
- */
+/** PART 1: Inline Core Script - Consent-gated GA4 loader */
 add_action('wp_head', function() {
     ?>
     <script data-no-optimize="1" data-cfasync="false">
-    (function() {
-        'use strict';
-
-        // -------------------------------------------------------
-        // UNIVERSAL CONSENT CHECK
-        // -------------------------------------------------------
-
-function hasConsent() {
-    // Check for SEOPress consent cookie with multiple possible values
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        cookie = cookie.trim();
-        // SEOPress - check for various formats
-        if (cookie.startsWith('seopress-user-consent-accept=')) {
-            const value = cookie.split('=')[1];
-            // Accept: "1", "true", or just the presence of the cookie
-            if (value === '1' || value === 'true' || value === '\'1\'' || value === '"1"') {
-                return true;
+    (function(){'use strict';
+    function hasConsent(){
+        var c=document.cookie.split(';');
+        for(var i=0;i<c.length;i++){
+            var ck=c[i].trim();
+            if(ck.startsWith('seopress-user-consent-accept=')){
+                var v=ck.split('=')[1];
+                if(v==='1'||v==='true'||v==="'1'"||v==='"1"')return true;
             }
         }
-        // Other consent plugins
-        if (cookie.startsWith('cookie_notice_accepted=true')) return true;
-        if (cookie.startsWith('viewed_cookie_policy=yes')) return true;
-        if (cookie.startsWith('cmplz_consented_services=')) return true;
-        if (cookie.startsWith('cookieyes-consent=yes')) return true;
+        return false;
     }
-
-    return false;
-}
-
-        function initializeTracking() {
-            // Exit if no consent
-            if (!hasConsent()) {
-                console.log('🛑 GA4 Enhanced: Waiting for cookie consent');
-                return;
-            }
-
-            // Load gtag.js if we have a measurement ID
-            if (window.brighterGA4 && !window.brighterGA4.loaded) {
-                const script = document.createElement('script');
-                script.async = true;
-                script.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.brighterGA4.measurementId;
-                document.head.appendChild(script);
-
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                window.gtag = gtag;
-                gtag('js', new Date());
-                gtag('config', window.brighterGA4.measurementId, {
-                    'send_page_view': false  // We'll send it ourselves with custom params
-                });
-
-                window.brighterGA4.loaded = true;
-                console.log('✅ GA4 Loaded: ' + window.brighterGA4.measurementId);
-            }
-
-            // Wait for gtag to be ready
-            function initTracking() {
-                if (typeof window.gtag !== 'function') {
-                    // gtag not ready yet, try again in 100ms
-                    setTimeout(initTracking, 100);
-                    return;
-                }
-
-                console.log('✅ GA4 Enhanced: Consent granted, tracking active');
-            
-            // -------------------------------------------------------
-            // CORE TRACKING (Inline)
-            // -------------------------------------------------------
-            
-            const region = new URLSearchParams(location.search).get('region') || 'zone4-remote';
-            
-            // Set region as user property
-            gtag('set', 'user_properties', { region_id: region });
-            
-            // Basic click tracking
-            document.addEventListener('click', function(e) {
-                const el = e.target.closest('a, button');
-                if (!el || el.dataset.gaSkip === '1') return;
-                
-                const href = el.getAttribute('href');
-                if (!href) return;
-                
-                let eventName = 'click';
-                if (href.startsWith('tel:')) eventName = 'click_phone';
-                else if (href.startsWith('mailto:')) eventName = 'click_email';
-                else if (/\.(pdf|docx?|xlsx?|zip)$/i.test(href)) eventName = 'download';
-                
-                gtag('event', eventName, {
-                    event_category: 'Engagement',
-                    event_label: el.textContent?.trim() || href,
-                    page_title: document.title,
-                    page_path: location.pathname,
-                    region_id: region
-                });
-            }, true);
-            
-            // Basic scroll tracking (50%)
-            let scrolled = false;
-            window.addEventListener('scroll', function() {
-                if (scrolled) return;
-                const depth = (window.scrollY + window.innerHeight) / Math.max(
-                    document.body.scrollHeight, 
-                    document.documentElement.scrollHeight
-                );
-                if (depth >= 0.5) {
-                    scrolled = true;
-                    gtag('event', 'scroll', {
-                        event_category: 'Engagement',
-                        event_label: 'Scrolled 50%',
-                        depth_percent: 50,
-                        page_title: document.title,
-                        page_path: location.pathname,
-                        region_id: region
-                    });
-                }
-            }, { passive: true });
+    function init(){
+        if(!hasConsent())return;
+        if(window.brighterGA4&&!window.brighterGA4.loaded){
+            var s=document.createElement('script');
+            s.async=true;
+            s.src='https://www.googletagmanager.com/gtag/js?id='+window.brighterGA4.measurementId;
+            document.head.appendChild(s);
+            window.dataLayer=window.dataLayer||[];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag=gtag;
+            gtag('js',new Date());
+            gtag('config',window.brighterGA4.measurementId,{'send_page_view':false});
+            window.brighterGA4.loaded=true;
         }
-
-        // Start initialization
-        initTracking();
+        (function track(){
+            if(typeof window.gtag!=='function'){setTimeout(track,100);return;}
+            var region=new URLSearchParams(location.search).get('region')||'zone4-remote';
+            gtag('set','user_properties',{region_id:region});
+            document.addEventListener('click',function(e){
+                var el=e.target.closest('a,button');
+                if(!el||el.dataset.gaSkip==='1')return;
+                var href=el.getAttribute('href');
+                if(!href)return;
+                var ev='click';
+                if(href.startsWith('tel:'))ev='click_phone';
+                else if(href.startsWith('mailto:'))ev='click_email';
+                else if(/\.(pdf|docx?|xlsx?|zip)$/i.test(href))ev='download';
+                gtag('event',ev,{event_category:'Engagement',event_label:el.textContent?.trim()||href,page_title:document.title,page_path:location.pathname,region_id:region});
+            },true);
+            var scrolled=false;
+            window.addEventListener('scroll',function(){
+                if(scrolled)return;
+                var depth=(window.scrollY+window.innerHeight)/Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
+                if(depth>=0.5){scrolled=true;gtag('event','scroll',{event_category:'Engagement',event_label:'Scrolled 50%',depth_percent:50,page_title:document.title,page_path:location.pathname,region_id:region});}
+            },{passive:true});
+        })();
     }
-
-    // Try to initialize immediately (if consent cookie already exists)
-    initializeTracking();
-
-    // Listen for SEOPress consent event (fires when user clicks "accept")
-    document.addEventListener('seopress_analytics_cookies_accepted', function() {
-        console.log('🍪 SEOPress consent granted - initializing GA4');
-        initializeTracking();
-    });
-
-    // Also listen for generic consent events from other plugins
-    document.addEventListener('cookie_consent_accepted', function() {
-        console.log('🍪 Cookie consent granted - initializing GA4');
-        initializeTracking();
-    });
-
+    init();
+    document.addEventListener('seopress_analytics_cookies_accepted',init);
     })();
     </script>
     <?php
-}, 99); // Priority 99 = after SEOPress loads
+}, 99);
 
 /**
  * PART 2: Enhanced Script (Selector attribution, deferred)

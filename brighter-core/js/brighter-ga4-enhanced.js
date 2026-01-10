@@ -203,9 +203,19 @@
   }
 
   // ============================================
-  // AD TAG DETECTION SYSTEM    //**PRO** need to add a way to turn this on or off with a toggle, and use input for "Please coordinate with SEO before adding paid tracking tags."
+  // AD TAG DETECTION SYSTEM - DISABLED
   // ============================================
-  
+  // 
+  // TODO: Re-enable as optional "Agency Level" feature with toggle in admin settings
+  // - Add option: get_option('brighter_ad_tag_detection', false)
+  // - Only fire on homepage: if (location.pathname === '/')
+  // - Reduce noise: fire once per session, not per page
+  // - Event name: call_bw_seo_gal_we_shld_wrk_2gether
+  //
+  // REASON DISABLED: Fires too many events, creates noise in GA4 reports
+  // The gtag.js script itself triggers this detection (false positive)
+  //
+  /*
   const knownAdTags = [
     // Tag Managers
     { pattern: /googletagmanager\.com\/gtm\.js/, name: 'Google Tag Manager', type: 'container' },
@@ -229,6 +239,9 @@
   let alertSent = false;
   
   function detectAdTags() {
+    // Only run on homepage if re-enabled
+    // if (location.pathname !== '/') return;
+    
     // Check all script tags
     document.querySelectorAll('script[src]').forEach(script => {
       const src = script.src;
@@ -238,7 +251,7 @@
           detectedTags.add(tag.name);
           
           console.warn(
-            '%c?? Ad Tag Detected',
+            '%c⚠️ Ad Tag Detected',
             'background: #ff6b6b; color: white; padding: 4px 8px; border-radius: 3px; font-weight: bold;',
             `\n${tag.name} (${tag.type})`,
             `\nPlease coordinate with SEO before adding paid tracking tags.`,
@@ -261,10 +274,10 @@
       gtag('event', 'call_bw_seo_gal_we_shld_wrk_2gether', payload);
       
       console.info(
-        '%c?? GA4 Alert Sent',
+        '%c📊 GA4 Alert Sent',
         'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 3px;',
         '\nEvent: call_bw_seo_gal_we_shld_wrk_2gether',
-        '\nCheck GA4 ? Realtime ? Events'
+        '\nCheck GA4 → Realtime → Events'
       );
     }
   }
@@ -286,6 +299,7 @@
     childList: true,
     subtree: true
   });
+  */ // END AD TAG DETECTION (disabled)
   
   // ============================================
   // SELECTOR ATTRIBUTION RULES  //do more of these have a performance impact? is there a way to add more custom selector attributes in a repeater or too performance heavy? 

@@ -142,10 +142,11 @@ add_action('wp_footer', function() {
         { name: 'view_lead_magnet', category: 'Lead Magnet' },
         
         // Hierarchy
-        { name: 'view_section', category: 'Hierarchy' },
+        { name: 'view_section', category: 'Hierarchy' }
         
-        // System
-        { name: 'call_bw_seo_gal_we_shld_wrk_2gether', category: 'System Alert' }
+        // System - DISABLED (Ad Tag Detection commented out in enhanced.js)
+        // TODO: Re-enable when Agency Level ad tag detection is added as optional feature
+        // { name: 'call_bw_seo_gal_we_shld_wrk_2gether', category: 'System Alert' }
     ];
     
     // Fire each event with tiny delay

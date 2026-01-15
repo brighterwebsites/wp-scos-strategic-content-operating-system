@@ -10,6 +10,11 @@
  * - bw_breadcrumb_schema: Override breadcrumb label
  * - bw_purpose: Detect service pages (value: 'service-page')
  *
+ * Kill Switch Controls:
+ * - SCOS_DISABLE_SCHEMA: Set to true in wp-config.php to disable all schema output
+ * - SCOS_SCHEMA_ALLOWED_SITES: Array of allowed domains (whitelist approach)
+ *   Example: define('SCOS_SCHEMA_ALLOWED_SITES', ['brighterwebsites.com.au']);
+ *
  * @package    BrighterCore
  * @subpackage Schema
  * @version    1.0.0
@@ -24,6 +29,48 @@ if (!defined('ABSPATH')) exit;
 add_action('template_redirect', 'bw_output_schema_graph', 1);
 
 function bw_output_schema_graph() {
+    
+    // ============================================
+    // KILL SWITCH SYSTEM
+    // ============================================
+    
+    // Global kill switch: If SCOS_DISABLE_SCHEMA is true, stop all schema output
+    if (defined('SCOS_DISABLE_SCHEMA') && SCOS_DISABLE_SCHEMA === true) {
+        return;
+    }
+    
+    // Whitelist approach: If SCOS_SCHEMA_ALLOWED_SITES is defined, check current domain
+    if (defined('SCOS_SCHEMA_ALLOWED_SITES')) {
+        $allowed_sites = SCOS_SCHEMA_ALLOWED_SITES;
+        if (!is_array($allowed_sites)) {
+            $allowed_sites = [];
+        }
+        
+        // Get current domain (strip www. if present for comparison)
+        $current_host = isset($_SERVER['HTTP_HOST']) ? strtolower($_SERVER['HTTP_HOST']) : '';
+        $current_host = preg_replace('/^www\./', '', $current_host);
+        
+        // Check if current domain is in whitelist
+        $is_allowed = false;
+        foreach ($allowed_sites as $allowed_domain) {
+            $allowed_domain = strtolower($allowed_domain);
+            $allowed_domain = preg_replace('/^www\./', '', $allowed_domain);
+            
+            if ($current_host === $allowed_domain) {
+                $is_allowed = true;
+                break;
+            }
+        }
+        
+        // If not in whitelist, stop schema output
+        if (!$is_allowed) {
+            return;
+        }
+    }
+    
+    // ============================================
+    // STANDARD CHECKS
+    // ============================================
     
     // Skip admin, feeds, REST, AJAX
     if (is_admin() || is_feed() || wp_doing_ajax()) return;

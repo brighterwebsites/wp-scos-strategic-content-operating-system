@@ -1400,16 +1400,31 @@ function bw_cs_render_metabox($post) {
         .bw-cs-field textarea { width: 100%; }
         .bw-cs-field textarea { min-height: 60px; }
         .bw-cs-help { font-size: 11px; color: #666; margin-top: 2px; }
-        .bw-progress-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .bw-progress-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
         .bw-progress-tags label { 
-            display: inline-flex; align-items: center; 
-            padding: 3px 8px; border-radius: 3px; 
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 8px; border-radius: 4px; 
             font-size: 11px; cursor: pointer; 
-            background: #f0f0f1; transition: all 0.2s;
+            background: #f5f5f5; color: #999;
+            border: 1px solid #ddd;
+            transition: all 0.15s ease;
+            opacity: 0.6;
         }
-        .bw-progress-tags label:hover { background: #e0e0e0; }
-        .bw-progress-tags input:checked + span { font-weight: 600; }
-        .bw-progress-tags input { display: none; }
+        .bw-progress-tags label:hover { 
+            opacity: 0.85;
+            border-color: #bbb;
+        }
+        .bw-progress-tags label.is-selected {
+            opacity: 1;
+            font-weight: 600;
+            border-color: currentColor;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .bw-progress-tags input[type="checkbox"] { 
+            width: 14px; height: 14px; 
+            margin: 0; cursor: pointer;
+            accent-color: currentColor;
+        }
     </style>
 
     <div class="bw-cs-field">
@@ -1472,15 +1487,37 @@ function bw_cs_render_metabox($post) {
     <div class="bw-cs-field">
         <label>Progress</label>
         <div class="bw-progress-tags">
-            <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): ?>
-                <label style="color:<?php echo esc_attr($cfg['color']); ?>;background:<?php echo esc_attr($cfg['bg']); ?>;">
-                    <input type="checkbox" name="workflow_progress[]" value="<?php echo esc_attr($key); ?>" <?php checked(in_array($key, $workflow_progress, true)); ?>>
+            <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): 
+                $is_checked = in_array($key, $workflow_progress, true);
+            ?>
+                <label class="<?php echo $is_checked ? 'is-selected' : ''; ?>" style="<?php echo $is_checked ? 'color:' . esc_attr($cfg['color']) . ';background:' . esc_attr($cfg['bg']) . ';' : ''; ?>" data-color="<?php echo esc_attr($cfg['color']); ?>" data-bg="<?php echo esc_attr($cfg['bg']); ?>">
+                    <input type="checkbox" name="workflow_progress[]" value="<?php echo esc_attr($key); ?>" <?php checked($is_checked); ?>>
                     <span><?php echo esc_html($cfg['label']); ?></span>
                 </label>
             <?php endforeach; ?>
         </div>
         <p class="bw-cs-help">Track content creation stages</p>
     </div>
+    <script>
+    jQuery(document).ready(function($) {
+        $('.bw-progress-tags input[type="checkbox"]').on('change', function() {
+            var $label = $(this).closest('label');
+            if (this.checked) {
+                $label.addClass('is-selected')
+                      .css({
+                          'color': $label.data('color'),
+                          'background': $label.data('bg')
+                      });
+            } else {
+                $label.removeClass('is-selected')
+                      .css({
+                          'color': '#999',
+                          'background': '#f5f5f5'
+                      });
+            }
+        });
+    });
+    </script>
     
     <div class="bw-cs-field">
         <label for="content_plan">Next Step</label>

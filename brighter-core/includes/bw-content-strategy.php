@@ -193,6 +193,7 @@ function bw_cs_index_status_options() {
         'indexed'     => 'Indexed',      // Dark Green
         'requested'   => 'Requested',    // Teal - Waiting
         'issue'       => 'Issue',        // Dark Red - Critical
+        'no_index'    => 'Do Not Index', // Red - Excluded
     ];
 }
 
@@ -327,6 +328,7 @@ add_action('admin_init', function() {
                         'indexed' => ['color' => '#065f46', 'bg' => '#d1fae5'],      // Dark Green
                         'requested' => ['color' => '#0f766e', 'bg' => '#ccfbf1'],    // Teal - Waiting
                         'issue' => ['color' => '#991b1b', 'bg' => '#fee2e2'],        // Dark Red - Critical
+                        'no_index' => ['color' => '#dc2626', 'bg' => '#fee2e2'],     // Red - Excluded
                         '' => ['color' => '#6b7280', 'bg' => '#f3f4f6']               // Grey - Not Set
                     ];
                     $color = $colors[$val] ?? $colors[''];

@@ -23,6 +23,12 @@ class BW_ALTC_Taxonomies {
         add_action('init', [__CLASS__, 'register_taxonomies']);
         add_action('init', [__CLASS__, 'register_post_meta']);
         add_action('init', [__CLASS__, 'register_term_meta']);
+        
+        // Add sameAs URL field to topic taxonomy forms
+        add_action('altc_topic_add_form_fields', [__CLASS__, 'add_topic_sameas_field']);
+        add_action('altc_topic_edit_form_fields', [__CLASS__, 'edit_topic_sameas_field']);
+        add_action('created_altc_topic', [__CLASS__, 'save_topic_sameas_field']);
+        add_action('edited_altc_topic', [__CLASS__, 'save_topic_sameas_field']);
     }
 
     /**
@@ -160,6 +166,14 @@ class BW_ALTC_Taxonomies {
                 ],
             ],
         ]);
+
+        // sameAs URL for topic (used in schema)
+        register_term_meta('altc_topic', 'topic_sameas_url', [
+            'type'              => 'string',
+            'single'            => true,
+            'sanitize_callback' => 'esc_url_raw',
+            'show_in_rest'      => true,
+        ]);
     }
 
     /**
@@ -186,6 +200,59 @@ class BW_ALTC_Taxonomies {
             'thought_leader'    => 'Thought Leader',
             'industry_authority' => 'Industry Authority',
         ];
+    }
+
+    /**
+     * Add sameAs URL field to topic add form
+     */
+    public static function add_topic_sameas_field() {
+        ?>
+        <div class="form-field">
+            <label for="topic_sameas_url"><?php esc_html_e('sameAs URL', 'brighterwebsites'); ?></label>
+            <input type="url" name="topic_sameas_url" id="topic_sameas_url" value="" />
+            <p class="description"><?php esc_html_e('External authoritative URL for this topic (used in schema sameAs). Example: https://www.wikidata.org/wiki/Q12345', 'brighterwebsites'); ?></p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Add sameAs URL field to topic edit form
+     */
+    public static function edit_topic_sameas_field($term) {
+        $sameas_url = get_term_meta($term->term_id, 'topic_sameas_url', true);
+        ?>
+        <tr class="form-field">
+            <th scope="row">
+                <label for="topic_sameas_url"><?php esc_html_e('sameAs URL', 'brighterwebsites'); ?></label>
+            </th>
+            <td>
+                <input type="url" name="topic_sameas_url" id="topic_sameas_url" value="<?php echo esc_attr($sameas_url); ?>" class="regular-text" />
+                <p class="description"><?php esc_html_e('External authoritative URL for this topic (used in schema sameAs). Example: https://www.wikidata.org/wiki/Q12345', 'brighterwebsites'); ?></p>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * Save sameAs URL field
+     */
+    public static function save_topic_sameas_field($term_id) {
+        if (!isset($_POST['topic_sameas_url'])) {
+            return;
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_categories')) {
+            return;
+        }
+
+        $sameas_url = esc_url_raw($_POST['topic_sameas_url']);
+
+        if (!empty($sameas_url)) {
+            update_term_meta($term_id, 'topic_sameas_url', $sameas_url);
+        } else {
+            delete_term_meta($term_id, 'topic_sameas_url');
+        }
     }
 }
 

@@ -288,7 +288,7 @@ function bw_render_schema_graph() {
         if ($topic_id) {
             $topic_term = get_term($topic_id, 'altc_topic');
             if ($topic_term && !is_wp_error($topic_term)) {
-                $topic_sameas = get_term_meta($topic_id, 'topic_sameas_url', true); // Future: add this field
+                $topic_sameas = get_term_meta($topic_id, 'topic_sameas_url', true);
                 $about = [
                     "@type" => "Thing",
                     "name" => $topic_term->name

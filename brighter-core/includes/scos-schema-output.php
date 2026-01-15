@@ -188,6 +188,14 @@ function bw_render_schema_graph() {
         ]
     ];
     
+
+    // Use the "Content Type" field to be created for Social Amplification to generate the webpage schema ID
+    // "mainEntity": {
+    //   "@id":  "@id" => esc_url($current_url) "#service"  = Content Type
+    //
+
+
+
     // Add author for singles (posts, projects), publisher for archives/pages
     // Author: articles, projects, news
     // Publisher only: service pages, Legal/Terms, Conversion Hub, Landing Page

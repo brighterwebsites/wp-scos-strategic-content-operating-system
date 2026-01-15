@@ -295,6 +295,25 @@ function brighter_core_enqueue_frontend_styles() {
 add_action('wp_enqueue_scripts', 'brighter_core_enqueue_frontend_styles', 20);
 
 /**
+ * Enqueue frontend JavaScript
+ */
+function brighter_core_enqueue_frontend_scripts() {
+    if (is_admin()) return;
+    
+    // Breadcrumb overflow detection
+    if (file_exists(BRIGHTER_CORE_PATH . 'js/breadcrumbs.js')) {
+        wp_enqueue_script(
+            'brighter-breadcrumbs',
+            BRIGHTER_CORE_URL . 'js/breadcrumbs.js',
+            array(),
+            BRIGHTER_CORE_VERSION,
+            true // Load in footer
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'brighter_core_enqueue_frontend_scripts', 20);
+
+/**
  * Plugin activation hook
  */
 function brighter_core_activate() {

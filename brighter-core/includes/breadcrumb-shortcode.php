@@ -147,8 +147,9 @@ function bw_render_breadcrumbs($atts = []) {
     }
     $class_attr = implode(' ', $classes);
     
-    // Build HTML
-    $output = '<ul class="' . esc_attr($class_attr) . '">';
+    // Build HTML with wrapper for overflow detection
+    $output = '<div class="bw-breadcrumbs-wrap">';
+    $output .= '<ul class="' . esc_attr($class_attr) . '">';
     
     $count = count($breadcrumbs);
     foreach ($breadcrumbs as $i => $crumb) {
@@ -172,6 +173,7 @@ function bw_render_breadcrumbs($atts = []) {
     }
     
     $output .= '</ul>';
+    $output .= '</div>';
     
     return $output;
 }

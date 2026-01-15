@@ -1065,6 +1065,9 @@ add_action('wp_ajax_bw_cs_save_field', function() {
             $value = [];
         }
         $value = array_map('sanitize_text_field', $value);
+    } elseif ($field === 'bw_altc_notes') {
+        // Textarea field - preserve newlines
+        $value = sanitize_textarea_field($value);
     } else {
         $value = sanitize_text_field($value);
     }
@@ -1198,6 +1201,7 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                 </label>
             <?php elseif ($col === 'bw_progress'): ?>
                 <label><span class="title">Progress</span>
+                    <input type="hidden" name="workflow_progress_touched" value="1">
                     <div class="bw-progress-checkboxes-edit" style="margin-top:4px;">
                         <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): ?>
                             <label style="display:block;font-size:11px;margin-bottom:2px;">
@@ -1333,16 +1337,18 @@ add_action('save_post', function($post_id) {
     }
     
     // Handle workflow_progress (multi-select checkboxes)
+    // Only update if the progress field was actually rendered in the form (marker field present)
     if (isset($_REQUEST['workflow_progress'])) {
         $progress = $_REQUEST['workflow_progress'];
         if (is_array($progress)) {
             $progress = array_map('sanitize_text_field', $progress);
             update_post_meta($post_id, 'workflow_progress', $progress);
         }
-    } elseif (!$is_bulk_edit && isset($_REQUEST['_inline_edit'])) {
-        // If unchecked all boxes in quick edit, clear the field
+    } elseif (!$is_bulk_edit && isset($_REQUEST['workflow_progress_touched'])) {
+        // Only clear if the progress section was rendered but no boxes checked
         update_post_meta($post_id, 'workflow_progress', []);
     }
+    // If neither condition met, leave existing workflow_progress unchanged
 });
 
 // ==========================

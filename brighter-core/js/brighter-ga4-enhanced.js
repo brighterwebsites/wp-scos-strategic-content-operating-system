@@ -23,6 +23,8 @@
   function initializeEnhanced() {
     if (enhancedInitialized) return;
     if (!hasConsent()) return;
+    // Skip tracking if admin/editor is logged in
+    if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
     if (typeof window.gtag !== 'function') { setTimeout(initializeEnhanced, 100); return; }
     enhancedInitialized = true;
   
@@ -97,21 +99,48 @@
       tier = tier || inferred.tier;
       type = type || inferred.type;
     }
+    
+    // Ensure tier is always a valid value: 'hot', 'warm', 'cold', or 'unknown'
+    const validTiers = ['hot', 'warm', 'cold'];
+    if (!tier || !validTiers.includes(tier)) {
+      tier = 'unknown';
+    }
+    
+    // Ensure type is always a string
+    type = type || 'unknown';
+    
     return { tier, type };
   }
 
   // Selector attribution rules
   const RULES = [
+
+    //All the CTA Caetegory here must have the link/button text as the default lablel fallback to label only if no text (like for image links, icon links etc)
     { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'Meetings', l: 'Meeting CTA', v: 25 },
     { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 30 },
     { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 30 },
     { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 15 },
     { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 15 },
-    { s: '.ga-cta-phone, [href^="tel:"]', e: 'CTA', c: 'CTA', l: 'Phone CTA', v: 10 },
-    { s: '.ga-cta-email, [href^="mailto:"]', e: 'CTA', c: 'CTA', l: 'Email CTA', v: 10 },
-    { s: '.ga-cta-end', e: 'click_main_cta', c: 'CTA', l: 'Final CTA', v: 35 },
-    { s: '.ga-lead_magnet', e: 'get_lead_magnet', c: 'Lead Magnet', l: 'Access LM', v: 20 },
+    { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 35 },
+
+    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 10 },
+    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 10 },
+
+//All the Form Caetegory label should be the form id and fallback to lable here. . 
+    { s: '.ga-form',      e: 'form', c: 'Forms', l: 'Contact Form', v: 20 },
+    { s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 20 },
+    { s: '.ga-quote',     e: 'enquiry_form', c: 'Forms', l: 'Quote Form', v: 30 },
+    { s: '.ga-lead_mag',     e: 'lead_magnet_form', c: 'Forms', l: 'Lead Magnet Form', v: 20 },
+
+    //Form Containers not form itself
+    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Engagement', l: 'Subscribe Form Viewed ', v: 2 },
+    { s: '.ga-vquote',     e: 'view_enquiry_form', c: 'Engagement', l: 'Enquiry Form Viewed', v: 5 },
+    { s: '.ga-vcontact',   e: 'view_contact_form', c: 'Engagement', l: 'Contact Form Viewed', v: 4 },
+
+
+    { s: '.ga-lead_magnet',     e: 'get_lead_magnet', c: 'Lead Magnet', l: 'Access LM', v: 20 },
     { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 5 },
+
     { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog Path', v: 1 },
     { s: '.ga-nav-project', e: 'nav_project', c: 'Navigation', l: 'Portfolio Path', v: 1 },
     { s: '.ga-nav-product', e: 'nav_product', c: 'Navigation', l: 'Product Path', v: 2 },
@@ -139,12 +168,7 @@
     { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 5 },
     { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 5 },
     { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 5 },
-    { s: '.ga-form', e: 'form', c: 'Forms', l: 'General Form', v: 20 },
-    { s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 20 },
-    { s: '.ga-quote', e: 'quote_form', c: 'Forms', l: 'Quote Form', v: 30 },
-    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Forms', l: 'View Subscribe Form', v: 2 },
-    { s: '.ga-vquote', e: 'view_quote_form', c: 'Forms', l: 'View Quote Form', v: 5 },
-    { s: '.ga-vcontact', e: 'view_contact_form', c: 'Forms', l: 'View Contact Form', v: 4 }
+ 
   ];
   
   function tag(root = document) {
@@ -203,6 +227,8 @@
 
   // Click tracking
   document.addEventListener('click', function(e) {
+    // Skip if admin/editor is logged in
+    if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
     const el = e.target.closest('[data-ga-event]');
     if (!el || el.dataset.gaSkip === '1') return;
     if (el.classList.contains('ga-cta-main') || el.classList.contains('ga-cta-micro') || 
@@ -222,6 +248,9 @@
   
   // Impression tracking
   if ('IntersectionObserver' in window) {
+    // Skip if admin/editor is logged in
+    if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
+    
     const obs = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -238,6 +267,9 @@
   }
   
   // Form tracking with lead hierarchy
+  // Skip if admin/editor is logged in
+  if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
+  
   const started = new WeakSet();
   document.querySelectorAll('form').forEach(form => {
     const id = form.id || form.className || 'Form';
@@ -246,9 +278,13 @@
 
     form.addEventListener('input', () => {
       if (!started.has(form)) {
+        const leadData = detectFormLeadData(form);
         const payload = getBaseParams();
         payload.event_category = cat;
         payload.event_label = label;
+        // Include lead_tier on form_start (may be determined from form structure)
+        payload.lead_tier = leadData.tier || 'unknown';
+        payload.lead_type = leadData.type || 'unknown';
         gtag('event', 'form_start', payload);
         started.add(form);
       }
@@ -262,9 +298,10 @@
       const payload = getBaseParams();
       payload.event_category = cat;
       payload.event_label = label;
-      payload.lead_tier = leadData.tier;
-      payload.lead_type = leadData.type;
-      payload.form_type = leadData.type;
+      // Ensure lead_tier is always a valid string (GA4 may ignore null/undefined)
+      payload.lead_tier = leadData.tier || 'unknown';
+      payload.lead_type = leadData.type || 'unknown';
+      payload.form_type = leadData.type || 'unknown';
       payload.form_fields = fieldCount;
       payload.form_id = form.id || form.getAttribute('name') || 'unknown';
 
@@ -287,7 +324,10 @@
     });
   });
   
-  gtag('event', 'page_view', getBaseParams());
+  // Only send page_view if not admin/editor
+  if (!(window.brighterGA4 && window.brighterGA4.skipTracking === true)) {
+    gtag('event', 'page_view', getBaseParams());
+  }
   
   // Watch for dynamic content
   const contentObserver = new MutationObserver(mutations => {

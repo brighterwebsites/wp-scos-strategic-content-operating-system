@@ -20,13 +20,17 @@ add_action('wp_head', function() {
         return;
     }
 
+    // Check if admin or editor is logged in (skip tracking)
+    $is_admin_or_editor = current_user_can('edit_posts');
+    
     // Pass GA4 ID to JavaScript for consent-based loading
     ?>
     <!-- Google Analytics 4 - Brighter Core -->
     <script>
         window.brighterGA4 = {
             measurementId: '<?php echo esc_js($ga4_id); ?>',
-            loaded: false
+            loaded: false,
+            skipTracking: <?php echo $is_admin_or_editor ? 'true' : 'false'; ?> // Skip events if admin/editor logged in
         };
     </script>
     <?php
@@ -50,6 +54,8 @@ add_action('wp_head', function() {
     }
     function init(){
         if(!hasConsent())return;
+        // Skip tracking if admin/editor is logged in
+        if(window.brighterGA4&&window.brighterGA4.skipTracking===true)return;
         if(window.brighterGA4&&!window.brighterGA4.loaded){
             var s=document.createElement('script');
             s.async=true;

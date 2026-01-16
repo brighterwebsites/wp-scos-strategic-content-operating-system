@@ -31,11 +31,11 @@ function register_faq_cpt() {
     $args = array(
         'labels'                => $labels,
         'public'                => true,               // Needed for admin editing
-        'publicly_queryable'    => false,              // No front-end single pages
+        'publicly_queryable'    => true,               // Allow front-end single pages
         'show_ui'               => true,               // Show in admin
         'show_in_menu'          => true,
         'query_var'             => true,               // Needed for admin edit screen
-        'rewrite'               => false,              // No front-end URLs
+        'rewrite'               => array('slug' => 'faq'),  // Front-end URLs: /faq/slug/
         'exclude_from_search'   => true,               // Exclude from search results
         'capability_type'       => 'post',
         'has_archive'           => false,

@@ -204,6 +204,16 @@ function brighter_analytics_render_page() {
                             <td><strong>Content Maturity Level</strong></td>
                             <td>beginner, intermediate, expert, advanced</td>
                         </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td><code>lead_tier</code></td>
+                            <td><strong>Lead Quality Tier</strong> (Form-based)</td>
+                            <td>hot, warm, cold, unknown</td>
+                        </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td><code>lead_type</code></td>
+                            <td><strong>Lead Type</strong> (Form-based)</td>
+                            <td>quote_request, contact_form, newsletter, etc.</td>
+                        </tr>
                     </tbody>
                 </table>
 

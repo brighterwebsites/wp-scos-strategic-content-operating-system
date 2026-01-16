@@ -35,7 +35,10 @@ function register_faq_cpt() {
         'show_ui'               => true,               // Show in admin
         'show_in_menu'          => true,
         'query_var'             => true,               // Needed for admin edit screen
-        'rewrite'               => array('slug' => 'faq'),  // Front-end URLs: /faq/slug/
+        'rewrite'               => array(
+            'slug'       => 'faq',  // Front-end URLs: /faq/slug/
+            'with_front' => false,  // Force root-level, don't inherit blog prefix
+        ),
         'exclude_from_search'   => true,               // Exclude from search results
         'capability_type'       => 'post',
         'has_archive'           => false,
@@ -52,7 +55,25 @@ function register_faq_cpt() {
 
     register_post_type('faq', $args);
 }
-add_action('init', 'register_faq_cpt');
+add_action('init', 'register_faq_cpt', 20); // Priority 20 to ensure it runs after other init hooks
+
+/**
+ * Flush rewrite rules when FAQ CPT rewrite structure changes
+ * This ensures /faq/slug URLs work correctly without blog prefix
+ * 
+ * Note: If FAQ pages still return 404 after this update, manually flush permalinks:
+ * Go to Settings → Permalinks → Click "Save Changes" (no changes needed, just save)
+ */
+function bw_faq_maybe_flush_rewrite_rules() {
+    $rewrite_version = '1.1'; // Increment when rewrite structure changes
+    $flushed_version = get_option('bw_faq_rewrite_version', '0');
+    
+    if ($flushed_version !== $rewrite_version) {
+        flush_rewrite_rules(false); // false = soft flush (faster)
+        update_option('bw_faq_rewrite_version', $rewrite_version);
+    }
+}
+add_action('init', 'bw_faq_maybe_flush_rewrite_rules', 999);
 
 // ============================================
 // 2. FAQ META FIELDS

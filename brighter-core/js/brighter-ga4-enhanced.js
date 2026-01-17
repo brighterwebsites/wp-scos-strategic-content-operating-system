@@ -116,20 +116,24 @@
   const RULES = [
 
     //All the CTA Caetegory here must have the link/button text as the default lablel fallback to label only if no text (like for image links, icon links etc)
-    { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'Meetings', l: 'Meeting CTA', v: 25 },
-    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 30 },
-    { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 30 },
-    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 15 },
-    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 15 },
-    { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 35 },
+    { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'CTA', l: 'Meeting CTA', v: 10 },
+    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 10 },
+    { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 10 },
+    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 5 },
+    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 3 },
+    { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 12 },
 
-    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 10 },
-    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 10 },
+    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 20 },
+    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 20 },
 
-//All the Form Caetegory label should be the form id and fallback to lable here. . 
+//All the Form Caetegory label should be the form id and fallback to lable here. 
+{ s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 5 },
+
     { s: '.ga-form',      e: 'form', c: 'Forms', l: 'Contact Form', v: 20 },
-    { s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 20 },
-    { s: '.ga-quote',     e: 'enquiry_form', c: 'Forms', l: 'Quote Form', v: 30 },
+    { s: '.ga-form',      e: 'enquiry_form', c: 'Forms', l: 'Specific Enquiry', v: 20 },
+
+    
+    { s: '.ga-quote',     e: 'quote_form', c: 'Forms', l: 'Quote Form', v: 30 },
     { s: '.ga-lead_mag',     e: 'lead_magnet_form', c: 'Forms', l: 'Lead Magnet Form', v: 20 },
 
     //Form Containers not form itself
@@ -146,28 +150,30 @@
     { s: '.ga-nav-product', e: 'nav_product', c: 'Navigation', l: 'Product Path', v: 2 },
     { s: '.ga-nav-service', e: 'nav_service', c: 'Navigation', l: 'Service Path', v: 2 },
     { s: '.ga-nav-pricing', e: 'nav_pricing_detail', c: 'Navigation', l: 'Pricing Path', v: 8 },
-    { s: '.ga-nav-compare', e: 'nav_comparison', c: 'Navigation', l: 'Comparison Path', v: 8 },
-    { s: '.ga-nav-faq', e: 'nav_faq', c: 'Navigation', l: 'FAQ Path', v: 8 },
-    { s: '.ga-nav-path', e: 'nav_path', c: 'Navigation', l: 'Conversion Path', v: 8 },
-    { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed', v: 5 },
-    { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed', v: 8 },
-    { s: '.ga-trust-specs', e: 'view_specs', c: 'Trust', l: 'Specifications Viewed', v: 7 },
-    { s: '.ga-trust-case', e: 'view_case', c: 'Trust', l: 'Case Study Excerpt Viewed', v: 6 },
-    { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 2 },
-    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 7 },
+
+
+
+
+    { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed', v: 0 },
+    { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed', v: 0 },
+    { s: '.ga-trust-specs', e: 'view_specs', c: 'Trust', l: 'Specifications Viewed', v: 0 },
+    { s: '.ga-trust-case', e: 'view_case', c: 'Trust', l: 'Case Study Excerpt Viewed', v: 0 },
+    { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 0 },
+    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 0 },
+    
     { s: '.ga-hrcy-atf', e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed', v: 1 },
-    { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 2 },
-    { s: '.ga-hrcy-ppd', e: 'view_section', c: 'Hierarchy', l: 'Position Promise Dif Viewed', v: 3 },
-    { s: '.ga-hrcy-method', e: 'view_section', c: 'Hierarchy', l: 'Method Viewed', v: 3 },
-    { s: '.ga-hrcy-specs', e: 'view_section', c: 'Hierarchy', l: 'Specifications Viewed', v: 7 },
-    { s: '.ga-hrcy-pricing', e: 'view_section', c: 'Hierarchy', l: 'Pricing Viewed', v: 8 },
-    { s: '.ga-hrcy-aut', e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed', v: 3 },
-    { s: '.ga-hrcy-tac', e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed', v: 4 },
-    { s: '.ga-hrcy-faq', e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed', v: 3 },
-    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 3 },
-    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 5 },
-    { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 5 },
-    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 5 },
+    { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 1 },
+    { s: '.ga-hrcy-ppd', e: 'view_section', c: 'Hierarchy', l: 'Position Promise Dif Viewed', v: 0 },
+    { s: '.ga-hrcy-method', e: 'view_section', c: 'Hierarchy', l: 'Method Viewed', v: 0 },
+    { s: '.ga-hrcy-specs', e: 'view_section', c: 'Hierarchy', l: 'Specifications Viewed', v: 0 },
+    { s: '.ga-hrcy-pricing', e: 'view_section', c: 'Hierarchy', l: 'Pricing Viewed', v: 0 },
+    { s: '.ga-hrcy-aut', e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed', v: 0 },
+    { s: '.ga-hrcy-tac', e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed', v: 0 },
+    { s: '.ga-hrcy-faq', e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed', v: 0 },
+    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 1 },
+    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 2 },
+    { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 2 },
+    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 3 },
  
   ];
   

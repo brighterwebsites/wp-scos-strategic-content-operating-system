@@ -58,6 +58,24 @@ function register_faq_cpt() {
 add_action('init', 'register_faq_cpt', 20); // Priority 20 to ensure it runs after other init hooks
 
 /**
+ * Force FAQ permalinks to /faq/slug (override any blog prefix)
+ * This filter runs after CPT registration and forcefully removes blog prefix
+ */
+function bw_faq_force_permalink_structure($post_link, $post) {
+    if ($post->post_type === 'faq') {
+        // Remove any blog prefix that might have been added
+        $post_link = str_replace('/blog/faq/', '/faq/', $post_link);
+        // Ensure it's exactly /faq/slug
+        if (strpos($post_link, '/faq/') === false) {
+            $home_url = home_url('/');
+            $post_link = $home_url . 'faq/' . $post->post_name . '/';
+        }
+    }
+    return $post_link;
+}
+add_filter('post_type_link', 'bw_faq_force_permalink_structure', 10, 2);
+
+/**
  * Flush rewrite rules when FAQ CPT rewrite structure changes
  * This ensures /faq/slug URLs work correctly without blog prefix
  * 
@@ -65,15 +83,35 @@ add_action('init', 'register_faq_cpt', 20); // Priority 20 to ensure it runs aft
  * Go to Settings → Permalinks → Click "Save Changes" (no changes needed, just save)
  */
 function bw_faq_maybe_flush_rewrite_rules() {
-    $rewrite_version = '1.1'; // Increment when rewrite structure changes
+    $rewrite_version = '1.2'; // Increment when rewrite structure changes
     $flushed_version = get_option('bw_faq_rewrite_version', '0');
     
     if ($flushed_version !== $rewrite_version) {
         flush_rewrite_rules(false); // false = soft flush (faster)
         update_option('bw_faq_rewrite_version', $rewrite_version);
+        update_option('bw_faq_rewrite_flushed_at', current_time('mysql')); // Track when flushed
     }
 }
 add_action('init', 'bw_faq_maybe_flush_rewrite_rules', 999);
+
+/**
+ * Diagnostic function: Check if rewrite rules were flushed
+ * Can be called via: wp-cli eval "bw_faq_check_rewrite_status();"
+ * Or add to admin notice if needed
+ */
+function bw_faq_check_rewrite_status() {
+    $version = get_option('bw_faq_rewrite_version', '0');
+    $flushed_at = get_option('bw_faq_rewrite_flushed_at', 'Never');
+    
+    $status = array(
+        'rewrite_version' => $version,
+        'flushed_at' => $flushed_at,
+        'expected_version' => '1.2',
+        'needs_flush' => ($version !== '1.2'),
+    );
+    
+    return $status;
+}
 
 // ============================================
 // 2. FAQ META FIELDS

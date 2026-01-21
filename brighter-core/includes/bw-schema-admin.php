@@ -8,7 +8,10 @@
 
 if (!defined('ABSPATH')) exit;
 
-// File loaded - admin menu will be registered
+// Only register admin menus when in admin context
+if (!is_admin() && !wp_doing_ajax() && !(defined('DOING_ADMIN_POST') && DOING_ADMIN_POST)) {
+    return; // Exit early if not in admin context
+}
 
 // Register settings
 add_action('admin_init', function() {

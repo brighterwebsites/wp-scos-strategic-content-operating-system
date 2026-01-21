@@ -226,20 +226,10 @@ function brighter_load_modules() {
        // 'brighter-tweaks',
     ];
     
-    // Check if we're in admin context
-    // Note: is_admin() might be false when MU plugins load, so we also check REQUEST_URI
-    $is_admin = is_admin() || (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '/wp-admin/') !== false);
-    $is_ajax = wp_doing_ajax();
-    $is_admin_post = (defined('DOING_ADMIN_POST') && DOING_ADMIN_POST);
-    
+    // Load all modules - admin-only modules are safe to load on frontend
+    // They simply won't register hooks/menus if not in admin context
+    // This ensures admin menus work reliably regardless of when MU plugins load
     foreach ($modules as $module) {
-        // Skip admin-only modules on frontend
-        // BUT: Always load admin-only modules if we're in admin, AJAX, or admin-post context
-        // This ensures admin menus and forms work properly
-        if (!$is_admin && !$is_ajax && !$is_admin_post && in_array($module, $admin_only, true)) {
-            continue;
-        }
-        
         brighter_load_module($module);
     }
 }

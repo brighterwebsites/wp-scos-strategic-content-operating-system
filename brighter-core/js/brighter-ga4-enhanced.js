@@ -5,24 +5,10 @@
 (function() {
   'use strict';
 
-  function hasConsent() {
-    var c = document.cookie.split(';');
-    for (var i = 0; i < c.length; i++) {
-      var ck = c[i].trim();
-      if (ck.startsWith('seopress-user-consent-accept=')) {
-        var v = ck.split('=')[1];
-        if (v === '1' || v === 'true' || v === "'1'" || v === '"1"') return true;
-      }
-    }
-    if (window.brighterGA4 && window.brighterGA4.loaded) return true;
-    return false;
-  }
-
   var enhancedInitialized = false;
 
   function initializeEnhanced() {
     if (enhancedInitialized) return;
-    if (!hasConsent()) return;
     // Skip tracking if admin/editor is logged in
     if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
     if (typeof window.gtag !== 'function') { setTimeout(initializeEnhanced, 100); return; }
@@ -116,33 +102,28 @@
   const RULES = [
 
     //All the CTA Caetegory here must have the link/button text as the default lablel fallback to label only if no text (like for image links, icon links etc)
-    { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'CTA', l: 'Meeting CTA', v: 10 },
-    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 10 },
-    { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 10 },
-    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 5 },
-    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 3 },
-    { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 12 },
+    { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'CTA', l: 'Meeting CTA', v: 5 },
+    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 5 },
+    { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 5 },
+    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 3 },
+    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 2 },
+    { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 5 },
 
     { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 20 },
     { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 20 },
 
 //All the Form Caetegory label should be the form id and fallback to lable here. 
-{ s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 5 },
+   
+{ s: '.ga-form',      e: 'form_enquiry', c: 'Forms', l: 'Specific Enquiry', v: 15 },  
+{ s: '.ga-quote',     e: 'form_quote', c: 'Forms', l: 'Quote Form', v: 30 },
+{ s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 1 },
+{ s: '.ga-lead_magnet',     e: 'form_lead_magnet', c: 'Forms', l: 'Lead Magnet', v: 5 },
 
-    { s: '.ga-form',      e: 'form', c: 'Forms', l: 'Contact Form', v: 20 },
-    { s: '.ga-form',      e: 'enquiry_form', c: 'Forms', l: 'Specific Enquiry', v: 20 },
-
-    
-    { s: '.ga-quote',     e: 'quote_form', c: 'Forms', l: 'Quote Form', v: 30 },
-    { s: '.ga-lead_mag',     e: 'lead_magnet_form', c: 'Forms', l: 'Lead Magnet Form', v: 20 },
 
     //Form Containers not form itself
     { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Engagement', l: 'Subscribe Form Viewed ', v: 2 },
     { s: '.ga-vquote',     e: 'view_enquiry_form', c: 'Engagement', l: 'Enquiry Form Viewed', v: 5 },
     { s: '.ga-vcontact',   e: 'view_contact_form', c: 'Engagement', l: 'Contact Form Viewed', v: 4 },
-
-
-    { s: '.ga-lead_magnet',     e: 'get_lead_magnet', c: 'Lead Magnet', l: 'Access LM', v: 20 },
     { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 5 },
 
     { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog Path', v: 1 },
@@ -346,5 +327,4 @@
 }
 
   initializeEnhanced();
-  document.addEventListener('seopress_analytics_cookies_accepted', initializeEnhanced);
 })();

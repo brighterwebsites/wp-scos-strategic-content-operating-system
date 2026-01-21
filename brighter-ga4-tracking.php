@@ -36,35 +36,30 @@ add_action('wp_head', function() {
     <?php
 }, 5); // Priority 5 = loads early
 
-/** PART 1: Inline Core Script - Consent-gated GA4 loader */
+/** PART 1: Inline Core Script - GA4 loader (no consent check) */
 add_action('wp_head', function() {
     ?>
     <script data-no-optimize="1" data-cfasync="false">
     (function(){'use strict';
-    function hasConsent(){
-        var c=document.cookie.split(';');
-        for(var i=0;i<c.length;i++){
-            var ck=c[i].trim();
-            if(ck.startsWith('seopress-user-consent-accept=')){
-                var v=ck.split('=')[1];
-                if(v==='1'||v==='true'||v==="'1'"||v==='"1"')return true;
-            }
-        }
-        return false;
-    }
     function init(){
-        if(!hasConsent())return;
         // Skip tracking if admin/editor is logged in
         if(window.brighterGA4&&window.brighterGA4.skipTracking===true)return;
         if(window.brighterGA4&&!window.brighterGA4.loaded){
-            var s=document.createElement('script');
-            s.async=true;
-            s.src='https://www.googletagmanager.com/gtag/js?id='+window.brighterGA4.measurementId;
-            document.head.appendChild(s);
+            // Set consent mode to granted (no consent check required)
             window.dataLayer=window.dataLayer||[];
             function gtag(){dataLayer.push(arguments);}
             window.gtag=gtag;
             gtag('js',new Date());
+            // Grant analytics storage by default
+            gtag('consent','default',{
+                'analytics_storage':'granted',
+                'ad_storage':'denied'
+            });
+            // Load GA4 script
+            var s=document.createElement('script');
+            s.async=true;
+            s.src='https://www.googletagmanager.com/gtag/js?id='+window.brighterGA4.measurementId;
+            document.head.appendChild(s);
             gtag('config',window.brighterGA4.measurementId,{'send_page_view':false});
             window.brighterGA4.loaded=true;
         }
@@ -90,7 +85,6 @@ add_action('wp_head', function() {
         })();
     }
     init();
-    document.addEventListener('seopress_analytics_cookies_accepted',init);
     })();
     </script>
     <?php

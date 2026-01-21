@@ -33,19 +33,22 @@ add_action('admin_init', function() {
 // Add Schema submenu to Brighter Support
 // Priority 20 ensures brighter_support parent menu exists first
 add_action('admin_menu', function() {
-    error_log('BW Schema Admin: admin_menu hook fired');
+    // Check if parent menu exists
+    global $submenu;
+    if (!isset($submenu['brighter_support'])) {
+        error_log('BW Schema Admin: Parent menu brighter_support not found');
+        return;
+    }
     
     add_submenu_page(
         'brighter_support',           // Parent slug
         'Schema',                      // Page title
         'Schema',                      // Menu title
-        'manage_options',             // Capability
+        'manage_options',             // Capability (matches Analytics)
         'brighter-schema',            // Menu slug
         'bw_schema_render_page',      // Callback
         4                             // Position (after Analytics which is at 2)
     );
-    
-    error_log('BW Schema Admin: add_submenu_page called');
 }, 20);
 
 // Handle form submission via admin-post.php

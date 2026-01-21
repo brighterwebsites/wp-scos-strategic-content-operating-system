@@ -27,11 +27,22 @@ add_action('wp_head', function() {
     ?>
     <!-- Google Analytics 4 - Brighter Core -->
     <script>
-        window.brighterGA4 = {
-            measurementId: '<?php echo esc_js($ga4_id); ?>',
-            loaded: false,
-            skipTracking: <?php echo $is_admin_or_editor ? 'true' : 'false'; ?> // Skip events if admin/editor logged in
-        };
+        (function() {
+            'use strict';
+            window.brighterGA4 = {
+                measurementId: '<?php echo esc_js($ga4_id); ?>',
+                loaded: false,
+                skipTracking: <?php echo $is_admin_or_editor ? 'true' : 'false'; ?> // Skip events if admin/editor logged in
+            };
+            // Debug logging (only in development - remove in production)
+            if (window.console && window.console.log) {
+                console.log('[Brighter GA4] Initialized:', {
+                    measurementId: window.brighterGA4.measurementId,
+                    skipTracking: window.brighterGA4.skipTracking,
+                    userLoggedIn: <?php echo is_user_logged_in() ? 'true' : 'false'; ?>
+                });
+            }
+        })();
     </script>
     <?php
 }, 5); // Priority 5 = loads early
@@ -42,9 +53,21 @@ add_action('wp_head', function() {
     <script data-no-optimize="1" data-cfasync="false">
     (function(){'use strict';
     function init(){
+        // Check if brighterGA4 exists
+        if(!window.brighterGA4){
+            if(window.console&&window.console.error){
+                console.error('[Brighter GA4] ERROR: window.brighterGA4 not found! Check if brighter-ga4-tracking.php is loading.');
+            }
+            return;
+        }
         // Skip tracking if admin/editor is logged in
-        if(window.brighterGA4&&window.brighterGA4.skipTracking===true)return;
-        if(window.brighterGA4&&!window.brighterGA4.loaded){
+        if(window.brighterGA4.skipTracking===true){
+            if(window.console&&window.console.log){
+                console.log('[Brighter GA4] Skipping tracking (admin/editor logged in)');
+            }
+            return;
+        }
+        if(!window.brighterGA4.loaded){
             // Set consent mode to granted (no consent check required)
             window.dataLayer=window.dataLayer||[];
             function gtag(){dataLayer.push(arguments);}
@@ -62,6 +85,9 @@ add_action('wp_head', function() {
             document.head.appendChild(s);
             gtag('config',window.brighterGA4.measurementId,{'send_page_view':false});
             window.brighterGA4.loaded=true;
+            if(window.console&&window.console.log){
+                console.log('[Brighter GA4] Script loaded and configured:',window.brighterGA4.measurementId);
+            }
         }
         (function track(){
             if(typeof window.gtag!=='function'){setTimeout(track,100);return;}

@@ -95,7 +95,7 @@ add_action('wp_head', function() {
     $intent = get_post_meta($post_id, 'bw_intent', true) ?: 'not_set';
     $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: 'not_set';
     $maturity = get_post_meta($post_id, 'bw_cont_maturity', true) ?: 'not_set';
-    $opt_status = get_post_meta($post_id, '_brt_opt_status', true) ?: 'not_set';
+    $opt_status = get_post_meta($post_id, '_brt_opt_status', true) ?: 'not_set';  //deprecated replaced by content_plan- ok to remove.
     
     // ============================================
     // GATHER PILLAR RELATIONSHIP
@@ -181,46 +181,36 @@ add_action('wp_head', function() {
     
     // ============================================
     // OUTPUT JAVASCRIPT
+    // notes moved from head output for security and clean code
+    // used by and with bw-content-strategy.php, brighter-ga4-tracking.php, class-altc-ga4-integration.php)
+    // Maintain existing window objects for GA4 tracking scripts 
+    // Legacy GA4 config object (used by brighter-ga4-tracking.php)
+    // brighterContentStrategy - Content strategy object (used by GA4 enhanced tracking & bw-content-strategy)
+    // brighterContentStrategy - Original fields from bw-content-strategy.php
+    // brighterContentStrategy - ALTC fields from class-altc-ga4-integration.php
     // ============================================
     ?>
     <script>
-    // SCOS Content Architecture Record (CAR)
-    // Single source of truth for content metadata
+    // SCOS Content Architecture Record (CAR) Single source of truth for content metadata
     window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES); ?>;
     
-    // ============================================
-    // BACKWARDS COMPATIBILITY
-    // ============================================
-    // Maintain existing window objects for GA4 tracking scripts
+    // Note: window.brighterGA4 is created by brighter-ga4-tracking.php (runs on ALL pages)
+    // We don't create it here to avoid conflicts and ensure skipTracking property is preserved
     
-    // Legacy GA4 config object (used by brighter-ga4-tracking.php)
-    window.brighterGA4 = {
-        measurementId: window.brighterSCOS.tracking.ga4_id,
-        loaded: false
-    };
-    
-    // Legacy content strategy object (used by GA4 enhanced tracking)
     window.brighterContentStrategy = {
-        // Original fields from bw-content-strategy.php
-        content_intent: window.brighterSCOS.car.intent,
-        content_purpose: window.brighterSCOS.car.purpose,
-        content_topic: window.brighterSCOS.car.topic, // Legacy - kept for backwards compatibility
-        optimization_status: window.brighterSCOS.car.optimization_status, // Legacy - deprecated
-        pillar_page: <?php echo json_encode($pillar_name); ?>,
-        pillar_type: <?php echo json_encode($pillar_type); ?>,
-        post_type: window.brighterSCOS.meta.post_type,
-        
-        // ALTC fields from class-altc-ga4-integration.php
         altc_primary: window.brighterSCOS.car.cluster,
         altc_topic: window.brighterSCOS.car.topic, // Preferred over content_topic
         content_maturity: window.brighterSCOS.car.maturity,
-        
-        // New fields
+        content_intent: window.brighterSCOS.car.intent,
+        content_purpose: window.brighterSCOS.car.purpose,
         service_pathway: <?php echo json_encode($service_pathway_name); ?>,
+        pillar_page: <?php echo json_encode($pillar_name); ?>,
+        pillar_type: <?php echo json_encode($pillar_type); ?>,
         content_plan: <?php echo json_encode($content_plan); ?>,
-        
-        // Breadcrumb schema for short page title
-        breadcrumb_schema: <?php echo json_encode(get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: ''); ?>
+        post_type: window.brighterSCOS.meta.post_type,
+        breadcrumb_schema: <?php echo json_encode(get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: ''); ?>,
+        content_topic: window.brighterSCOS.car.topic, // Legacy - kept for backwards compatibility
+        optimization_status: window.brighterSCOS.car.optimization_status // Legacy - deprecated
     };
     </script>
     <?php

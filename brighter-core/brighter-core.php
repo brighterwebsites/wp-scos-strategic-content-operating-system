@@ -144,13 +144,16 @@ function brighter_load_module($module) {
     }
     
     if (!file_exists($real_path)) {
-        error_log('Brighter Core: Module not found: ' . esc_html($module));
+        error_log('Brighter Core: Module not found: ' . esc_html($module) . ' at path: ' . $real_path);
         return false;
     }
     
     try {
         require_once $real_path;
         $loaded[$module] = true;
+        if ($module === 'bw-schema-admin') {
+            error_log('Brighter Core: bw-schema-admin module loaded successfully from: ' . $real_path);
+        }
         return true;
     } catch (Exception $e) {
         error_log('Brighter Core: Error loading module ' . esc_html($module) . ': ' . esc_html($e->getMessage()));
@@ -228,9 +231,15 @@ function brighter_load_modules() {
     foreach ($modules as $module) {
         // Skip admin-only modules on frontend
         if (!$is_admin && in_array($module, $admin_only, true)) {
+            if ($module === 'bw-schema-admin') {
+                error_log('Brighter Core: Skipping bw-schema-admin (admin-only, not in admin)');
+            }
             continue;
         }
         
+        if ($module === 'bw-schema-admin') {
+            error_log('Brighter Core: Attempting to load bw-schema-admin module');
+        }
         brighter_load_module($module);
     }
 }

@@ -28,7 +28,15 @@ add_action('admin_init', function() {
 });
 
 // Add Schema submenu to Brighter Support
+// Priority 20 ensures brighter_support parent menu exists first
 add_action('admin_menu', function() {
+    // Verify parent menu exists before adding submenu
+    global $menu, $submenu;
+    
+    if (!isset($submenu['brighter_support'])) {
+        return; // Parent menu doesn't exist yet
+    }
+    
     add_submenu_page(
         'brighter_support',           // Parent slug
         'Schema',                      // Page title
@@ -36,9 +44,9 @@ add_action('admin_menu', function() {
         'manage_options',             // Capability
         'brighter-schema',            // Menu slug
         'bw_schema_render_page',      // Callback
-        3                             // Position (after Analytics)
+        4                             // Position (after Analytics which is at 2)
     );
-});
+}, 20);
 
 // Render the Schema page
 function bw_schema_render_page() {

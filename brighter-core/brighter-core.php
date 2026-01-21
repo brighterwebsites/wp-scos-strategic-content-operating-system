@@ -230,16 +230,12 @@ function brighter_load_modules() {
     
     foreach ($modules as $module) {
         // Skip admin-only modules on frontend
-        if (!$is_admin && in_array($module, $admin_only, true)) {
-            if ($module === 'bw-schema-admin') {
-                error_log('Brighter Core: Skipping bw-schema-admin (admin-only, not in admin)');
-            }
+        // BUT: Always load admin-only modules if we're in admin OR if it's an AJAX/admin-post request
+        // This ensures admin forms and AJAX handlers work properly
+        if (!$is_admin && !wp_doing_ajax() && !(defined('DOING_ADMIN_POST') && DOING_ADMIN_POST) && in_array($module, $admin_only, true)) {
             continue;
         }
         
-        if ($module === 'bw-schema-admin') {
-            error_log('Brighter Core: Attempting to load bw-schema-admin module');
-        }
         brighter_load_module($module);
     }
 }

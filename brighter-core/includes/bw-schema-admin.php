@@ -48,19 +48,48 @@ add_action('admin_menu', function() {
     error_log('BW Schema Admin: add_submenu_page called');
 }, 20);
 
+// Handle form submission via admin-post.php
+add_action('admin_post_bw_save_schema', function() {
+    if (!current_user_can('manage_options')) {
+        wp_die('Unauthorized');
+    }
+    
+    check_admin_referer('bw_schema_settings', 'bw_schema_settings_nonce');
+    
+    if (isset($_POST['bw_local_business_schema'])) {
+        $schema = wp_unslash($_POST['bw_local_business_schema']);
+        
+        // Validate JSON if not empty
+        if (!empty($schema)) {
+            $decoded = json_decode($schema, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                add_settings_error('bw_local_business_schema', 'invalid_json', 'Invalid JSON format. Please check your schema.');
+                wp_redirect(admin_url('admin.php?page=brighter-schema&settings-updated=error'));
+                exit;
+            }
+        }
+        
+        update_option('bw_local_business_schema', $schema);
+        wp_redirect(admin_url('admin.php?page=brighter-schema&settings-updated=success'));
+        exit;
+    }
+    
+    wp_redirect(admin_url('admin.php?page=brighter-schema'));
+    exit;
+});
+
 // Render the Schema page
 function bw_schema_render_page() {
     if (!current_user_can('manage_options')) {
         wp_die('Unauthorized');
     }
     
-    // Handle form submission
-    if (isset($_POST['bw_schema_settings_nonce']) &&
-        wp_verify_nonce($_POST['bw_schema_settings_nonce'], 'bw_schema_settings')) {
-        
-        if (isset($_POST['bw_local_business_schema'])) {
-            update_option('bw_local_business_schema', wp_unslash($_POST['bw_local_business_schema']));
+    // Show success/error messages
+    if (isset($_GET['settings-updated'])) {
+        if ($_GET['settings-updated'] === 'success') {
             echo '<div class="notice notice-success is-dismissible"><p>Local Business Schema saved!</p></div>';
+        } elseif ($_GET['settings-updated'] === 'error') {
+            settings_errors('bw_local_business_schema');
         }
     }
     
@@ -84,7 +113,8 @@ function bw_schema_render_page() {
                 </ul>
             </div>
             
-            <form method="post">
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="bw_save_schema">
                 <?php wp_nonce_field('bw_schema_settings', 'bw_schema_settings_nonce'); ?>
                 
                 <table class="form-table">

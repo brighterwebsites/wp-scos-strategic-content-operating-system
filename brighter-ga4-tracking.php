@@ -26,7 +26,7 @@ add_action('wp_head', function() {
     // Pass GA4 ID to JavaScript for consent-based loading
     ?>
     <!-- Google Analytics 4 - Brighter Core -->
-    <script>
+    <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
         (function() {
             'use strict';
             window.brighterGA4 = {
@@ -50,16 +50,26 @@ add_action('wp_head', function() {
 /** PART 1: Inline Core Script - GA4 loader (no consent check) */
 add_action('wp_head', function() {
     ?>
-    <script data-no-optimize="1" data-cfasync="false">
+    <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
     (function(){'use strict';
-    function init(){
-        // Check if brighterGA4 exists
+    // Wait for brighterGA4 to be created (PART 0 runs at priority 5, this runs at 99)
+    var attempts = 0;
+    var maxAttempts = 50; // Wait up to 5 seconds (50 * 100ms)
+    
+    function checkAndInit(){
+        attempts++;
         if(!window.brighterGA4){
+            if(attempts < maxAttempts){
+                setTimeout(checkAndInit, 100);
+                return;
+            }
+            // Only log error after all attempts failed
             if(window.console&&window.console.error){
-                console.error('[Brighter GA4] ERROR: window.brighterGA4 not found! Check if brighter-ga4-tracking.php is loading.');
+                console.error('[Brighter GA4] ERROR: window.brighterGA4 not found after ' + (maxAttempts * 100) + 'ms! Check if brighter-ga4-tracking.php is loading.');
             }
             return;
         }
+        
         // Skip tracking if admin/editor is logged in
         if(window.brighterGA4.skipTracking===true){
             if(window.console&&window.console.log){
@@ -67,6 +77,7 @@ add_action('wp_head', function() {
             }
             return;
         }
+        
         if(!window.brighterGA4.loaded){
             // Set consent mode to granted (no consent check required)
             window.dataLayer=window.dataLayer||[];
@@ -89,6 +100,7 @@ add_action('wp_head', function() {
                 console.log('[Brighter GA4] Script loaded and configured:',window.brighterGA4.measurementId);
             }
         }
+        
         (function track(){
             if(typeof window.gtag!=='function'){setTimeout(track,100);return;}
             document.addEventListener('click',function(e){
@@ -110,7 +122,8 @@ add_action('wp_head', function() {
             },{passive:true});
         })();
     }
-    init();
+    // Start initialization check
+    checkAndInit();
     })();
     </script>
     <?php

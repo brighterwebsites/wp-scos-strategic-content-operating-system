@@ -17,15 +17,35 @@
   const contentStrategy = window.brighterContentStrategy || {};
   
   function getBaseParams() {
+    // Use breadcrumb schema as short title if available, fallback to document.title
+    const pageTitle = (contentStrategy.breadcrumb_schema && contentStrategy.breadcrumb_schema.trim()) 
+      ? contentStrategy.breadcrumb_schema.trim() 
+      : document.title;
+    
     return {
-      page_title: document.title,
-      page_path: location.pathname,
+      // Page metadata
+      page_title: pageTitle,
+      // Note: page_path removed - GA4 automatically tracks this as 'page_location'
+      
+      // Content strategy fields
       content_intent: contentStrategy.content_intent || 'not_set',
       content_purpose: contentStrategy.content_purpose || 'not_set',
-      content_topic: contentStrategy.content_topic || 'not_set',
-      optimization_status: contentStrategy.optimization_status || 'not_set',
-      pillar_page: contentStrategy.pillar_page || document.title,
+      
+      // ALTC Framework fields
+      altc_primary: contentStrategy.altc_primary || 'not_set',
+      altc_topic: contentStrategy.altc_topic || 'not_set', // Preferred field name (maps to ALTC taxonomy)
+      content_topic: contentStrategy.content_topic || 'not_set', // Legacy - kept for backwards compatibility
+      content_maturity: contentStrategy.content_maturity || 'not_set',
+      
+      // Content workflow fields
+      content_plan: contentStrategy.content_plan || 'none', // Replaces deprecated optimization_status
+      
+      // Relationship fields
+      pillar_page: contentStrategy.pillar_page || 'none',
       pillar_type: contentStrategy.pillar_type || 'none',
+      service_pathway: contentStrategy.service_pathway || 'none',
+      
+      // Post metadata
       post_type: contentStrategy.post_type || 'page'
     };
   }
@@ -109,22 +129,23 @@
     { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 2 },
     { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 5 },
 
-    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'CTA', l: 'Phone CTA', v: 20 },
-    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'CTA', l: 'Email CTA', v: 20 },
+    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'Contact', l: 'Phone CTA', v: 20 },
+    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'Contact', l: 'Email CTA', v: 20 },
 
 //All the Form Caetegory label should be the form id and fallback to lable here. 
    
 { s: '.ga-form',      e: 'form_enquiry', c: 'Forms', l: 'Specific Enquiry', v: 15 },  
 { s: '.ga-quote',     e: 'form_quote', c: 'Forms', l: 'Quote Form', v: 30 },
-{ s: '.ga-subscribe', e: 'subscribe', c: 'Forms', l: 'Subscribed', v: 1 },
+{ s: '.ga-subscribe', e: 'form_subscribe', c: 'Forms', l: 'Subscribed', v: 1 },
 { s: '.ga-lead_magnet',     e: 'form_lead_magnet', c: 'Forms', l: 'Lead Magnet', v: 5 },
 
 
     //Form Containers not form itself
-    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Engagement', l: 'Subscribe Form Viewed ', v: 2 },
-    { s: '.ga-vquote',     e: 'view_enquiry_form', c: 'Engagement', l: 'Enquiry Form Viewed', v: 5 },
-    { s: '.ga-vcontact',   e: 'view_contact_form', c: 'Engagement', l: 'Contact Form Viewed', v: 4 },
-    { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 5 },
+    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Engagement', l: 'Subscribe Form Viewed ', v: 0 },
+    { s: '.ga-vquote',     e: 'view_enquiry_form', c: 'Engagement', l: 'Enquiry Form Viewed', v: 0 },
+    { s: '.ga-vcontact',   e: 'view_contact_form', c: 'Engagement', l: 'Contact Form Viewed', v: 0 },
+
+    { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 0 },
 
     { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog Path', v: 1 },
     { s: '.ga-nav-project', e: 'nav_project', c: 'Navigation', l: 'Portfolio Path', v: 1 },

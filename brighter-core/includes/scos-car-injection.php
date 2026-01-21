@@ -118,6 +118,17 @@ add_action('wp_head', function() {
         ];
     }
     
+    // Service Pathway (similar to Pillar but for service/product pathways)
+    $service_pathway_id = get_post_meta($post_id, 'bw_service_pathway_id', true);
+    $service_pathway_name = 'none';
+    
+    if ($service_pathway_id) {
+        $service_pathway_name = get_the_title($service_pathway_id);
+    }
+    
+    // Content Plan (replaces deprecated optimization_status)
+    $content_plan = get_post_meta($post_id, 'content_plan', true) ?: 'none';
+    
     // ============================================
     // GATHER CONTENT METRICS (Internal use only)
     // ============================================
@@ -193,16 +204,23 @@ add_action('wp_head', function() {
         // Original fields from bw-content-strategy.php
         content_intent: window.brighterSCOS.car.intent,
         content_purpose: window.brighterSCOS.car.purpose,
-        content_topic: window.brighterSCOS.car.topic,
-        optimization_status: window.brighterSCOS.car.optimization_status,
+        content_topic: window.brighterSCOS.car.topic, // Legacy - kept for backwards compatibility
+        optimization_status: window.brighterSCOS.car.optimization_status, // Legacy - deprecated
         pillar_page: <?php echo json_encode($pillar_name); ?>,
         pillar_type: <?php echo json_encode($pillar_type); ?>,
         post_type: window.brighterSCOS.meta.post_type,
         
         // ALTC fields from class-altc-ga4-integration.php
         altc_primary: window.brighterSCOS.car.cluster,
-        altc_topic: window.brighterSCOS.car.topic,
-        content_maturity: window.brighterSCOS.car.maturity
+        altc_topic: window.brighterSCOS.car.topic, // Preferred over content_topic
+        content_maturity: window.brighterSCOS.car.maturity,
+        
+        // New fields
+        service_pathway: <?php echo json_encode($service_pathway_name); ?>,
+        content_plan: <?php echo json_encode($content_plan); ?>,
+        
+        // Breadcrumb schema for short page title
+        breadcrumb_schema: <?php echo json_encode(get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: ''); ?>
     };
     </script>
     <?php

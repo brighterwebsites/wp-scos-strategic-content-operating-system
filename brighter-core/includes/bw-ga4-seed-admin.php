@@ -102,17 +102,22 @@ function brighter_analytics_render_page() {
 
                 <h3>🎯 Current Tracking Setup</h3>
                 <p><strong>Status:</strong> <?php echo $ga4_id ? '✅ GA4 tracking configured' : '⚠️ No GA4 ID set'; ?></p>
-
+                <p><strong>Content TrackingStatus:</strong> ✅ Australian Busienss GA4 Consent not rquired. </p>
+                <p>'✅ Consent Settings Configures in GA4 - Admin / Data Collection and modifications / Consent settings</p>
+                <p>'✅ Data Collection Settings Configures in GA4 - Admin / Data Collection and modifications / Data Collection</p>
+                <p>'✅ GA4 DPA Administration Configured https://marketingplatform.google.com/gdpr </p>    
                 <h4>What's Being Tracked:</h4>
                 <ul style="line-height: 1.8;">
                     <li>📄 <strong>Page views</strong> with content strategy metadata</li>
-                    <li>🎯 <strong>CTA clicks</strong> (main, micro, meeting, phone, email)</li>
+                    <li>🎯 <strong>CTA clicks</strong> (main, micro, menu cta, assists)</li>
+                    <li>🎯 <strong>Contact Clicks</strong> (phone, email)</li>
                     <li>📝 <strong>Form interactions</strong> (start, submit, lead generation)</li>
+                    <li>📝 <strong>Form Lead Generation</strong> (cold, warm, hot)</li>
                     <li>🎓 <strong>Lead magnets</strong> (downloads, guides)</li>
                     <li>👁️ <strong>Trust signals</strong> (reviews, pricing, case studies, videos)</li>
                     <li>📊 <strong>Navigation</strong> (blog, portfolio, products, services)</li>
-                    <li>📍 <strong>Page hierarchy</strong> (ATF, mid-page, final CTA sections)</li>
-                    <li>🚨 <strong>Ad tag alerts</strong> (detects unauthorized tracking pixels)</li>
+                    <li>📍 <strong>Page hierarchy</strong> (Above the fold, mid & final CTA sections)</li>
+                   
                 </ul>
 
                 <h4>Tracking Files:</h4>
@@ -131,7 +136,7 @@ function brighter_analytics_render_page() {
             <?php elseif ($current_tab === 'content-strategy'): ?>
                 <!-- TAB 2: Content Strategy Tracking -->
                 <h2>Content Strategy Tracking</h2>
-                <p>Your GA4 tracking automatically includes these custom dimensions on every page view.</p>
+                <p>Your GA4 tracking automatically includes custom dimensions on every page view.</p>
 
                 <div class="notice notice-info inline">
                     <p><strong>ℹ️ How It Works:</strong> Each page/post in WordPress has content strategy metadata
@@ -149,6 +154,26 @@ function brighter_analytics_render_page() {
                         </tr>
                     </thead>
                     <tbody>
+
+            
+               
+
+                        <tr>
+                            <td><code>post_type</code></td>
+                            <td>WordPress post type</td>
+                            <td>page, post, project, etc.</td>
+                        </tr>
+                  
+                        <tr style="background-color: #e8f5e9;">
+                            <td><code>altc_primary</code></td>
+                            <td><strong>ALTC Strategic Lens</strong> (Authority cluster)</td>
+                            <td>AI-First SEO, Conversion Optimization, etc.</td>
+                        </tr>
+                        <tr style="background-color: #e8f5e9;">
+                            <td><code>altc_topic</code></td>
+                            <td><strong>ALTC Topic</strong> (Specific focus area)</td>
+                            <td>Content Strategy, Technical SEO, UX Design, etc.</td>
+                        </tr>
                         <tr>
                             <td><code>content_intent</code></td>
                             <td>User search intent for this page</td>
@@ -159,16 +184,7 @@ function brighter_analytics_render_page() {
                             <td>Content role in your strategy</td>
                             <td>pillar, service-page, supporting, case-study, conversion-hub</td>
                         </tr>
-                        <tr>
-                            <td><code>content_topic</code></td>
-                            <td>Main topic/theme</td>
-                            <td>SEO, Web Design, E-commerce, etc.</td>
-                        </tr>
-                        <tr>
-                            <td><code>optimization_status</code></td>
-                            <td>Internal tracking status</td>
-                            <td>op90, improve, cro, draft, etc.</td>
-                        </tr>
+
                         <tr>
                             <td><code>pillar_page</code></td>
                             <td>Parent pillar/service page</td>
@@ -180,25 +196,16 @@ function brighter_analytics_render_page() {
                             <td>pillar, service, none</td>
                         </tr>
                         <tr>
-                            <td><code>post_type</code></td>
-                            <td>WordPress post type</td>
-                            <td>page, post, project, etc.</td>
+                            <td><code>service_pathway</code></td>
+                            <td>Service/Product pathway page</td>
+                            <td>Page title of linked service pathway</td>
                         </tr>
                         <tr>
-                            <td><code>region_id</code></td>
-                            <td>User region (from URL param)</td>
-                            <td>zone4-remote, brisbane, sydney, etc.</td>
+                            <td><code>content_plan</code></td>
+                            <td>Content workflow status</td>
+                            <td>approve, testing, revise, merge, archive</td>
                         </tr>
-                        <tr style="background-color: #e8f5e9;">
-                            <td><code>altc_primary</code></td>
-                            <td><strong>ALTC Strategic Lens</strong> (Authority cluster)</td>
-                            <td>AI-First SEO, Conversion Optimization, etc.</td>
-                        </tr>
-                        <tr style="background-color: #e8f5e9;">
-                            <td><code>altc_topic</code></td>
-                            <td><strong>ALTC Topic</strong> (Specific focus area)</td>
-                            <td>Content Strategy, Technical SEO, UX Design, etc.</td>
-                        </tr>
+
                         <tr style="background-color: #e8f5e9;">
                             <td><code>content_maturity</code></td>
                             <td><strong>Content Maturity Level</strong></td>
@@ -214,6 +221,21 @@ function brighter_analytics_render_page() {
                             <td><strong>Lead Type</strong> (Form-based)</td>
                             <td>quote_request, contact_form, newsletter, etc.</td>
                         </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td><code>cta_label</code></td>
+                            <td><strong>CTA Label</strong> (Form context)</td>
+                            <td>Text of CTA clicked before form submission</td>
+                        </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td><code>cta_location</code></td>
+                            <td><strong>CTA Location</strong> (Form context)</td>
+                            <td>Section where CTA was located (header, footer, atf, etc.)</td>
+                        </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td><code>cta_type</code></td>
+                            <td><strong>CTA Type</strong> (Form context)</td>
+                            <td>main, micro, assist, unknown</td>
+                        </tr>
                     </tbody>
                 </table>
 
@@ -221,6 +243,13 @@ function brighter_analytics_render_page() {
                     <p><strong>🆕 ALTC Dimensions (Green Rows):</strong> Authority-Led Topic Clusters (ALTC) parameters 
                     help track how your strategic content clusters perform. These allow you to measure the effectiveness
                     of your authority positioning and topic targeting strategy.</p>
+                </div>
+                
+                <div class="notice notice-info inline" style="margin-top: 15px;">
+                    <p><strong>📝 Form Context Dimensions (Yellow Rows):</strong> Lead tier, lead type, and CTA context 
+                    (cta_label, cta_location, cta_type) are automatically captured on form submissions. These help you 
+                    understand which CTAs and content sections drive conversions. <strong>Note:</strong> CTA dimensions are 
+                    only sent with <code>form_submit</code> and <code>generate_lead</code> events.</p>
                 </div>
 
                 <hr style="margin: 30px 0;">
@@ -237,7 +266,7 @@ function brighter_analytics_render_page() {
                             <li><strong>Event parameter:</strong> content_intent (exact parameter name)</li>
                         </ul>
                     </li>
-                    <li>Repeat for all 11 parameters (8 core + 3 ALTC dimensions)</li>
+                    <li>Repeat for all parameters</li>
                 </ol>
 
                 <div class="notice notice-info inline" style="margin-top: 15px;">
@@ -310,7 +339,7 @@ function brighter_analytics_render_page() {
                             <tr style="background-color: #fff4e5;">
                                 <td><code>generate_lead</code></td>
                                 <td>Forms</td>
-                                <td><strong>🔥 Primary conversion</strong></td>
+                                <td><strong>🔥 Primary conversion</strong> - GA4 standard event. Mark as conversion in GA4 Admin → Events.</td>
                             </tr>
                             <tr style="background-color: #fff4e5;">
                                 <td><code>form_submit</code></td>

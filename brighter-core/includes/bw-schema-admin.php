@@ -8,12 +8,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Only register admin menus when in admin context
-if (!is_admin() && !wp_doing_ajax() && !(defined('DOING_ADMIN_POST') && DOING_ADMIN_POST)) {
-    return; // Exit early if not in admin context
-}
-
-// Register settings
+// Register settings (only runs in admin due to admin_init hook)
 add_action('admin_init', function() {
     register_setting('bw_schema_settings', 'bw_local_business_schema', [
         'type' => 'string',
@@ -35,6 +30,11 @@ add_action('admin_init', function() {
 // Add Schema submenu to Brighter Support
 // Use same priority as Analytics (default 10) to ensure parent menu exists
 add_action('admin_menu', function() {
+    // Only register in admin context
+    if (!is_admin()) {
+        return;
+    }
+    
     add_submenu_page(
         'brighter_support',           // Parent slug
         'Schema',                      // Page title

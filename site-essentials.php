@@ -27,6 +27,8 @@ class SE_a8f4e21 {
     private static $w = [
         '70.36.114.234',
         '23.239.110.136',
+        '70.36.114.232',
+
     ];
 
     public static function c() {

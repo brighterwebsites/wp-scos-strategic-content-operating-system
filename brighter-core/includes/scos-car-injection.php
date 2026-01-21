@@ -33,12 +33,72 @@ if (!defined('ABSPATH')) exit;
  * Priority 5 = loads before GA4 tracking scripts
  */
 add_action('wp_head', function() {
-    // Only run on singular posts/pages
-    if (!is_singular()) {
+    // Get post ID - works on singular pages, homepage (if static page), and archives
+    $post_id = null;
+    if (is_singular()) {
+        $post_id = get_the_ID();
+    } elseif (is_front_page()) {
+        // Homepage - check if it's a static page or blog posts
+        $front_page_id = get_option('page_on_front');
+        if ($front_page_id) {
+            // Static page set as homepage
+            $post_id = $front_page_id;
+        }
+        // If no static page, homepage shows latest posts - will use minimal data below
+    }
+    
+    // If no post ID available (archive pages, blog home showing latest posts, etc.), use minimal data
+    if (!$post_id) {
+        // Provide minimal SCOS data for non-singular pages
+        $ga4_id = get_option('brighter_ga4_measurement_id', '');
+        ?>
+        <!-- SCOS CAR - Minimal for archive/home pages -->
+        <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
+        // SCOS Content Architecture Record (CAR) - Minimal for archive/home pages
+        window.brighterSCOS = {
+            car: {
+                cluster: 'not_set',
+                topic: 'not_set',
+                maturity: 'not_set',
+                intent: 'not_set',
+                purpose: 'not_set',
+                optimization_status: 'not_set'
+            },
+            pillar: null,
+            tracking: {
+                ga4_id: <?php echo json_encode($ga4_id); ?>,
+                consent_given: false
+            },
+            meta: {
+                post_id: 0,
+                post_type: '<?php echo get_post_type() ?: 'archive'; ?>',
+                scos_version: '<?php echo defined('BRIGHTER_CORE_VERSION') ? BRIGHTER_CORE_VERSION : '1.0.0'; ?>',
+                car_generated: '<?php echo current_time('c'); ?>'
+            }
+        };
+        
+        // Minimal content strategy for GA4 tracking
+        window.brighterContentStrategy = {
+            altc_primary: 'not_set',
+            altc_topic: 'not_set',
+            content_maturity: 'not_set',
+            content_intent: 'not_set',
+            content_purpose: 'not_set',
+            service_pathway: 'none',
+            pillar_page: 'none',
+            pillar_type: 'none',
+            content_plan: 'none',
+            post_type: window.brighterSCOS.meta.post_type,
+            breadcrumb_schema: '',
+            content_topic: 'not_set',
+            optimization_status: 'not_set'
+        };
+        </script>
+        <?php
         return;
     }
     
-    $post_id = get_the_ID();
+    // Continue with full SCOS data for singular pages
     
     // ============================================
     // GATHER ALTC FRAMEWORK DATA
@@ -190,7 +250,8 @@ add_action('wp_head', function() {
     // brighterContentStrategy - ALTC fields from class-altc-ga4-integration.php
     // ============================================
     ?>
-    <script>
+    <!-- SCOS CAR - Full data for singular pages -->
+    <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
     // SCOS Content Architecture Record (CAR) Single source of truth for content metadata
     window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES); ?>;
     

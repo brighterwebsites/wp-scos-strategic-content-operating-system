@@ -3,7 +3,7 @@
  * Schema Admin Interface
  *
  * Adds Schema submenu under Brighter Support with Local Business Schema settings
- * Path: Support > SEO > Schema
+ * Path: Support > Schema
  */
 
 if (!defined('ABSPATH')) exit;
@@ -27,42 +27,16 @@ add_action('admin_init', function() {
     ]);
 });
 
-// Add SEO submenu if it doesn't exist, then add Schema submenu
+// Add Schema submenu to Brighter Support
 add_action('admin_menu', function() {
-    // Check if SEO menu already exists
-    global $submenu;
-    $seo_exists = false;
-    if (isset($submenu['brighter_support'])) {
-        foreach ($submenu['brighter_support'] as $item) {
-            if (isset($item[2]) && $item[2] === 'brighter-seo') {
-                $seo_exists = true;
-                break;
-            }
-        }
-    }
-    
-    // Create SEO parent menu if it doesn't exist
-    if (!$seo_exists) {
-        add_submenu_page(
-            'brighter_support',
-            'SEO',
-            'SEO',
-            'manage_options',
-            'brighter-seo',
-            '__return_false', // Parent menu, no content
-            10
-        );
-    }
-    
-    // Add Schema submenu under SEO
     add_submenu_page(
-        'brighter-seo',
-        'Schema',
-        'Schema',
-        'manage_options',
-        'brighter-schema',
-        'bw_schema_render_page',
-        1
+        'brighter_support',           // Parent slug
+        'Schema',                      // Page title
+        'Schema',                      // Menu title
+        'manage_options',             // Capability
+        'brighter-schema',            // Menu slug
+        'bw_schema_render_page',      // Callback
+        3                             // Position (after Analytics)
     );
 });
 

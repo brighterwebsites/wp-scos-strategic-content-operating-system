@@ -8,8 +8,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Debug: Verify file is loaded
-error_log('BW Schema Admin: File loaded at ' . current_time('mysql'));
+// File loaded - admin menu will be registered
 
 // Register settings
 add_action('admin_init', function() {
@@ -31,15 +30,8 @@ add_action('admin_init', function() {
 });
 
 // Add Schema submenu to Brighter Support
-// Priority 20 ensures brighter_support parent menu exists first
+// Use same priority as Analytics (default 10) to ensure parent menu exists
 add_action('admin_menu', function() {
-    // Check if parent menu exists
-    global $submenu;
-    if (!isset($submenu['brighter_support'])) {
-        error_log('BW Schema Admin: Parent menu brighter_support not found');
-        return;
-    }
-    
     add_submenu_page(
         'brighter_support',           // Parent slug
         'Schema',                      // Page title
@@ -49,7 +41,7 @@ add_action('admin_menu', function() {
         'bw_schema_render_page',      // Callback
         4                             // Position (after Analytics which is at 2)
     );
-}, 20);
+});
 
 // Handle form submission via admin-post.php
 add_action('admin_post_bw_save_schema', function() {

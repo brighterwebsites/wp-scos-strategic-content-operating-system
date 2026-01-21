@@ -12,9 +12,9 @@
  * 
  * Responsibilities:
  * - Inject SCOS CAR data into <head> as window.brighterSCOS
- * - Maintain backwards compatibility with window.brighterContentStrategy
- * - Maintain backwards compatibility with window.brighterGA4
- * - Only load on singular posts/pages
+ * - Single source of truth for all content metadata
+ * - Used by GA4 tracking scripts and AI agents
+ * - Loads on all page types (singular, archive, home)
  * 
  * Data Structure:
  * - car: Content Architecture Record (ALTC, strategy, metrics)
@@ -62,9 +62,12 @@ add_action('wp_head', function() {
                 maturity: 'not_set',
                 intent: 'not_set',
                 purpose: 'not_set',
-                optimization_status: 'not_set'
+                optimization_status: 'not_set',
+                content_plan: 'none'
             },
             pillar: null,
+            service_pathway: null,
+            breadcrumb_schema: '',
             tracking: {
                 ga4_id: <?php echo json_encode($ga4_id); ?>,
                 consent_given: false
@@ -77,22 +80,6 @@ add_action('wp_head', function() {
             }
         };
         
-        // Minimal content strategy for GA4 tracking
-        window.brighterContentStrategy = {
-            altc_primary: 'not_set',
-            altc_topic: 'not_set',
-            content_maturity: 'not_set',
-            content_intent: 'not_set',
-            content_purpose: 'not_set',
-            service_pathway: 'none',
-            pillar_page: 'none',
-            pillar_type: 'none',
-            content_plan: 'none',
-            post_type: window.brighterSCOS.meta.post_type,
-            breadcrumb_schema: '',
-            content_topic: 'not_set',
-            optimization_status: 'not_set'
-        };
         </script>
         <?php
         return;
@@ -180,14 +167,22 @@ add_action('wp_head', function() {
     
     // Service Pathway (similar to Pillar but for service/product pathways)
     $service_pathway_id = get_post_meta($post_id, 'bw_service_pathway_id', true);
+    $service_pathway = null;
     $service_pathway_name = 'none';
     
     if ($service_pathway_id) {
         $service_pathway_name = get_the_title($service_pathway_id);
+        $service_pathway = [
+            'id' => (int) $service_pathway_id,
+            'title' => $service_pathway_name
+        ];
     }
     
     // Content Plan (replaces deprecated optimization_status)
     $content_plan = get_post_meta($post_id, 'content_plan', true) ?: 'none';
+    
+    // Breadcrumb schema (for short page title)
+    $breadcrumb_schema = get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: '';
     
     // ============================================
     // GATHER CONTENT METRICS (Internal use only)
@@ -221,8 +216,15 @@ add_action('wp_head', function() {
             'metrics' => $metrics
         ],
         
-        // Pillar relationship
+        // Content workflow
+        'content_plan' => $content_plan,
+        
+        // Relationships
         'pillar' => $pillar,
+        'service_pathway' => $service_pathway,
+        
+        // Display
+        'breadcrumb_schema' => $breadcrumb_schema,
         
         // GA4 tracking config
         'tracking' => [
@@ -241,38 +243,17 @@ add_action('wp_head', function() {
     
     // ============================================
     // OUTPUT JAVASCRIPT
-    // notes moved from head output for security and clean code
-    // used by and with bw-content-strategy.php, brighter-ga4-tracking.php, class-altc-ga4-integration.php)
-    // Maintain existing window objects for GA4 tracking scripts 
-    // Legacy GA4 config object (used by brighter-ga4-tracking.php)
-    // brighterContentStrategy - Content strategy object (used by GA4 enhanced tracking & bw-content-strategy)
-    // brighterContentStrategy - Original fields from bw-content-strategy.php
-    // brighterContentStrategy - ALTC fields from class-altc-ga4-integration.php
+    // SCOS Content Architecture Record (CAR) - Single source of truth for content metadata
+    // Used by: GA4 tracking scripts, content strategy tools, AI agents
     // ============================================
     ?>
     <!-- SCOS CAR - Full data for singular pages -->
     <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
-    // SCOS Content Architecture Record (CAR) Single source of truth for content metadata
+    // SCOS Content Architecture Record (CAR) - Single source of truth for content metadata
     window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES); ?>;
     
     // Note: window.brighterGA4 is created by brighter-ga4-tracking.php (runs on ALL pages)
     // We don't create it here to avoid conflicts and ensure skipTracking property is preserved
-    
-    window.brighterContentStrategy = {
-        altc_primary: window.brighterSCOS.car.cluster,
-        altc_topic: window.brighterSCOS.car.topic, // Preferred over content_topic
-        content_maturity: window.brighterSCOS.car.maturity,
-        content_intent: window.brighterSCOS.car.intent,
-        content_purpose: window.brighterSCOS.car.purpose,
-        service_pathway: <?php echo json_encode($service_pathway_name); ?>,
-        pillar_page: <?php echo json_encode($pillar_name); ?>,
-        pillar_type: <?php echo json_encode($pillar_type); ?>,
-        content_plan: <?php echo json_encode($content_plan); ?>,
-        post_type: window.brighterSCOS.meta.post_type,
-        breadcrumb_schema: <?php echo json_encode(get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: ''); ?>,
-        content_topic: window.brighterSCOS.car.topic, // Legacy - kept for backwards compatibility
-        optimization_status: window.brighterSCOS.car.optimization_status // Legacy - deprecated
-    };
     </script>
     <?php
 }, 5); // Priority 5 = loads before GA4 tracking (priority 99)

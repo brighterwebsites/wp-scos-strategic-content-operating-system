@@ -14,12 +14,18 @@
     if (typeof window.gtag !== 'function') { setTimeout(initializeEnhanced, 100); return; }
     enhancedInitialized = true;
   
-  const contentStrategy = window.brighterContentStrategy || {};
+  // Use SCOS CAR directly (single source of truth)
+  const scos = window.brighterSCOS || {};
+  const car = scos.car || {};
+  const meta = scos.meta || {};
+  const pillar = scos.pillar || null;
+  const servicePathway = scos.service_pathway || null;
   
   function getBaseParams() {
     // Use breadcrumb schema as short title if available, fallback to document.title
-    const pageTitle = (contentStrategy.breadcrumb_schema && contentStrategy.breadcrumb_schema.trim()) 
-      ? contentStrategy.breadcrumb_schema.trim() 
+    const breadcrumb = scos.breadcrumb_schema || '';
+    const pageTitle = (breadcrumb && breadcrumb.trim()) 
+      ? breadcrumb.trim() 
       : document.title;
     
     return {
@@ -27,26 +33,26 @@
       page_title: pageTitle,
       // Note: page_path removed - GA4 automatically tracks this as 'page_location'
       
-      // Content strategy fields
-      content_intent: contentStrategy.content_intent || 'not_set',
-      content_purpose: contentStrategy.content_purpose || 'not_set',
+      // Content strategy fields (from SCOS CAR)
+      content_intent: car.intent || 'not_set',
+      content_purpose: car.purpose || 'not_set',
       
-      // ALTC Framework fields
-      altc_primary: contentStrategy.altc_primary || 'not_set',
-      altc_topic: contentStrategy.altc_topic || 'not_set', // Preferred field name (maps to ALTC taxonomy)
-      content_topic: contentStrategy.content_topic || 'not_set', // Legacy - kept for backwards compatibility
-      content_maturity: contentStrategy.content_maturity || 'not_set',
+      // ALTC Framework fields (from SCOS CAR)
+      altc_primary: car.cluster || 'not_set',
+      altc_topic: car.topic || 'not_set', // Preferred field name
+      content_topic: car.topic || 'not_set', // Legacy - kept for backwards compatibility
+      content_maturity: car.maturity || 'not_set',
       
-      // Content workflow fields
-      content_plan: contentStrategy.content_plan || 'none', // Replaces deprecated optimization_status
+      // Content workflow fields (from SCOS CAR)
+      content_plan: car.content_plan || 'none',
       
-      // Relationship fields
-      pillar_page: contentStrategy.pillar_page || 'none',
-      pillar_type: contentStrategy.pillar_type || 'none',
-      service_pathway: contentStrategy.service_pathway || 'none',
+      // Relationship fields (from SCOS CAR)
+      pillar_page: (pillar && pillar.title) ? pillar.title : 'none',
+      pillar_type: (pillar && pillar.type) ? pillar.type : 'none',
+      service_pathway: (servicePathway && servicePathway.title) ? servicePathway.title : 'none',
       
-      // Post metadata
-      post_type: contentStrategy.post_type || 'page'
+      // Post metadata (from SCOS CAR)
+      post_type: meta.post_type || 'page'
     };
   }
 

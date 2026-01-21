@@ -1610,24 +1610,22 @@ add_action('save_post', function($post_id) {
  * - impression tracking (brighter-ga4-enhanced.js:229)
  * - form interactions (brighter-ga4-enhanced.js:252, 262)
  *
- * The data flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
+ * The data flows: WordPress → window.brighterSCOS → getBaseParams() → gtag()
  */
 
 /**
- * DATA INJECTION MOVED TO scos-car-injection.php
+ * DATA INJECTION HANDLED BY scos-car-injection.php
  * 
- * The window.brighterContentStrategy object is now injected by
- * brighter-core/includes/scos-car-injection.php as part of the 
- * consolidated SCOS CAR (Content Architecture Record) structure.
+ * Content strategy metadata is injected by brighter-core/includes/scos-car-injection.php
+ * as part of the SCOS CAR (Content Architecture Record) structure.
  * 
- * This consolidation provides:
- * - Single source of truth for content metadata
- * - Better AI agent readability (window.brighterSCOS)
- * - Backwards compatibility maintained
- * - Reduced code complexity
+ * The SCOS CAR provides:
+ * - Single source of truth for content metadata (window.brighterSCOS)
+ * - Machine-readable structure for AI agents
+ * - All GA4 tracking scripts use window.brighterSCOS directly
+ * - Reduced code complexity and better maintainability
  * 
- * The data still flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
- * But now it's generated from the SCOS CAR structure.
+ * The data flows: WordPress → window.brighterSCOS → getBaseParams() → gtag()
  * 
  * See: brighter-core/includes/scos-car-injection.php
  */

@@ -31,7 +31,7 @@ add_action('template_redirect', 'bw_output_schema_graph', 1);
 function bw_output_schema_graph() {
     
     // ============================================
-    // KILL SWITCH SYSTEM
+    // KILL SWITCH SYSTEM  ///remove this. 
     // ============================================
     
     // Global kill switch: If SCOS_DISABLE_SCHEMA is true, stop all schema output
@@ -84,7 +84,7 @@ function bw_output_schema_graph() {
  * Get author schema @id from user data
  * 
  * @param int|null $user_id User ID (defaults to post author)
- * @return string Author @id URL (e.g., home_url('/#vanessa-wood'))
+ * @return string Author @id URL (e.g., home_url('/#author-slug'))
  */
 function bw_get_author_schema_id($user_id = null) {
     if (!$user_id && is_singular()) {
@@ -92,19 +92,25 @@ function bw_get_author_schema_id($user_id = null) {
     }
     
     if (!$user_id) {
-        return home_url('/#vanessa-wood'); // Fallback
+        return home_url('/#author');
     }
     
     $user = get_userdata($user_id);
     if (!$user) {
-        return home_url('/#vanessa-wood'); // Fallback
+        return home_url('/#author');
     }
     
-    // Build slug from first-last name
-    $first = sanitize_title($user->first_name ?: 'vanessa');
-    $last = sanitize_title($user->last_name ?: 'wood');
+    // Build slug from first-last name, fallback to username
+    $first = sanitize_title($user->first_name ?: '');
+    $last = sanitize_title($user->last_name ?: '');
     
-    return home_url('/#' . $first . '-' . $last);
+    if ($first && $last) {
+        return home_url('/#' . $first . '-' . $last);
+    } elseif ($user->user_login) {
+        return home_url('/#' . sanitize_title($user->user_login));
+    }
+    
+    return home_url('/#author');
 }
 
 /**
@@ -119,11 +125,11 @@ function bw_get_author_name($user_id = null) {
     }
     
     if (!$user_id) {
-        return 'Vanessa Wood';
+        return get_bloginfo('name');
     }
     
     $user = get_userdata($user_id);
-    return $user ? $user->display_name : 'Vanessa Wood';
+    return $user ? $user->display_name : get_bloginfo('name');
 }
 
 /**
@@ -142,13 +148,26 @@ function bw_render_schema_graph() {
         "@type" => "WebSite",
         "@id" => home_url('/#website'),
         "url" => home_url('/'),
-        "name" => "Brighter Websites",
+        "name" => get_bloginfo('name'),
         "publisher" => [
             "@id" => home_url('/#organization')
         ]
     ];
     
-    // LocalBusiness
+    // LocalBusiness - Loaded from admin options (Site Essentials > SEO > Schema)
+    $local_business_schema = get_option('bw_local_business_schema', '');
+    if (!empty($local_business_schema)) {
+        $decoded = json_decode($local_business_schema, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            // Ensure @id is set for organization reference
+            if (!isset($decoded['@id'])) {
+                $decoded['@id'] = home_url('/#organization');
+            }
+            $graph[] = $decoded;
+        }
+    }
+    
+    /* TEMPORARILY COMMENTED OUT - Using admin options instead
     $graph[] = [
         "@type" => "LocalBusiness",
         "@id" => home_url('/#organization'),
@@ -217,6 +236,7 @@ function bw_render_schema_graph() {
             "name" => "Ballarat, VIC, Australia"
         ]
     ];
+    */
     
     // ============================================
     // DYNAMIC BLOCKS
@@ -235,12 +255,6 @@ function bw_render_schema_graph() {
         ]
     ];
     
-
-    // Use the "Content Type" field to be created for Social Amplification to generate the webpage schema ID
-    // "mainEntity": {
-    //   "@id":  "@id" => esc_url($current_url) "#service"  = Content Type
-    //
-
 
 
     // Add author for singles (posts, projects), publisher for archives/pages

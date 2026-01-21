@@ -8,6 +8,9 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Debug: Verify file is loaded (remove after testing)
+// error_log('BW Schema Admin: File loaded');
+
 // Register settings
 add_action('admin_init', function() {
     register_setting('bw_schema_settings', 'bw_local_business_schema', [

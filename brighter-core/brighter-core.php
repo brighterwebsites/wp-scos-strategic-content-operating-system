@@ -208,6 +208,7 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
+        'bw-schema-admin',              // Schema admin interface (admin only)
         // ALTC admin modules
         'class-altc-meta-boxes',
         'class-altc-admin-columns',

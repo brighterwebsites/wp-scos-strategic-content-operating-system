@@ -48,9 +48,18 @@ add_action('admin_menu', function() {
     );
 });
 
-// Handle form submission via admin-post.php
-// Note: This hook must be registered early, so file loads in all contexts
-add_action('admin_post_bw_save_schema', function() {
+// Handle form submission - support both admin-post.php and direct POST
+add_action('admin_post_bw_save_schema', 'bw_schema_save_handler');
+add_action('admin_init', function() {
+    // Handle direct POST (fallback if admin-post doesn't work)
+    if (isset($_POST['bw_schema_settings_nonce']) && 
+        isset($_GET['page']) && $_GET['page'] === 'brighter-schema' &&
+        wp_verify_nonce($_POST['bw_schema_settings_nonce'], 'bw_schema_settings')) {
+        bw_schema_save_handler();
+    }
+});
+
+function bw_schema_save_handler() {
     if (!current_user_can('manage_options')) {
         wp_die('Unauthorized');
     }
@@ -77,7 +86,7 @@ add_action('admin_post_bw_save_schema', function() {
     
     wp_redirect(admin_url('admin.php?page=brighter-schema'));
     exit;
-});
+}
 
 // Render the Schema page
 function bw_schema_render_page() {

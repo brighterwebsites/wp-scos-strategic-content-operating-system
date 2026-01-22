@@ -4,6 +4,8 @@
  *
  * Adds Schema submenu under Brighter Support with Local Business Schema settings
  * Path: Support > Schema
+ * 
+ * TODO: Move to Site Essentials SEO module in future version
  */
 
 if (!defined('ABSPATH')) exit;
@@ -47,6 +49,7 @@ add_action('admin_menu', function() {
 });
 
 // Handle form submission via admin-post.php
+// Note: This hook must be registered early, so file loads in all contexts
 add_action('admin_post_bw_save_schema', function() {
     if (!current_user_can('manage_options')) {
         wp_die('Unauthorized');

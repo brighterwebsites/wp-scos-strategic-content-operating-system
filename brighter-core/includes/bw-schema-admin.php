@@ -48,45 +48,8 @@ add_action('admin_menu', function() {
     );
 });
 
-// Handle form submission - support both admin-post.php and direct POST
-add_action('admin_post_bw_save_schema', 'bw_schema_save_handler');
-add_action('admin_init', function() {
-    // Handle direct POST (fallback if admin-post doesn't work)
-    if (isset($_POST['bw_schema_settings_nonce']) && 
-        isset($_GET['page']) && $_GET['page'] === 'brighter-schema' &&
-        wp_verify_nonce($_POST['bw_schema_settings_nonce'], 'bw_schema_settings')) {
-        bw_schema_save_handler();
-    }
-});
-
-function bw_schema_save_handler() {
-    if (!current_user_can('manage_options')) {
-        wp_die('Unauthorized');
-    }
-    
-    check_admin_referer('bw_schema_settings', 'bw_schema_settings_nonce');
-    
-    if (isset($_POST['bw_local_business_schema'])) {
-        $schema = wp_unslash($_POST['bw_local_business_schema']);
-        
-        // Validate JSON if not empty
-        if (!empty($schema)) {
-            $decoded = json_decode($schema, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                add_settings_error('bw_local_business_schema', 'invalid_json', 'Invalid JSON format. Please check your schema.');
-                wp_redirect(admin_url('admin.php?page=brighter-schema&settings-updated=error'));
-                exit;
-            }
-        }
-        
-        update_option('bw_local_business_schema', $schema);
-        wp_redirect(admin_url('admin.php?page=brighter-schema&settings-updated=success'));
-        exit;
-    }
-    
-    wp_redirect(admin_url('admin.php?page=brighter-schema'));
-    exit;
-}
+// Handle form submission (same approach as Analytics admin)
+// Note: This runs in admin_init, so form is processed before page renders
 
 // Render the Schema page
 function bw_schema_render_page() {
@@ -94,12 +57,27 @@ function bw_schema_render_page() {
         wp_die('Unauthorized');
     }
     
-    // Show success/error messages
-    if (isset($_GET['settings-updated'])) {
-        if ($_GET['settings-updated'] === 'success') {
-            echo '<div class="notice notice-success is-dismissible"><p>Local Business Schema saved!</p></div>';
-        } elseif ($_GET['settings-updated'] === 'error') {
-            settings_errors('bw_local_business_schema');
+    // Handle form submission (same approach as Analytics)
+    if (isset($_POST['bw_schema_settings_nonce']) &&
+        wp_verify_nonce($_POST['bw_schema_settings_nonce'], 'bw_schema_settings')) {
+        
+        if (isset($_POST['bw_local_business_schema'])) {
+            $schema = wp_unslash($_POST['bw_local_business_schema']);
+            
+            // Validate JSON if not empty
+            if (!empty($schema)) {
+                $decoded = json_decode($schema, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    echo '<div class="notice notice-error is-dismissible"><p>Invalid JSON format. Please check your schema.</p></div>';
+                } else {
+                    update_option('bw_local_business_schema', $schema);
+                    echo '<div class="notice notice-success is-dismissible"><p>Local Business Schema saved!</p></div>';
+                }
+            } else {
+                // Empty schema is valid (disables LocalBusiness schema)
+                update_option('bw_local_business_schema', '');
+                echo '<div class="notice notice-success is-dismissible"><p>Local Business Schema cleared!</p></div>';
+            }
         }
     }
     
@@ -123,8 +101,7 @@ function bw_schema_render_page() {
                 </ul>
             </div>
             
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                <input type="hidden" name="action" value="bw_save_schema">
+            <form method="post">
                 <?php wp_nonce_field('bw_schema_settings', 'bw_schema_settings_nonce'); ?>
                 
                 <table class="form-table">

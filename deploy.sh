@@ -13,11 +13,18 @@ TEMP_DIR="/tmp/mu-plugin-deploy-$$"
 
 # Sites to deploy to
 declare -A SITES=(
-    ["brighterwebsites"]="/home/brighterwebsites.com.au/public_html"
-    ["pawsforsupport"]="/home/pawsforsupport.com.au/public_html"
-    ["oneteamqld"]="/home/oneteamqld.com.au/public_html"
-    ["guerillasteelstables"]="/home/guerillasteelstables.com.au/public_html"
+    ["baseb5993"]="/home/base.bweb1.com.au/public_html"
+    ["lucid7419"]="/home/lucidlearners.com.au/public_html"
+    ["south6867"]="/home/southbrislawn.com.au/public_html"
+    ["brighterwebsites"]="/home/daylesfordgardener.com.au/public_html"
+    ["pawsforsupport"]="/home/ballaratlawncare.com.au/public_html"
+    ["oneteamqld"]="/home/abandonstress.com.au/public_html"
+    ["guerillasteelstables"]="/home/nmxstudio.com.au/public_html"
+
 )
+
+#   ["cubew3861"]="/home/cubewebservices.com.au/public_html"
+#   ["mensf8194 "]="/home/mensfinanceadvice.com.au/public_html"
 
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║     Multi-Site Deployment from GitHub                         ║"
@@ -162,9 +169,11 @@ fi
 echo ""
 echo "Next steps:"
 echo "1. Test Site Essentials in each site's admin"
-echo "2. Test sitemap URLs:"
-echo "   - https://brighterwebsites.com.au/sitemap.xml"
-echo "   - https://pawsforsupport.com.au/sitemap.xml"
-echo "   - https://oneteamqld.com.au/sitemap.xml"
-echo "   - https://guerillasteelstables.com.au/sitemap.xml"
+echo "   - https://base.bweb1.com.au/wp-admin"
+echo "   - https://lucidlearners.com.au/wp-admin"
+echo "   - https://southbrislawn.com.au/wp-admin"
+echo "   - https://daylesfordgardener.com.au/wp-admin"
+echo "   - https://ballaratlawncare.com.au/wp-admin"
+echo "   - https://abandonstress.com.au/wp-admin"
+echo "   - https://nmxstudio.com.au/wp-admin"
 echo ""

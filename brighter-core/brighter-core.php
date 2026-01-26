@@ -177,6 +177,8 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
+        'bw-schema-admin',
+
 	'bw-content-strategy',
  	'bw-ga4-seeder',
  	'bw-ga4-seed-admin',

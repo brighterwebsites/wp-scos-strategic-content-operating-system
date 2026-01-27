@@ -243,13 +243,13 @@ class Brighter_API_Endpoints {
 
             $query = new WP_Query($query_args);
 
-            // Format response with error handling for each item
+            // Format response with error handling for each item (Phase 1: Simple format)
             $items = array();
             if ($query->have_posts()) {
                 while ($query->have_posts()) {
                     $query->the_post();
                     try {
-                        $item = $this->format_content_item(get_post());
+                        $item = $this->format_simple_item(get_post());
                         $items[] = $item;
                     } catch (Exception $e) {
                         // Log error but continue processing other items
@@ -301,41 +301,118 @@ class Brighter_API_Endpoints {
      * @return WP_REST_Response|WP_Error Response object or error
      */
     public function get_pages($request) {
-        // Get configured page IDs from settings
-        $page_ids = get_option('brighter_api_pages', array());
+        try {
+            // Get configured page IDs from settings
+            $page_ids = get_option('brighter_api_pages', array());
 
-        if (empty($page_ids)) {
-            return rest_ensure_response(array('pages' => array()));
-        }
-
-        // Generate cache key
-        $cache_key = 'brighter_api_pages_' . md5(serialize($page_ids));
-
-        // Try to get cached response
-        $cached = get_transient($cache_key);
-        if ($cached !== false) {
-            return rest_ensure_response($cached);
-        }
-
-        // Get pages
-        $pages = array();
-        foreach ($page_ids as $page_id) {
-            $post = get_post($page_id);
-            if ($post && $post->post_status === 'publish') {
-                $pages[] = $this->format_page_item($post);
+            if (empty($page_ids)) {
+                // Return consistent structure even when empty
+                return rest_ensure_response(array(
+                    'items' => array(),
+                    'pagination' => array(
+                        'total' => 0,
+                        'total_pages' => 0,
+                        'current_page' => 1,
+                        'per_page' => count($page_ids),
+                        'has_more' => false
+                    )
+                ));
             }
+
+            // Generate cache key
+            $cache_key = 'brighter_api_pages_' . md5(serialize($page_ids));
+
+            // Try to get cached response
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            // Get pages (Phase 1: Simple format, consistent structure)
+            $items = array();
+            foreach ($page_ids as $page_id) {
+                $post = get_post($page_id);
+                if ($post) {
+                    // Include all statuses, not just published (for consistency)
+                    try {
+                        $items[] = $this->format_simple_item($post);
+                    } catch (Exception $e) {
+                        error_log('Brighter API: Error formatting page ' . $page_id . ': ' . $e->getMessage());
+                        continue;
+                    }
+                }
+            }
+
+            // Build consistent response structure (same as posts/faqs)
+            $response = array(
+                'items' => $items,
+                'pagination' => array(
+                    'total' => count($items),
+                    'total_pages' => 1,
+                    'current_page' => 1,
+                    'per_page' => count($items),
+                    'has_more' => false
+                )
+            );
+
+            // Cache for 5 minutes
+            set_transient($cache_key, $response, self::CACHE_DURATION);
+
+            return rest_ensure_response($response);
+
+        } catch (Exception $e) {
+            error_log('Brighter API: Error in get_pages: ' . $e->getMessage());
+            return new WP_Error(
+                'api_error',
+                'An error occurred while retrieving pages.',
+                array('status' => 500)
+            );
         }
-
-        $response = array('pages' => $pages);
-
-        // Cache for 5 minutes
-        set_transient($cache_key, $response, self::CACHE_DURATION);
-
-        return rest_ensure_response($response);
     }
 
     /**
-     * Format a content item for API response
+     * Format a simple item for API response (Phase 1: Minimal structure)
+     * Returns only: id, title, excerpt, url, status
+     *
+     * @param WP_Post $post Post object
+     * @return array Formatted item
+     */
+    private function format_simple_item($post) {
+        $post_id = $post->ID;
+
+        try {
+            // Get excerpt (auto-generate if empty, max 200 chars)
+            $excerpt = $post->post_excerpt;
+            if (empty($excerpt)) {
+                $excerpt = wp_trim_words(wp_strip_all_tags($post->post_content), 200, '...');
+            }
+
+            // Get post status
+            $status = $post->post_status;
+
+            // Build simple item
+            return array(
+                'id' => (int) $post_id,
+                'title' => get_the_title($post_id) ?: '',
+                'excerpt' => $excerpt ?: '',
+                'url' => get_permalink($post_id) ?: '',
+                'status' => $status
+            );
+        } catch (Exception $e) {
+            // Return minimal item if formatting fails
+            error_log('Brighter API: Error formatting item ' . $post_id . ': ' . $e->getMessage());
+            return array(
+                'id' => (int) $post_id,
+                'title' => get_the_title($post_id) ?: 'Error loading item',
+                'excerpt' => '',
+                'url' => get_permalink($post_id) ?: '',
+                'status' => $post->post_status ?: 'unknown'
+            );
+        }
+    }
+
+    /**
+     * Format a content item for API response (Legacy - kept for future expansion)
      *
      * @param WP_Post $post Post object
      * @return array Formatted item

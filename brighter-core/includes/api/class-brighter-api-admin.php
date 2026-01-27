@@ -460,105 +460,33 @@ components:
       description: API token for authentication
 
   schemas:
-    FeaturedImage:
+    SimpleItem:
       type: object
-      properties:
-        url:
-          type: string
-          format: uri
-        width:
-          type: integer
-        height:
-          type: integer
-        alt:
-          type: string
-      required:
-        - url
-        - width
-        - height
-      additionalProperties: false
-
-    ContentItem:
-      type: object
+      description: Minimal item structure (Phase 1) - consistent across all endpoints
       properties:
         id:
           type: integer
+          description: Post/Page ID
         title:
           type: string
+          description: Post/Page title
         excerpt:
           type: string
-        content:
-          type: string
-        slug:
-          type: string
+          description: Excerpt (auto-generated if empty, max 200 chars)
         url:
           type: string
           format: uri
-        date:
+          description: Full URL to the post/page
+        status:
           type: string
-          format: date-time
-        modified:
-          type: string
-          format: date-time
-        featured_image:
-          oneOf:
-            - $ref: '#/components/schemas/FeaturedImage'
-            - type: 'null'
-        categories:
-          type: array
-          items:
-            type: string
-        tags:
-          type: array
-          items:
-            type: string
-        meta_description:
-          type: string
-        altc_content_data:
-          type: object
-          additionalProperties: true
-        custom_fields:
-          type: object
-          additionalProperties: true
+          enum: ['publish', 'draft', 'private', 'pending', 'future', 'trash']
+          description: Post status
       required:
         - id
         - title
         - excerpt
-        - content
-        - slug
         - url
-        - date
-        - modified
-        - categories
-        - tags
-        - meta_description
-        - altc_content_data
-        - custom_fields
-      additionalProperties: false
-
-    PageItem:
-      type: object
-      properties:
-        id:
-          type: integer
-        title:
-          type: string
-        content:
-          type: string
-        url:
-          type: string
-          format: uri
-        excerpt:
-          type: string
-        meta_description:
-          type: string
-      required:
-        - id
-        - title
-        - content
-        - url
-        - excerpt
-        - meta_description
+        - status
       additionalProperties: false
 
     Pagination:
@@ -582,29 +510,19 @@ components:
         - has_more
       additionalProperties: false
 
-    ContentListResponse:
+    SimpleListResponse:
       type: object
+      description: Standard response structure for all endpoints (Phase 1) - consistent across posts, pages, and FAQs
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/ContentItem'
+            $ref: '#/components/schemas/SimpleItem'
         pagination:
           $ref: '#/components/schemas/Pagination'
       required:
         - items
         - pagination
-      additionalProperties: false
-
-    PagesResponse:
-      type: object
-      properties:
-        pages:
-          type: array
-          items:
-            $ref: '#/components/schemas/PageItem'
-      required:
-        - pages
       additionalProperties: false
 
     Error:
@@ -654,7 +572,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContentListResponse'
+                $ref: '#/components/schemas/SimpleListResponse'
         '401':
           description: Unauthorized
           content:
@@ -693,7 +611,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContentListResponse'
+                $ref: '#/components/schemas/SimpleListResponse'
         '401':
           description: Unauthorized
           content:
@@ -712,7 +630,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PagesResponse'
+                $ref: '#/components/schemas/SimpleListResponse'
         '401':
           description: Unauthorized
           content:

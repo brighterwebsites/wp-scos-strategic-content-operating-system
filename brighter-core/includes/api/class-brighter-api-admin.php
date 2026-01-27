@@ -446,7 +446,6 @@ info:
 
 servers:
   - url: <?php echo esc_html($base_url); ?>
-
     description: Production API
 
 security:
@@ -461,6 +460,24 @@ components:
       description: API token for authentication
 
   schemas:
+    FeaturedImage:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        width:
+          type: integer
+        height:
+          type: integer
+        alt:
+          type: string
+      required:
+        - url
+        - width
+        - height
+      additionalProperties: false
+
     ContentItem:
       type: object
       properties:
@@ -476,6 +493,7 @@ components:
           type: string
         url:
           type: string
+          format: uri
         date:
           type: string
           format: date-time
@@ -483,8 +501,9 @@ components:
           type: string
           format: date-time
         featured_image:
-          type: object
-          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/FeaturedImage'
+            - type: 'null'
         categories:
           type: array
           items:
@@ -497,8 +516,50 @@ components:
           type: string
         altc_content_data:
           type: object
+          additionalProperties: true
         custom_fields:
           type: object
+          additionalProperties: true
+      required:
+        - id
+        - title
+        - excerpt
+        - content
+        - slug
+        - url
+        - date
+        - modified
+        - categories
+        - tags
+        - meta_description
+        - altc_content_data
+        - custom_fields
+      additionalProperties: false
+
+    PageItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        url:
+          type: string
+          format: uri
+        excerpt:
+          type: string
+        meta_description:
+          type: string
+      required:
+        - id
+        - title
+        - content
+        - url
+        - excerpt
+        - meta_description
+      additionalProperties: false
 
     Pagination:
       type: object
@@ -513,6 +574,38 @@ components:
           type: integer
         has_more:
           type: boolean
+      required:
+        - total
+        - total_pages
+        - current_page
+        - per_page
+        - has_more
+      additionalProperties: false
+
+    ContentListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required:
+        - items
+        - pagination
+      additionalProperties: false
+
+    PagesResponse:
+      type: object
+      properties:
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PageItem'
+      required:
+        - pages
+      additionalProperties: false
 
     Error:
       type: object
@@ -523,6 +616,11 @@ components:
           type: string
         data:
           type: object
+          additionalProperties: true
+      required:
+        - code
+        - message
+      additionalProperties: false
 
 paths:
   /posts:
@@ -548,22 +646,15 @@ paths:
           in: query
           schema:
             type: string
-            enum: [publish, draft, any]
-            default: publish
+            enum: ['publish', 'draft', 'any']
+            default: 'publish'
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ContentItem'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/ContentListResponse'
         '401':
           description: Unauthorized
           content:
@@ -571,121 +662,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /our-work:
-    get:
-      operationId: getPortfolio
-      summary: Get portfolio items
-      description: Retrieve paginated portfolio/work items
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
-  /kb:
-    get:
-      operationId: getKnowledgeBase
-      summary: Get knowledge base articles
-      description: Retrieve paginated knowledge base articles
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
-  /news:
-    get:
-      operationId: getNews
-      summary: Get news articles
-      description: Retrieve paginated news articles
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
   /faqs:
     get:
       operationId: getFAQs
       summary: Get FAQ items
-      description: Retrieve paginated FAQ items
+      description: Retrieve paginated FAQ items with full content and metadata
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+            minimum: 1
         - name: per_page
           in: query
           schema:
             type: integer
             default: 15
+            minimum: 1
             maximum: 50
         - name: status
           in: query
           schema:
             type: string
-            enum: [publish, draft, any]
-            default: publish
+            enum: ['publish', 'draft', 'any']
+            default: 'publish'
       responses:
         '200':
           description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentListResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /pages:
     get:
@@ -698,57 +712,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  pages:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                        title:
-                          type: string
-                        content:
-                          type: string
-                        url:
-                          type: string
-                        excerpt:
-                          type: string
-                        meta_description:
-                          type: string
+                $ref: '#/components/schemas/PagesResponse'
         '401':
           description: Unauthorized
-
-  /project:
-    get:
-      operationId: getProject
-      summary: Get projects
-      description: Retrieve paginated projects (GS only - post type: projects)
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         <?php
         return ob_get_clean();
     }

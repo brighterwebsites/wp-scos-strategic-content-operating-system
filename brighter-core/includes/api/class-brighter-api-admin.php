@@ -540,6 +540,132 @@ components:
         - message
       additionalProperties: false
 
+    SCOSResponse:
+      type: object
+      description: SCOS (window.brighterSCOS) data structure
+      properties:
+        car:
+          type: object
+          properties:
+            cluster:
+              type: string
+            topic:
+              type: string
+            maturity:
+              type: string
+            intent:
+              type: string
+            purpose:
+              type: string
+            metrics:
+              type: object
+              properties:
+                word_count:
+                  type: integer
+                reading_time:
+                  type: integer
+                internal_links:
+                  type: integer
+                external_links:
+                  type: integer
+                last_updated:
+                  type: string
+              additionalProperties: false
+          required:
+            - cluster
+            - topic
+            - maturity
+            - intent
+            - purpose
+            - metrics
+          additionalProperties: false
+        content_plan:
+          type: string
+        pillar:
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                id:
+                  type: integer
+                title:
+                  type: string
+                type:
+                  type: string
+                  enum: ['pillar', 'service']
+                url:
+                  type: string
+                  format: uri
+              required:
+                - id
+                - title
+                - type
+                - url
+              additionalProperties: false
+        service_pathway:
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                id:
+                  type: integer
+                title:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+              required:
+                - id
+                - title
+                - url
+              additionalProperties: false
+        breadcrumb_schema:
+          type: string
+        google_index_status:
+          type: string
+        search_intent_goal:
+          type: string
+        tracking:
+          type: object
+          properties:
+            ga4_id:
+              type: string
+            consent_given:
+              type: boolean
+          required:
+            - ga4_id
+            - consent_given
+          additionalProperties: false
+        meta:
+          type: object
+          properties:
+            post_id:
+              type: integer
+            post_type:
+              type: string
+            scos_version:
+              type: string
+            car_generated:
+              type: string
+              format: date-time
+          required:
+            - post_id
+            - post_type
+            - scos_version
+            - car_generated
+          additionalProperties: false
+      required:
+        - car
+        - content_plan
+        - pillar
+        - service_pathway
+        - breadcrumb_schema
+        - google_index_status
+        - search_intent_goal
+        - tracking
+        - meta
+      additionalProperties: false
+
 paths:
   /posts:
     get:
@@ -651,6 +777,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimpleListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /scos:
+    get:
+      operationId: getSCOS
+      summary: Get SCOS data for a post/page
+      description: Retrieve window.brighterSCOS data structure for any post or page by URL or post_id
+      parameters:
+        - name: url
+          in: query
+          schema:
+            type: string
+          description: URL path (e.g., /about-us) or full URL
+        - name: post_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Post/Page ID
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SCOSResponse'
+        '400':
+          description: Bad request (missing parameter)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post/page not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Unauthorized
           content:

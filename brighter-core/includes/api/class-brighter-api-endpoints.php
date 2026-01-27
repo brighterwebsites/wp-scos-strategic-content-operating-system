@@ -93,6 +93,26 @@ class Brighter_API_Endpoints {
             'permission_callback' => array($this->auth, 'verify_token'),
             'args' => $this->get_content_endpoint_args() // Use same args as other endpoints
         ));
+
+        // SCOS endpoint - returns window.brighterSCOS data for any post/page
+        register_rest_route(self::NAMESPACE, '/scos', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_scos'),
+            'permission_callback' => array($this->auth, 'verify_token'),
+            'args' => array(
+                'url' => array(
+                    'description' => 'URL path (e.g., /about-us) or full URL',
+                    'type' => 'string',
+                    'sanitize_callback' => 'sanitize_text_field'
+                ),
+                'post_id' => array(
+                    'description' => 'Post/Page ID',
+                    'type' => 'integer',
+                    'minimum' => 1,
+                    'sanitize_callback' => 'absint'
+                )
+            )
+        ));
     }
 
     /**
@@ -305,6 +325,263 @@ class Brighter_API_Endpoints {
     public function get_pages($request) {
         // Use the same logic as get_content() but for post_type='page'
         return $this->get_content($request, 'page');
+    }
+
+    /**
+     * Get SCOS (window.brighterSCOS) data for a post/page
+     * Accepts either URL path or post_id parameter
+     *
+     * @param WP_REST_Request $request Request object
+     * @return WP_REST_Response|WP_Error Response object or error
+     */
+    public function get_scos($request) {
+        try {
+            // Get parameters
+            $url = $request->get_param('url');
+            $post_id = $request->get_param('post_id');
+
+            // Must provide either url or post_id
+            if (empty($url) && empty($post_id)) {
+                return new WP_Error(
+                    'missing_parameter',
+                    'Either url or post_id parameter is required.',
+                    array('status' => 400)
+                );
+            }
+
+            // Resolve URL to post_id if URL provided
+            if (!empty($url)) {
+                // Remove domain if full URL provided
+                $url = preg_replace('#^https?://[^/]+#', '', $url);
+                // Ensure leading slash
+                $url = '/' . ltrim($url, '/');
+                
+                // Try to get post ID from URL
+                $post_id = url_to_postid($url);
+                
+                if (!$post_id) {
+                    // Try parsing as slug
+                    $url_parts = explode('/', trim($url, '/'));
+                    $slug = end($url_parts);
+                    
+                    if (!empty($slug)) {
+                        $post = get_page_by_path($slug);
+                        if ($post) {
+                            $post_id = $post->ID;
+                        }
+                    }
+                }
+                
+                if (!$post_id) {
+                    return new WP_Error(
+                        'not_found',
+                        'Post/page not found for the provided URL.',
+                        array('status' => 404)
+                    );
+                }
+            }
+
+            // Validate post exists
+            $post = get_post($post_id);
+            if (!$post) {
+                return new WP_Error(
+                    'not_found',
+                    'Post/page not found.',
+                    array('status' => 404)
+                );
+            }
+
+            // Generate cache key
+            $cache_key = 'brighter_api_scos_' . $post_id;
+
+            // Try to get cached response
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            // Build SCOS data structure
+            $scos_data = $this->build_scos_data($post_id);
+
+            // Cache for 5 minutes
+            set_transient($cache_key, $scos_data, self::CACHE_DURATION);
+
+            return rest_ensure_response($scos_data);
+
+        } catch (Exception $e) {
+            error_log('Brighter API: Error in get_scos: ' . $e->getMessage());
+            return new WP_Error(
+                'api_error',
+                'An error occurred while retrieving SCOS data.',
+                array('status' => 500)
+            );
+        }
+    }
+
+    /**
+     * Build SCOS data structure for a post
+     * Similar to scos-car-injection.php but with API-specific field mappings
+     *
+     * @param int $post_id Post ID
+     * @return array SCOS data structure
+     */
+    private function build_scos_data($post_id) {
+        // ============================================
+        // GATHER ALTC FRAMEWORK DATA
+        // ============================================
+        
+        $altc_id = get_post_meta($post_id, 'bw_primary_altc_id', true);
+        $altc_name = 'not_set';
+        
+        if ($altc_id) {
+            $altc_term = get_term($altc_id, 'altc_strategic_lens');
+            if ($altc_term && !is_wp_error($altc_term)) {
+                $altc_name = $altc_term->name;
+            }
+        }
+        
+        // Fallback: Try to get first assigned ALTC term if no primary set
+        if ($altc_name === 'not_set') {
+            $altc_terms = wp_get_post_terms($post_id, 'altc_strategic_lens', array('fields' => 'names'));
+            if (!empty($altc_terms) && !is_wp_error($altc_terms)) {
+                $altc_name = $altc_terms[0];
+            }
+        }
+        
+        $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
+        $topic_name = 'not_set';
+        
+        if ($topic_id) {
+            $topic_term = get_term($topic_id, 'altc_topic');
+            if ($topic_term && !is_wp_error($topic_term)) {
+                $topic_name = $topic_term->name;
+            }
+        }
+        
+        // Fallback: Try to get first assigned topic term if no primary set
+        if ($topic_name === 'not_set') {
+            $topic_terms = wp_get_post_terms($post_id, 'altc_topic', array('fields' => 'names'));
+            if (!empty($topic_terms) && !is_wp_error($topic_terms)) {
+                $topic_name = $topic_terms[0];
+            }
+        }
+        
+        // Fallback: Try old bw_page_topic meta field
+        if ($topic_name === 'not_set') {
+            $old_topic = get_post_meta($post_id, 'bw_page_topic', true);
+            if (!empty($old_topic)) {
+                $topic_name = $old_topic;
+            }
+        }
+        
+        // ============================================
+        // GATHER CONTENT STRATEGY DATA
+        // ============================================
+        
+        $intent = get_post_meta($post_id, 'bw_intent', true) ?: 'not_set';
+        $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: 'not_set';
+        $maturity = get_post_meta($post_id, 'bw_cont_maturity', true) ?: 'not_set';
+        
+        // Content Plan (replaces deprecated optimization_status)
+        $content_plan = get_post_meta($post_id, 'content_plan', true) ?: 'none';
+        
+        // ============================================
+        // GATHER PILLAR RELATIONSHIP
+        // ============================================
+        
+        $pillar_id = get_post_meta($post_id, 'bw_pillar_page_id', true);
+        $pillar = null;
+        
+        if ($pillar_id) {
+            $pillar_purpose = get_post_meta($pillar_id, 'bw_purpose', true);
+            $pillar_name = get_the_title($pillar_id);
+            $pillar_type = ($pillar_purpose === 'service-page') ? 'service' : 'pillar';
+            
+            $pillar = array(
+                'id' => (int) $pillar_id,
+                'title' => $pillar_name,
+                'type' => $pillar_type,
+                'url' => get_permalink($pillar_id) ?: ''
+            );
+        }
+        
+        // Service Pathway (similar to Pillar but for service/product pathways)
+        $service_pathway_id = get_post_meta($post_id, 'bw_service_pathway_id', true);
+        $service_pathway = null;
+        
+        if ($service_pathway_id) {
+            $service_pathway_name = get_the_title($service_pathway_id);
+            $service_pathway = array(
+                'id' => (int) $service_pathway_id,
+                'title' => $service_pathway_name,
+                'url' => get_permalink($service_pathway_id) ?: ''
+            );
+        }
+        
+        // Breadcrumb schema (for short page title)
+        $breadcrumb_schema = get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: '';
+        
+        // ============================================
+        // GATHER CONTENT METRICS (Internal use only)
+        // ============================================
+        
+        $metrics = array(
+            'word_count' => (int) get_post_meta($post_id, 'bw_word_count', true),
+            'reading_time' => (int) get_post_meta($post_id, 'bw_reading_time', true),
+            'internal_links' => (int) get_post_meta($post_id, 'bw_internal_link_count', true),
+            'external_links' => (int) get_post_meta($post_id, 'bw_external_link_count', true),
+            'last_updated' => get_the_modified_date('Y-m-d', $post_id)
+        );
+        
+        // ============================================
+        // BUILD SCOS CAR STRUCTURE
+        // ============================================
+        
+        $scos = array(
+            'car' => array(
+                // ALTC Framework
+                'cluster' => $altc_name,
+                'topic' => $topic_name,
+                'maturity' => $maturity,
+                
+                // Content Strategy
+                'intent' => $intent,
+                'purpose' => $purpose,
+                
+                // Metrics (internal only - not sent to GA4)
+                'metrics' => $metrics
+            ),
+            
+            // Content workflow
+            'content_plan' => $content_plan,
+            
+            // Relationships
+            'pillar' => $pillar,
+            'service_pathway' => $service_pathway,
+            
+            // Display
+            'breadcrumb_schema' => $breadcrumb_schema,
+            
+            // Field mappings (API-specific)
+            'google_index_status' => get_post_meta($post_id, 'bw_index_status', true) ?: 'not_set',
+            'search_intent_goal' => get_post_meta($post_id, 'bw_altc_notes', true) ?: '',
+            
+            // GA4 tracking config
+            'tracking' => array(
+                'ga4_id' => get_option('brighter_ga4_measurement_id', ''),
+                'consent_given' => false  // Updated by consent handler JS
+            ),
+            
+            // Metadata
+            'meta' => array(
+                'post_id' => $post_id,
+                'post_type' => get_post_type($post_id),
+                'scos_version' => defined('BRIGHTER_CORE_VERSION') ? BRIGHTER_CORE_VERSION : '1.0.0',
+                'car_generated' => current_time('c')  // ISO 8601 format
+            )
+        );
+        
+        return $scos;
     }
 
     /**

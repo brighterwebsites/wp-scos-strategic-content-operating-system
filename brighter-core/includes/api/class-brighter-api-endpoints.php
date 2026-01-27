@@ -180,9 +180,9 @@ class Brighter_API_Endpoints {
             'per_page' => array(
                 'description' => 'Items per page',
                 'type' => 'integer',
-                'default' => 15,
+                'default' => 10,
                 'minimum' => 1,
-                'maximum' => 50,
+                'maximum' => 10,
                 'sanitize_callback' => 'absint'
             ),
             'status' => array(
@@ -203,59 +203,95 @@ class Brighter_API_Endpoints {
      * @return WP_REST_Response|WP_Error Response object or error
      */
     public function get_content($request, $post_type) {
-        // Get parameters
-        $page = $request->get_param('page');
-        $per_page = $request->get_param('per_page');
-        $status = $request->get_param('status');
+        try {
+            // Get parameters
+            $page = $request->get_param('page');
+            $per_page = $request->get_param('per_page');
+            $status = $request->get_param('status');
 
-        // Generate cache key
-        $cache_key = "brighter_api_{$post_type}_{$page}_{$per_page}_{$status}";
-
-        // Try to get cached response
-        $cached = get_transient($cache_key);
-        if ($cached !== false) {
-            return rest_ensure_response($cached);
-        }
-
-        // Query posts
-        $query_args = array(
-            'post_type' => $post_type,
-            'post_status' => $status,
-            'posts_per_page' => $per_page,
-            'paged' => $page,
-            'orderby' => 'date',
-            'order' => 'DESC',
-            'no_found_rows' => false // We need total count for pagination
-        );
-
-        $query = new WP_Query($query_args);
-
-        // Format response
-        $items = array();
-        if ($query->have_posts()) {
-            while ($query->have_posts()) {
-                $query->the_post();
-                $items[] = $this->format_content_item(get_post());
+            // Cap per_page to prevent memory issues with large content
+            // Some sites have very large posts, so reduce default if not specified
+            if ($per_page > 10) {
+                // For sites with potentially large content, cap at 10
+                // This prevents 500 errors on sites like Guerilla Steel
+                $per_page = min($per_page, 10);
             }
-            wp_reset_postdata();
+
+            // Generate cache key
+            $cache_key = "brighter_api_{$post_type}_{$page}_{$per_page}_{$status}";
+
+            // Try to get cached response
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            // Increase memory limit temporarily for large content processing
+            $original_memory = ini_get('memory_limit');
+            @ini_set('memory_limit', '256M');
+
+            // Query posts
+            $query_args = array(
+                'post_type' => $post_type,
+                'post_status' => $status,
+                'posts_per_page' => $per_page,
+                'paged' => $page,
+                'orderby' => 'date',
+                'order' => 'DESC',
+                'no_found_rows' => false // We need total count for pagination
+            );
+
+            $query = new WP_Query($query_args);
+
+            // Format response with error handling for each item
+            $items = array();
+            if ($query->have_posts()) {
+                while ($query->have_posts()) {
+                    $query->the_post();
+                    try {
+                        $item = $this->format_content_item(get_post());
+                        $items[] = $item;
+                    } catch (Exception $e) {
+                        // Log error but continue processing other items
+                        error_log('Brighter API: Error formatting post ' . get_the_ID() . ': ' . $e->getMessage());
+                        // Skip this item and continue
+                        continue;
+                    }
+                }
+                wp_reset_postdata();
+            }
+
+            // Restore original memory limit
+            @ini_set('memory_limit', $original_memory);
+
+            // Build response with pagination
+            $response = array(
+                'items' => $items,
+                'pagination' => array(
+                    'total' => $query->found_posts,
+                    'total_pages' => $query->max_num_pages,
+                    'current_page' => $page,
+                    'per_page' => $per_page,
+                    'has_more' => $page < $query->max_num_pages
+                )
+            );
+
+            // Cache for 5 minutes
+            set_transient($cache_key, $response, self::CACHE_DURATION);
+
+            return rest_ensure_response($response);
+
+        } catch (Exception $e) {
+            // Log the error
+            error_log('Brighter API: Error in get_content: ' . $e->getMessage());
+            
+            // Return a proper error response instead of causing a 500
+            return new WP_Error(
+                'api_error',
+                'An error occurred while retrieving content. Please try again with a smaller per_page value.',
+                array('status' => 500)
+            );
         }
-
-        // Build response with pagination
-        $response = array(
-            'items' => $items,
-            'pagination' => array(
-                'total' => $query->found_posts,
-                'total_pages' => $query->max_num_pages,
-                'current_page' => $page,
-                'per_page' => $per_page,
-                'has_more' => $page < $query->max_num_pages
-            )
-        );
-
-        // Cache for 5 minutes
-        set_transient($cache_key, $response, self::CACHE_DURATION);
-
-        return rest_ensure_response($response);
     }
 
     /**
@@ -307,38 +343,69 @@ class Brighter_API_Endpoints {
     private function format_content_item($post) {
         $post_id = $post->ID;
 
-        // Get featured image
-        $featured_image = $this->get_featured_image($post_id);
+        try {
+            // Get featured image
+            $featured_image = $this->get_featured_image($post_id);
 
-        // Get excerpt (auto-generate if empty)
-        $excerpt = $post->post_excerpt;
-        if (empty($excerpt)) {
-            $excerpt = wp_trim_words(wp_strip_all_tags($post->post_content), 200, '...');
+            // Get excerpt (auto-generate if empty)
+            $excerpt = $post->post_excerpt;
+            if (empty($excerpt)) {
+                $excerpt = wp_trim_words(wp_strip_all_tags($post->post_content), 200, '...');
+            }
+
+            // Get categories and tags
+            $categories = $this->get_term_names($post_id, 'category');
+            $tags = $this->get_term_names($post_id, 'post_tag');
+
+            // Safely get content with error handling
+            $content = '';
+            try {
+                $content = apply_filters('the_content', $post->post_content);
+            } catch (Exception $e) {
+                // Fallback to raw content if filters fail
+                $content = $post->post_content;
+                error_log('Brighter API: Error applying content filters for post ' . $post_id . ': ' . $e->getMessage());
+            }
+
+            // Build base item
+            $item = array(
+                'id' => $post_id,
+                'title' => get_the_title($post_id) ?: '',
+                'excerpt' => $excerpt ?: '',
+                'content' => $content,
+                'slug' => $post->post_name ?: '',
+                'url' => get_permalink($post_id) ?: '',
+                'date' => get_the_date('c', $post_id) ?: '',
+                'modified' => get_the_modified_date('c', $post_id) ?: '',
+                'featured_image' => $featured_image,
+                'categories' => $categories,
+                'tags' => $tags,
+                'meta_description' => $this->get_meta_description($post_id),
+                'altc_content_data' => $this->get_altc_data($post_id),
+                'custom_fields' => $this->get_custom_fields($post_id)
+            );
+
+            return $item;
+        } catch (Exception $e) {
+            // Return minimal item if formatting fails completely
+            error_log('Brighter API: Critical error formatting post ' . $post_id . ': ' . $e->getMessage());
+            return array(
+                'id' => $post_id,
+                'title' => get_the_title($post_id) ?: 'Error loading post',
+                'excerpt' => '',
+                'content' => '',
+                'slug' => $post->post_name ?: '',
+                'url' => get_permalink($post_id) ?: '',
+                'date' => get_the_date('c', $post_id) ?: '',
+                'modified' => get_the_modified_date('c', $post_id) ?: '',
+                'featured_image' => null,
+                'categories' => array(),
+                'tags' => array(),
+                'meta_description' => '',
+                'altc_content_data' => array(),
+                'custom_fields' => array()
+            );
         }
-
-        // Get categories and tags
-        $categories = $this->get_term_names($post_id, 'category');
-        $tags = $this->get_term_names($post_id, 'post_tag');
-
-        // Build base item
-        $item = array(
-            'id' => $post_id,
-            'title' => get_the_title($post_id),
-            'excerpt' => $excerpt,
-            'content' => apply_filters('the_content', $post->post_content),
-            'slug' => $post->post_name,
-            'url' => get_permalink($post_id),
-            'date' => get_the_date('c', $post_id),
-            'modified' => get_the_modified_date('c', $post_id),
-            'featured_image' => $featured_image,
-            'categories' => $categories,
-            'tags' => $tags,
-            'meta_description' => $this->get_meta_description($post_id),
-            'altc_content_data' => $this->get_altc_data($post_id),
-            'custom_fields' => $this->get_custom_fields($post_id)
-        );
-
-        return $item;
     }
 
     /**

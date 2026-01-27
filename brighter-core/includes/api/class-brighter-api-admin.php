@@ -639,9 +639,9 @@ paths:
           in: query
           schema:
             type: integer
-            default: 15
+            default: 10
             minimum: 1
-            maximum: 50
+            maximum: 10
         - name: status
           in: query
           schema:
@@ -678,9 +678,9 @@ paths:
           in: query
           schema:
             type: integer
-            default: 15
+            default: 10
             minimum: 1
-            maximum: 50
+            maximum: 10
         - name: status
           in: query
           schema:

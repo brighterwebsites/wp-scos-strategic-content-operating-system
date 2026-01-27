@@ -30,6 +30,9 @@ declare -A SITES=(
  # ["sunse5067"]="/home/sunsetbookkeeping.com.au/public_html"
 
 
+#   ["cubew3861"]="/home/cubewebservices.com.au/public_html"
+#   ["mensf8194 "]="/home/mensfinanceadvice.com.au/public_html"
+
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║     Multi-Site Deployment from GitHub                         ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
@@ -173,9 +176,11 @@ fi
 echo ""
 echo "Next steps:"
 echo "1. Test Site Essentials in each site's admin"
-echo "2. Test sitemap URLs:"
-echo "   - https://brighterwebsites.com.au/sitemap.xml"
-echo "   - https://pawsforsupport.com.au/sitemap.xml"
-echo "   - https://oneteamqld.com.au/sitemap.xml"
-echo "   - https://guerillasteelstables.com.au/sitemap.xml"
+echo "   - https://base.bweb1.com.au/wp-admin"
+echo "   - https://lucidlearners.com.au/wp-admin"
+echo "   - https://southbrislawn.com.au/wp-admin"
+echo "   - https://daylesfordgardener.com.au/wp-admin"
+echo "   - https://ballaratlawncare.com.au/wp-admin"
+echo "   - https://abandonstress.com.au/wp-admin"
+echo "   - https://nmxstudio.com.au/wp-admin"
 echo ""

@@ -60,7 +60,7 @@ function brighter_get_whitelisted_modules() {
             'bw-content-strategy',
             'bw-ga4-seeder',
             'bw-ga4-seed-admin',
-            'bw-schema-admin',              // Schema admin interface (Local Business Schema settings)
+            // 'bw-schema-admin',              // Schema admin interface (Local Business Schema settings) - DISABLED
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
@@ -151,9 +151,6 @@ function brighter_load_module($module) {
     try {
         require_once $real_path;
         $loaded[$module] = true;
-        if ($module === 'bw-schema-admin') {
-            error_log('Brighter Core: bw-schema-admin module loaded successfully from: ' . $real_path);
-        }
         return true;
     } catch (Exception $e) {
         error_log('Brighter Core: Error loading module ' . esc_html($module) . ': ' . esc_html($e->getMessage()));

@@ -17,10 +17,9 @@ class BW_Content_Type_Helper {
      * Get content type for a post
      *
      * Standardized logic shared across Social Amplification and Airtable:
-     * - Check bw_intent first (if not empty)
-     * - Pages: Check bw_purpose meta field (if intent empty)
+     * - Check homepage first
+     * - Pages: Check bw_purpose meta field (if not empty)
      * - Fallback: Map post type to content type
-     * - Special handling for homepage
      * - Archive only for content-collection purpose
      *
      * @param int $post_id Post ID
@@ -42,15 +41,7 @@ class BW_Content_Type_Helper {
             return 'home';
         }
 
-        // Check bw_intent first (for all post types)
-        $intent = get_post_meta($post_id, 'bw_intent', true);
-        if (!empty($intent)) {
-            // Map intent to content type if needed, otherwise use intent directly
-            // For now, return intent as-is (can add mapping later if needed)
-            return sanitize_key($intent);
-        }
-
-        // Pages: Check for bw_purpose meta (only if intent is empty)
+        // Pages: Check for bw_purpose meta (if not empty)
         if ($post_type === 'page') {
             $purpose = get_post_meta($post_id, 'bw_purpose', true);
 
@@ -95,11 +86,11 @@ class BW_Content_Type_Helper {
                 return sanitize_key($purpose);
             }
 
-            // Default for pages without purpose or intent
+            // Default for pages without purpose
             return 'page';
         }
 
-        // Post type mapping (only used if bw_intent and bw_purpose are empty)
+        // Post type mapping (fallback if not a page or page has no purpose)
         $post_type_map = array(
             'post'     => 'article',
             'projects' => 'case-study',

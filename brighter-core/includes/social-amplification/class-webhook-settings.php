@@ -72,6 +72,19 @@ class BW_Social_Webhook_Settings {
         register_setting('bw_social_amplification', 'bw_yourls_password', array(
             'sanitize_callback' => 'sanitize_text_field'
         ));
+
+        // Airtable settings
+        register_setting('bw_social_amplification', 'bw_airtable_api_token', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_airtable_base_id', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        register_setting('bw_social_amplification', 'bw_airtable_table_id', array(
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
     }
 
     /**
@@ -241,6 +254,97 @@ class BW_Social_Webhook_Settings {
                         </td>
                     </tr>
 
+                    <!-- Airtable Configuration -->
+                    <tr>
+                        <th colspan="2" style="background: #f5f5f5; padding: 10px;">
+                            <h3 style="margin: 0;"><?php _e('Airtable CAR Sync Configuration', 'brighterwebsites'); ?></h3>
+                            <p style="margin: 5px 0 0 0; font-weight: normal;">
+                                <?php _e('Configure Airtable integration for Content Architecture Record (CAR) synchronization', 'brighterwebsites'); ?>
+                            </p>
+                        </th>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_airtable_api_token"><?php _e('Airtable API Token', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_airtable_api_token"
+                                   name="bw_airtable_api_token"
+                                   value="<?php echo esc_attr(get_option('bw_airtable_api_token', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;"
+                                   placeholder="Bearer pat..." />
+                            <p class="description">
+                                <?php _e('Your Airtable Personal Access Token (starts with "Bearer pat...").', 'brighterwebsites'); ?>
+                                <br>
+                                <?php _e('Get this from:', 'brighterwebsites'); ?> 
+                                <a href="https://airtable.com/create/tokens" target="_blank"><?php _e('Airtable Account → Developer → Personal Access Tokens', 'brighterwebsites'); ?></a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_airtable_base_id"><?php _e('Airtable Base ID', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_airtable_base_id"
+                                   name="bw_airtable_base_id"
+                                   value="<?php echo esc_attr(get_option('bw_airtable_base_id', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;"
+                                   placeholder="appOqcQR79umbJJGP" />
+                            <p class="description">
+                                <?php _e('Your Airtable Base ID (found in the API docs URL).', 'brighterwebsites'); ?>
+                                <br>
+                                <?php _e('Get this from:', 'brighterwebsites'); ?> 
+                                <a href="https://airtable.com/api" target="_blank"><?php _e('Airtable → Help → API documentation', 'brighterwebsites'); ?></a>
+                                <?php _e(' - The Base ID is in the URL:', 'brighterwebsites'); ?> 
+                                <code>https://airtable.com/appOqcQR79umbJJGP/api/docs</code>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_airtable_table_id"><?php _e('Airtable Table ID', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_airtable_table_id"
+                                   name="bw_airtable_table_id"
+                                   value="<?php echo esc_attr(get_option('bw_airtable_table_id', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;"
+                                   placeholder="tblXXXXXXXXXXXXXX" />
+                            <p class="description">
+                                <?php _e('Your Airtable Table ID (stronger than name - won\'t break if table is renamed).', 'brighterwebsites'); ?>
+                                <br>
+                                <?php _e('Get this from the API docs - look for the table name in the left sidebar, then check the URL or API response.', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row"><?php _e('Airtable Table Structure', 'brighterwebsites'); ?></th>
+                        <td>
+                            <p><?php _e('Use this Google Sheets template to set up your Airtable table with the correct structure:', 'brighterwebsites'); ?></p>
+                            <p>
+                                <a href="https://docs.google.com/spreadsheets/d/1hNYVYF31T7S2CA0J8Jv01eMH5s3tnACaZg6Il9IBn9s/edit?usp=sharing" 
+                                   target="_blank" 
+                                   class="button button-secondary">
+                                    <?php _e('View Airtable Structure Template', 'brighterwebsites'); ?>
+                                </a>
+                            </p>
+                            <p class="description">
+                                <?php _e('This template can be easily imported into Airtable to set up the table correctly with all required fields.', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
                     <tr>
                         <th scope="row"><?php _e('API Documentation', 'brighterwebsites'); ?></th>
                         <td>
@@ -336,6 +440,15 @@ class BW_Social_Webhook_Settings {
         update_option('bw_yourls_signature', $yourls_signature);
         update_option('bw_yourls_username', $yourls_username);
         update_option('bw_yourls_password', $yourls_password);
+        
+        // Save Airtable settings
+        $airtable_api_token = isset($_POST['bw_airtable_api_token']) ? sanitize_text_field($_POST['bw_airtable_api_token']) : '';
+        $airtable_base_id = isset($_POST['bw_airtable_base_id']) ? sanitize_text_field($_POST['bw_airtable_base_id']) : '';
+        $airtable_table_id = isset($_POST['bw_airtable_table_id']) ? sanitize_text_field($_POST['bw_airtable_table_id']) : '';
+        
+        update_option('bw_airtable_api_token', $airtable_api_token);
+        update_option('bw_airtable_base_id', $airtable_base_id);
+        update_option('bw_airtable_table_id', $airtable_table_id);
 
         // Redirect back with success message
         wp_redirect(add_query_arg(array(

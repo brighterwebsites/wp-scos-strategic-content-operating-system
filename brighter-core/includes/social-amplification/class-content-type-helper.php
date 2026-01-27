@@ -17,9 +17,11 @@ class BW_Content_Type_Helper {
      * Get content type for a post
      *
      * Standardized logic shared across Social Amplification and Airtable:
-     * - Pages: Check bw_purpose meta field first (if not empty)
+     * - Check bw_intent first (if not empty)
+     * - Pages: Check bw_purpose meta field (if intent empty)
      * - Fallback: Map post type to content type
      * - Special handling for homepage
+     * - Archive only for content-collection purpose
      *
      * @param int $post_id Post ID
      * @param string $post_type Post type slug
@@ -40,13 +42,15 @@ class BW_Content_Type_Helper {
             return 'home';
         }
 
-        // Check if URL contains /blog/ (archive page)
-        $post_url = get_permalink($post_id);
-        if ($post_url && strpos($post_url, '/blog/') !== false) {
-            return 'archive';
+        // Check bw_intent first (for all post types)
+        $intent = get_post_meta($post_id, 'bw_intent', true);
+        if (!empty($intent)) {
+            // Map intent to content type if needed, otherwise use intent directly
+            // For now, return intent as-is (can add mapping later if needed)
+            return sanitize_key($intent);
         }
 
-        // Pages: Check for bw_purpose meta (only if not empty)
+        // Pages: Check for bw_purpose meta (only if intent is empty)
         if ($post_type === 'page') {
             $purpose = get_post_meta($post_id, 'bw_purpose', true);
 
@@ -72,7 +76,7 @@ class BW_Content_Type_Helper {
                     // Brand & trust
                     'authority-page'      => 'brand',
 
-                    // Aggregation
+                    // Aggregation (ONLY archive mapping)
                     'content-collection'  => 'archive',
 
                     // Deep education
@@ -91,11 +95,11 @@ class BW_Content_Type_Helper {
                 return sanitize_key($purpose);
             }
 
-            // Default for pages without purpose
+            // Default for pages without purpose or intent
             return 'page';
         }
 
-        // Post type mapping (only used if bw_purpose is empty or not a page)
+        // Post type mapping (only used if bw_intent and bw_purpose are empty)
         $post_type_map = array(
             'post'     => 'article',
             'projects' => 'case-study',

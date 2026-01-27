@@ -174,10 +174,10 @@ class BW_YOURLS_Helper {
      *
      * @param string $breadcrumb The breadcrumb slug (e.g., "seo-signals")
      * @param string $platform The platform (facebook, linkedin, twitter, instagram, gmb)
-     * @return string The keyword (e.g., "seo-signals-fb")
+     * @return string The keyword (e.g., "seo-signals") - platform suffix removed
      */
     public static function build_keyword($breadcrumb, $platform) {
-        // Platform suffixes
+        // Platform suffixes (commented out - might want to add back later)
         $platform_codes = array(
             'facebook' => 'fb',
             'linkedin' => 'li',
@@ -186,9 +186,12 @@ class BW_YOURLS_Helper {
             'gmb' => 'gmb'
         );
 
-        $suffix = isset($platform_codes[$platform]) ? $platform_codes[$platform] : $platform;
-
-        return sanitize_title($breadcrumb . '-' . $suffix);
+        // Platform suffix logic (commented out - might want to add back later)
+        // $suffix = isset($platform_codes[$platform]) ? $platform_codes[$platform] : $platform;
+        // return sanitize_title($breadcrumb . '-' . $suffix);
+        
+        // Return breadcrumb without platform suffix
+        return sanitize_title($breadcrumb);
     }
 
     /**

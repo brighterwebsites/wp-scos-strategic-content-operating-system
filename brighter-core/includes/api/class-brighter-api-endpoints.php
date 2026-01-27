@@ -41,42 +41,128 @@ class Brighter_API_Endpoints {
      * Register all REST API routes
      */
     public function register_routes() {
-        // Content endpoints for BW sites (plural) and GS sites (singular)
-        $content_endpoints = array(
-            // BW endpoints (plural - existing)
-            'posts' => 'post',
-            'our-work' => 'folio',
-            'kb' => 'kb',
-            'news' => 'news',
-            'faqs' => 'faq',
-
-            // GS endpoints (singular - new)
-            'post' => 'post',           // GS: single blog post
-            'page' => 'page',           // GS: single page
-            'project' => 'projects',    // GS: single project (note: post type is 'projects')
-            'faq' => 'faq'              // GS: single FAQ
+        // Standard endpoints - always available on all sites
+        // Note: 'pages' is handled separately as a special endpoint for configured pages
+        $standard_endpoints = array(
+            'posts' => 'post',      // Standard WordPress posts
+            'faqs' => 'faq'         // FAQ custom post type (registered by MU plugin)
         );
 
-        foreach ($content_endpoints as $route => $post_type) {
-            // Only register if post type exists
+        // Optional endpoints - only register if post type exists
+        $optional_endpoints = array(
+            // BW-specific (plural routes)
+            'our-work' => 'folio',     // Portfolio (BW)
+            'kb' => 'kb',              // Knowledge Base (BW)
+            'news' => 'news',          // News (BW)
+            
+            // GS-specific (singular routes - for compatibility)
+            'post' => 'post',          // Singular post route (GS compatibility)
+            'page' => 'page',          // Singular page route (GS compatibility)
+            'project' => 'projects',   // Projects (GS - note: post type is 'projects')
+            'faq' => 'faq'             // Singular FAQ route (GS compatibility)
+        );
+
+        // Register standard endpoints (always available)
+        foreach ($standard_endpoints as $route => $post_type) {
+            // Only register if post type exists (faq might not be registered on some sites)
             if (post_type_exists($post_type)) {
-                register_rest_route(self::NAMESPACE, '/' . $route, array(
-                    'methods' => 'GET',
-                    'callback' => function($request) use ($post_type) {
-                        return $this->get_content($request, $post_type);
-                    },
-                    'permission_callback' => array($this->auth, 'verify_token'),
-                    'args' => $this->get_content_endpoint_args()
-                ));
+                $this->register_content_route($route, $post_type);
             }
         }
 
-        // Pages endpoint (special handling - BW only, for configured pages)
+        // Register optional endpoints (only if post type exists)
+        foreach ($optional_endpoints as $route => $post_type) {
+            if (post_type_exists($post_type)) {
+                // Avoid duplicate registration - check if route already registered
+                $already_registered = false;
+                foreach ($standard_endpoints as $std_route => $std_type) {
+                    if ($std_route === $route && $std_type === $post_type) {
+                        $already_registered = true;
+                        break;
+                    }
+                }
+                
+                if (!$already_registered) {
+                    $this->register_content_route($route, $post_type);
+                }
+            }
+        }
+
+        // Pages endpoint (special handling - for configured pages, always available)
         register_rest_route(self::NAMESPACE, '/pages', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_pages'),
             'permission_callback' => array($this->auth, 'verify_token')
         ));
+    }
+
+    /**
+     * Register a content route
+     *
+     * @param string $route Route name
+     * @param string $post_type Post type
+     */
+    private function register_content_route($route, $post_type) {
+        register_rest_route(self::NAMESPACE, '/' . $route, array(
+            'methods' => 'GET',
+            'callback' => function($request) use ($post_type) {
+                return $this->get_content($request, $post_type);
+            },
+            'permission_callback' => array($this->auth, 'verify_token'),
+            'args' => $this->get_content_endpoint_args()
+        ));
+    }
+
+    /**
+     * Get list of registered endpoints
+     * Used by admin interface to show available endpoints
+     *
+     * @return array Array of endpoint info: ['route' => ['name' => '...', 'post_type' => '...', 'registered' => bool]]
+     */
+    public function get_registered_endpoints() {
+        $endpoints = array();
+
+        // Standard endpoints
+        $standard = array(
+            'posts' => array('name' => 'Blog Posts', 'post_type' => 'post'),
+            'faqs' => array('name' => 'FAQs', 'post_type' => 'faq')
+        );
+
+        // Optional endpoints
+        $optional = array(
+            'our-work' => array('name' => 'Portfolio', 'post_type' => 'folio'),
+            'kb' => array('name' => 'Knowledge Base', 'post_type' => 'kb'),
+            'news' => array('name' => 'News Articles', 'post_type' => 'news'),
+            'post' => array('name' => 'Post (Singular)', 'post_type' => 'post'),
+            'page' => array('name' => 'Page (Singular)', 'post_type' => 'page'),
+            'project' => array('name' => 'Projects', 'post_type' => 'projects'),
+            'faq' => array('name' => 'FAQ (Singular)', 'post_type' => 'faq')
+        );
+
+        // Check standard endpoints
+        foreach ($standard as $route => $data) {
+            $exists = post_type_exists($data['post_type']);
+            $endpoints[$route] = array_merge($data, array('registered' => $exists));
+        }
+
+        // Check optional endpoints
+        foreach ($optional as $route => $data) {
+            $exists = post_type_exists($data['post_type']);
+            // Only include if not already in standard endpoints
+            if (!isset($endpoints[$route])) {
+                $endpoints[$route] = array_merge($data, array('registered' => $exists));
+            }
+        }
+
+        // Always include /pages endpoint (special handling)
+        $endpoints['pages'] = array(
+            'name' => 'Configured Pages',
+            'post_type' => 'page',
+            'registered' => true,
+            'special' => true // Indicates special handling (configured pages)
+        );
+
+        return $endpoints;
     }
 
     /**

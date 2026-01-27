@@ -172,23 +172,24 @@ class Brighter_API_Admin {
                     </thead>
                     <tbody>
                         <?php
-                        $endpoints = array(
-                            'posts' => array('name' => 'Blog Posts', 'post_type' => 'post'),
-                            'our-work' => array('name' => 'Portfolio', 'post_type' => 'folio'),
-                            'kb' => array('name' => 'Knowledge Base', 'post_type' => 'kb'),
-                            'news' => array('name' => 'News Articles', 'post_type' => 'news'),
-                            'faqs' => array('name' => 'FAQs', 'post_type' => 'faq'),
-                            'pages' => array('name' => 'Service Pages', 'post_type' => 'page')
-                        );
+                        // Get dynamically registered endpoints
+                        $api_endpoints = brighter_api()->get_endpoints();
+                        $endpoints = $api_endpoints->get_registered_endpoints();
 
                         foreach ($endpoints as $route => $data):
-                            $exists = post_type_exists($data['post_type']);
-                            $status_class = $exists ? 'success' : 'error';
-                            $status_text = $exists ? __('Active', 'brighterwebsites') : __('Post Type Not Found', 'brighterwebsites');
+                            $registered = isset($data['registered']) ? $data['registered'] : false;
+                            $status_class = $registered ? 'success' : 'error';
+                            $status_text = $registered ? __('Active', 'brighterwebsites') : __('Post Type Not Found', 'brighterwebsites');
+                            
+                            // Add note for special endpoints
+                            $description = $data['name'];
+                            if (isset($data['special']) && $data['special']) {
+                                $description .= ' <span style="color: #666; font-size: 0.9em;">(' . esc_html__('Configured pages only', 'brighterwebsites') . ')</span>';
+                            }
                         ?>
                             <tr>
                                 <td><code>GET /<?php echo esc_html($route); ?></code></td>
-                                <td><?php echo esc_html($data['name']); ?></td>
+                                <td><?php echo wp_kses_post($description); ?></td>
                                 <td>
                                     <span class="notice notice-<?php echo esc_attr($status_class); ?> inline" style="margin: 0; padding: 2px 8px;">
                                         <?php echo esc_html($status_text); ?>

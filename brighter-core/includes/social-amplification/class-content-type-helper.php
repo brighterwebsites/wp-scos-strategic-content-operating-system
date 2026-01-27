@@ -16,40 +16,78 @@ class BW_Content_Type_Helper {
     /**
      * Get content type for a post
      *
-     * Logic:
-     * - Pages: Check bw_purpose meta field (home, about, service, etc.)
-     * - Other CPTs: Map post type to friendly name
+     * Standardized logic shared across Social Amplification and Airtable:
+     * - Pages: Check bw_purpose meta field first (if not empty)
+     * - Fallback: Map post type to content type
+     * - Special handling for homepage
      *
      * @param int $post_id Post ID
      * @param string $post_type Post type slug
-     * @return string Content type for UTM parameters
+     * @return string Content type (standardized across all systems)
      */
     public static function get_content_type($post_id, $post_type = null) {
+        if (!$post_id) {
+            return 'page';
+        }
+
         if (!$post_type) {
             $post = get_post($post_id);
             $post_type = $post ? $post->post_type : 'post';
         }
 
-        // Pages: Check for bw_purpose meta
+        // Check if homepage
+        if (is_front_page() || $post_id === get_option('page_on_front')) {
+            return 'home';
+        }
+
+        // Check if URL contains /blog/ (archive page)
+        $post_url = get_permalink($post_id);
+        if ($post_url && strpos($post_url, '/blog/') !== false) {
+            return 'archive';
+        }
+
+        // Pages: Check for bw_purpose meta (only if not empty)
         if ($post_type === 'page') {
             $purpose = get_post_meta($post_id, 'bw_purpose', true);
 
             if (!empty($purpose)) {
-                // Map purpose to content type
-                $purpose_map = array(
-                    'pillar'        => 'pillar',
-                    'service-page'  => 'service',
-                    'about'         => 'about',
-                    'team'          => 'about',
-                    'contact'       => 'contact',
-                    'home'          => 'home',
+                // Standardized purpose to content type mapping
+                $purpose_to_content_type = array(
+                    // Core content (educational / authority building)
+                    'pillar'              => 'article',
+                    'supporting'          => 'article',
+
+                    // Commercial
+                    'service-page'        => 'service',
+                    'product-page'        => 'product',
+
+                    // Conversion mechanics
+                    'conversion-hub'      => 'conversion',
+                    'conversion-event'    => 'conversion',
+                    'conversion-endpoint' => 'functional',  // Thank you pages
+
+                    // Proof
+                    'case-study'          => 'case-study',
+
+                    // Brand & trust
+                    'authority-page'      => 'brand',
+
+                    // Aggregation
+                    'content-collection'  => 'archive',
+
+                    // Deep education
+                    'resource-guide'      => 'guide',
+
+                    // Legal & system
+                    'terms'               => 'policy',
+                    'functional'          => 'functional',
                 );
 
-                if (isset($purpose_map[$purpose])) {
-                    return $purpose_map[$purpose];
+                if (isset($purpose_to_content_type[$purpose])) {
+                    return $purpose_to_content_type[$purpose];
                 }
 
-                // Use purpose value directly if not in map
+                // Use purpose value directly if not in map (sanitized)
                 return sanitize_key($purpose);
             }
 
@@ -57,14 +95,14 @@ class BW_Content_Type_Helper {
             return 'page';
         }
 
-        // Other CPTs: Map post type to friendly name
+        // Post type mapping (only used if bw_purpose is empty or not a page)
         $post_type_map = array(
-            'post'     => 'blog',
-            'folio'    => 'project',
-            'projects' => 'project',
-            'kb'       => 'kb',
+            'post'     => 'article',
+            'projects' => 'case-study',
+            'folio'    => 'case-study',
+            'kb'       => 'guide',
             'news'     => 'news',
-            'faq'      => 'faq',
+            'faq'      => 'guide',
         );
 
         return isset($post_type_map[$post_type]) ? $post_type_map[$post_type] : $post_type;
@@ -116,7 +154,7 @@ class BW_Content_Type_Helper {
      */
     public static function build_utm_string($platform, $content_type, $format = 'link', $campaign = 'none') {
         return http_build_query(array(
-            'utm_source'   => $platform,
+            'utm_source'   => 'social_media',
             'utm_medium'   => 'social',
             'utm_content'  => self::build_utm_content($content_type, $format),
             'utm_campaign' => $campaign

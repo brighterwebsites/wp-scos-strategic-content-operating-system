@@ -49,17 +49,15 @@ class Brighter_API_Endpoints {
         );
 
         // Optional endpoints - only register if post type exists
+        // These are site-specific custom post types
         $optional_endpoints = array(
-            // BW-specific (plural routes)
-            'our-work' => 'folio',     // Portfolio (BW)
-            'kb' => 'kb',              // Knowledge Base (BW)
-            'news' => 'news',          // News (BW)
+            // BW-specific custom post types
+            'our-work' => 'folio',     // Portfolio (BW only)
+            'kb' => 'kb',              // Knowledge Base (BW only)
+            'news' => 'news',          // News (BW only)
             
-            // GS-specific (singular routes - for compatibility)
-            'post' => 'post',          // Singular post route (GS compatibility)
-            'page' => 'page',          // Singular page route (GS compatibility)
-            'project' => 'projects',   // Projects (GS - note: post type is 'projects')
-            'faq' => 'faq'             // Singular FAQ route (GS compatibility)
+            // GS-specific custom post types
+            'project' => 'projects'   // Projects (GS only - note: post type is 'projects', not 'project')
         );
 
         // Register standard endpoints (always available)
@@ -128,15 +126,15 @@ class Brighter_API_Endpoints {
             'faqs' => array('name' => 'FAQs', 'post_type' => 'faq')
         );
 
-        // Optional endpoints
+        // Optional endpoints - site-specific custom post types
         $optional = array(
+            // BW-specific
             'our-work' => array('name' => 'Portfolio', 'post_type' => 'folio'),
             'kb' => array('name' => 'Knowledge Base', 'post_type' => 'kb'),
             'news' => array('name' => 'News Articles', 'post_type' => 'news'),
-            'post' => array('name' => 'Post (Singular)', 'post_type' => 'post'),
-            'page' => array('name' => 'Page (Singular)', 'post_type' => 'page'),
-            'project' => array('name' => 'Projects', 'post_type' => 'projects'),
-            'faq' => array('name' => 'FAQ (Singular)', 'post_type' => 'faq')
+            
+            // GS-specific
+            'project' => array('name' => 'Projects', 'post_type' => 'projects')
         );
 
         // Check standard endpoints

@@ -86,11 +86,12 @@ class Brighter_API_Endpoints {
             }
         }
 
-        // Pages endpoint (special handling - for configured pages, always available)
+        // Pages endpoint (post_type=page) - works like posts/faqs, returns all pages
         register_rest_route(self::NAMESPACE, '/pages', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_pages'),
-            'permission_callback' => array($this->auth, 'verify_token')
+            'permission_callback' => array($this->auth, 'verify_token'),
+            'args' => $this->get_content_endpoint_args() // Use same args as other endpoints
         ));
     }
 
@@ -295,79 +296,15 @@ class Brighter_API_Endpoints {
     }
 
     /**
-     * Get configured pages
+     * Get WordPress pages (post_type=page)
+     * Works like get_content() - returns all pages, not just configured ones
      *
      * @param WP_REST_Request $request Request object
      * @return WP_REST_Response|WP_Error Response object or error
      */
     public function get_pages($request) {
-        try {
-            // Get configured page IDs from settings
-            $page_ids = get_option('brighter_api_pages', array());
-
-            if (empty($page_ids)) {
-                // Return consistent structure even when empty
-                return rest_ensure_response(array(
-                    'items' => array(),
-                    'pagination' => array(
-                        'total' => 0,
-                        'total_pages' => 0,
-                        'current_page' => 1,
-                        'per_page' => count($page_ids),
-                        'has_more' => false
-                    )
-                ));
-            }
-
-            // Generate cache key
-            $cache_key = 'brighter_api_pages_' . md5(serialize($page_ids));
-
-            // Try to get cached response
-            $cached = get_transient($cache_key);
-            if ($cached !== false) {
-                return rest_ensure_response($cached);
-            }
-
-            // Get pages (Phase 1: Simple format, consistent structure)
-            $items = array();
-            foreach ($page_ids as $page_id) {
-                $post = get_post($page_id);
-                if ($post) {
-                    // Include all statuses, not just published (for consistency)
-                    try {
-                        $items[] = $this->format_simple_item($post);
-                    } catch (Exception $e) {
-                        error_log('Brighter API: Error formatting page ' . $page_id . ': ' . $e->getMessage());
-                        continue;
-                    }
-                }
-            }
-
-            // Build consistent response structure (same as posts/faqs)
-            $response = array(
-                'items' => $items,
-                'pagination' => array(
-                    'total' => count($items),
-                    'total_pages' => 1,
-                    'current_page' => 1,
-                    'per_page' => count($items),
-                    'has_more' => false
-                )
-            );
-
-            // Cache for 5 minutes
-            set_transient($cache_key, $response, self::CACHE_DURATION);
-
-            return rest_ensure_response($response);
-
-        } catch (Exception $e) {
-            error_log('Brighter API: Error in get_pages: ' . $e->getMessage());
-            return new WP_Error(
-                'api_error',
-                'An error occurred while retrieving pages.',
-                array('status' => 500)
-            );
-        }
+        // Use the same logic as get_content() but for post_type='page'
+        return $this->get_content($request, 'page');
     }
 
     /**

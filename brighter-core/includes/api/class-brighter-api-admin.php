@@ -622,8 +622,28 @@ paths:
   /pages:
     get:
       operationId: getPages
-      summary: Get configured service pages
-      description: Retrieve pages configured in API settings
+      summary: Get WordPress pages
+      description: Retrieve paginated WordPress pages (post_type=page) with full content and metadata
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: ['publish', 'draft', 'any']
+            default: 'publish'
       responses:
         '200':
           description: Successful response

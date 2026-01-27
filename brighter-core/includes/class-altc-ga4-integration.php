@@ -21,12 +21,13 @@ class BW_ALTC_GA4_Integration {
      * NOTE: ALTC parameter injection has been moved to scos-car-injection.php
      * as part of the consolidated SCOS CAR (Content Architecture Record) structure.
      * 
-     * The window.brighterContentStrategy object now includes:
-     * - altc_primary (from bw_primary_altc_id)
-     * - altc_topic (from bw_primary_topic_id)
-     * - content_maturity (from bw_cont_maturity)
+     * ALTC parameters are now available in window.brighterSCOS.car:
+     * - altc_primary (from bw_primary_altc_id) → car.cluster
+     * - altc_topic (from bw_primary_topic_id) → car.topic
+     * - content_maturity (from bw_cont_maturity) → car.maturity
      * 
      * This class is kept for backwards compatibility but no longer injects data.
+     * All GA4 tracking scripts now use window.brighterSCOS directly.
      * 
      * See: brighter-core/includes/scos-car-injection.php
      */
@@ -40,6 +41,9 @@ class BW_ALTC_GA4_Integration {
      * 
      * This method is no longer called. ALTC parameters are now injected by
      * scos-car-injection.php as part of the consolidated SCOS CAR structure.
+     * 
+     * All scripts now use window.brighterSCOS.car directly instead of
+     * the deprecated window.brighterContentStrategy object.
      * 
      * Kept for reference only.
      */

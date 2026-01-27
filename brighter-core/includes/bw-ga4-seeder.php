@@ -84,22 +84,47 @@ add_action('wp_footer', function() {
     
     console.log('%c?? GA4 Event Seeder', 'background: #4CAF50; color: white; padding: 6px 12px; font-weight: bold; border-radius: 4px;');
     
-    // Get base params (matches your main script)
-    const contentStrategy = window.brighterContentStrategy || {};
-    const region = new URLSearchParams(location.search).get('region') || 'zone4-remote';
+    // Use SCOS CAR directly (single source of truth)
+    const scos = window.brighterSCOS || {};
+    const car = scos.car || {};
+    const meta = scos.meta || {};
+    const pillar = scos.pillar || null;
+    const servicePathway = scos.service_pathway || null;
     
     function getBaseParams() {
+        // Use breadcrumb schema as short title if available, fallback to document.title
+        const breadcrumb = scos.breadcrumb_schema || '';
+        const pageTitle = (breadcrumb && breadcrumb.trim()) 
+            ? breadcrumb.trim() + ' [SEED]'
+            : document.title + ' [SEED]';
+        
         return {
-            region_id: region,
-            page_title: document.title + ' [SEED]',
-            page_path: location.pathname,
-            content_intent: contentStrategy.content_intent || 'not_set',
-            content_purpose: contentStrategy.content_purpose || 'not_set',
-            content_topic: contentStrategy.content_topic || 'not_set',
-            optimization_status: 'seed_test',
-            pillar_page: contentStrategy.pillar_page || document.title,
-            pillar_type: contentStrategy.pillar_type || 'none',
-            post_type: contentStrategy.post_type || 'page',
+            // Page metadata
+            page_title: pageTitle,
+            // Note: page_path removed - GA4 automatically tracks this
+            
+            // Content strategy fields (from SCOS CAR)
+            content_intent: car.intent || 'not_set',
+            content_purpose: car.purpose || 'not_set',
+            
+            // ALTC Framework fields (from SCOS CAR)
+            altc_primary: car.cluster || 'not_set',
+            altc_topic: car.topic || 'not_set', // Preferred field name
+            content_topic: car.topic || 'not_set', // Legacy - kept for backwards compatibility
+            content_maturity: car.maturity || 'not_set',
+            
+            // Content workflow fields (from SCOS CAR)
+            content_plan: car.content_plan || 'none',
+            
+            // Relationship fields (from SCOS CAR)
+            pillar_page: (pillar && pillar.title) ? pillar.title : 'none',
+            pillar_type: (pillar && pillar.type) ? pillar.type : 'none',
+            service_pathway: (servicePathway && servicePathway.title) ? servicePathway.title : 'none',
+            
+            // Post metadata (from SCOS CAR)
+            post_type: meta.post_type || 'page',
+            
+            // Seed event markers
             event_label: 'Seed Event - Ignore',
             value: 0.01 // Tiny value to identify as test
         };
@@ -108,44 +133,57 @@ add_action('wp_footer', function() {
     // All events from your RULES
     const eventsToSeed = [
         // Conversion events
-        { name: 'click_meeting', category: 'Meetings' },
-        { name: 'click_main_cta', category: 'Quote' },
-        { name: 'click_micro_cta', category: 'Quote' },
-        { name: 'form_submit', category: 'Forms' },
-        { name: 'generate_lead', category: 'Forms' },
-        { name: 'get_lead_magnet', category: 'Lead Magnet' },
-        { name: 'subscribe', category: 'Subscribe' },
-        
-        // Contact events
+        { name: 'click_meeting', category: 'CTA' },
+        { name: 'click_main_cta', category: 'CTA' },
+        { name: 'click_micro_cta', category: 'CTA' },
+        { name: 'click_menu_cta', category: 'CTA' },
+        { name: 'click_assist_cta', category: 'CTA' },
+        { name: 'click_end_cta', category: 'CTA' },
+
+    // Contact events
         { name: 'click_phone', category: 'Contact' },
         { name: 'click_email', category: 'Contact' },
         
+        // Forms
+        { name: 'form_start', category: 'Forms' },
+        { name: 'form_submit', category: 'Forms' },
+
+
+        { name: 'form_enquiry', category: 'Forms' },
+        { name: 'form_quote', category: 'Forms' },
+       
+        
+        { name: 'form_lead_magnet', category: 'Forms' },
+        { name: 'form_subscribe', category: 'Forms' },
+
+        { name: 'generate_lead', category: 'Forms' },
+          
+
         // Navigation
         { name: 'nav_blog', category: 'Navigation' },
         { name: 'nav_project', category: 'Navigation' },
-        { name: 'click_product', category: 'Product' },
-        { name: 'click_service', category: 'Service' },
-        { name: 'click_pricing_detail', category: 'Navigation' },
-        { name: 'click_comparison', category: 'Navigation' },
+        { name: 'nav_product', category: 'Navigation' },
+        { name: 'nav_service', category: 'Navigation' },
+        { name: 'nav_pricing', category: 'Navigation' },
+      
         
         // Trust signals
         { name: 'view_reviews', category: 'Trust' },
         { name: 'view_pricing', category: 'Trust' },
         { name: 'view_specs', category: 'Trust' },
         { name: 'view_case', category: 'Trust' },
+        { name: 'view_badge', category: 'Trust' },
         { name: 'click_video', category: 'Trust' },
         
-        // Forms
-        { name: 'form_start', category: 'Forms' },
-        { name: 'view_quote_form', category: 'Forms' },
-        { name: 'view_contact_form', category: 'Forms' },
-        { name: 'view_lead_magnet', category: 'Lead Magnet' },
+
         
         // Hierarchy
-        { name: 'view_section', category: 'Hierarchy' },
+        { name: 'view_section', category: 'Hierarchy' }
+
         
-        // System
-        { name: 'call_bw_seo_gal_we_shld_wrk_2gether', category: 'System Alert' }
+        // System - DISABLED (Ad Tag Detection commented out in enhanced.js)
+        // TODO: Re-enable when Agency Level ad tag detection is added as optional feature
+        // { name: 'call_bw_seo_gal_we_shld_wrk_2gether', category: 'System Alert' }
     ];
     
     // Fire each event with tiny delay

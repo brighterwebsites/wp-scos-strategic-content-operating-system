@@ -33,10 +33,10 @@ class BW_ALTC_Meta_Boxes {
         $post_types = BW_ALTC_Taxonomies::get_supported_post_types();
 
         foreach ($post_types as $post_type) {
-            // ALTC Topic Cluster Strategy meta box
+            // Content Architecture + Strategy meta box
             add_meta_box(
                 'bw_altc_strategy',
-                __('ALTC Topic Cluster Strategy', 'brighterwebsites'),
+                __('Content Architecture + Strategy', 'brighterwebsites'),
                 [__CLASS__, 'render_altc_strategy_metabox'],
                 $post_type,
                 'side',
@@ -46,7 +46,7 @@ class BW_ALTC_Meta_Boxes {
     }
 
     /**
-     * Render ALTC Content Strategy meta box
+     * Render Content Architecture + Strategy meta box
      */
     public static function render_altc_strategy_metabox($post) {
         wp_nonce_field('bw_altc_metabox', 'bw_altc_nonce');
@@ -54,7 +54,8 @@ class BW_ALTC_Meta_Boxes {
         $primary_altc_id = get_post_meta($post->ID, 'bw_primary_altc_id', true);
         $primary_topic_id = get_post_meta($post->ID, 'bw_primary_topic_id', true);
         $content_maturity = get_post_meta($post->ID, 'bw_cont_maturity', true);
-        $notes = get_post_meta($post->ID, 'bw_notes', true);
+        $notes = get_post_meta($post->ID, 'bw_altc_notes', true);
+        $service_pathway_id = get_post_meta($post->ID, 'bw_service_pathway_id', true);
 
         // Get ALTC terms
         $altc_terms = get_terms([
@@ -70,6 +71,21 @@ class BW_ALTC_Meta_Boxes {
             'hide_empty' => false,
             'orderby' => 'name',
             'order' => 'ASC',
+        ]);
+        
+        // Get service pathway pages for dropdown (service-page, product-page, conversion-hub)
+        $service_pathway_pages = get_posts([
+            'post_type'      => function_exists('bw_cs_post_types') ? bw_cs_post_types() : ['post', 'page'],
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'meta_query'     => [
+                'relation' => 'OR',
+                ['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
+                ['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '='],
+                ['key' => 'bw_purpose', 'value' => 'conversion-hub', 'compare' => '=']
+            ]
         ]);
 
         $maturity_options = BW_ALTC_Taxonomies::get_maturity_options();
@@ -186,13 +202,36 @@ class BW_ALTC_Meta_Boxes {
             </select>
             <p class="bw-altc-help"><?php esc_html_e('Content maturity level: Entry → Industry Authority', 'brighterwebsites'); ?></p>
         </div>
+        
+        <div class="bw-altc-field">
+            <label for="bw_service_pathway_id">
+                <?php esc_html_e('Service Pathway', 'brighterwebsites'); ?>
+            </label>
+            <select id="bw_service_pathway_id" name="bw_service_pathway_id">
+                <option value=""><?php esc_html_e('Not Set', 'brighterwebsites'); ?></option>
+                <?php foreach ($service_pathway_pages as $p):
+                    $p_purpose = get_post_meta($p->ID, 'bw_purpose', true);
+                    $type_labels = [
+                        'service-page' => ' [Service]',
+                        'product-page' => ' [Product]',
+                        'conversion-hub' => ' [Hub]'
+                    ];
+                    $type = isset($type_labels[$p_purpose]) ? $type_labels[$p_purpose] : '';
+                ?>
+                    <option value="<?php echo esc_attr($p->ID); ?>" <?php selected($service_pathway_id, $p->ID); ?>>
+                        <?php echo esc_html(get_the_title($p) . $type); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <p class="bw-altc-help"><?php esc_html_e('Link to related Service, Product, or Conversion Hub', 'brighterwebsites'); ?></p>
+        </div>
 
         <div class="bw-altc-field">
             <label for="bw_altc_notes">
-                <?php esc_html_e('Topic & Cluster Notes', 'brighterwebsites'); ?>
+                <?php esc_html_e('Primary Search Intent Satisfied', 'brighterwebsites'); ?>
             </label>
-            <textarea id="bw_altc_notes" name="bw_notes" rows="3" placeholder="<?php esc_attr_e('Note any secondary topics or strategic considerations...', 'brighterwebsites'); ?>"><?php echo esc_textarea($notes); ?></textarea>
-            <p class="bw-altc-help"><?php esc_html_e('Optional internal note about strategy, cluster or secondary topics', 'brighterwebsites'); ?></p>
+            <textarea id="bw_altc_notes" name="bw_altc_notes" rows="3" placeholder="<?php esc_attr_e('What is the primary search intent satisfied by this content...', 'brighterwebsites'); ?>"><?php echo esc_textarea($notes); ?></textarea>
+            <p class="bw-altc-help"><?php esc_html_e('What is the primary search intent satisfied by this content (eg "How to choose a stable builder")', 'brighterwebsites'); ?></p>
         </div>
 
         <script>
@@ -316,8 +355,22 @@ class BW_ALTC_Meta_Boxes {
             $maturity = sanitize_text_field($_POST['bw_cont_maturity']);
             update_post_meta($post_id, 'bw_cont_maturity', $maturity);
         }
-
-        // Notes are saved by the existing bw-content-strategy.php handler
+        
+        // Save service pathway ID
+        if (isset($_POST['bw_service_pathway_id'])) {
+            $service_pathway_id = absint($_POST['bw_service_pathway_id']);
+            if ($service_pathway_id > 0) {
+                update_post_meta($post_id, 'bw_service_pathway_id', $service_pathway_id);
+            } else {
+                delete_post_meta($post_id, 'bw_service_pathway_id');
+            }
+        }
+        
+        // Save ALTC notes (Primary Search Intent)
+        if (isset($_POST['bw_altc_notes'])) {
+            $notes = sanitize_textarea_field($_POST['bw_altc_notes']);
+            update_post_meta($post_id, 'bw_altc_notes', $notes);
+        }
     }
 
     /**

@@ -26,7 +26,24 @@ class Brighter_API_Auth {
      */
     public function verify_token($request) {
         // Get token from X-Brighter-Token header
+        // Try multiple header name variations for compatibility
         $provided_token = $request->get_header('X-Brighter-Token');
+        
+        // Fallback: check HTTP headers directly if REST API header method fails
+        if (empty($provided_token)) {
+            $headers = $request->get_headers();
+            if (isset($headers['x-brighter-token'])) {
+                $provided_token = is_array($headers['x-brighter-token']) ? $headers['x-brighter-token'][0] : $headers['x-brighter-token'];
+            }
+        }
+        
+        // Final fallback: check $_SERVER directly
+        if (empty($provided_token)) {
+            $header_name = 'HTTP_X_BRIGHTER_TOKEN';
+            if (isset($_SERVER[$header_name])) {
+                $provided_token = sanitize_text_field($_SERVER[$header_name]);
+            }
+        }
 
         // Check if token was provided
         if (empty($provided_token)) {
@@ -37,8 +54,8 @@ class Brighter_API_Auth {
             );
         }
 
-        // Get stored token
-        $stored_token = get_option(self::TOKEN_OPTION);
+        // Get stored token (no caching to ensure fresh check)
+        $stored_token = get_option(self::TOKEN_OPTION, false);
 
         // Check if token exists in database
         if (empty($stored_token)) {

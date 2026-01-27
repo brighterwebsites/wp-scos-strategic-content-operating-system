@@ -172,23 +172,24 @@ class Brighter_API_Admin {
                     </thead>
                     <tbody>
                         <?php
-                        $endpoints = array(
-                            'posts' => array('name' => 'Blog Posts', 'post_type' => 'post'),
-                            'our-work' => array('name' => 'Portfolio', 'post_type' => 'folio'),
-                            'kb' => array('name' => 'Knowledge Base', 'post_type' => 'kb'),
-                            'news' => array('name' => 'News Articles', 'post_type' => 'news'),
-                            'faqs' => array('name' => 'FAQs', 'post_type' => 'faq'),
-                            'pages' => array('name' => 'Service Pages', 'post_type' => 'page')
-                        );
+                        // Get dynamically registered endpoints
+                        $api_endpoints = brighter_api()->get_endpoints();
+                        $endpoints = $api_endpoints->get_registered_endpoints();
 
                         foreach ($endpoints as $route => $data):
-                            $exists = post_type_exists($data['post_type']);
-                            $status_class = $exists ? 'success' : 'error';
-                            $status_text = $exists ? __('Active', 'brighterwebsites') : __('Post Type Not Found', 'brighterwebsites');
+                            $registered = isset($data['registered']) ? $data['registered'] : false;
+                            $status_class = $registered ? 'success' : 'error';
+                            $status_text = $registered ? __('Active', 'brighterwebsites') : __('Post Type Not Found', 'brighterwebsites');
+                            
+                            // Add note for special endpoints
+                            $description = $data['name'];
+                            if (isset($data['special']) && $data['special']) {
+                                $description .= ' <span style="color: #666; font-size: 0.9em;">(' . esc_html__('Configured pages only', 'brighterwebsites') . ')</span>';
+                            }
                         ?>
                             <tr>
                                 <td><code>GET /<?php echo esc_html($route); ?></code></td>
-                                <td><?php echo esc_html($data['name']); ?></td>
+                                <td><?php echo wp_kses_post($description); ?></td>
                                 <td>
                                     <span class="notice notice-<?php echo esc_attr($status_class); ?> inline" style="margin: 0; padding: 2px 8px;">
                                         <?php echo esc_html($status_text); ?>
@@ -445,7 +446,6 @@ info:
 
 servers:
   - url: <?php echo esc_html($base_url); ?>
-
     description: Production API
 
 security:
@@ -460,44 +460,34 @@ components:
       description: API token for authentication
 
   schemas:
-    ContentItem:
+    SimpleItem:
       type: object
+      description: Minimal item structure (Phase 1) - consistent across all endpoints
       properties:
         id:
           type: integer
+          description: Post/Page ID
         title:
           type: string
+          description: Post/Page title
         excerpt:
           type: string
-        content:
-          type: string
-        slug:
-          type: string
+          description: Excerpt (auto-generated if empty, max 200 chars)
         url:
           type: string
-        date:
+          format: uri
+          description: Full URL to the post/page
+        status:
           type: string
-          format: date-time
-        modified:
-          type: string
-          format: date-time
-        featured_image:
-          type: object
-          nullable: true
-        categories:
-          type: array
-          items:
-            type: string
-        tags:
-          type: array
-          items:
-            type: string
-        meta_description:
-          type: string
-        altc_content_data:
-          type: object
-        custom_fields:
-          type: object
+          enum: ['publish', 'draft', 'private', 'pending', 'future', 'trash']
+          description: Post status
+      required:
+        - id
+        - title
+        - excerpt
+        - url
+        - status
+      additionalProperties: false
 
     Pagination:
       type: object
@@ -512,6 +502,28 @@ components:
           type: integer
         has_more:
           type: boolean
+      required:
+        - total
+        - total_pages
+        - current_page
+        - per_page
+        - has_more
+      additionalProperties: false
+
+    SimpleListResponse:
+      type: object
+      description: Standard response structure for all endpoints (Phase 1) - consistent across posts, pages, and FAQs
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required:
+        - items
+        - pagination
+      additionalProperties: false
 
     Error:
       type: object
@@ -522,6 +534,137 @@ components:
           type: string
         data:
           type: object
+          additionalProperties: true
+      required:
+        - code
+        - message
+      additionalProperties: false
+
+    SCOSResponse:
+      type: object
+      description: SCOS (window.brighterSCOS) data structure
+      properties:
+        car:
+          type: object
+          properties:
+            cluster:
+              type: string
+            topic:
+              type: string
+            maturity:
+              type: string
+            intent:
+              type: string
+            purpose:
+              type: string
+            metrics:
+              type: object
+              properties:
+                word_count:
+                  type: integer
+                reading_time:
+                  type: integer
+                internal_links:
+                  type: integer
+                external_links:
+                  type: integer
+                last_updated:
+                  type: string
+              additionalProperties: false
+          required:
+            - cluster
+            - topic
+            - maturity
+            - intent
+            - purpose
+            - metrics
+          additionalProperties: false
+        content_plan:
+          type: string
+        pillar:
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                id:
+                  type: integer
+                title:
+                  type: string
+                type:
+                  type: string
+                  enum: ['pillar', 'service']
+                url:
+                  type: string
+                  format: uri
+              required:
+                - id
+                - title
+                - type
+                - url
+              additionalProperties: false
+        service_pathway:
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                id:
+                  type: integer
+                title:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+              required:
+                - id
+                - title
+                - url
+              additionalProperties: false
+        breadcrumb_schema:
+          type: string
+        google_index_status:
+          type: string
+        search_intent_goal:
+          type: string
+        tracking:
+          type: object
+          properties:
+            ga4_id:
+              type: string
+            consent_given:
+              type: boolean
+          required:
+            - ga4_id
+            - consent_given
+          additionalProperties: false
+        meta:
+          type: object
+          properties:
+            post_id:
+              type: integer
+            post_type:
+              type: string
+            scos_version:
+              type: string
+            car_generated:
+              type: string
+              format: date-time
+          required:
+            - post_id
+            - post_type
+            - scos_version
+            - car_generated
+          additionalProperties: false
+      required:
+        - car
+        - content_plan
+        - pillar
+        - service_pathway
+        - breadcrumb_schema
+        - google_index_status
+        - search_intent_goal
+        - tracking
+        - meta
+      additionalProperties: false
 
 paths:
   /posts:
@@ -540,29 +683,22 @@ paths:
           in: query
           schema:
             type: integer
-            default: 15
+            default: 10
             minimum: 1
-            maximum: 50
+            maximum: 10
         - name: status
           in: query
           schema:
             type: string
-            enum: [publish, draft, any]
-            default: publish
+            enum: ['publish', 'draft', 'any']
+            default: 'publish'
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ContentItem'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/SimpleListResponse'
         '401':
           description: Unauthorized
           content:
@@ -570,270 +706,126 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /our-work:
-    get:
-      operationId: getPortfolio
-      summary: Get portfolio items
-      description: Retrieve paginated portfolio/work items
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
-  /kb:
-    get:
-      operationId: getKnowledgeBase
-      summary: Get knowledge base articles
-      description: Retrieve paginated knowledge base articles
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
-  /news:
-    get:
-      operationId: getNews
-      summary: Get news articles
-      description: Retrieve paginated news articles
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 15
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
   /faqs:
     get:
       operationId: getFAQs
       summary: Get FAQ items
-      description: Retrieve paginated FAQ items
+      description: Retrieve paginated FAQ items with full content and metadata
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+            minimum: 1
         - name: per_page
           in: query
           schema:
             type: integer
-            default: 15
-            maximum: 50
+            default: 10
+            minimum: 1
+            maximum: 10
         - name: status
           in: query
           schema:
             type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
-  /pages:
-    get:
-      operationId: getPages
-      summary: Get configured service pages
-      description: Retrieve pages configured in API settings
+            enum: ['publish', 'draft', 'any']
+            default: 'publish'
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  pages:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                        title:
-                          type: string
-                        content:
-                          type: string
-                        url:
-                          type: string
-                        excerpt:
-                          type: string
-                        meta_description:
-                          type: string
+                $ref: '#/components/schemas/SimpleListResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  /post:
+  /pages:
     get:
-      operationId: getBlogPost
-      summary: Get blog post (singular)
-      description: Retrieve single or paginated blog posts - GS format
+      operationId: getPages
+      summary: Get WordPress pages
+      description: Retrieve paginated WordPress pages (post_type=page) with full content and metadata
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+            minimum: 1
         - name: per_page
           in: query
           schema:
             type: integer
-            default: 1
-            maximum: 50
+            default: 10
+            minimum: 1
+            maximum: 10
         - name: status
           in: query
           schema:
             type: string
-            enum: [publish, draft, any]
-            default: publish
+            enum: ['publish', 'draft', 'any']
+            default: 'publish'
       responses:
         '200':
           description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleListResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  /page:
+  /scos:
     get:
-      operationId: getPage
-      summary: Get page (singular)
-      description: Retrieve single or paginated pages - GS format
+      operationId: getSCOS
+      summary: Get SCOS data for a post/page
+      description: Retrieve window.brighterSCOS data structure for any post or page by URL or post_id
       parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 1
-            maximum: 50
-        - name: status
+        - name: url
           in: query
           schema:
             type: string
-            enum: [publish, draft, any]
-            default: publish
+          description: URL path (e.g., /about-us) or full URL
+        - name: post_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Post/Page ID
       responses:
         '200':
           description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SCOSResponse'
+        '400':
+          description: Bad request (missing parameter)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post/page not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Unauthorized
-
-  /project:
-    get:
-      operationId: getProject
-      summary: Get project (singular)
-      description: Retrieve single or paginated projects - GS format
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 1
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
-
-  /faq:
-    get:
-      operationId: getFAQ
-      summary: Get FAQ (singular)
-      description: Retrieve single or paginated FAQs - GS format
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: per_page
-          in: query
-          schema:
-            type: integer
-            default: 1
-            maximum: 50
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [publish, draft, any]
-            default: publish
-      responses:
-        '200':
-          description: Successful response
-        '401':
-          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         <?php
         return ob_get_clean();
     }

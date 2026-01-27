@@ -32,7 +32,8 @@ add_action('init', function() {
         'auth_callback'     => function() { return current_user_can('edit_posts'); },
     ];
     
-    register_post_meta('', 'bw_notes', $string_args);
+    // ALTC Notes (Primary Search Intent) - replaces deprecated bw_notes
+    register_post_meta('', 'bw_altc_notes', $string_args);
     register_post_meta('', 'bw_page_topic', $string_args);
     register_post_meta('', 'bw_intent', $string_args);
     register_post_meta('', 'bw_purpose', $string_args);
@@ -44,7 +45,16 @@ add_action('init', function() {
         'auth_callback'     => function() { return current_user_can('edit_posts'); },
     ]);
     
-    // Optimization status
+    // Service Pathway (functions like Pillar Page for services/products)
+    register_post_meta('', 'bw_service_pathway_id', [
+        'type'              => 'integer',
+        'single'            => true,
+        'sanitize_callback' => 'absint',
+        'show_in_rest'      => false,
+        'auth_callback'     => function() { return current_user_can('edit_posts'); },
+    ]);
+    
+    // Optimization status (DEPRECATED - kept for backwards compatibility)
     register_post_meta('', '_brt_opt_status', [
         'type'          => 'string',
         'single'        => true,
@@ -58,6 +68,29 @@ add_action('init', function() {
         'single'        => true,
         'show_in_rest'  => false,
         'auth_callback' => function() { return current_user_can('edit_posts'); },
+    ]);
+    
+    // Workflow Progress (multi-select tags)
+    register_post_meta('', 'workflow_progress', [
+        'type'              => 'array',
+        'single'            => true,
+        'show_in_rest'      => false,
+        'auth_callback'     => function() { return current_user_can('edit_posts'); },
+        'sanitize_callback' => function($value) {
+            if (!is_array($value)) {
+                return [];
+            }
+            return array_map('sanitize_text_field', $value);
+        },
+    ]);
+    
+    // Next Step / Content Plan (single select)
+    register_post_meta('', 'content_plan', [
+        'type'              => 'string',
+        'single'            => true,
+        'sanitize_callback' => 'sanitize_text_field',
+        'show_in_rest'      => false,
+        'auth_callback'     => function() { return current_user_can('edit_posts'); },
     ]);
 });
 
@@ -82,20 +115,36 @@ function bw_cs_post_types() {
 //Page Intent - add or modify your own - also maps to GA4 Automatically at the page/Post level
 function bw_cs_intent_options() {
     return [
-        ''              => 'NA',
-        'informational' => 'Informational',
-        'commercial' => 'Commercial',
-        'transactional' => 'Transactional',
-        'navigational'  => 'Navigational',
-        'retention'     => 'Retention',
-        'support'    => 'Support',  //Content designed to guide a new customer (post-sale) or a user of a tool.
-        'trust'         => 'E-E-A-T/Trust', //measures content focused on building authority 
-        'functional'    => 'System/Functional',
+       /* **important note for "major refactor"
+         do not yet changes these meta field names until explicitily advised.  
+       many related uses in 
+       content statistics, ga4 analytics,  API/external tools like airtable, make.com, yourls, social amplification loop (likely others
+       so many areas will need updating so for now, i will leave these fields in tact and only change the front facing ones. 
+       When imported to other tools informational_p is imported - it would be better if they were more recognisable and standardised 
+       Field meta names to be changed (use standard/correct - or _ between ie if conversion-hub or conversion_hub)
+              - informational_p - info_problem_aware
+              - informational_s   - info_solution_aware
+              - commercial_ds  - comm_decision_support
 
-        'informational_p' => 'Informational (Problem)', 
-        'informational_s' => 'Informational (Solution)',
-        'commercial_ds' => 'Commercial (Decision Support)', // Replaces commercial_c and commercial_r
-        
+
+       */
+
+        ''              => 'NA',
+        'informational' => 'Informational', //General (Learn / Solve / Understand)
+        'informational_p' => 'Info Problem', //Problem Aware (Learn / Solve / Understand)
+        'informational_s' => 'Info Solution', //Solution Aware (Learn / Solve / Understand)
+        'commercial' => 'Commercial', // 
+        'commercial_ds' => 'Decision Support', // Compare / Pricing Pages Commercial Investigation
+        'transactional' => 'Transactional Payment', //Payment Intent Conversion Goal   
+        'transact_lead' => 'Transactional Lead', //Warm or Hot Lead Generated Conversion Goal Offline Sales Conversion End-of-funnel Quote, Contact, Thank You  
+
+        'trust'         => 'Authority Trust', //Trust / Validation (Prove / Reassure)
+
+        'navigational'  => 'Navigate Hub', // Navigational (Find a Brand / Page / Login)
+
+        'functional'    => 'Policy Functional',  //Sitemap, Maintenance, Privacy, Terms, Access
+
+
 
 
     ];
@@ -103,20 +152,36 @@ function bw_cs_intent_options() {
 
 function bw_cs_purpose_options() {
     return [
+       /* **important note for "major refactor"
+       do not yet changes these meta field names until explicitily advised.  
+       many related uses in 
+       content statistics, ga4 analytics,  API/external tools like airtable, make.com, yourls, social amplification loop (likely others
+       so many areas will need updating so for now, i will leave these fields in tact and only change the front facing ones. 
+      When imported to other tools informational_p is imported - it would be better if they were more recognisable and standardised 
+       Field meta names to be changed
+       - service-page to service         
+       - product-page to product         
+       - case-study to success-story         
+       - authority-page to brand-authority  
+       - supporting to supporting-topic
+       - terms to policy      
+       */
  	''              => 'NA',
         'pillar'        => 'Pillar',             // High-level topic hub (e.g., "The Complete Stable Buyer's Guide")
-        'service-page'  => 'Service Page',       // Page detailing a service (e.g., "Shed-to-Stable Retrofit Conversion")
-        'product-page'  => 'Product Page',       // Page detailing a specific model (e.g., "4x4m Modular Stable Kit")
-        'supporting'    => 'Supporting',         // Standard blog article (e.g., The article we just wrote)
-        'case-study'    => 'Case Study',         // Specific client success story (e.g., "4-Bay Build in Tamworth")
-        'conversion-hub'=> 'Conversion Hub',     // High-friction conversion page (e.g., "Get a Quote" form, Pricing Tool)
-        'resource-guide'=> 'Resource/Guide',     // Lead magnet delivery (e.g., "Download Stable Buyer's Guide")
-        'authority-page'=> 'Authority Page',     // E-E-A-T pages (e.g., "About Us," "Our Welding Process")
-        'location-page' => 'Location Page',      // Geo-targeted pages (e.g., "Horse Stables Brisbane")
-        'industry-page' => 'Industry Page',      // Persona-targeted content (e.g., "Stables for Breeding Facilities")
-        'landing-page'  => 'Landing Page',       // Generic landing page for paid campaigns
-        'terms'         => 'Legal/Terms',        // Standard functional page
-    
+        'service-page'  => 'Service',       // Page detailing a service (e.g., "Shed-to-Stable Retrofit Conversion")
+        'product-page'  => 'Product',       // Page detailing a specific model (e.g., "4x4m Modular Stable Kit")
+        'conversion-hub'=> 'Conversion Hub',     // conversion page with multiple pathways (eg service/product collection pages, find your perfect "service" )
+        'conversion-event'=> 'Conversion Event',     // Dedicated Conversion event - (eg Lead magnet delivery, Quote, Pricing Calculator, Service Finder Quiz)
+        'conversion-endpoint'=> 'Conversion End-Point',     // Post Conversion Event - Thank you page, Post Sale Conversion redirect
+        'case-study'    => 'Success Story',         // Specific client success story (e.g., "4-Bay Build in Tamworth")
+        'authority-page'=> 'Brand Authority',     // E-E-A-T pages (e.g., "About Us," "Our Welding Process")
+        'supporting'    => 'Supporting Topic',         // Standard blog article (e.g., The article we just wrote)
+        'content-collection'=> 'Content Collection',     // Topic/Cluster Curated/Collection Hub/Archive pages
+        'resource-guide'=> 'xResource Guide',     // In Use but to be depreciated and replaced by content-collection
+      
+        'terms'         => 'Policy',        // Legal Terms Pages, privacy, terms, warranty, returns)
+        'functional'         => 'Functional',        // Functional pages - maintenance, access, front end editing.
+
     ];
 }
 
@@ -128,6 +193,37 @@ function bw_cs_index_status_options() {
         'indexed'     => 'Indexed',      // Dark Green
         'requested'   => 'Requested',    // Teal - Waiting
         'issue'       => 'Issue',        // Dark Red - Critical
+        'no_index'    => 'Do Not Index', // Red - Excluded
+    ];
+}
+
+/**
+ * Workflow Progress options (multi-select tags)
+ */
+function bw_cs_workflow_progress_options() {
+    return [
+        'idea'               => ['label' => 'Idea 💡', 'color' => '#7c3aed', 'bg' => '#ede9fe'],              // Purple - Planning
+        'content'            => ['label' => 'Content ✏️', 'color' => '#2563eb', 'bg' => '#dbeafe'],           // Blue - Writing
+        'entities-semantics' => ['label' => 'Entity Semantic Coverage 📑', 'color' => '#0891b2', 'bg' => '#cffafe'], // Cyan - Research
+        'conversion'         => ['label' => 'Conversion 💲', 'color' => '#16a34a', 'bg' => '#dcfce7'],         // Green - CRO
+        'seo-basic'          => ['label' => 'Basic SEO 🥈', 'color' => '#ca8a04', 'bg' => '#fef9c3'],          // Yellow - Basic
+        'seo-advanced'       => ['label' => 'Advanced SEO 🥇', 'color' => '#ea580c', 'bg' => '#ffedd5'],       // Orange - Advanced
+        'authority-outreach' => ['label' => 'Authority Outreach 🔗', 'color' => '#be185d', 'bg' => '#fce7f3'], // Pink - Outreach
+        'amplification'      => ['label' => 'Social Amplification 📢', 'color' => '#4f46e5', 'bg' => '#e0e7ff'], // Indigo - Promotion
+    ];
+}
+
+/**
+ * Next Step / Content Plan options (single select)
+ */
+function bw_cs_content_plan_options() {
+    return [
+        ''        => ['label' => '— Not Set —', 'color' => '#6b7280', 'bg' => '#f3f4f6'],
+        'approve' => ['label' => '✅ Approved', 'color' => '#15803d', 'bg' => '#dcfce7'],
+        'testing' => ['label' => '🚥 Testing', 'color' => '#ca8a04', 'bg' => '#fef9c3'],
+        'revise'  => ['label' => '🔄 Revise', 'color' => '#2563eb', 'bg' => '#dbeafe'],
+        'merge'   => ['label' => '🔀 Merge', 'color' => '#7c3aed', 'bg' => '#ede9fe'],
+        'archive' => ['label' => '🗑️ Archive', 'color' => '#dc2626', 'bg' => '#fee2e2'],
     ];
 }
 
@@ -167,12 +263,15 @@ add_action('admin_init', function() {
             foreach ($cols as $k => $v) {
                 $new[$k] = $v;
                 if ($k === 'title') {
-                    $new['bw_pillar']  = 'Pillar';
-                    $new['bw_intent']  = 'Intent';
-                    $new['bw_purpose'] = 'Purpose';
-                    $new['bw_index']   = 'Index Status';
-                    $new['bw_opt']     = 'Optimization';
-                    $new['bw_notes']   = 'Content Notes';
+                    $new['bw_pillar']          = 'Pillar';
+                    $new['bw_service_pathway'] = 'Service Pathway';
+                    $new['bw_intent']          = 'Intent';
+                    $new['bw_purpose']         = 'Purpose';
+                    $new['bw_index']           = 'Index Status';
+                    $new['bw_opt']             = 'Optimization';
+                    $new['bw_progress']        = 'Progress';
+                    $new['bw_next_step']       = 'Next Step';
+                    $new['bw_altc_notes']      = 'Primary Intent';
                     // Stats columns - TEMPORARILY DISABLED for performance testing
                     // Each column makes get_post_meta() calls which causes query explosion
                     // TODO: Add proper meta cache priming before re-enabling
@@ -229,6 +328,7 @@ add_action('admin_init', function() {
                         'indexed' => ['color' => '#065f46', 'bg' => '#d1fae5'],      // Dark Green
                         'requested' => ['color' => '#0f766e', 'bg' => '#ccfbf1'],    // Teal - Waiting
                         'issue' => ['color' => '#991b1b', 'bg' => '#fee2e2'],        // Dark Red - Critical
+                        'no_index' => ['color' => '#dc2626', 'bg' => '#fee2e2'],     // Red - Excluded
                         '' => ['color' => '#6b7280', 'bg' => '#f3f4f6']               // Grey - Not Set
                     ];
                     $color = $colors[$val] ?? $colors[''];
@@ -236,33 +336,85 @@ add_action('admin_init', function() {
                          . esc_html($label) . '</span>';
                     break;
 
-		// LOCATION 1: In the admin column display (around line 160)
-		case 'bw_pillar':
-  		  $id = get_post_meta($post_id, 'bw_pillar_page_id', true);
-  		  if ($id) {
-    		    	$title = get_the_title($id);
-       			$purpose = get_post_meta($id, 'bw_purpose', true);
-        		$type_labels = [
-        		    'service-page' => ' [Service]',
-        		    'product-page' => ' [Product]',
-        		    'pillar' => ' [Pillar]'
-        		];
-        		$type_label = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
-        		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">'
-             			. esc_html($title . $type_label) . '</span>';
-    	       } else {
-        		echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;color:#999;">Not Set</span>';
-    		}
-    		break;         
-                case 'bw_notes':
-                    $notes = get_post_meta($post_id, 'bw_notes', true);
-    // Manual truncation that's more reliable with special characters
-    $display_notes = mb_strlen($notes) > 60 
-        ? mb_substr($notes, 0, 60) . '�' 
-        : $notes;
-    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_notes">'
-         . esc_html($display_notes) . '</span>';
-    break;
+                case 'bw_pillar':
+                    $id = get_post_meta($post_id, 'bw_pillar_page_id', true);
+                    if ($id) {
+                        $title = get_the_title($id);
+                        $purpose = get_post_meta($id, 'bw_purpose', true);
+                        $type_labels = [
+                            'service-page' => ' [Service]',
+                            'product-page' => ' [Product]',
+                            'pillar' => ' [Pillar]'
+                        ];
+                        $type_label = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
+                        echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">'
+                             . esc_html($title . $type_label) . '</span>';
+                    } else {
+                        echo '<span class="bw-cs-pillar" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;color:#999;">Not Set</span>';
+                    }
+                    break;
+                    
+                case 'bw_service_pathway':
+                    $id = get_post_meta($post_id, 'bw_service_pathway_id', true);
+                    if ($id) {
+                        $title = get_the_title($id);
+                        $purpose = get_post_meta($id, 'bw_purpose', true);
+                        $type_labels = [
+                            'service-page' => ' [Service]',
+                            'product-page' => ' [Product]',
+                            'conversion-hub' => ' [Hub]'
+                        ];
+                        $type_label = isset($type_labels[$purpose]) ? $type_labels[$purpose] : '';
+                        echo '<span class="bw-cs-service-pathway" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;text-decoration:underline dotted;">'
+                             . esc_html($title . $type_label) . '</span>';
+                    } else {
+                        echo '<span class="bw-cs-service-pathway" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;color:#999;">Not Set</span>';
+                    }
+                    break;
+                    
+                case 'bw_progress':
+                    $values = get_post_meta($post_id, 'workflow_progress', true);
+                    $opts = bw_cs_workflow_progress_options();
+                    if (!empty($values) && is_array($values)) {
+                        echo '<span class="bw-cs-progress" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;">';
+                        $tags = [];
+                        foreach ($values as $val) {
+                            if (isset($opts[$val])) {
+                                $cfg = $opts[$val];
+                                $tags[] = '<span style="display:inline-block;border-radius:3px;padding:2px 6px;font-size:10px;font-weight:600;color:' . esc_attr($cfg['color']) . ';background:' . esc_attr($cfg['bg']) . ';margin:1px;">' . esc_html($cfg['label']) . '</span>';
+                            }
+                        }
+                        echo implode('', $tags);
+                        echo '</span>';
+                    } else {
+                        echo '<span class="bw-cs-progress" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;color:#999;">Not Set</span>';
+                    }
+                    break;
+                    
+                case 'bw_next_step':
+                    $val = get_post_meta($post_id, 'content_plan', true);
+                    $opts = bw_cs_content_plan_options();
+                    if (!isset($opts[$val])) $val = '';
+                    $cfg = $opts[$val];
+                    printf(
+                        '<span class="bw-cs-next-step" data-post="%d" data-value="%s" title="Click to edit" style="display:inline-block;border-radius:3px;padding:3px 8px;font-size:11px;font-weight:600;color:%s;background:%s;cursor:pointer;">%s</span>',
+                        $post_id,
+                        esc_attr($val),
+                        esc_attr($cfg['color']),
+                        esc_attr($cfg['bg']),
+                        esc_html($cfg['label'])
+                    );
+                    break;
+                    
+                case 'bw_altc_notes':
+                    $notes = get_post_meta($post_id, 'bw_altc_notes', true);
+                    // Manual truncation that's more reliable with special characters
+                    $display_notes = mb_strlen($notes) > 60 
+                        ? mb_substr($notes, 0, 60) . '…' 
+                        : $notes;
+                    echo '<span class="bw-cs-text" data-post="' . esc_attr($post_id) . '" data-field="bw_altc_notes" style="cursor:pointer;">'
+                         . esc_html($display_notes ?: '—') . '</span>';
+                    break;
 
                 // Stats columns - TEMPORARILY DISABLED for performance testing
                 /*
@@ -303,11 +455,13 @@ add_action('admin_init', function() {
 foreach (['post', 'page'] as $pt) {
     add_filter("manage_edit-{$pt}_sortable_columns", function($cols) {
         // DEPRECATED: bw_topic removed - use ALTC Topic taxonomy instead
-        $cols['bw_intent']  = 'bw_intent';
-        $cols['bw_purpose'] = 'bw_purpose';
-        $cols['bw_opt']     = '_brt_opt_status';
-        $cols['bw_index']   = 'bw_index_status';
-        $cols['bw_pillar']  = 'bw_pillar_page_id';
+        $cols['bw_intent']          = 'bw_intent';
+        $cols['bw_purpose']         = 'bw_purpose';
+        $cols['bw_opt']             = '_brt_opt_status';
+        $cols['bw_index']           = 'bw_index_status';
+        $cols['bw_pillar']          = 'bw_pillar_page_id';
+        $cols['bw_service_pathway'] = 'bw_service_pathway_id';
+        $cols['bw_next_step']       = 'content_plan';
         // Stats columns - TEMPORARILY DISABLED
         // $cols['bw_word_count']     = 'bw_word_count';
         // $cols['bw_images']         = 'bw_image_count';
@@ -324,7 +478,7 @@ add_action('pre_get_posts', function($q) {
 
     // Text-based meta fields
     // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
-    if (in_array($orderby, ['bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id'], true)) {
+    if (in_array($orderby, ['bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id', 'bw_service_pathway_id', 'content_plan'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
     }
@@ -347,45 +501,84 @@ add_action('admin_enqueue_scripts', function($hook) {
     if (!$screen || !in_array($screen->post_type, bw_cs_post_types(), true)) return;
     
     // Get pillar pages for dropdown (all post types with qualifying purposes)
-$pillar_pages = get_posts([
-    'post_type'      => bw_cs_post_types(),
-    'posts_per_page' => -1,
-    'post_status'    => 'publish',
-    'orderby'        => 'title',
-    'order'          => 'ASC',
-    'meta_query'     => [
-        'relation' => 'OR',
-        [
-            'key'     => 'bw_purpose',
-            'value'   => 'pillar',
-            'compare' => '='
-        ],
-        [
-            'key'     => 'bw_purpose',
-            'value'   => 'service-page',
-            'compare' => '='
-        ],
-        [
-            'key'     => 'bw_purpose',
-            'value'   => 'product-page',
-            'compare' => '='
+    $pillar_pages = get_posts([
+        'post_type'      => bw_cs_post_types(),
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'meta_query'     => [
+            'relation' => 'OR',
+            [
+                'key'     => 'bw_purpose',
+                'value'   => 'pillar',
+                'compare' => '='
+            ],
+            [
+                'key'     => 'bw_purpose',
+                'value'   => 'service-page',
+                'compare' => '='
+            ],
+            [
+                'key'     => 'bw_purpose',
+                'value'   => 'product-page',
+                'compare' => '='
+            ]
         ]
-    ]
-]);
+    ]);
 
-$pillar_opts = ['0' => 'Not Set'];
-foreach ($pillar_pages as $p) {
-    $purpose = get_post_meta($p->ID, 'bw_purpose', true);
-    $type_labels = [
-        'service-page' => ' [Service]',
-        'product-page' => ' [Product]',
-        'pillar' => ' [Pillar]'
-    ];
-    $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
-    $pillar_opts[$p->ID] = get_the_title($p) . $type;
-}
+    $pillar_opts = ['0' => 'Not Set'];
+    foreach ($pillar_pages as $p) {
+        $purpose = get_post_meta($p->ID, 'bw_purpose', true);
+        $type_labels = [
+            'service-page' => ' [Service]',
+            'product-page' => ' [Product]',
+            'pillar' => ' [Pillar]'
+        ];
+        $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
+        $pillar_opts[$p->ID] = get_the_title($p) . $type;
+    }
     
-    wp_register_script('bw-cs-inline', false, ['jquery'], '1.2', true);
+    // Get service pathway pages for dropdown (service-page, product-page, conversion-hub)
+    $service_pathway_pages = get_posts([
+        'post_type'      => bw_cs_post_types(),
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'meta_query'     => [
+            'relation' => 'OR',
+            [
+                'key'     => 'bw_purpose',
+                'value'   => 'service-page',
+                'compare' => '='
+            ],
+            [
+                'key'     => 'bw_purpose',
+                'value'   => 'product-page',
+                'compare' => '='
+            ],
+            [
+                'key'     => 'bw_purpose',
+                'value'   => 'conversion-hub',
+                'compare' => '='
+            ]
+        ]
+    ]);
+
+    $service_pathway_opts = ['0' => 'Not Set'];
+    foreach ($service_pathway_pages as $p) {
+        $purpose = get_post_meta($p->ID, 'bw_purpose', true);
+        $type_labels = [
+            'service-page' => ' [Service]',
+            'product-page' => ' [Product]',
+            'conversion-hub' => ' [Hub]'
+        ];
+        $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : '';
+        $service_pathway_opts[$p->ID] = get_the_title($p) . $type;
+    }
+    
+    wp_register_script('bw-cs-inline', false, ['jquery'], '1.3', true);
     wp_add_inline_script('bw-cs-inline', '(function($){
         const nonce = "' . esc_js(wp_create_nonce('bw_cs_inline')) . '";
         const intentOpts = ' . wp_json_encode(bw_cs_intent_options()) . ';
@@ -393,6 +586,9 @@ foreach ($pillar_pages as $p) {
         const optOpts = ' . wp_json_encode(bw_cs_opt_status_options()) . ';
         const indexOpts = ' . wp_json_encode(bw_cs_index_status_options()) . ';
         const pillarOpts = ' . wp_json_encode($pillar_opts) . ';
+        const servicePathwayOpts = ' . wp_json_encode($service_pathway_opts) . ';
+        const progressOpts = ' . wp_json_encode(bw_cs_workflow_progress_options()) . ';
+        const nextStepOpts = ' . wp_json_encode(bw_cs_content_plan_options()) . ';
         
         let activeRequest = null; // Track active AJAX request
         
@@ -621,7 +817,7 @@ foreach ($pillar_pages as $p) {
             $select.prop("disabled", true);
             saveField(postId, "bw_pillar_page_id", value).done(function(resp) {
                 if (resp && resp.success) {
-                    const label = pillarOpts[value] || "�";
+                    const label = pillarOpts[value] || "—";
                     const $span = $("<span>", {
                         class: "bw-cs-pillar",
                         "data-post": postId,
@@ -630,6 +826,188 @@ foreach ($pillar_pages as $p) {
                             cursor: "pointer",
                             textDecoration: value > 0 ? "underline dotted" : "none",
                             color: value > 0 ? "#000" : "#999"
+                        }
+                    });
+                    $select.replaceWith($span);
+                } else {
+                    alert("Save failed");
+                    $select.prop("disabled", false).focus();
+                }
+            });
+        });
+        
+        // Service Pathway
+        $(document).on("click", ".bw-cs-service-pathway", function(e) {
+            e.preventDefault();
+            const $span = $(this);
+            const postId = $span.data("post");
+            
+            const $select = $("<select>", {
+                class: "bw-service-pathway-dropdown",
+                "data-post": postId
+            });
+            
+            $.each(servicePathwayOpts, function(key, label) {
+                $select.append($("<option>", { value: key, text: label }));
+            });
+            
+            $span.replaceWith($select);
+            $select.focus();
+        });
+        
+        $(document).on("change blur", ".bw-service-pathway-dropdown", function(e) {
+            const $select = $(this);
+            const postId = $select.data("post");
+            const value = $select.val();
+            
+            $select.prop("disabled", true);
+            saveField(postId, "bw_service_pathway_id", value).done(function(resp) {
+                if (resp && resp.success) {
+                    const label = servicePathwayOpts[value] || "—";
+                    const $span = $("<span>", {
+                        class: "bw-cs-service-pathway",
+                        "data-post": postId,
+                        text: label,
+                        css: {
+                            cursor: "pointer",
+                            textDecoration: value > 0 ? "underline dotted" : "none",
+                            color: value > 0 ? "#000" : "#999"
+                        }
+                    });
+                    $select.replaceWith($span);
+                } else {
+                    alert("Save failed");
+                    $select.prop("disabled", false).focus();
+                }
+            });
+        });
+        
+        // Progress (multi-select tags)
+        $(document).on("click", ".bw-cs-progress", function(e) {
+            e.preventDefault();
+            const $span = $(this);
+            const postId = $span.data("post");
+            
+            const $wrapper = $("<div>", {
+                class: "bw-progress-checkboxes",
+                "data-post": postId,
+                css: { padding: "6px", background: "#f9f9f9", borderRadius: "3px" }
+            });
+            
+            $.each(progressOpts, function(key, cfg) {
+                const $label = $("<label>", {
+                    css: { display: "block", fontSize: "11px", marginBottom: "3px", cursor: "pointer" }
+                });
+                const $cb = $("<input>", {
+                    type: "checkbox",
+                    value: key,
+                    css: { marginRight: "4px" }
+                });
+                $label.append($cb).append(cfg.label);
+                $wrapper.append($label);
+            });
+            
+            const $saveBtn = $("<button>", {
+                type: "button",
+                class: "button button-small bw-progress-save",
+                text: "Save",
+                css: { marginTop: "6px" }
+            });
+            $wrapper.append($saveBtn);
+            
+            $span.replaceWith($wrapper);
+        });
+        
+        $(document).on("click", ".bw-progress-save", function(e) {
+            e.preventDefault();
+            const $wrapper = $(this).closest(".bw-progress-checkboxes");
+            const postId = $wrapper.data("post");
+            const values = [];
+            
+            $wrapper.find("input:checked").each(function() {
+                values.push($(this).val());
+            });
+            
+            $(this).prop("disabled", true).text("Saving...");
+            saveField(postId, "workflow_progress", JSON.stringify(values)).done(function(resp) {
+                if (resp && resp.success) {
+                    let html = "";
+                    if (values.length > 0) {
+                        values.forEach(function(val) {
+                            if (progressOpts[val]) {
+                                const cfg = progressOpts[val];
+                                html += "<span style=\"display:inline-block;border-radius:3px;padding:2px 6px;font-size:10px;font-weight:600;color:" + cfg.color + ";background:" + cfg.bg + ";margin:1px;\">" + cfg.label + "</span>";
+                            }
+                        });
+                    } else {
+                        html = "Not Set";
+                    }
+                    const $span = $("<span>", {
+                        class: "bw-cs-progress",
+                        "data-post": postId,
+                        html: html,
+                        css: {
+                            cursor: "pointer",
+                            color: values.length > 0 ? "#000" : "#999"
+                        }
+                    });
+                    $wrapper.replaceWith($span);
+                } else {
+                    alert("Save failed");
+                    $wrapper.find(".bw-progress-save").prop("disabled", false).text("Save");
+                }
+            });
+        });
+        
+        // Next Step dropdown
+        $(document).on("click", ".bw-cs-next-step", function(e) {
+            e.preventDefault();
+            const $span = $(this);
+            const postId = $span.data("post");
+            const current = $span.data("value") || "";
+            
+            const $select = $("<select>", {
+                class: "bw-next-step-dropdown",
+                "data-post": postId,
+                css: { fontSize: "12px" }
+            });
+            
+            $.each(nextStepOpts, function(key, cfg) {
+                $select.append($("<option>", {
+                    value: key,
+                    text: cfg.label,
+                    selected: key === current
+                }));
+            });
+            
+            $span.replaceWith($select);
+            $select.focus();
+        });
+        
+        $(document).on("change blur", ".bw-next-step-dropdown", function(e) {
+            const $select = $(this);
+            const postId = $select.data("post");
+            const value = $select.val();
+            const cfg = nextStepOpts[value] || nextStepOpts[""];
+            
+            $select.prop("disabled", true);
+            saveField(postId, "content_plan", value).done(function(resp) {
+                if (resp && resp.success) {
+                    const $span = $("<span>", {
+                        class: "bw-cs-next-step",
+                        "data-post": postId,
+                        "data-value": value,
+                        title: "Click to edit",
+                        text: cfg.label,
+                        css: {
+                            display: "inline-block",
+                            borderRadius: "3px",
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            fontWeight: "600",
+                            color: cfg.color,
+                            background: cfg.bg,
+                            cursor: "pointer"
                         }
                     });
                     $select.replaceWith($span);
@@ -650,7 +1028,10 @@ foreach ($pillar_pages as $p) {
         .fixed .column-bw_purpose { width: 120px; }
         .fixed .column-bw_opt { width: 130px; }
         .fixed .column-bw_pillar { width: 140px; }
-        .fixed .column-bw_notes { width: 160px; }
+        .fixed .column-bw_service_pathway { width: 140px; }
+        .fixed .column-bw_progress { width: 180px; }
+        .fixed .column-bw_next_step { width: 100px; }
+        .fixed .column-bw_altc_notes { width: 180px; }
     ');
 });
 
@@ -670,14 +1051,25 @@ add_action('wp_ajax_bw_cs_save_field', function() {
         wp_send_json_error('No permission');
     }
     
-    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
-    $allowed = ['bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', '_brt_opt_status', 'bw_index_status'];
+    // Allowed fields for inline editing
+    $allowed = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', 'bw_service_pathway_id', '_brt_opt_status', 'bw_index_status', 'workflow_progress', 'content_plan'];
     if (!in_array($field, $allowed, true)) {
         wp_send_json_error('Invalid field');
     }
     
-    if ($field === 'bw_pillar_page_id') {
+    // Handle different field types
+    if (in_array($field, ['bw_pillar_page_id', 'bw_service_pathway_id'], true)) {
         $value = absint($value);
+    } elseif ($field === 'workflow_progress') {
+        // Handle array field (multi-select tags)
+        $value = json_decode($value, true);
+        if (!is_array($value)) {
+            $value = [];
+        }
+        $value = array_map('sanitize_text_field', $value);
+    } elseif ($field === 'bw_altc_notes') {
+        // Textarea field - preserve newlines
+        $value = sanitize_textarea_field($value);
     } else {
         $value = sanitize_text_field($value);
     }
@@ -693,48 +1085,53 @@ add_action('quick_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 add_action('bulk_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 
 function bw_cs_quick_bulk_box($col, $post_type) {
-    // DEPRECATED: bw_topic removed - use ALTC Topic taxonomy instead
-    if (!in_array($col, ['bw_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_opt', 'bw_index'], true)) return;
+    // Allowed columns for quick/bulk edit
+    $allowed_cols = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_service_pathway', 'bw_opt', 'bw_index', 'bw_progress', 'bw_next_step'];
+    if (!in_array($col, $allowed_cols, true)) return;
     if (!in_array($post_type, bw_cs_post_types(), true)) return;
 
     // Detect if this is bulk edit (hide notes field for bulk edit)
     $is_bulk = (current_filter() === 'bulk_edit_custom_box');
 
     // Hide notes field in bulk edit
-    if ($is_bulk && $col === 'bw_notes') return;
+    if ($is_bulk && $col === 'bw_altc_notes') return;
 
+    // Get pillar pages for dropdown
     $pillar_pages = get_posts([
-    'post_type' => bw_cs_post_types(),
-    'posts_per_page' => -1,
-    'post_status' => 'publish',
-    'orderby' => 'title',
-    'order' => 'ASC',
-    'meta_query' => [
-        'relation' => 'OR',
-        [
-            'key' => 'bw_purpose',
-            'value' => 'pillar',
-            'compare' => '='
-        ],
-        [
-            'key' => 'bw_purpose',
-            'value' => 'service-page',
-            'compare' => '='
-        ],
-        [
-            'key' => 'bw_purpose',
-            'value' => 'product-page',
-            'compare' => '='
+        'post_type' => bw_cs_post_types(),
+        'posts_per_page' => -1,
+        'post_status' => 'publish',
+        'orderby' => 'title',
+        'order' => 'ASC',
+        'meta_query' => [
+            'relation' => 'OR',
+            ['key' => 'bw_purpose', 'value' => 'pillar', 'compare' => '='],
+            ['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
+            ['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '=']
         ]
-    ]
-]);    ?>
+    ]);
+    
+    // Get service pathway pages for dropdown
+    $service_pathway_pages = get_posts([
+        'post_type' => bw_cs_post_types(),
+        'posts_per_page' => -1,
+        'post_status' => 'publish',
+        'orderby' => 'title',
+        'order' => 'ASC',
+        'meta_query' => [
+            'relation' => 'OR',
+            ['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
+            ['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '='],
+            ['key' => 'bw_purpose', 'value' => 'conversion-hub', 'compare' => '=']
+        ]
+    ]);
+    ?>
     <fieldset class="inline-edit-col-left">
         <div class="inline-edit-col">
             <?php
-            // DEPRECATED: bw_topic field removed - use ALTC Topic taxonomy instead
-            if ($col === 'bw_notes'): ?>
-                <label><span class="title">Content Notes</span>
-                    <textarea name="bw_notes" rows="2"></textarea>
+            if ($col === 'bw_altc_notes'): ?>
+                <label><span class="title">Primary Intent</span>
+                    <textarea name="bw_altc_notes" rows="2"></textarea>
                 </label>
             <?php elseif ($col === 'bw_intent'): ?>
                 <label><span class="title">Intent</span>
@@ -760,27 +1157,73 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                 </label>
             <?php elseif ($col === 'bw_pillar'): ?>
                 <label><span class="title">Pillar Page</span>
-                  <select name="bw_pillar_page_id">
-                    <?php if ($is_bulk): ?>
-                        <option value="">-- No Change --</option>
-                    <?php else: ?>
-                        <option value="">Not Set</option>
-                    <?php endif; ?>
-   		     <?php foreach ($pillar_pages as $p):
-    			    $purpose = get_post_meta($p->ID, 'bw_purpose', true);
-    			    $type_labels = [
-        			'service-page' => ' [Service]',
-        			'product-page' => ' [Product]',
-        			'pillar' => ' [Pillar]'
-    			    ];
- 			    $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
-    			?>
-        			<option value="<?php echo esc_attr($p->ID); ?>">
-           			 <?php echo esc_html(get_the_title($p) . $type); ?>
-        			</option>
-    			<?php endforeach; ?>
-		  </select>
-		</label>
+                    <select name="bw_pillar_page_id">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php else: ?>
+                            <option value="">Not Set</option>
+                        <?php endif; ?>
+                        <?php foreach ($pillar_pages as $p):
+                            $purpose = get_post_meta($p->ID, 'bw_purpose', true);
+                            $type_labels = [
+                                'service-page' => ' [Service]',
+                                'product-page' => ' [Product]',
+                                'pillar' => ' [Pillar]'
+                            ];
+                            $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
+                        ?>
+                            <option value="<?php echo esc_attr($p->ID); ?>">
+                                <?php echo esc_html(get_the_title($p) . $type); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            <?php elseif ($col === 'bw_service_pathway'): ?>
+                <label><span class="title">Service Pathway</span>
+                    <select name="bw_service_pathway_id">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php else: ?>
+                            <option value="">Not Set</option>
+                        <?php endif; ?>
+                        <?php foreach ($service_pathway_pages as $p):
+                            $purpose = get_post_meta($p->ID, 'bw_purpose', true);
+                            $type_labels = [
+                                'service-page' => ' [Service]',
+                                'product-page' => ' [Product]',
+                                'conversion-hub' => ' [Hub]'
+                            ];
+                            $type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : '';
+                        ?>
+                            <option value="<?php echo esc_attr($p->ID); ?>">
+                                <?php echo esc_html(get_the_title($p) . $type); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            <?php elseif ($col === 'bw_progress'): ?>
+                <label><span class="title">Progress</span>
+                    <input type="hidden" name="workflow_progress_touched" value="1">
+                    <div class="bw-progress-checkboxes-edit" style="margin-top:4px;">
+                        <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): ?>
+                            <label style="display:block;font-size:11px;margin-bottom:2px;">
+                                <input type="checkbox" name="workflow_progress[]" value="<?php echo esc_attr($key); ?>">
+                                <?php echo esc_html($cfg['label']); ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </label>
+            <?php elseif ($col === 'bw_next_step'): ?>
+                <label><span class="title">Next Step</span>
+                    <select name="content_plan">
+                        <?php if ($is_bulk): ?>
+                            <option value="">-- No Change --</option>
+                        <?php endif; ?>
+                        <?php foreach (bw_cs_content_plan_options() as $key => $cfg): ?>
+                            <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($cfg['label']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
             <?php elseif ($col === 'bw_opt'): ?>
                 <label><span class="title">Optimization</span>
                     <select name="_brt_opt_status">
@@ -822,8 +1265,8 @@ add_action('admin_footer-edit.php', function() {
             var postId = (typeof id === 'object') ? this.getId(id) : id;
             var $row = $('#post-' + postId);
 
-            // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
-            $('textarea[name="bw_notes"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_notes"]').text().trim());
+            // Primary Intent (bw_altc_notes)
+            $('textarea[name="bw_altc_notes"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_altc_notes"]').text().trim());
             
             var intent = $row.find('.bw-cs-select[data-field="bw_intent"]').text().trim();
             $('select[name="bw_intent"] option', '.inline-edit-row').filter(function() {
@@ -842,6 +1285,10 @@ add_action('admin_footer-edit.php', function() {
             $('select[name="bw_index_status"] option', '.inline-edit-row').filter(function() {
                 return $(this).text() === indexStatus;
             }).prop('selected', true);
+            
+            // Next Step
+            var nextStepVal = $row.find('.bw-cs-next-step').data('value') || '';
+            $('select[name="content_plan"]', '.inline-edit-row').val(nextStepVal);
         };
     });
     </script>
@@ -866,14 +1313,16 @@ add_action('save_post', function($post_id) {
     // Check if this is bulk edit (skip empty values for bulk)
     $is_bulk_edit = isset($_REQUEST['bulk_edit']);
 
-    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
+    // Text/select fields
     $fields = [
-        'bw_notes'          => 'sanitize_textarea_field',
-        'bw_intent'         => 'sanitize_text_field',
-        'bw_purpose'        => 'sanitize_text_field',
-        'bw_pillar_page_id' => 'absint',
-        '_brt_opt_status'   => 'sanitize_text_field',
-        'bw_index_status'   => 'sanitize_text_field',
+        'bw_altc_notes'         => 'sanitize_textarea_field',
+        'bw_intent'             => 'sanitize_text_field',
+        'bw_purpose'            => 'sanitize_text_field',
+        'bw_pillar_page_id'     => 'absint',
+        'bw_service_pathway_id' => 'absint',
+        '_brt_opt_status'       => 'sanitize_text_field',
+        'bw_index_status'       => 'sanitize_text_field',
+        'content_plan'          => 'sanitize_text_field',
     ];
 
     foreach ($fields as $key => $sanitizer) {
@@ -888,6 +1337,20 @@ add_action('save_post', function($post_id) {
             update_post_meta($post_id, $key, $value);
         }
     }
+    
+    // Handle workflow_progress (multi-select checkboxes)
+    // Only update if the progress field was actually rendered in the form (marker field present)
+    if (isset($_REQUEST['workflow_progress'])) {
+        $progress = $_REQUEST['workflow_progress'];
+        if (is_array($progress)) {
+            $progress = array_map('sanitize_text_field', $progress);
+            update_post_meta($post_id, 'workflow_progress', $progress);
+        }
+    } elseif (!$is_bulk_edit && isset($_REQUEST['workflow_progress_touched'])) {
+        // Only clear if the progress section was rendered but no boxes checked
+        update_post_meta($post_id, 'workflow_progress', []);
+    }
+    // If neither condition met, leave existing workflow_progress unchanged
 });
 
 // ==========================
@@ -897,7 +1360,7 @@ add_action('add_meta_boxes', function() {
     foreach (bw_cs_post_types() as $pt) {
         add_meta_box(
             'bw_content_strategy',
-            'Content Strategy',
+            'Content Management',
             'bw_cs_render_metabox',
             $pt,
             'side',
@@ -909,26 +1372,33 @@ add_action('add_meta_boxes', function() {
 function bw_cs_render_metabox($post) {
     wp_nonce_field('bw_cs_metabox', 'bw_cs_nonce');
 
-    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
+    // Get current values
     $intent = get_post_meta($post->ID, 'bw_intent', true);
     $purpose = get_post_meta($post->ID, 'bw_purpose', true);
     $pillar = get_post_meta($post->ID, 'bw_pillar_page_id', true);
-    $notes = get_post_meta($post->ID, 'bw_notes', true);
     $opt = get_post_meta($post->ID, '_brt_opt_status', true);
+    $index_status = get_post_meta($post->ID, 'bw_index_status', true);
+    $workflow_progress = get_post_meta($post->ID, 'workflow_progress', true);
+    $content_plan = get_post_meta($post->ID, 'content_plan', true);
     
+    if (!is_array($workflow_progress)) {
+        $workflow_progress = [];
+    }
+    
+    // Get pillar pages for dropdown
     $pillar_pages = get_posts([
-    	'post_type' => bw_cs_post_types(),
-    	'posts_per_page' => -1,
-    	'post_status' => 'publish',
-    	'orderby' => 'title',
-    	'order' => 'ASC',
-    	'meta_query' => [
-        	'relation' => 'OR',
-        	['key' => 'bw_purpose', 'value' => 'pillar', 'compare' => '='],
-        	['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
-        	['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '=']
-    	]
-	]);
+        'post_type' => bw_cs_post_types(),
+        'posts_per_page' => -1,
+        'post_status' => 'publish',
+        'orderby' => 'title',
+        'order' => 'ASC',
+        'meta_query' => [
+            'relation' => 'OR',
+            ['key' => 'bw_purpose', 'value' => 'pillar', 'compare' => '='],
+            ['key' => 'bw_purpose', 'value' => 'service-page', 'compare' => '='],
+            ['key' => 'bw_purpose', 'value' => 'product-page', 'compare' => '=']
+        ]
+    ]);
 ?>
     <style>
         .bw-cs-field { margin-bottom: 12px; }
@@ -938,9 +1408,32 @@ function bw_cs_render_metabox($post) {
         .bw-cs-field textarea { width: 100%; }
         .bw-cs-field textarea { min-height: 60px; }
         .bw-cs-help { font-size: 11px; color: #666; margin-top: 2px; }
+        .bw-progress-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .bw-progress-tags label { 
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 8px; border-radius: 4px; 
+            font-size: 11px; cursor: pointer; 
+            background: #f5f5f5; color: #999;
+            border: 1px solid #ddd;
+            transition: all 0.15s ease;
+            opacity: 0.6;
+        }
+        .bw-progress-tags label:hover { 
+            opacity: 0.85;
+            border-color: #bbb;
+        }
+        .bw-progress-tags label.is-selected {
+            opacity: 1;
+            font-weight: 600;
+            border-color: currentColor;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .bw-progress-tags input[type="checkbox"] { 
+            width: 14px; height: 14px; 
+            margin: 0; cursor: pointer;
+            accent-color: currentColor;
+        }
     </style>
-
-    <?php /* DEPRECATED: bw_page_topic field removed - use ALTC Topic taxonomy instead */ ?>
 
     <div class="bw-cs-field">
         <label for="bw_intent">Intent</label>
@@ -951,8 +1444,8 @@ function bw_cs_render_metabox($post) {
                 </option>
             <?php endforeach; ?>
         </select>
+        <p class="bw-cs-help">User search intent</p>
     </div>
-    <p class="bw-cs-help">User search intent</p>
 
     <div class="bw-cs-field">
         <label for="bw_purpose">Purpose</label>
@@ -963,34 +1456,32 @@ function bw_cs_render_metabox($post) {
                 </option>
             <?php endforeach; ?>
         </select>
+        <p class="bw-cs-help">Content purpose in strategy</p>
     </div>
-    <p class="bw-cs-help">Content purpose in strategy</p>
-    <p class="bw-cs-help" style="margin-top: 6px; padding: 8px; background: #e7f5fe; border-left: 3px solid #00a0d2;">
-        <strong>💡 Tip:</strong> Diversifying content types (case studies, resource guides, etc.) within a topic reduces cannibalization risk.
-    </p>
     
     <div class="bw-cs-field">
         <label for="bw_pillar_page_id">Pillar Page</label>
-	<select id="bw_pillar_page_id" name="bw_pillar_page_id">
-    		<option value="">Not Set</option>
-    		<?php foreach ($pillar_pages as $p):
-        		$purpose = get_post_meta($p->ID, 'bw_purpose', true);
-        		$type_labels = [
-        		    'service-page' => ' [Service]',
-        		    'product-page' => ' [Product]',
-        		    'pillar' => ' [Pillar]'
-        		];
-        		$type = isset($type_labels[$purpose]) ? $type_labels[$purpose] : ' [Pillar]';
-    		?>
-        	<option value="<?php echo esc_attr($p->ID); ?>" <?php selected($pillar, $p->ID); ?>>
-            <?php echo esc_html(get_the_title($p) . $type); ?>
-        </option>
-    <?php endforeach; ?>
-</select>        <p class="bw-cs-help">Link to parent pillar content</p>
+        <select id="bw_pillar_page_id" name="bw_pillar_page_id">
+            <option value="">Not Set</option>
+            <?php foreach ($pillar_pages as $p):
+                $p_purpose = get_post_meta($p->ID, 'bw_purpose', true);
+                $type_labels = [
+                    'service-page' => ' [Service]',
+                    'product-page' => ' [Product]',
+                    'pillar' => ' [Pillar]'
+                ];
+                $type = isset($type_labels[$p_purpose]) ? $type_labels[$p_purpose] : ' [Pillar]';
+            ?>
+                <option value="<?php echo esc_attr($p->ID); ?>" <?php selected($pillar, $p->ID); ?>>
+                    <?php echo esc_html(get_the_title($p) . $type); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="bw-cs-help">Link to parent pillar content</p>
     </div>
     
     <div class="bw-cs-field">
-        <label for="_brt_opt_status">Optimization Status</label>
+        <label for="_brt_opt_status">Optimization Status <em style="font-weight:normal;color:#999;">(Legacy)</em></label>
         <select id="_brt_opt_status" name="_brt_opt_status" style="width:100%;">
             <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
                 <option value="<?php echo esc_attr($key); ?>" <?php selected($opt, $key); ?>>
@@ -998,28 +1489,66 @@ function bw_cs_render_metabox($post) {
                 </option>
             <?php endforeach; ?>
         </select>
-        <p class="bw-cs-help">Internal tracking only</p>
+        <p class="bw-cs-help">Legacy field - to be deprecated</p>
+    </div>
+    
+    <div class="bw-cs-field">
+        <label>Progress</label>
+        <div class="bw-progress-tags">
+            <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): 
+                $is_checked = in_array($key, $workflow_progress, true);
+            ?>
+                <label class="<?php echo $is_checked ? 'is-selected' : ''; ?>" style="<?php echo $is_checked ? 'color:' . esc_attr($cfg['color']) . ';background:' . esc_attr($cfg['bg']) . ';' : ''; ?>" data-color="<?php echo esc_attr($cfg['color']); ?>" data-bg="<?php echo esc_attr($cfg['bg']); ?>">
+                    <input type="checkbox" name="workflow_progress[]" value="<?php echo esc_attr($key); ?>" <?php checked($is_checked); ?>>
+                    <span><?php echo esc_html($cfg['label']); ?></span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        <p class="bw-cs-help">Track content creation stages</p>
+    </div>
+    <script>
+    jQuery(document).ready(function($) {
+        $('.bw-progress-tags input[type="checkbox"]').on('change', function() {
+            var $label = $(this).closest('label');
+            if (this.checked) {
+                $label.addClass('is-selected')
+                      .css({
+                          'color': $label.data('color'),
+                          'background': $label.data('bg')
+                      });
+            } else {
+                $label.removeClass('is-selected')
+                      .css({
+                          'color': '#999',
+                          'background': '#f5f5f5'
+                      });
+            }
+        });
+    });
+    </script>
+    
+    <div class="bw-cs-field">
+        <label for="content_plan">Next Step</label>
+        <select id="content_plan" name="content_plan" style="width:100%;">
+            <?php foreach (bw_cs_content_plan_options() as $key => $cfg): ?>
+                <option value="<?php echo esc_attr($key); ?>" <?php selected($content_plan, $key); ?>>
+                    <?php echo esc_html($cfg['label']); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="bw-cs-help">Current content action status</p>
     </div>
 
     <div class="bw-cs-field">
         <label for="bw_index_status">Index Status</label>
         <select id="bw_index_status" name="bw_index_status" style="width:100%;">
-            <?php
-            $index_status = get_post_meta($post->ID, 'bw_index_status', true);
-            foreach (bw_cs_index_status_options() as $key => $label):
-            ?>
+            <?php foreach (bw_cs_index_status_options() as $key => $label): ?>
                 <option value="<?php echo esc_attr($key); ?>" <?php selected($index_status, $key); ?>>
                     <?php echo esc_html($label); ?>
                 </option>
             <?php endforeach; ?>
         </select>
         <p class="bw-cs-help">Search engine indexing status</p>
-    </div>
-
-    <div class="bw-cs-field">
-        <label for="bw_notes">Content Notes</label>
-        <textarea id="bw_notes" name="bw_notes" rows="3" placeholder="Internal notes..."><?php echo esc_textarea($notes); ?></textarea>
-        <p class="bw-cs-help">Optional internal note about content strategy</p>
     </div>
     <?php
 }
@@ -1036,20 +1565,29 @@ add_action('save_post', function($post_id) {
 
     if (!current_user_can('edit_post', $post_id)) return;
 
-    // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
+    // Text/select fields
     $fields = [
-        'bw_notes'          => 'sanitize_textarea_field',
-        'bw_intent'         => 'sanitize_text_field',
-        'bw_purpose'        => 'sanitize_text_field',
-        'bw_pillar_page_id' => 'absint',
-        '_brt_opt_status'   => 'sanitize_text_field',
-        'bw_index_status'   => 'sanitize_text_field',
+        'bw_intent'             => 'sanitize_text_field',
+        'bw_purpose'            => 'sanitize_text_field',
+        'bw_pillar_page_id'     => 'absint',
+        '_brt_opt_status'       => 'sanitize_text_field',
+        'bw_index_status'       => 'sanitize_text_field',
+        'content_plan'          => 'sanitize_text_field',
     ];
     
     foreach ($fields as $key => $sanitizer) {
         if (isset($_POST[$key])) {
             update_post_meta($post_id, $key, call_user_func($sanitizer, $_POST[$key]));
         }
+    }
+    
+    // Handle workflow_progress (multi-select checkboxes)
+    if (isset($_POST['workflow_progress']) && is_array($_POST['workflow_progress'])) {
+        $progress = array_map('sanitize_text_field', $_POST['workflow_progress']);
+        update_post_meta($post_id, 'workflow_progress', $progress);
+    } else {
+        // If no checkboxes selected, save empty array
+        update_post_meta($post_id, 'workflow_progress', []);
     }
 }, 10);
 
@@ -1072,24 +1610,22 @@ add_action('save_post', function($post_id) {
  * - impression tracking (brighter-ga4-enhanced.js:229)
  * - form interactions (brighter-ga4-enhanced.js:252, 262)
  *
- * The data flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
+ * The data flows: WordPress → window.brighterSCOS → getBaseParams() → gtag()
  */
 
 /**
- * DATA INJECTION MOVED TO scos-car-injection.php
+ * DATA INJECTION HANDLED BY scos-car-injection.php
  * 
- * The window.brighterContentStrategy object is now injected by
- * brighter-core/includes/scos-car-injection.php as part of the 
- * consolidated SCOS CAR (Content Architecture Record) structure.
+ * Content strategy metadata is injected by brighter-core/includes/scos-car-injection.php
+ * as part of the SCOS CAR (Content Architecture Record) structure.
  * 
- * This consolidation provides:
- * - Single source of truth for content metadata
- * - Better AI agent readability (window.brighterSCOS)
- * - Backwards compatibility maintained
- * - Reduced code complexity
+ * The SCOS CAR provides:
+ * - Single source of truth for content metadata (window.brighterSCOS)
+ * - Machine-readable structure for AI agents
+ * - All GA4 tracking scripts use window.brighterSCOS directly
+ * - Reduced code complexity and better maintainability
  * 
- * The data still flows: WordPress → window.brighterContentStrategy → getBaseParams() → gtag()
- * But now it's generated from the SCOS CAR structure.
+ * The data flows: WordPress → window.brighterSCOS → getBaseParams() → gtag()
  * 
  * See: brighter-core/includes/scos-car-injection.php
  */

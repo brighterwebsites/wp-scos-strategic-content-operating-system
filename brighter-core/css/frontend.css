@@ -98,7 +98,7 @@ body.admin-bar a.skip-link.screen-reader-text {
 
 .tldr-summary {
     background: #f8f9fa;
-    border-left: 4px solid #0073aa;
+    border-left: 4px solid var(--bde-brand-primary-color);
     padding: 1.5rem;
     margin: 2rem 0;
     border-radius: 4px;
@@ -108,7 +108,7 @@ body.admin-bar a.skip-link.screen-reader-text {
     margin-top: 0;
     margin-bottom: 1rem;
     font-size: 1.2em;
-    color: #0073aa;
+    color: #303030;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -173,7 +173,7 @@ body.admin-bar a.skip-link.screen-reader-text {
 .bw-faq-section[data-format="plain"] .bw-faq-answer {
     margin-bottom: 1.5rem;
     padding-left: 1rem;
-    border-left: 3px solid #0073aa;
+    border-left: 3px solid var(--bde-brand-primary-color);  
 }
 
 /* ============================================
@@ -192,4 +192,82 @@ img.litespeed-loaded {
     -moz-transition: opacity .5s linear 0.2s;
     transition: opacity .5s linear 0.2s;
     opacity: 1;
+}
+
+/* ============================================
+ * BREADCRUMB SHORTCODE STYLES
+ * ============================================ */
+
+.bw-breadcrumbs-wrap {
+    position: relative;
+    overflow: hidden;
+}
+
+ul.bw-breadcrumbs {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-inline-start: 0;
+    margin: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.bw-breadcrumbs::-webkit-scrollbar {
+    display: none;
+}
+
+.bw-breadcrumbs > li:first-child {
+    list-style-type: none;
+}
+
+.bw-breadcrumbs li::marker {
+    color: var(--bde-brand-primary-color);
+}
+
+.bw-breadcrumbs li {
+    white-space: nowrap;
+    list-style-position: inside;
+    list-style-type: square;
+}
+
+.bw-breadcrumbs li,
+.bw-breadcrumbs li a {
+    color: var(--bde-body-text-color);
+    font-size: 18px;
+    text-decoration-line: none;
+    text-transform: uppercase;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 1px;
+    margin-bottom: 5px;
+}
+
+.bw-breadcrumbs li a:hover {
+    color: var(--bde-button-text-text-color-hover);
+}
+
+/* Overflow fade indicator */
+.bw-breadcrumbs-wrap.is-overflowing::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.35) 100%
+    );
+}
+
+@media (max-width: 675px) {
+    .bw-breadcrumbs li,
+    .bw-breadcrumbs li a {
+        font-size: 14px;
+    }
 }

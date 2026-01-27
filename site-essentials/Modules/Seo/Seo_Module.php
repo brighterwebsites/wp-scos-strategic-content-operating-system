@@ -140,6 +140,10 @@ class Seo_Module implements Module_Interface {
         // Add admin notices for conflicting plugins
         if (is_admin()) {
             add_action('admin_notices', [$this, 'check_conflicts']);
+            
+            // Initialize Schema Meta Box for post/page editors
+            require_once __DIR__ . '/Schema_Meta_Box.php';
+            Schema_Meta_Box::init();
         }
     }
 

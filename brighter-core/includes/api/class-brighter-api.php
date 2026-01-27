@@ -168,7 +168,7 @@ class Brighter_API {
         }
 
         // Only clear cache for relevant post types
-        $relevant_types = array('post', 'page', 'folio', 'kb', 'news', 'faq');
+        $relevant_types = array('post', 'page', 'folio', 'kb', 'news', 'faq', 'projects');
         if (in_array($post->post_type, $relevant_types, true)) {
             Brighter_API_Endpoints::clear_cache();
         }

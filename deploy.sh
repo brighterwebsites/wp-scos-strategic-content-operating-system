@@ -13,15 +13,22 @@ TEMP_DIR="/tmp/mu-plugin-deploy-$$"
 
 # Sites to deploy to
 declare -A SITES=(
-    ["baseb5993"]="/home/base.bweb1.com.au/public_html"
-    ["lucid7419"]="/home/lucidlearners.com.au/public_html"
-    ["south6867"]="/home/southbrislawn.com.au/public_html"
-    ["brighterwebsites"]="/home/daylesfordgardener.com.au/public_html"
-    ["pawsforsupport"]="/home/ballaratlawncare.com.au/public_html"
-    ["oneteamqld"]="/home/abandonstress.com.au/public_html"
-    ["guerillasteelstables"]="/home/nmxstudio.com.au/public_html"
+    ["brigh1978"]="/home/brighterwebsites.com.au/public_html"
+    ["onete1610"]="/home/oneteamqld.com.au/public_html"
+    ["gueri4801"]="/home/guerillasteelstables.com.au/public_html"
+    ["lucid3796"]="/home/lucidlearners.com.au/public_html"
+    ["aband3945"]="/home/abandonstress.com.au/stage.abandonstress.com.au"
+   
+) 
+ #   ["nmxstudio"]="/home/nmxstudio.com.au/public_html"
+ #   ["south6867"]="/home/southbrislawn.com.au/public_html"
+ #   ["daylesfordgardener"]="/home/daylesfordgardener.com.au/public_html"
+ #   ["ballaratlawncare"]="/home/ballaratlawncare.com.au/public_html"
+ #   ["baseb5993"]="/home/base.bweb1.com.au/public_html"
+ #   ["cubew3861"]="/home/cubewebservices.com.au/public_html"
+ #   ["mensf8194 "]="/home/mensfinanceadvice.com.au/public_html"
+ # ["sunse5067"]="/home/sunsetbookkeeping.com.au/public_html"
 
-)
 
 #   ["cubew3861"]="/home/cubewebservices.com.au/public_html"
 #   ["mensf8194 "]="/home/mensfinanceadvice.com.au/public_html"

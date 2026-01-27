@@ -60,7 +60,9 @@ function brighter_get_whitelisted_modules() {
             'bw-content-strategy',
             'bw-ga4-seeder',
             'bw-ga4-seed-admin',
+            'bw-schema-admin',              // Schema admin interface (Local Business Schema settings)
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
+            'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
             'bw-faq',
             // ALTC modules
@@ -81,6 +83,7 @@ function brighter_get_whitelisted_modules() {
             'class-tldr-meta-box', // TLDR field meta box (admin only)
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
+            'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
         ];
     }
 
@@ -141,13 +144,16 @@ function brighter_load_module($module) {
     }
     
     if (!file_exists($real_path)) {
-        error_log('Brighter Core: Module not found: ' . esc_html($module));
+        error_log('Brighter Core: Module not found: ' . esc_html($module) . ' at path: ' . $real_path);
         return false;
     }
     
     try {
         require_once $real_path;
         $loaded[$module] = true;
+        if ($module === 'bw-schema-admin') {
+            error_log('Brighter Core: bw-schema-admin module loaded successfully from: ' . $real_path);
+        }
         return true;
     } catch (Exception $e) {
         error_log('Brighter Core: Error loading module ' . esc_html($module) . ': ' . esc_html($e->getMessage()));
@@ -171,10 +177,13 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
+        'bw-schema-admin',
+
 	'bw-content-strategy',
  	'bw-ga4-seeder',
  	'bw-ga4-seed-admin',
 	'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
+	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
         'bw-faq',
         'privacy-policy-style',
@@ -194,6 +203,7 @@ function brighter_load_modules() {
         'class-tldr-meta-box', // TLDR field meta box (admin only)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
         'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
+        'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
     ];
 
     // Admin-only modules (backend only, not frontend)
@@ -203,6 +213,7 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
+        // NOTE: bw-schema-admin moved to main modules list (will move to Site Essentials SEO module later)
         // ALTC admin modules
         'class-altc-meta-boxes',
         'class-altc-admin-columns',
@@ -217,14 +228,10 @@ function brighter_load_modules() {
        // 'brighter-tweaks',
     ];
     
-    $is_admin = is_admin();
-    
+    // Load all modules - admin-only modules are safe to load on frontend
+    // They simply won't register hooks/menus if not in admin context
+    // This ensures admin menus work reliably regardless of when MU plugins load
     foreach ($modules as $module) {
-        // Skip admin-only modules on frontend
-        if (!$is_admin && in_array($module, $admin_only, true)) {
-            continue;
-        }
-        
         brighter_load_module($module);
     }
 }
@@ -289,6 +296,25 @@ function brighter_core_enqueue_frontend_styles() {
     );
 }
 add_action('wp_enqueue_scripts', 'brighter_core_enqueue_frontend_styles', 20);
+
+/**
+ * Enqueue frontend JavaScript
+ */
+function brighter_core_enqueue_frontend_scripts() {
+    if (is_admin()) return;
+    
+    // Breadcrumb overflow detection
+    if (file_exists(BRIGHTER_CORE_PATH . 'js/breadcrumbs.js')) {
+        wp_enqueue_script(
+            'brighter-breadcrumbs',
+            BRIGHTER_CORE_URL . 'js/breadcrumbs.js',
+            array(),
+            BRIGHTER_CORE_VERSION,
+            true // Load in footer
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'brighter_core_enqueue_frontend_scripts', 20);
 
 /**
  * Plugin activation hook

@@ -174,7 +174,7 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
-        'bw-schema-admin',
+        // 'bw-schema-admin',  // DISABLED
 
 	'bw-content-strategy',
  	'bw-ga4-seeder',
@@ -210,7 +210,7 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
-        // NOTE: bw-schema-admin moved to main modules list (will move to Site Essentials SEO module later)
+        // NOTE: bw-schema-admin DISABLED (commented out in modules list and whitelist)
         // ALTC admin modules
         'class-altc-meta-boxes',
         'class-altc-admin-columns',

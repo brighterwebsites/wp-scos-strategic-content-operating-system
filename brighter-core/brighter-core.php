@@ -60,7 +60,7 @@ function brighter_get_whitelisted_modules() {
             'bw-content-strategy',
             'bw-ga4-seeder',
             'bw-ga4-seed-admin',
-            // 'bw-schema-admin',              // Schema admin interface (Local Business Schema settings) - DISABLED
+            'bw-schema-admin',              // Schema admin interface (Local Business Schema settings)
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
@@ -174,7 +174,7 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
-        // 'bw-schema-admin',  // DISABLED
+        'bw-schema-admin',
 
 	'bw-content-strategy',
  	'bw-ga4-seeder',
@@ -210,7 +210,7 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
-        // NOTE: bw-schema-admin DISABLED (commented out in modules list and whitelist)
+        // NOTE: bw-schema-admin must be in main modules list (not admin-only) to work properly
         // ALTC admin modules
         'class-altc-meta-boxes',
         'class-altc-admin-columns',

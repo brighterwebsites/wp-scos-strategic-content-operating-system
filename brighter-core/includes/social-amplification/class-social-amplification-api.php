@@ -64,10 +64,11 @@ class BW_Social_Amplification_API {
             )
         ));
 
-        // Generate AI prompt
+        // Prompt-data for Make.com (Gemini → GPT flow). No prompt built here; returns structured JSON.
+        // See PROMPT-DATA-ENDPOINT.md for scenario, strategy, request/response.
         register_rest_route(self::NAMESPACE, '/social-amplification/generate-prompt', array(
             'methods'  => 'GET',
-            'callback' => array($this, 'generate_prompt'),
+            'callback' => array($this, 'get_prompt_data'),
             'permission_callback' => array($this->auth, 'verify_token'),
             'args' => array(
                 'post_id' => array(
@@ -75,11 +76,7 @@ class BW_Social_Amplification_API {
                     'type'              => 'integer',
                     'required'          => false,
                     'validate_callback' => function($value, $request, $key) {
-                        // Allow empty if url is provided
-                        if (empty($value) && !empty($request->get_param('url'))) {
-                            return true;
-                        }
-                        // Otherwise validate as integer
+                        if (empty($value) && !empty($request->get_param('url'))) return true;
                         return empty($value) || is_numeric($value);
                     }
                 ),
@@ -89,35 +86,9 @@ class BW_Social_Amplification_API {
                     'format'            => 'uri',
                     'required'          => false,
                     'validate_callback' => function($value, $request, $key) {
-                        // Allow empty if post_id is provided
-                        if (empty($value) && !empty($request->get_param('post_id'))) {
-                            return true;
-                        }
-                        // Otherwise validate as URL
+                        if (empty($value) && !empty($request->get_param('post_id'))) return true;
                         return empty($value) || filter_var($value, FILTER_VALIDATE_URL);
                     }
-                ),
-                'talking_point_id' => array(
-                    'description' => 'Talking point ID',
-                    'type'        => 'integer',
-                    'required'    => true
-                ),
-                'cta_focus' => array(
-                    'description' => 'CTA focus type',
-                    'type'        => 'string',
-                    'enum'        => array('learn', 'engage', 'act'),
-                    'required'    => true
-                ),
-                'platform' => array(
-                    'description' => 'Social platform',
-                    'type'        => 'string',
-                    'enum'        => array('facebook', 'linkedin', 'twitter', 'instagram', 'gmb'),
-                    'required'    => true
-                ),
-                'word_count' => array(
-                    'description' => 'Target word count',
-                    'type'        => 'integer',
-                    'required'    => false
                 )
             )
         ));
@@ -207,7 +178,7 @@ class BW_Social_Amplification_API {
                         'url'          => get_permalink(),
                         'excerpt'      => get_the_excerpt(),
                         'post_type'    => $post_type,
-                        'content_type' => $this->determine_content_type($post_id, $post_type),
+                        'content_type' => BW_Content_Type_Helper::get_content_type($post_id, $post_type),
                         'date'         => get_the_date('c'),
                         'modified'     => get_the_modified_date('c')
                     );
@@ -256,22 +227,23 @@ class BW_Social_Amplification_API {
     }
 
     /**
-     * Generate AI prompt for social post
+     * Get prompt-data for Make.com (Gemini → GPT flow).
+     *
+     * Returns structured JSON only. No prompt is built here; Make builds it from this data.
+     * Step 1: Gemini uses framing_options, source_material, context, count_h2.
+     * Step 2: GPT uses Gemini output + selected fields from this response.
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response|WP_Error
      */
-    public function generate_prompt($request) {
+    public function get_prompt_data($request) {
         $post_id = $request->get_param('post_id');
         $url = $request->get_param('url');
-        $talking_point_id = $request->get_param('talking_point_id');
-        $cta_focus = $request->get_param('cta_focus');
-        $platform = $request->get_param('platform');
-        $word_count = $request->get_param('word_count') ?: 90;
 
-        // Validate that we have either post_id or url
         if (!$post_id && !$url) {
             return new WP_Error('missing_parameter', 'Either post_id or url is required', array('status' => 400));
         }
 
-        // If URL provided, look up the post ID
         if ($url && !$post_id) {
             $post_id = url_to_postid($url);
             if (!$post_id) {
@@ -279,169 +251,87 @@ class BW_Social_Amplification_API {
             }
         }
 
-        // Get post content
         $post = get_post($post_id);
         if (!$post) {
             return new WP_Error('invalid_post', 'Post not found', array('status' => 404));
         }
 
-        // Get talking point
-        $talking_point = get_post($talking_point_id);
-        if (!$talking_point || $talking_point->post_type !== 'bw_talking_point') {
-            return new WP_Error('invalid_talking_point', 'Talking point not found', array('status' => 404));
+        $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
+        $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: '';
+        $intent = get_post_meta($post_id, 'bw_intent', true) ?: '';
+        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_the_excerpt($post_id) ?: '';
         }
+        $h2_count = (int) get_post_meta($post_id, 'bw_h2_count', true);
+        $source_url = get_permalink($post_id) ?: '';
+        $source_material = wp_strip_all_tags($post->post_content);
 
-        // Get talking point metadata
-        $tp_context = get_post_meta($talking_point_id, '_bw_tp_context', true);
-        $tp_example = get_post_meta($talking_point_id, '_bw_tp_example', true);
-        $tp_cta_example = get_post_meta($talking_point_id, '_bw_tp_cta_example', true);
+        $talking_points = $this->talking_points->get_talking_points_by_content_type($content_type);
+        $framing_options = $this->build_framing_options($talking_points, $content_type);
 
-        // Build the prompt
-        $prompt = $this->build_prompt(
-            $post,
-            $talking_point->post_title,
-            $tp_context,
-            $tp_example,
-            $tp_cta_example,
-            $cta_focus,
-            $platform,
-            $word_count
+        $data = array(
+            'post_id'          => (int) $post_id,
+            'source_url'       => $source_url,
+            'context'          => array(
+                'title'   => $post->post_title,
+                'type'    => $content_type,
+                'purpose' => $purpose,
+                'intent'  => $intent,
+            ),
+            'framing_options'  => $framing_options,
+            'source_material'  => $source_material,
+            'source_tldr'      => $tldr,
+            'count_h2'         => $h2_count,
         );
 
-        return rest_ensure_response(array(
-            'success' => true,
-            'prompt'  => $prompt,
-            'meta'    => array(
-                'post_id'          => $post_id,
-                'post_title'       => $post->post_title,
-                'post_url'         => get_permalink($post_id),
-                'talking_point'    => $talking_point->post_title,
-                'cta_focus'        => $cta_focus,
-                'platform'         => $platform,
-                'word_count'       => $word_count
-            )
-        ));
+        return rest_ensure_response($data);
     }
 
     /**
-     * Build AI prompt
+     * Build framing_options array from talking points.
+     *
+     * @param array  $talking_points From get_talking_points_by_content_type().
+     * @param string $content_type   Slug used for filtering (same for all items).
+     * @return array
      */
-    private function build_prompt($post, $talking_point_name, $tp_context, $tp_example, $tp_cta_example, $cta_focus, $platform, $word_count) {
-        // Get brand voice (from settings or default)
-        $brand_voice = $this->get_brand_voice();
-
-        // Platform-specific rules
-        $platform_rules = $this->get_platform_rules($platform);
-
-        // CTA focus instructions
-        $cta_instructions = $this->get_cta_instructions($cta_focus);
-
-        // Build the prompt
-        $prompt = "You are a social media content writer for Brighter Websites.\n\n";
-
-        $prompt .= "## BRAND VOICE\n";
-        $prompt .= $brand_voice . "\n\n";
-
-        $prompt .= "## CONTENT TO AMPLIFY\n";
-        $prompt .= "Title: " . $post->post_title . "\n";
-        $prompt .= "URL: " . get_permalink($post->ID) . "\n";
-        $prompt .= "Excerpt: " . get_the_excerpt($post->ID) . "\n\n";
-        $prompt .= "Full Content:\n" . wp_strip_all_tags($post->post_content) . "\n\n";
-
-        $prompt .= "## TALKING POINT: " . $talking_point_name . "\n";
-        $prompt .= $tp_context . "\n\n";
-
-        if ($tp_example) {
-            $prompt .= "Example angles:\n" . $tp_example . "\n\n";
+    private function build_framing_options($talking_points, $content_type) {
+        $out = array();
+        foreach ($talking_points as $tp) {
+            $min = isset($tp['word_count_min']) ? (int) $tp['word_count_min'] : 50;
+            $max = isset($tp['word_count_max']) ? (int) $tp['word_count_max'] : 130;
+            $out[] = array(
+                'label'         => isset($tp['name']) ? $tp['name'] : '',
+                'type'          => $content_type,
+                'context'       => isset($tp['context']) ? $tp['context'] : '',
+                'hook_examples' => self::text_to_array(isset($tp['example']) ? $tp['example'] : ''),
+                'cta_examples'  => self::text_to_array(isset($tp['cta_example']) ? $tp['cta_example'] : ''),
+                'target_length' => $min . '-' . $max,
+            );
         }
+        return $out;
+    }
 
-        $prompt .= "## YOUR TASK\n";
-        $prompt .= "Create a social media post for " . strtoupper($platform) . ".\n\n";
-
-        $prompt .= "Requirements:\n";
-        $prompt .= "- Extract a single point about '" . $talking_point_name . "' from the content above\n";
-        $prompt .= "- Target word count: " . $word_count . " words\n";
-        $prompt .= "- CTA Focus: " . strtoupper($cta_focus) . " - " . $cta_instructions . "\n";
-        $prompt .= "- Platform: " . strtoupper($platform) . " - " . $platform_rules . "\n";
-
-        if ($tp_cta_example) {
-            $prompt .= "- CTA examples: " . $tp_cta_example . "\n";
+    /**
+     * Split text into non-empty trimmed strings (newlines or commas).
+     *
+     * @param string $text
+     * @return array
+     */
+    private static function text_to_array($text) {
+        if (empty($text) || !is_string($text)) {
+            return array();
         }
-
-        $prompt .= "- IMPORTANT: Include [SHORTLINK] as a placeholder at the end of your CTA where the URL should go\n";
-        $prompt .= "- Example: \"Learn more: [SHORTLINK]\" or \"Discover how: [SHORTLINK]\"\n";
-
-        $prompt .= "\n## OUTPUT FORMAT\n";
-        $prompt .= "Provide ONLY the social media post text. Do NOT include:\n";
-        $prompt .= "- Meta labels like 'Facebook Post:' or 'LinkedIn Post:'\n";
-        $prompt .= "- Explanations or commentary\n";
-        $prompt .= "- Multiple versions\n\n";
-        $prompt .= "Just the post text itself with [SHORTLINK] placeholder, ready to publish.\n";
-
-        return $prompt;
-    }
-
-    /**
-     * Get brand voice instructions
-     */
-    private function get_brand_voice() {
-        // TODO: Make this configurable via settings
-        return "Brighter Websites is authoritative but approachable. We're experts who explain clearly without jargon. We're confident but never arrogant. Direct, practical, and focused on results. We challenge bad practices respectfully and offer better solutions.";
-    }
-
-    /**
-     * Get platform-specific rules
-     */
-    private function get_platform_rules($platform) {
-        $rules = array(
-            'facebook'  => 'Use line breaks for readability. Emojis sparingly (mainly for CTA/link). 3-4 hashtags at end.',
-            'linkedin'  => 'Professional tone. Longer-form acceptable (up to 150 words). Line breaks for structure. 2-3 relevant hashtags.',
-            'twitter'   => 'Concise and punchy. Max 280 characters. 1-2 hashtags. No URL needed (will be added separately).',
-            'instagram' => 'Visual-first mindset. First line is hook. Line breaks. More hashtags ok (5-8). Emojis welcome.',
-            'gmb'       => 'Short and local-focused. NO URLs. NO CTAs with links. Focus on value and location relevance.'
-        );
-
-        return $rules[$platform] ?? 'Follow best practices for this platform.';
-    }
-
-    /**
-     * Get CTA focus instructions
-     */
-    private function get_cta_instructions($cta_focus) {
-        $instructions = array(
-            'learn'  => 'Educational, no ask. "Learn more", "Find out", "Discover" - value-focused.',
-            'engage' => 'Soft ask, low friction. "Check it out and get the free thing", "Take the quiz", "Download the guide".',
-            'act'    => 'Clear CTA. "Get a quote", "Book now", "DM for details", "Contact us" - direct action.'
-        );
-
-        return $instructions[$cta_focus] ?? 'Appropriate call-to-action.';
-    }
-
-    /**
-     * Determine content type based on post type and metadata
-     */
-    private function determine_content_type($post_id, $post_type) {
-        // Map post types to content types
-        $type_map = array(
-            'post'     => 'blog',
-            'folio'    => 'project',
-            'projects' => 'project',
-            'page'     => 'authority'  // Default, can be overridden
-        );
-
-        $content_type = $type_map[$post_type] ?? 'blog';
-
-        // Check if page has specific purpose meta
-        if ($post_type === 'page') {
-            $purpose = get_post_meta($post_id, 'bw_purpose', true);
-            if ($purpose === 'service-page') {
-                $content_type = 'conversion';
-            } elseif ($purpose === 'about' || $purpose === 'team') {
-                $content_type = 'authority';
+        $lines = preg_split('/[\r\n]+/', $text);
+        $items = array();
+        foreach ($lines as $line) {
+            foreach (array_map('trim', explode(',', $line)) as $part) {
+                if ($part !== '') {
+                    $items[] = $part;
+                }
             }
         }
-
-        return $content_type;
+        return array_values(array_unique($items));
     }
 
     /**

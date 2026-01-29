@@ -265,7 +265,7 @@ class BW_Social_Amplification_API {
         }
         $h2_count = (int) get_post_meta($post_id, 'bw_h2_count', true);
         $source_url = get_permalink($post_id) ?: '';
-        $source_material = wp_strip_all_tags($post->post_content);
+        $source_material = self::sanitize_content_for_prompt($post->post_content);
 
         $talking_points = $this->talking_points->get_talking_points_by_content_type($content_type);
         $framing_options = $this->build_framing_options($talking_points, $content_type);
@@ -332,6 +332,67 @@ class BW_Social_Amplification_API {
             }
         }
         return array_values(array_unique($items));
+    }
+
+    /**
+     * Sanitize post content for prompt data.
+     *
+     * - Converts H2 headings to markdown format (## Heading)
+     * - Converts paragraphs to single newlines (no extra blank lines)
+     * - Strips other HTML tags
+     * - Removes excessive whitespace
+     *
+     * @param string $content Raw post content (HTML)
+     * @return string Cleaned content ready for AI processing
+     */
+    private static function sanitize_content_for_prompt($content) {
+        if (empty($content) || !is_string($content)) {
+            return '';
+        }
+
+        // Convert H2 headings to markdown format (## Heading)
+        $content = preg_replace('/<h2[^>]*>(.*?)<\/h2>/is', '## $1', $content);
+
+        // Convert paragraph tags to single newlines
+        // Replace <p>...</p> with content + single newline
+        $content = preg_replace('/<p[^>]*>(.*?)<\/p>/is', "$1\n", $content);
+
+        // Convert other block-level elements to newlines
+        $content = preg_replace('/<br\s*\/?>/i', "\n", $content);
+        $content = preg_replace('/<\/?(div|section|article|header|footer|aside|nav)[^>]*>/i', "\n", $content);
+
+        // Strip all remaining HTML tags
+        $content = wp_strip_all_tags($content);
+
+        // Decode HTML entities
+        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Normalize whitespace:
+        // - Replace multiple spaces with single space
+        $content = preg_replace('/[ \t]+/', ' ', $content);
+        
+        // - Replace 3+ newlines with single newline (removes excessive blank lines)
+        $content = preg_replace('/\n{3,}/', "\n\n", $content);
+        
+        // - Remove leading/trailing whitespace from each line
+        $lines = explode("\n", $content);
+        $lines = array_map('trim', $lines);
+        
+        // - Remove all blank lines (no extra spacing between paragraphs)
+        $cleaned_lines = array();
+        foreach ($lines as $line) {
+            if ($line !== '') {
+                $cleaned_lines[] = $line;
+            }
+        }
+
+        // Join lines back together
+        $content = implode("\n", $cleaned_lines);
+
+        // Final trim
+        $content = trim($content);
+
+        return $content;
     }
 
     /**

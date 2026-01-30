@@ -15,10 +15,15 @@ if (!defined('ABSPATH')) exit;
 class BW_Social_Webhook_Manual {
     
     /**
-     * Post types that support social posts
+     * Post types that support social posts (all content-strategy post types)
      */
-    private $post_types = array('post', 'page', 'folio', 'projects', 'kb', 'news');
-    
+    private function get_post_types() {
+        if (function_exists('bw_cs_post_types')) {
+            return bw_cs_post_types();
+        }
+        return array('post', 'page', 'folio', 'projects', 'kb', 'news');
+    }
+
     /**
      * Initialize hooks
      */
@@ -27,7 +32,7 @@ class BW_Social_Webhook_Manual {
         add_action('add_meta_boxes', array($this, 'add_meta_box'));
         
         // Add admin column for all post types
-        foreach ($this->post_types as $post_type) {
+        foreach ($this->get_post_types() as $post_type) {
             add_action("manage_{$post_type}_posts_columns", array($this, 'add_admin_column'));
             add_action("manage_{$post_type}_posts_custom_column", array($this, 'render_admin_column'), 10, 2);
         }
@@ -43,7 +48,7 @@ class BW_Social_Webhook_Manual {
      * Add meta box to post editor
      */
     public function add_meta_box() {
-        foreach ($this->post_types as $post_type) {
+        foreach ($this->get_post_types() as $post_type) {
             add_meta_box(
                 'bw_social_webhook_trigger',
                 '🚀 Social Amplification',
@@ -136,6 +141,9 @@ class BW_Social_Webhook_Manual {
     
     /**
      * Render admin column content
+     *
+     * Always shows a "Create" button. Same action as single-post meta box (Make "create social post").
+     * Button disabled when not published or webhook not configured; tooltip explains why.
      */
     public function render_admin_column($column, $post_id) {
         if ($column !== 'bw_social') {
@@ -143,29 +151,37 @@ class BW_Social_Webhook_Manual {
         }
         
         $post = get_post($post_id);
-        $webhook_url = get_option('bw_social_webhook_url', '');
-        $webhook_enabled = get_option('bw_social_webhook_enabled', 0);
-        
-        // Only show button for published posts with webhook configured
-        if ($post->post_status === 'publish' && !empty($webhook_url) && $webhook_enabled) {
-            $last_trigger = get_post_meta($post_id, '_bw_social_last_trigger', true);
-            ?>
-            <button type="button" 
-                    class="button button-small bw-trigger-social-webhook-inline"
-                    data-post-id="<?php echo esc_attr($post_id); ?>"
-                    title="Create social post">
-                <span class="dashicons dashicons-megaphone" style="font-size: 13px; width: 13px; height: 13px;"></span>
-                Create
-            </button>
-            <?php if ($last_trigger): ?>
-                <br><small style="color: #50575e; font-size: 11px;">
-                    <?php echo esc_html(human_time_diff(strtotime($last_trigger), current_time('timestamp'))); ?> ago
-                </small>
-            <?php endif; ?>
-            <?php
-        } else {
-            echo '<span style="color: #d63638;">—</span>';
+        if (!$post) {
+            echo '—';
+            return;
         }
+        
+        $webhook_url = get_option('bw_social_webhook_url', '');
+        $can_trigger = ($post->post_status === 'publish' && !empty($webhook_url));
+        $title = 'Create social post (sends to Make.com)';
+        if ($post->post_status !== 'publish') {
+            $title = 'Publish first to create social post';
+        } elseif (empty($webhook_url)) {
+            $title = 'Configure webhook in Social Amplification settings';
+        }
+        
+        $last_trigger = get_post_meta($post_id, '_bw_social_last_trigger', true);
+        ?>
+        <button type="button" 
+                class="button button-small bw-trigger-social-webhook-inline <?php echo $can_trigger ? '' : 'disabled'; ?>"
+                data-post-id="<?php echo esc_attr($post_id); ?>"
+                data-can-trigger="<?php echo $can_trigger ? '1' : '0'; ?>"
+                title="<?php echo esc_attr($title); ?>"
+                <?php echo $can_trigger ? '' : ' disabled="disabled"'; ?>>
+            <span class="dashicons dashicons-megaphone" style="font-size: 13px; width: 13px; height: 13px;"></span>
+            Create
+        </button>
+        <?php if ($last_trigger): ?>
+            <br><small style="color: #50575e; font-size: 11px;">
+                <?php echo esc_html(human_time_diff(strtotime($last_trigger), current_time('timestamp'))); ?> ago
+            </small>
+        <?php endif; ?>
+        <?php
     }
     
     /**
@@ -230,6 +246,7 @@ class BW_Social_Webhook_Manual {
             $(document).on('click', '.bw-trigger-social-webhook-inline', function(e) {
                 e.preventDefault();
                 var $btn = $(this);
+                if ($btn.prop('disabled') || $btn.data('can-trigger') !== 1) return;
                 var postId = $btn.data('post-id');
                 var originalHtml = $btn.html();
                 

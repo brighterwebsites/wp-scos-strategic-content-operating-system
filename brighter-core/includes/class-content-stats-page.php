@@ -79,8 +79,11 @@ class BW_Content_Stats_Page {
         // Get filter parameters
         $post_type = isset($_GET['post_type_filter']) ? sanitize_key($_GET['post_type_filter']) : $default_post_type;
         $post_status = isset($_GET['status_filter']) ? sanitize_key($_GET['status_filter']) : 'publish';
-        $orderby = isset($_GET['orderby']) ? sanitize_key($_GET['orderby']) : 'modified';
+        $orderby = isset($_GET['orderby']) ? sanitize_key($_GET['orderby']) : 'updated';
         $order = isset($_GET['order']) && $_GET['order'] === 'asc' ? 'asc' : 'desc';
+        if (!in_array($orderby, ['title', 'modified', 'updated'], true)) {
+            $orderby = 'updated';
+        }
         $per_page = 50;
         $paged = isset($_GET['paged']) ? absint($_GET['paged']) : 1;
 
@@ -168,22 +171,25 @@ class BW_Content_Stats_Page {
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
-                        <th style="width: 35%;">
+                        <th style="width: 30%;">
                             <a href="<?php echo esc_url(add_query_arg(['orderby' => 'title', 'order' => $order === 'desc' ? 'asc' : 'desc'])); ?>">
                                 Title <?php if ($orderby === 'title') echo $order === 'desc' ? '▼' : '▲'; ?>
                             </a>
                         </th>
-                        <th style="width: 10%;">Type</th>
-                        <th style="width: 10%; text-align: center;">Words</th>
-                        <th style="width: 8%; text-align: center;">Images</th>
-                        <th style="width: 8%; text-align: center;">H2s</th>
-                        <th style="width: 10%; text-align: center;">Int Links</th>
-                        <th style="width: 10%; text-align: center;">Ext Links</th>
-                        <th style="width: 9%;">
-                            <a href="<?php echo esc_url(add_query_arg(['orderby' => 'modified', 'order' => $order === 'desc' ? 'asc' : 'desc'])); ?>">
-                                Updated <?php if ($orderby === 'modified') echo $order === 'desc' ? '▼' : '▲'; ?>
+                        <th style="width: 8%;">Type</th>
+                        <th style="width: 8%; text-align: center;">Words</th>
+                        <th style="width: 6%; text-align: center;">Images</th>
+                        <th style="width: 6%; text-align: center;">H2s</th>
+                        <th style="width: 8%; text-align: center;">Int Links</th>
+                        <th style="width: 8%; text-align: center;">Ext Links</th>
+                        <th style="width: 10%;">
+                            <a href="<?php echo esc_url(add_query_arg(['orderby' => 'updated', 'order' => $order === 'desc' ? 'asc' : 'desc'])); ?>">
+                                Updated <?php if ($orderby === 'updated' || $orderby === 'modified') echo $order === 'desc' ? '▼' : '▲'; ?>
                             </a>
+                            <br><small style="font-weight: normal; color: #666;">Analyzed / Modified</small>
                         </th>
+                        <th style="width: 12%; font-size: 11px;">Last Analysed</th>
+                        <th style="width: 12%; font-size: 11px;">Post Modified</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -233,13 +239,26 @@ class BW_Content_Stats_Page {
                                 <?php echo $ext_links ? absint($ext_links) : '0'; ?>
                             </td>
                             <td style="font-size: 11px; color: #666;">
-                                <?php echo human_time_diff(get_the_modified_time('U'), current_time('timestamp')) . ' ago'; ?>
+                                <?php
+                                $modified_ts = get_the_modified_time('U');
+                                $analyzed_ts = $last_analyzed ? strtotime($last_analyzed) : 0;
+                                $updated_ts = max($modified_ts, $analyzed_ts);
+                                $updated_label = ($analyzed_ts >= $modified_ts && $analyzed_ts > 0) ? 'Analyzed' : 'Modified';
+                                echo esc_html(human_time_diff($updated_ts, current_time('timestamp')) . ' ago');
+                                ?>
+                                <br><small style="color: #888;"><?php echo esc_html($updated_label); ?></small>
+                            </td>
+                            <td style="font-size: 11px; color: #666;">
+                                <?php echo $last_analyzed ? esc_html(gmdate('Y-m-d H:i', strtotime($last_analyzed))) : '—'; ?>
+                            </td>
+                            <td style="font-size: 11px; color: #666;">
+                                <?php echo esc_html(get_the_modified_date('Y-m-d H:i')); ?>
                             </td>
                         </tr>
                         <?php endwhile; wp_reset_postdata(); ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8" style="text-align: center; padding: 40px; color: #666;">
+                            <td colspan="10" style="text-align: center; padding: 40px; color: #666;">
                                 No posts found matching your filters.
                             </td>
                         </tr>

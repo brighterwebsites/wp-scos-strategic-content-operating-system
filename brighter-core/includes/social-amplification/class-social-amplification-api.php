@@ -265,7 +265,9 @@ class BW_Social_Amplification_API {
         }
         $h2_count = (int) get_post_meta($post_id, 'bw_h2_count', true);
         $source_url = get_permalink($post_id) ?: '';
-        $source_material = self::sanitize_content_for_prompt($post->post_content);
+        // Use same aggregated content as Content Analysis (post_content + ACF + Breakdance)
+        $raw_content = class_exists('BW_Content_Analysis') ? BW_Content_Analysis::get_aggregated_content($post_id) : $post->post_content;
+        $source_material = self::sanitize_content_for_prompt($raw_content);
 
         $talking_points = $this->talking_points->get_talking_points_by_content_type($content_type);
         $framing_options = $this->build_framing_options($talking_points, $content_type);

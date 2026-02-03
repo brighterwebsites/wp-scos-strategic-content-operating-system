@@ -108,19 +108,20 @@ class BW_Airtable_Helper {
     }
 
     /**
-     * Convert workflow stages to comma-separated list
+     * Get workflow progress as array of strings for Airtable Multiple Select
+     * Uses meta key workflow_progress. Send with typecast:true for INVALID_MULTIPLE_CHOICE_OPTIONS.
      *
      * @param int $post_id Post ID
-     * @return string Comma-separated workflow stages
+     * @return array Array of option strings e.g. ['content','entities-semantics','seo-basic','draft']
      */
-    private static function get_workflow_stage_as_list($post_id) {
-        $workflow_stages = get_post_meta($post_id, 'workflow_process', true);
+    private static function get_workflow_progress_as_array($post_id) {
+        $workflow_stages = get_post_meta($post_id, 'workflow_progress', true);
         
         if (empty($workflow_stages) || !is_array($workflow_stages)) {
-            return '';
+            return array();
         }
         
-        return implode(', ', $workflow_stages);
+        return array_map('sanitize_text_field', array_values($workflow_stages));
     }
 
     /**
@@ -209,7 +210,7 @@ class BW_Airtable_Helper {
             
             // Optimization & Index Status
             'Workflow Next Step' => get_post_meta($post_id, 'content_plan', true),
-            'Workflow Progress' => self::get_workflow_stage_as_list($post_id),
+            'Workflow Progress' => self::get_workflow_progress_as_array($post_id),
             
             // Content Analysis
             'Internal Links Count' => (int) get_post_meta($post_id, 'bw_internal_link_count', true),
@@ -331,7 +332,7 @@ class BW_Airtable_Helper {
                     'Authorization' => $api_token,
                     'Content-Type' => 'application/json'
                 ),
-                'body' => json_encode(array('fields' => $airtable_data), JSON_UNESCAPED_SLASHES),
+                'body' => json_encode(array('fields' => $airtable_data, 'typecast' => true), JSON_UNESCAPED_SLASHES),
                 'timeout' => 15
             ));
             
@@ -349,7 +350,7 @@ class BW_Airtable_Helper {
                     'Authorization' => $api_token,
                     'Content-Type' => 'application/json'
                 ),
-                'body' => json_encode(array('fields' => $airtable_data), JSON_UNESCAPED_SLASHES),
+                'body' => json_encode(array('fields' => $airtable_data, 'typecast' => true), JSON_UNESCAPED_SLASHES),
                 'timeout' => 15
             ));
             

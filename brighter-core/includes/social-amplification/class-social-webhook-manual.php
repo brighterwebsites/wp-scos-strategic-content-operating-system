@@ -31,11 +31,8 @@ class BW_Social_Webhook_Manual {
         // Add meta box to post editor
         add_action('add_meta_boxes', array($this, 'add_meta_box'));
         
-        // Add admin column for all post types
-        foreach ($this->get_post_types() as $post_type) {
-            add_action("manage_{$post_type}_posts_columns", array($this, 'add_admin_column'));
-            add_action("manage_{$post_type}_posts_custom_column", array($this, 'render_admin_column'), 10, 2);
-        }
+        // Add admin column for all post types (deferred to init:20 so CPTs like faq, projects are registered)
+        add_action('init', array($this, 'register_admin_columns'), 20);
         
         // AJAX handler for manual trigger
         add_action('wp_ajax_bw_trigger_social_webhook', array($this, 'ajax_trigger_webhook'));
@@ -124,6 +121,17 @@ class BW_Social_Webhook_Manual {
         <?php
     }
     
+    /**
+     * Register admin column hooks for all content-strategy post types
+     * Runs on init:20 so CPTs (faq, projects, etc.) are registered
+     */
+    public function register_admin_columns() {
+        foreach ($this->get_post_types() as $post_type) {
+            add_action("manage_{$post_type}_posts_columns", array($this, 'add_admin_column'));
+            add_action("manage_{$post_type}_posts_custom_column", array($this, 'render_admin_column'), 10, 2);
+        }
+    }
+
     /**
      * Add admin column for social post trigger
      */

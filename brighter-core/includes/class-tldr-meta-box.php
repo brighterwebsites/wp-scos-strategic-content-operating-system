@@ -49,7 +49,7 @@ class BW_TLDR_Meta_Box {
         
         // Get current value
         $value = get_post_meta($post->ID, 'bw_tldr', true);
-        
+        //Migration completed on all sites remove migration hint and code.
         // Check if old ACF field has data (for migration hint)
         $old_value = get_post_meta($post->ID, 'tldr', true);
         $show_migration_hint = !empty($old_value) && empty($value);

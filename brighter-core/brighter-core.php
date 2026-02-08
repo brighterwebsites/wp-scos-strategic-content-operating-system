@@ -151,9 +151,6 @@ function brighter_load_module($module) {
     try {
         require_once $real_path;
         $loaded[$module] = true;
-        if ($module === 'bw-schema-admin') {
-            error_log('Brighter Core: bw-schema-admin module loaded successfully from: ' . $real_path);
-        }
         return true;
     } catch (Exception $e) {
         error_log('Brighter Core: Error loading module ' . esc_html($module) . ': ' . esc_html($e->getMessage()));
@@ -213,7 +210,7 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
-        // NOTE: bw-schema-admin moved to main modules list (will move to Site Essentials SEO module later)
+        // NOTE: bw-schema-admin must be in main modules list (not admin-only) to work properly
         // ALTC admin modules
         'class-altc-meta-boxes',
         'class-altc-admin-columns',

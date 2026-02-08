@@ -1,5 +1,5 @@
 <?php
-/**
+/**  Completed migration - depreciate and archive on next read
  * Migrate TLDR Field
  * 
  * One-time migration: Copy data from ACF 'tldr' field to standardized 'bw_tldr' field

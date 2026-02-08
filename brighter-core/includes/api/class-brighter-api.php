@@ -86,6 +86,7 @@ class Brighter_API {
         require_once $social_path . 'class-social-amplification-api.php';
         require_once $social_path . 'class-webhook-trigger.php';
         require_once $social_path . 'class-webhook-settings.php';
+        require_once $social_path . 'class-airtable-helper.php';
         
         // Manual trigger UI (buttons) - check if file exists to prevent fatal errors
         $manual_file = $social_path . 'class-social-webhook-manual.php';
@@ -126,6 +127,9 @@ class Brighter_API {
         // Make webhook trigger globally accessible for manual triggers
         global $bw_social_webhook_trigger;
         $bw_social_webhook_trigger = $this->webhook_trigger;
+
+        // Initialize Airtable helper (syncs CAR data to Airtable)
+        BW_Airtable_Helper::init();
 
         // Initialize breadcrumbs meta (admin only)
         if (is_admin()) {

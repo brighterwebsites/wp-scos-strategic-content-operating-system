@@ -84,6 +84,24 @@ class BW_Content_Analysis {
     }
 
     /**
+     * Get aggregated content for a post (post_content + ACF + Breakdance).
+     *
+     * Same source as Content Analysis uses for word count and stats. Use this when you need
+     * "full" content including builder/meta content (e.g. Make prompt-data, exports).
+     * Refactor: move to central helper (Option 2) when content is refactored into new modules.
+     *
+     * @param int $post_id Post ID
+     * @return string Raw aggregated HTML/text (not sanitized for display)
+     */
+    public static function get_aggregated_content($post_id) {
+        $post = get_post($post_id);
+        if (!$post || !in_array($post->post_type, bw_cs_post_types(), true)) {
+            return '';
+        }
+        return self::aggregate_content($post_id, $post);
+    }
+
+    /**
      * Aggregate content from all sources
      */
     private static function aggregate_content($post_id, $post) {

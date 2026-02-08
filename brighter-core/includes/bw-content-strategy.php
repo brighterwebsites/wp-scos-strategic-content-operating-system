@@ -33,7 +33,7 @@ add_action('init', function() {
     ];
     
     // ALTC Notes (Primary Search Intent) - replaces deprecated bw_notes
-    register_post_meta('', 'bw_altc_notes', $string_args);
+    register_post_meta('', 'bw_altc_notes', $string_args);  //in major refactor this should be renamed to bw_intent_goal and migrated.
     register_post_meta('', 'bw_page_topic', $string_args);
     register_post_meta('', 'bw_intent', $string_args);
     register_post_meta('', 'bw_purpose', $string_args);
@@ -121,7 +121,7 @@ function bw_cs_intent_options() {
        content statistics, ga4 analytics,  API/external tools like airtable, make.com, yourls, social amplification loop (likely others
        so many areas will need updating so for now, i will leave these fields in tact and only change the front facing ones. 
        When imported to other tools informational_p is imported - it would be better if they were more recognisable and standardised 
-       Field meta names to be changed (use standard/correct - or _ between ie if conversion-hub or conversion_hub)
+       Field meta names to be changed as this is sent to ga4 so they should be easier to read and understand(use standard/correct - or _ between ie if conversion-hub or conversion_hub)
               - informational_p - info_problem_aware
               - informational_s   - info_solution_aware
               - commercial_ds  - comm_decision_support
@@ -165,6 +165,7 @@ function bw_cs_purpose_options() {
        - authority-page to brand-authority  
        - supporting to supporting-topic
        - terms to policy      
+       - changing these will have impact on all areas that rely on purpose like utm params in social loop
        */
  	''              => 'NA',
         'pillar'        => 'Pillar',             // High-level topic hub (e.g., "The Complete Stable Buyer's Guide")
@@ -177,7 +178,7 @@ function bw_cs_purpose_options() {
         'authority-page'=> 'Brand Authority',     // E-E-A-T pages (e.g., "About Us," "Our Welding Process")
         'supporting'    => 'Supporting Topic',         // Standard blog article (e.g., The article we just wrote)
         'content-collection'=> 'Content Collection',     // Topic/Cluster Curated/Collection Hub/Archive pages
-        'resource-guide'=> 'xResource Guide',     // In Use but to be depreciated and replaced by content-collection
+        'resource-guide'=> 'Resource Guide',     // Keep for how to guides.
       
         'terms'         => 'Policy',        // Legal Terms Pages, privacy, terms, warranty, returns)
         'functional'         => 'Functional',        // Functional pages - maintenance, access, front end editing.
@@ -226,7 +227,7 @@ function bw_cs_content_plan_options() {
         'archive' => ['label' => '🗑️ Archive', 'color' => '#dc2626', 'bg' => '#fee2e2'],
     ];
 }
-
+//this is ready to be depreciated fully please also search for other instances and uses of this and remove it, flag if we need to rework any other sections. 
 function bw_cs_opt_status_options() {
     return [
         ''              => ['label' => '� No status �', 'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned

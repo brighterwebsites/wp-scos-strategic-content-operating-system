@@ -161,7 +161,9 @@ class BW_Breadcrumbs_Meta {
 
     /**
      * Migrate from SEOPress breadcrumbs
+     * ARCHIVED - Migration tool removed from UI, keeping method for reference
      */
+    /*
     public static function migrate_from_seopress() {
         global $wpdb;
 
@@ -185,4 +187,5 @@ class BW_Breadcrumbs_Meta {
 
         return $migrated;
     }
+    */
 }

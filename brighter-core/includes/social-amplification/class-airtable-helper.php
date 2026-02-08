@@ -528,6 +528,28 @@ class BW_Airtable_Helper {
                 $error_message = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'Unknown validation error';
                 error_log(sprintf('[Airtable Sync] VALIDATION ERROR for post %d (%s): %s', 
                     $post_id, $post->post_type, $error_message));
+                // If "Record ID recXXX does not exist" - log which linked-record field likely triggered it
+                if (preg_match('/Record ID (rec[a-zA-Z0-9]+) does not exist/i', $error_message, $m)) {
+                    $invalid_rec_id = $m[1];
+                    $linked_fields = array();
+                    if (!empty($airtable_data['ALTC Cluster']) && is_array($airtable_data['ALTC Cluster'])) {
+                        $linked_fields['ALTC Cluster'] = $airtable_data['ALTC Cluster'];
+                    }
+                    if (!empty($airtable_data['Topics']) && is_array($airtable_data['Topics'])) {
+                        $linked_fields['Topics'] = $airtable_data['Topics'];
+                    }
+                    if (!empty($airtable_data['Internal Links']) && is_array($airtable_data['Internal Links'])) {
+                        $linked_fields['Internal Links'] = $airtable_data['Internal Links'];
+                    }
+                    error_log(sprintf('[Airtable Sync] Linked-record fields sent for post %d: %s', 
+                        $post_id, wp_json_encode($linked_fields)));
+                    $source = self::find_rec_id_source($invalid_rec_id);
+                    if ($source) {
+                        error_log(sprintf('[Airtable Sync] Invalid rec ID %s likely from: %s', $invalid_rec_id, $source));
+                    } else {
+                        error_log(sprintf('[Airtable Sync] Invalid rec ID %s not found in post/term meta (may be stale - clear _airtable_record_id)', $invalid_rec_id));
+                    }
+                }
             } elseif ($status_code !== 200 && $status_code !== 201) {
                 // Other errors
                 $body = wp_remote_retrieve_body($response);
@@ -535,6 +557,39 @@ class BW_Airtable_Helper {
                     $post_id, $post->post_type, $status_code, substr($body, 0, 200)));
             }
         }
+    }
+
+    /**
+     * Find where an Airtable record ID is stored (post or term meta).
+     * Used to diagnose "Record ID recXXX does not exist" validation errors.
+     *
+     * @param string $rec_id Airtable record ID (e.g. recFAYif2KQDWLN2r)
+     * @return string|null Human-readable source e.g. "Post 123 (Internal Links target)" or "ALTC term 45"
+     */
+    private static function find_rec_id_source($rec_id) {
+        global $wpdb;
+        if (empty($rec_id) || strpos($rec_id, 'rec') !== 0) return null;
+        $post_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_airtable_record_id' AND meta_value = %s LIMIT 1",
+            $rec_id
+        ));
+        if ($post_id) {
+            $post = get_post($post_id);
+            $title = $post ? $post->post_title : 'post ' . $post_id;
+            return sprintf('Post %d "%s" (Internal Links target - clear _airtable_record_id to re-sync)', $post_id, $title);
+        }
+        $term_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT term_id FROM {$wpdb->termmeta} WHERE meta_key = '_airtable_record_id' AND meta_value = %s LIMIT 1",
+            $rec_id
+        ));
+        if ($term_id) {
+            $term = get_term($term_id);
+            $tax = $term && !is_wp_error($term) ? $term->taxonomy : 'unknown';
+            $name = $term && !is_wp_error($term) ? $term->name : 'term ' . $term_id;
+            $field = ($tax === 'altc_strategic_lens') ? 'ALTC Cluster' : (($tax === 'altc_topic') ? 'Topics' : $tax);
+            return sprintf('%s term %d "%s" (clear _airtable_record_id to re-sync)', $field, $term_id, $name);
+        }
+        return null;
     }
 
     /**

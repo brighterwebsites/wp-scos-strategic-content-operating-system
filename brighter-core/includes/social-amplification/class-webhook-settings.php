@@ -25,6 +25,9 @@ class BW_Social_Webhook_Settings {
 
         // Handle form submission
         add_action('admin_post_bw_save_webhook_settings', array($this, 'handle_save'));
+
+        // Bulk sync AJAX
+        add_action('wp_ajax_bw_airtable_seed_bulk', array($this, 'ajax_seed_airtable_bulk'));
     }
 
     /**
@@ -96,6 +99,18 @@ class BW_Social_Webhook_Settings {
         ));
 
         register_setting('bw_social_amplification', 'bw_airtable_table_id', array(
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => ''
+        ));
+
+        register_setting('bw_social_amplification', 'bw_airtable_altc_table_id', array(
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => ''
+        ));
+
+        register_setting('bw_social_amplification', 'bw_airtable_topics_table_id', array(
             'type' => 'string',
             'sanitize_callback' => 'sanitize_text_field',
             'default' => ''
@@ -325,7 +340,7 @@ class BW_Social_Webhook_Settings {
 
                     <tr>
                         <th scope="row">
-                            <label for="bw_airtable_table_id"><?php _e('Airtable Table ID', 'brighterwebsites'); ?></label>
+                            <label for="bw_airtable_table_id"><?php _e('Airtable Content Table ID', 'brighterwebsites'); ?></label>
                         </th>
                         <td>
                             <input type="text"
@@ -336,9 +351,43 @@ class BW_Social_Webhook_Settings {
                                    style="width: 100%; max-width: 600px;"
                                    placeholder="tblXXXXXXXXXXXXXX" />
                             <p class="description">
-                                <?php _e('Your Airtable Table ID (stronger than name - won\'t break if table is renamed).', 'brighterwebsites'); ?>
-                                <br>
-                                <?php _e('Get this from the API docs - look for the table name in the left sidebar, then check the URL or API response.', 'brighterwebsites'); ?>
+                                <?php _e('Content table (stronger than name - use Table ID from API docs).', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_airtable_altc_table_id"><?php _e('Airtable ALTC Table ID', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_airtable_altc_table_id"
+                                   name="bw_airtable_altc_table_id"
+                                   value="<?php echo esc_attr(get_option('bw_airtable_altc_table_id', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;"
+                                   placeholder="tblXXXXXXXXXXXXXX" />
+                            <p class="description">
+                                <?php _e('ALTC Strategic Lenses table. Terms sync on save; stores record ID in term meta for linked records in Content.', 'brighterwebsites'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_airtable_topics_table_id"><?php _e('Airtable Topics Table ID', 'brighterwebsites'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text"
+                                   id="bw_airtable_topics_table_id"
+                                   name="bw_airtable_topics_table_id"
+                                   value="<?php echo esc_attr(get_option('bw_airtable_topics_table_id', '')); ?>"
+                                   class="regular-text code"
+                                   style="width: 100%; max-width: 600px;"
+                                   placeholder="tblXXXXXXXXXXXXXX" />
+                            <p class="description">
+                                <?php _e('Topics table. Terms sync on save; stores record ID in term meta for linked records in Content.', 'brighterwebsites'); ?>
                             </p>
                         </td>
                     </tr>
@@ -357,6 +406,20 @@ class BW_Social_Webhook_Settings {
                             <p class="description">
                                 <?php _e('This template can be easily imported into Airtable to set up the table correctly with all required fields.', 'brighterwebsites'); ?>
                             </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row"><?php _e('Seed Airtable (Bulk Sync)', 'brighterwebsites'); ?></th>
+                        <td>
+                            <p><?php _e('Sync all ALTC Clusters, Topics, and Content to Airtable. Recommended order: 1) ALTC Clusters, 2) Topics, 3) Content. Content runs in 2 phases: static data first, then Internal Links.', 'brighterwebsites'); ?></p>
+                            <p>
+                                <button type="button" id="bw-airtable-seed-bulk" class="button button-secondary">
+                                    <?php _e('Seed Airtable — Sync All', 'brighterwebsites'); ?>
+                                </button>
+                            </p>
+                            <p id="bw-airtable-seed-status" style="margin-top: 8px; font-family: monospace; font-size: 12px;"></p>
+                            <?php wp_nonce_field('bw_airtable_seed_bulk', 'bw_airtable_seed_nonce', false); ?>
                         </td>
                     </tr>
 
@@ -389,6 +452,34 @@ class BW_Social_Webhook_Settings {
             </ol>
 
         </div>
+        <script>
+        jQuery(document).ready(function($) {
+            $('#bw-airtable-seed-bulk').on('click', function() {
+                var $btn = $(this), $status = $('#bw-airtable-seed-status');
+                $btn.prop('disabled', true);
+                $status.text('Syncing... ALTC Clusters, Topics, Content (phase 1), Content (phase 2)');
+                $.post(ajaxurl, {
+                    action: 'bw_airtable_seed_bulk',
+                    nonce: $('#bw_airtable_seed_nonce').val()
+                }).done(function(r) {
+                    if (r.success) {
+                        var d = r.data, lines = [];
+                        lines.push('ALTC: ' + (d.altc ? d.altc.synced : 0) + ' synced, ' + (d.altc ? d.altc.errors : 0) + ' errors');
+                        lines.push('Topics: ' + (d.topics ? d.topics.synced : 0) + ' synced, ' + (d.topics ? d.topics.errors : 0) + ' errors');
+                        lines.push('Content P1: ' + (d.content_phase1 ? d.content_phase1.synced : 0) + ' synced, ' + (d.content_phase1 ? d.content_phase1.errors : 0) + ' errors');
+                        lines.push('Content P2 (links): ' + (d.content_phase2 ? d.content_phase2.synced : 0) + ' synced, ' + (d.content_phase2 ? d.content_phase2.errors : 0) + ' errors');
+                        $status.text(lines.join(' | '));
+                    } else {
+                        $status.text('Error: ' + (r.data && r.data.message ? r.data.message : 'Unknown'));
+                    }
+                }).fail(function() {
+                    $status.text('Request failed. Check console/network.');
+                }).always(function() {
+                    $btn.prop('disabled', false);
+                });
+            });
+        });
+        </script>
         <?php
     }
 
@@ -428,10 +519,14 @@ class BW_Social_Webhook_Settings {
         $airtable_api_token = isset($_POST['bw_airtable_api_token']) ? sanitize_text_field($_POST['bw_airtable_api_token']) : '';
         $airtable_base_id = isset($_POST['bw_airtable_base_id']) ? sanitize_text_field($_POST['bw_airtable_base_id']) : '';
         $airtable_table_id = isset($_POST['bw_airtable_table_id']) ? sanitize_text_field($_POST['bw_airtable_table_id']) : '';
+        $airtable_altc_table_id = isset($_POST['bw_airtable_altc_table_id']) ? sanitize_text_field($_POST['bw_airtable_altc_table_id']) : '';
+        $airtable_topics_table_id = isset($_POST['bw_airtable_topics_table_id']) ? sanitize_text_field($_POST['bw_airtable_topics_table_id']) : '';
         
         update_option('bw_airtable_api_token', $airtable_api_token);
         update_option('bw_airtable_base_id', $airtable_base_id);
         update_option('bw_airtable_table_id', $airtable_table_id);
+        update_option('bw_airtable_altc_table_id', $airtable_altc_table_id);
+        update_option('bw_airtable_topics_table_id', $airtable_topics_table_id);
 
         // Redirect back with success message
         wp_redirect(add_query_arg(array(
@@ -439,5 +534,25 @@ class BW_Social_Webhook_Settings {
             'updated' => 'true'
         ), admin_url('admin.php')));
         exit;
+    }
+
+    /**
+     * AJAX: Seed Airtable bulk sync (ALTC → Topics → Content phase 1 → Content phase 2)
+     */
+    public function ajax_seed_airtable_bulk() {
+        check_ajax_referer('bw_airtable_seed_bulk', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Insufficient permissions'));
+        }
+        if (!class_exists('BW_Airtable_Helper')) {
+            wp_send_json_error(array('message' => 'Airtable helper not loaded'));
+        }
+        set_time_limit(300);
+        $results = array();
+        $results['altc'] = BW_Airtable_Helper::bulk_sync_altc_terms();
+        $results['topics'] = BW_Airtable_Helper::bulk_sync_topics();
+        $results['content_phase1'] = BW_Airtable_Helper::bulk_sync_content(1);
+        $results['content_phase2'] = BW_Airtable_Helper::bulk_sync_content(2);
+        wp_send_json_success($results);
     }
 }

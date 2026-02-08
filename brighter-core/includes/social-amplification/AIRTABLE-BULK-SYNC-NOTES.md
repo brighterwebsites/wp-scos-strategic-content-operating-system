@@ -26,5 +26,6 @@
 
 ## Airtable table structure
 
-- **ALTC / Topics tables**: Primary field "Name" (term name)
+- **ALTC table**: Fields "ALTC" (term name), "Description" (term description)
+- **Topics table**: Fields "Topic" (term name), "Description" (term description)
 - **Content table**: ALTC Cluster and Topics must be Linked Record type pointing to respective tables

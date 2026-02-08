@@ -97,7 +97,11 @@ class BW_Airtable_Helper {
         if (!$term || is_wp_error($term)) {
             return;
         }
-        self::sync_term_to_airtable($term_id, 'altc_strategic_lens', $table_id, $term->name);
+        $fields = array(
+            'ALTC' => sanitize_text_field($term->name),
+            'Description' => sanitize_textarea_field($term->description ?: ''),
+        );
+        self::sync_term_to_airtable($term_id, $table_id, $fields);
     }
 
     /**
@@ -114,26 +118,29 @@ class BW_Airtable_Helper {
         if (!$term || is_wp_error($term)) {
             return;
         }
-        self::sync_term_to_airtable($term_id, 'altc_topic', $table_id, $term->name);
+        $fields = array(
+            'Topic' => sanitize_text_field($term->name),
+            'Description' => sanitize_textarea_field($term->description ?: ''),
+        );
+        self::sync_term_to_airtable($term_id, $table_id, $fields);
     }
 
     /**
      * Sync a term to Airtable (ALTC or Topic table).
-     * Uses "Name" as primary field. Stores Airtable record ID in term meta _airtable_record_id.
+     * Stores Airtable record ID in term meta _airtable_record_id.
      *
      * @param int $term_id Term ID
-     * @param string $taxonomy Taxonomy slug
      * @param string $table_id Airtable table ID
-     * @param string $name Term name for "Name" field
+     * @param array $fields Field name => value (e.g. 'ALTC' => '...', 'Description' => '...')
      */
-    private static function sync_term_to_airtable($term_id, $taxonomy, $table_id, $name) {
+    private static function sync_term_to_airtable($term_id, $table_id, $fields) {
         $url = self::get_table_url($table_id);
         if (!$url) return;
         $api_token = self::get_api_token();
         $meta_key = '_airtable_record_id';
         $existing_rec_id = get_term_meta($term_id, $meta_key, true);
 
-        $fields = array('Name' => sanitize_text_field($name));
+        $fields = array_filter($fields, function($v) { return $v !== '' && $v !== null; });
         $body = array('fields' => $fields, 'typecast' => true);
 
         if (!empty($existing_rec_id)) {

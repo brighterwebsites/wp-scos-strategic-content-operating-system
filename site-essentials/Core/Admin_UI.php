@@ -43,6 +43,7 @@ class Admin_UI {
     const PAGE_SLUG = 'site-essentials';
     const SEO_PAGE_SLUG = 'site-essentials-seo';
     const ESSENTIALS_PAGE_SLUG = 'site-essentials-essentials';
+    const CPT_PAGE_SLUG = 'site-essentials-cpt';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
 
     /**
@@ -67,6 +68,7 @@ class Admin_UI {
         add_action('wp_ajax_site_essentials_clear_sitemap_cache', [$this, 'ajax_clear_sitemap_cache']);
         add_action('admin_post_site_essentials_save_tweaks', [$this, 'save_tweaks_settings']);
         add_action('admin_post_site_essentials_save_seo', [$this, 'save_seo_settings']);
+        add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
     }
 
     /**
@@ -107,6 +109,16 @@ class Admin_UI {
             'manage_options',                                    // Capability
             self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
             [$this, 'render_essentials_page']                   // Callback
+        );
+
+        // Custom Posts (Recommended CPT) submenu
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Recommended CPT', 'site-essentials'),           // Page title
+            __('Custom Posts', 'site-essentials'),               // Menu title
+            'manage_options',                                    // Capability
+            self::CPT_PAGE_SLUG,                                // Menu slug
+            [$this, 'render_cpt_page']                          // Callback
         );
 
         // Settings submenu (always visible)
@@ -165,6 +177,7 @@ class Admin_UI {
             'toplevel_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
         ];
 
@@ -278,6 +291,43 @@ class Admin_UI {
         $tweaks_module = Module_Loader::get_module('tweaks');
 
         include SITE_ESSENTIALS_PATH . 'Views/essentials-page.php';
+    }
+
+    /**
+     * Render Custom Posts (Recommended CPT) page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_cpt_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        if (!$this->settings->is_module_enabled('cpt')) {
+            $this->render_module_disabled_notice(__('Custom Posts', 'site-essentials'), 'cpt');
+            return;
+        }
+
+        $cpt_module = Module_Loader::get_module('cpt');
+
+        if (!$cpt_module || !is_object($cpt_module)) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            esc_html_e('Custom Posts module is not loaded.', 'site-essentials');
+            echo '</p></div></div>';
+            return;
+        }
+
+        if (isset($_GET['updated']) && $_GET['updated'] === 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('CPT settings saved.', 'site-essentials') . '</p></div>';
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__('Recommended CPT', 'site-essentials') . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card" data-module-id="cpt">';
+        $cpt_module->render_settings();
+        echo '</div></div></div>';
     }
 
     /**
@@ -418,6 +468,10 @@ class Admin_UI {
             if ($module_id === 'seo') {
                 flush_rewrite_rules();
             }
+            // Flush rewrite rules when enabling CPT module (projects archive)
+            if ($module_id === 'cpt') {
+                flush_rewrite_rules();
+            }
         } else {
             error_log("[Admin_UI] Calling disable_module({$module_id})");
             $result = $this->settings->disable_module($module_id);
@@ -435,6 +489,9 @@ class Admin_UI {
                 }
                 // Clear standard WordPress cache
                 wp_cache_flush();
+            }
+            if ($module_id === 'cpt') {
+                flush_rewrite_rules();
             }
         }
 
@@ -675,6 +732,43 @@ class Admin_UI {
         $redirect_url = add_query_arg([
             'page'    => self::SEO_PAGE_SLUG,
             'tab'     => 'sitemaps',
+            'updated' => 'true',
+        ], admin_url('admin.php'));
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    /**
+     * Save Custom Posts (CPT) settings
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function save_cpt_settings() {
+        if (!isset($_POST['site_essentials_cpt_nonce']) ||
+            !wp_verify_nonce($_POST['site_essentials_cpt_nonce'], 'site_essentials_cpt')) {
+            wp_die(__('Security check failed', 'site-essentials'));
+        }
+
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'site-essentials'));
+        }
+
+        $cpt_options = isset($_POST['cpt_options']) && is_array($_POST['cpt_options']) ? $_POST['cpt_options'] : [];
+
+        $opts = [
+            'customer_success_stories' => !empty($cpt_options['customer_success_stories']),
+            'include_categories'       => !empty($cpt_options['include_categories']),
+            'include_tags'             => !empty($cpt_options['include_tags']),
+        ];
+
+        $this->settings->update_module_settings('cpt', $opts);
+
+        flush_rewrite_rules();
+
+        $redirect_url = add_query_arg([
+            'page'    => self::CPT_PAGE_SLUG,
             'updated' => 'true',
         ], admin_url('admin.php'));
 

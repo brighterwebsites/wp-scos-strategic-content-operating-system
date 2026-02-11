@@ -134,6 +134,11 @@ add_action('init', function() {
             \SiteEssentials\Modules\Seo\Seo_Module::class
         );
 
+        \SiteEssentials\Core\Module_Loader::register(
+            'cpt',
+            \SiteEssentials\Modules\CustomPosts\Cpt_Module::class
+        );
+
         // CRITICAL: Disable WordPress core sitemaps if SEO module is enabled
         // WordPress core registers sitemaps with: add_action('init', 'wp_sitemaps_get_server', 5)
         // We remove this action BEFORE it runs, then add our filter as backup

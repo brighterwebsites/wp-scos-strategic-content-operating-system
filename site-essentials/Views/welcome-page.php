@@ -61,6 +61,15 @@ if (file_exists(SITE_ESSENTIALS_PATH . '../.git/HEAD')) {
         </div>
 
         <div class="se-welcome-card">
+            <div class="dashicons dashicons-building"></div>
+            <h2><?php esc_html_e('Business Info', 'site-essentials'); ?></h2>
+            <p><?php esc_html_e('Contact name, phone, email and business details for privacy policy and schema.', 'site-essentials'); ?></p>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=site-essentials-business-info')); ?>" class="button button-primary">
+                <?php esc_html_e('Business Info', 'site-essentials'); ?>
+            </a>
+        </div>
+
+        <div class="se-welcome-card">
             <div class="dashicons dashicons-admin-settings"></div>
             <h2><?php esc_html_e('Settings', 'site-essentials'); ?></h2>
             <p><?php esc_html_e('Manage modules, import/export settings, and clear cache.', 'site-essentials'); ?></p>

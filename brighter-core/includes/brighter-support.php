@@ -113,7 +113,6 @@ function brighter_support_render_page() {
     }
 
     if (current_user_can('manage_options')) {
-        echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=business_info')) . '" class="nav-tab ' . ($active_tab == 'business_info' ? 'nav-tab-active' : '') . '">' . esc_html__('Business Info', 'brighterwebsites') . '</a>';
         echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=optimisation')) . '" class="nav-tab ' . ($active_tab == 'optimisation' ? 'nav-tab-active' : '') . '">' . esc_html__('Optimisation', 'brighterwebsites') . '</a>';
 
         if (class_exists('Brighter_Tweaks')) {
@@ -134,21 +133,6 @@ function brighter_support_render_page() {
 
     if ($active_tab === 'manuals' && current_user_can('manage_options')) {
         brighter_support_render_manuals_tab();
-    } elseif ($active_tab === 'business_info' && current_user_can('manage_options')) {
-        // SECURITY: Check if function exists before calling
-        if (function_exists('brighterweb_render_business_info_form')) {
-            brighterweb_render_business_info_form();
-        } else {
-            echo '<div class="support-page">';
-            echo '<div class="notice notice-error"><p><strong>' . esc_html__('Error:', 'brighterwebsites') . '</strong> ' . esc_html__('Business Info module not loaded.', 'brighterwebsites') . '</p></div>';
-            echo '<p>' . esc_html__('Debug info:', 'brighterwebsites') . '</p>';
-            echo '<ul>';
-            echo '<li>' . esc_html__('File exists:', 'brighterwebsites') . ' ' . (file_exists(BRIGHTER_CORE_PATH . 'includes/brighter-buinessinfo.php') ? '? YES' : '? NO') . '</li>';
-            echo '<li>' . esc_html__('Function defined:', 'brighterwebsites') . ' ' . (function_exists('brighterweb_render_business_info_form') ? '? YES' : '? NO') . '</li>';
-            echo '<li>' . esc_html__('Class exists:', 'brighterwebsites') . ' ' . (class_exists('Brighter_Business_Cache') ? '? YES' : '? NO') . '</li>';
-            echo '</ul>';
-            echo '</div>';
-        }
     } elseif ($active_tab === 'optimisation' && current_user_can('manage_options')) {
         brighter_support_render_optimisation_tab();
     } elseif ($active_tab === 'tweaks' && current_user_can('manage_options')) {
@@ -224,7 +208,10 @@ function brighter_support_output_main() {
     echo '<div class="support-page">';
     
     echo '<div class="support-desc">';
-    echo '<p>' . esc_html__('We\'ve created this page to help you confidently manage and maintain your website. Below are quick-access links and tips to get you started.', 'brighterwebsites') . '</p>';
+    echo '<p>' . esc_html__('We\'ve created this page to help you confidently manage and maintain your website.', 'brighterwebsites') . '</p>';
+    echo '<p>' . esc_html__('Below are quick-access links and tips to get you started.', 'brighterwebsites') . '</p>';
+ 
+    
     echo '</div>';
     
     // Website Owners Manual
@@ -290,20 +277,11 @@ function brighter_support_output_main() {
     echo '</ul>';
     echo '</div>'; // .support-container.support-search
 
-    // Recommended Tools
-    echo '<div class="support-container support-tools">';
-    echo '<p><strong>🛠️ ' . esc_html__('Recommended Tools', 'brighterwebsites') . '</strong> – ' . esc_html__('If these tools have been set up for you, you\'ll find the login details in your Website Owner Manual.', 'brighterwebsites') . '</p>';
-    echo '<ul>';
-    echo '<li><strong>' . esc_html__('Email Campaigns:', 'brighterwebsites') . '</strong> <a href="https://www.mailerlite.com/invite/e74a69700df56/" target="_blank" rel="noopener">MailerLite</a></li>';
-    echo '<li><strong>' . esc_html__('SMS Marketing:', 'brighterwebsites') . '</strong> <a href="https://www.smsglobal.com/" target="_blank" rel="noopener">SMSGlobal</a></li>';
-    echo '<li><strong>' . esc_html__('Social Media Management:', 'brighterwebsites') . '</strong> <a href="https://www.postly.ai/" target="_blank" rel="noopener">Postly</a></li>';
-    echo '<li><strong>' . esc_html__('Content copywriter:', 'brighterwebsites') . '</strong> <a href="https://app.neuronwriter.com/ar/98d2833da3de4ac1cc524b8864cf1241/" target="_blank" rel="noopener">Neuronwriter</a></li>';
-    echo '</ul>';
-    echo '</div>'; // .support-container.support-tools
+ 
 
     // Website Health (admin only)
     if (current_user_can('manage_options')) {
-        echo '<div class="support-container support-health">';
+        echo '<div class="support-container support-tools">';
         echo '<p>⚙️ <strong>' . esc_html__('Admin Tools', 'brighterwebsites') . '</strong> - ' . esc_html__('Log in as admin to access website health.', 'brighterwebsites') . '</p>';
         echo '<ul>';
         echo '<li><strong>' . esc_html__('Check Website Health:', 'brighterwebsites') . '</strong> <a href="' . esc_url(admin_url('site-health.php')) . '">' . esc_html__('Site Health Tool', 'brighterwebsites') . '</a></li>';

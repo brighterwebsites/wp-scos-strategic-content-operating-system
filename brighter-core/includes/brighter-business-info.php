@@ -14,9 +14,10 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Option prefix to prevent conflicts with other plugins
+ * Option prefix for business info options (e.g. bw_business_name, bw_phone_number, bw_email).
+ * Used for privacy policy and schema; only a small number of sites use this.
  */
-define('BRIGHTER_OPTION_PREFIX', 'brighter_');
+define('BRIGHTER_OPTION_PREFIX', 'bw_');
 
 /**
  * Cache group for business info

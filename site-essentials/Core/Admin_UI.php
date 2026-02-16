@@ -44,6 +44,7 @@ class Admin_UI {
     const SEO_PAGE_SLUG = 'site-essentials-seo';
     const ESSENTIALS_PAGE_SLUG = 'site-essentials-essentials';
     const CPT_PAGE_SLUG = 'site-essentials-cpt';
+    const BUSINESS_INFO_PAGE_SLUG = 'site-essentials-business-info';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
 
     /**
@@ -121,6 +122,16 @@ class Admin_UI {
             [$this, 'render_cpt_page']                          // Callback
         );
 
+        // Business Info submenu (standalone page; used for privacy policy, contact details)
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Business Info', 'site-essentials'),              // Page title
+            __('Business Info', 'site-essentials'),              // Menu title
+            'manage_options',                                    // Capability
+            self::BUSINESS_INFO_PAGE_SLUG,                      // Menu slug
+            [$this, 'render_business_info_page']                 // Callback
+        );
+
         // Settings submenu (always visible)
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
@@ -131,8 +142,7 @@ class Admin_UI {
             [$this, 'render_settings_page']                     // Callback
         );
 
-        // Remove duplicate first submenu item (WordPress auto-adds parent as first submenu)
-        remove_submenu_page(self::PAGE_SLUG, self::PAGE_SLUG);
+        // Keep first submenu item (Site Essentials -> welcome page) so top-level menu links to welcome, not SEO
     }
 
     /**
@@ -174,10 +184,12 @@ class Admin_UI {
     public function enqueue_assets($hook) {
         // Only load on Site Essentials pages
         $allowed_hooks = [
+            'toplevel_page_' . self::PAGE_SLUG,
             'toplevel_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
         ];
 
@@ -327,6 +339,35 @@ class Admin_UI {
         echo '<div class="site-essentials-content">';
         echo '<div class="card se-module-settings-card" data-module-id="cpt">';
         $cpt_module->render_settings();
+        echo '</div></div></div>';
+    }
+
+    /**
+     * Render Business Info page
+     *
+     * Uses the existing Business Info form from brighter-core (privacy policy, contact details).
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_business_info_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__('Business Info', 'site-essentials') . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card">';
+
+        if (function_exists('brighterweb_render_business_info_form')) {
+            brighterweb_render_business_info_form();
+        } else {
+            echo '<div class="notice notice-warning"><p>';
+            echo esc_html__('Business Info module is not loaded. Ensure brighter-core is active.', 'site-essentials');
+            echo '</p></div>';
+        }
+
         echo '</div></div></div>';
     }
 

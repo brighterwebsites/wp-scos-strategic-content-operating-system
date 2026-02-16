@@ -135,7 +135,8 @@ function brighter_support_render_page() {
     echo '<nav class="nav-tab-wrapper">';
     echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=support')) . '" class="nav-tab ' . ($active_tab == 'support' ? 'nav-tab-active' : '') . '">' . esc_html__('Support Info', 'brighterwebsites') . '</a>';
 
-    if (in_array($email, $admin_emails, true)) {
+    // Manual Links: show to site admins so they can add/edit support link URLs (Full Manual, Quick Guide, Ranking tools)
+    if (current_user_can('manage_options')) {
         echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=manuals')) . '" class="nav-tab ' . ($active_tab == 'manuals' ? 'nav-tab-active' : '') . '">' . esc_html__('Manual Links', 'brighterwebsites') . '</a>';
     }
 
@@ -160,7 +161,7 @@ function brighter_support_render_page() {
     // Tab content
     echo '<div class="tab-content">';
 
-    if ($active_tab === 'manuals' && in_array($email, $admin_emails, true)) {
+    if ($active_tab === 'manuals' && current_user_can('manage_options')) {
         brighter_support_render_manuals_tab();
     } elseif ($active_tab === 'analytics' && current_user_can('manage_options')) {
         brighter_support_render_analytics_tab();

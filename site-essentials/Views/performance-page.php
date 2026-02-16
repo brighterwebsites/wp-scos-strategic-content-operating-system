@@ -85,7 +85,10 @@ $base_url = admin_url('admin.php?page=' . $performance_slug);
                         <input type="search" name="s" value="<?php echo esc_attr(isset($_GET['s']) ? sanitize_text_field($_GET['s']) : ''); ?>" placeholder="<?php esc_attr_e('Search pages…', 'site-essentials'); ?>">
                         <button class="button"><?php esc_html_e('Search', 'site-essentials'); ?></button>
                     </form>
-                    <?php Brighter_Tweaks::render_preload_form(true); ?>
+                    <?php
+                    $asset_preload_url = admin_url('admin.php?page=site-essentials-essentials&tab=asset-preloading');
+                    Brighter_Tweaks::render_preload_form(true, $asset_preload_url);
+                    ?>
                 </div>
             <?php endif; ?>
 

@@ -150,10 +150,20 @@ class Brighter_Tweaks {
 
     /**
      * Redirect after save when form is submitted via admin-post (e.g. from Site Essentials).
+     * Uses redirect_to from POST when present and valid, else referer, else Support Hub tweaks.
      */
     public static function handle_save_redirect() {
         if (self::process_save()) {
-            $redirect = wp_get_referer();
+            $redirect = '';
+            if (!empty($_POST['redirect_to'])) {
+                $to = esc_url_raw(wp_unslash($_POST['redirect_to']));
+                if (wp_validate_redirect($to, admin_url())) {
+                    $redirect = $to;
+                }
+            }
+            if (!$redirect) {
+                $redirect = wp_get_referer();
+            }
             if (!$redirect || !wp_validate_redirect($redirect)) {
                 $redirect = admin_url('admin.php?page=brighter_support&tab=tweaks');
             }
@@ -167,8 +177,9 @@ class Brighter_Tweaks {
     /**
      * Render only the preload/tweaks form (for embedding in Site Essentials > Performance).
      * When $embed is true, form posts to admin-post.php so save works from the embedded page.
+     * $redirect_to: optional URL to redirect to after save (e.g. Performance asset-preloading tab).
      */
-    public static function render_preload_form($embed = false) {
+    public static function render_preload_form($embed = false, $redirect_to = '') {
         if (!current_user_can('manage_options')) {
             return;
         }
@@ -192,6 +203,12 @@ class Brighter_Tweaks {
             $form_action = admin_url('admin-post.php');
             $form_method = 'post';
             echo '<input type="hidden" name="action" value="brighter_tweaks_save">';
+            if ($redirect_to !== '') {
+                $redirect_to = wp_validate_redirect($redirect_to, '') ? $redirect_to : '';
+                if ($redirect_to !== '') {
+                    echo '<input type="hidden" name="redirect_to" value="' . esc_url($redirect_to) . '">';
+                }
+            }
         } else {
             $form_action = '';
             $form_method = 'post';

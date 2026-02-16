@@ -106,9 +106,9 @@ add_action('admin_init', function () {
 
     // Section: Image Settings
     add_settings_section(
-        'image_optimisation_section', 
-        '??? Image Settings', 
-        '__return_false', 
+        'image_optimisation_section',
+        'Image Settings',
+        '__return_false',
         'brighter_optimisation_page'
     );
 
@@ -144,7 +144,7 @@ add_action('admin_init', function () {
     }, 'brighter_optimisation_page', 'image_optimisation_section');
 
     // Section: Registered sizes overview (cached for performance)
-    add_settings_section('registered_sizes_section', '?? Registered Image Sizes', function () {
+    add_settings_section('registered_sizes_section', 'Registered Image Sizes', function () {
         // Cache the output for 5 minutes
         $transient_key = 'brighter_registered_sizes_html';
         $cached_html = get_transient($transient_key);
@@ -164,8 +164,8 @@ add_action('admin_init', function () {
             $width = esc_html($size['width']);
             $height = esc_html($size['height']);
             $crop = !empty($size['crop']) ? ' (cropped)' : '';
-            $status = $enabled ? '? Enabled' : '? Disabled';
-            echo "<li><strong>{$name}</strong>: {$width}×{$height}{$crop} — {$status}</li>";
+            $status = $enabled ? 'Enabled' : 'Disabled';
+            echo '<li><strong>' . esc_html($name) . '</strong>: ' . $width . '&times;' . $height . esc_html($crop) . ' &mdash; ' . esc_html($status) . '</li>';
         }
         echo '</ul>';
         
@@ -174,7 +174,7 @@ add_action('admin_init', function () {
         echo $output;
     }, 'brighter_optimisation_page');
 
-    add_settings_section('other_optimisation_section', '? Other Optimisations', function () {
+    add_settings_section('other_optimisation_section', 'Other Optimisations', function () {
         echo '<p>More performance tools coming soon...</p>';
     }, 'brighter_optimisation_page');
 });

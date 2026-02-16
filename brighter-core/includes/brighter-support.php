@@ -54,12 +54,6 @@ add_action('admin_init', function () {
         'default' => ''
     ]);
 
-    // Analytics settings
-    register_setting('brighter_analytics_settings', 'brighter_ga4_measurement_id', [
-        'sanitize_callback' => 'sanitize_text_field',
-        'default' => ''
-    ]);
-
     add_settings_section(
         'brighter_manual_links_section',
         'Manual & Tool Links',
@@ -89,28 +83,6 @@ add_action('admin_init', function () {
             ['id' => $id]
         );
     }
-
-    // Analytics settings section
-    add_settings_section(
-        'brighter_analytics_section',
-        'Google Analytics Settings',
-        function() {
-            echo '<p>' . esc_html__('Configure your Google Analytics 4 (GA4) tracking settings.', 'brighterwebsites') . '</p>';
-        },
-        'brighter_analytics_page'
-    );
-
-    add_settings_field(
-        'brighter_ga4_measurement_id',
-        'GA4 Measurement ID',
-        function() {
-            $value = get_option('brighter_ga4_measurement_id', '');
-            echo '<input type="text" name="brighter_ga4_measurement_id" value="' . esc_attr($value) . '" class="regular-text" placeholder="G-XXXXXXXXXX" />';
-            echo '<p class="description">' . esc_html__('Enter your Google Analytics 4 Measurement ID (e.g., G-3EHPSXNZV2)', 'brighterwebsites') . '</p>';
-        },
-        'brighter_analytics_page',
-        'brighter_analytics_section'
-    );
 });
 
 /**
@@ -141,7 +113,6 @@ function brighter_support_render_page() {
     }
 
     if (current_user_can('manage_options')) {
-        echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=analytics')) . '" class="nav-tab ' . ($active_tab == 'analytics' ? 'nav-tab-active' : '') . '">' . esc_html__('Analytics', 'brighterwebsites') . '</a>';
         echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=business_info')) . '" class="nav-tab ' . ($active_tab == 'business_info' ? 'nav-tab-active' : '') . '">' . esc_html__('Business Info', 'brighterwebsites') . '</a>';
         echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=optimisation')) . '" class="nav-tab ' . ($active_tab == 'optimisation' ? 'nav-tab-active' : '') . '">' . esc_html__('Optimisation', 'brighterwebsites') . '</a>';
 
@@ -163,8 +134,6 @@ function brighter_support_render_page() {
 
     if ($active_tab === 'manuals' && current_user_can('manage_options')) {
         brighter_support_render_manuals_tab();
-    } elseif ($active_tab === 'analytics' && current_user_can('manage_options')) {
-        brighter_support_render_analytics_tab();
     } elseif ($active_tab === 'business_info' && current_user_can('manage_options')) {
         // SECURITY: Check if function exists before calling
         if (function_exists('brighterweb_render_business_info_form')) {
@@ -219,57 +188,6 @@ function brighter_support_render_manuals_tab() {
     do_settings_sections('brighter_support_page');
     submit_button(esc_html__('Save Manual Links', 'brighterwebsites'));
     echo '</form>';
-    echo '</div>';
-}
-
-/**
- * Render analytics tab
- * SECURITY: Settings API provides nonce protection
- */
-function brighter_support_render_analytics_tab() {
-    if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
-    }
-
-    $ga4_id = get_option('brighter_ga4_measurement_id', '');
-
-    echo '<div class="support-page">';
-    echo '<h2>' . esc_html__('Analytics Configuration', 'brighterwebsites') . '</h2>';
-
-    echo '<div class="notice notice-info inline" style="margin: 20px 0;">';
-    echo '<p><strong>' . esc_html__('Content Strategy Tracking', 'brighterwebsites') . '</strong></p>';
-    echo '<p>' . esc_html__('Your GA4 tracking automatically includes these custom dimensions on every page view:', 'brighterwebsites') . '</p>';
-    echo '<ul style="margin-left: 20px;">';
-    echo '<li><strong>content_topic</strong> - ' . esc_html__('The topic entered in the Topic field', 'brighterwebsites') . '</li>';
-    echo '<li><strong>content_intent</strong> - ' . esc_html__('The intent (e.g., Informational, Commercial, Transactional)', 'brighterwebsites') . '</li>';
-    echo '<li><strong>content_purpose</strong> - ' . esc_html__('The purpose (e.g., Pillar, Supporting, Service Page)', 'brighterwebsites') . '</li>';
-    echo '<li><strong>optimization_status</strong> - ' . esc_html__('The optimization status (e.g., CRO Testing, Optimised 90+)', 'brighterwebsites') . '</li>';
-    echo '<li><strong>pillar_page</strong> - ' . esc_html__('The pillar page title (as entered in field)', 'brighterwebsites') . '</li>';
-    echo '</ul>';
-    echo '<p style="font-size: 12px; color: #666;"><em>' . esc_html__('These dimensions are sent with all page views and events, allowing you to segment and analyze content performance in GA4.', 'brighterwebsites') . '</em></p>';
-    echo '</div>';
-
-    echo '<form method="post" action="options.php">';
-    settings_fields('brighter_analytics_settings');
-    do_settings_sections('brighter_analytics_page');
-    submit_button(esc_html__('Save Analytics Settings', 'brighterwebsites'));
-    echo '</form>';
-
-    if (!empty($ga4_id)) {
-        echo '<hr style="margin: 30px 0;">';
-        echo '<h3>' . esc_html__('GA4 Setup Instructions', 'brighterwebsites') . '</h3>';
-        echo '<div class="notice notice-success inline">';
-        echo '<p><strong>' . esc_html__('Current GA4 ID:', 'brighterwebsites') . '</strong> <code>' . esc_html($ga4_id) . '</code></p>';
-        echo '</div>';
-        echo '<ol style="line-height: 2;">';
-        echo '<li>' . esc_html__('Go to GA4 Admin → Data display → Custom definitions', 'brighterwebsites') . '</li>';
-        echo '<li>' . esc_html__('Create custom dimensions for: content_intent, content_purpose, content_topic, optimization_status, pillar_page', 'brighterwebsites') . '</li>';
-        echo '<li>' . esc_html__('Set all dimensions to "Event scope" with matching event parameter names', 'brighterwebsites') . '</li>';
-        echo '<li>' . esc_html__('Wait 24-48 hours for data to populate', 'brighterwebsites') . '</li>';
-        echo '<li>' . esc_html__('Use these dimensions in your GA4 reports and explorations', 'brighterwebsites') . '</li>';
-        echo '</ol>';
-    }
-
     echo '</div>';
 }
 

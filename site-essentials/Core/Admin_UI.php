@@ -102,14 +102,14 @@ class Admin_UI {
             [$this, 'render_seo_page']                          // Callback
         );
 
-        // Essentials submenu (always visible, shows notice if disabled)
+        // Performance submenu (WordPress Tweaks, Image Optimization, Asset Preloading)
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
-            __('Essentials', 'site-essentials'),                // Page title
-            __('Essentials', 'site-essentials'),                // Menu title
+            __('Performance', 'site-essentials'),                // Page title
+            __('Performance', 'site-essentials'),                // Menu title
             'manage_options',                                    // Capability
-            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
-            [$this, 'render_essentials_page']                   // Callback
+            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug (unchanged: site-essentials-essentials)
+            [$this, 'render_performance_page']                  // Callback
         );
 
         // Custom Posts (Recommended CPT) submenu
@@ -280,29 +280,23 @@ class Admin_UI {
     }
 
     /**
-     * Render Essentials page
+     * Render Performance page (WordPress Tweaks, Image Optimization, Asset Preloading)
      *
      * @since 1.0.0
      * @return void
      */
-    public function render_essentials_page() {
-        // Check user capabilities
+    public function render_performance_page() {
         if (!current_user_can('manage_options')) {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
 
-        // Check if Tweaks module is enabled
-        if (!$this->settings->is_module_enabled('tweaks')) {
-            $this->render_module_disabled_notice('Essentials', 'tweaks');
-            return;
-        }
-
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'tweaks';
-
-        // Get WordPress Tweaks module if loaded
         $tweaks_module = Module_Loader::get_module('tweaks');
 
-        include SITE_ESSENTIALS_PATH . 'Views/essentials-page.php';
+        // Image Optimization tab: brighter-support-image-settings must be loaded (brighter-core)
+        $image_settings_available = function_exists('brighter_get_image_sizes_config');
+
+        include SITE_ESSENTIALS_PATH . 'Views/performance-page.php';
     }
 
     /**

@@ -112,14 +112,6 @@ function brighter_support_render_page() {
         echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=manuals')) . '" class="nav-tab ' . ($active_tab == 'manuals' ? 'nav-tab-active' : '') . '">' . esc_html__('Manual Links', 'brighterwebsites') . '</a>';
     }
 
-    if (current_user_can('manage_options')) {
-        echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=optimisation')) . '" class="nav-tab ' . ($active_tab == 'optimisation' ? 'nav-tab-active' : '') . '">' . esc_html__('Optimisation', 'brighterwebsites') . '</a>';
-
-        if (class_exists('Brighter_Tweaks')) {
-            echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=tweaks')) . '" class="nav-tab ' . ($active_tab == 'tweaks' ? 'nav-tab-active' : '') . '">' . esc_html__('Brighter Tweaks', 'brighterwebsites') . '</a>';
-        }
-    }
-
     // Allow other modules to add tabs (e.g., API Settings)
     $custom_tabs = apply_filters('brighter_support_tabs', array(), $email);
     foreach ($custom_tabs as $tab_key => $tab_label) {
@@ -133,14 +125,6 @@ function brighter_support_render_page() {
 
     if ($active_tab === 'manuals' && current_user_can('manage_options')) {
         brighter_support_render_manuals_tab();
-    } elseif ($active_tab === 'optimisation' && current_user_can('manage_options')) {
-        brighter_support_render_optimisation_tab();
-    } elseif ($active_tab === 'tweaks' && current_user_can('manage_options')) {
-        if (class_exists('Brighter_Tweaks')) {
-            Brighter_Tweaks::render_page();
-        } else {
-            echo '<div class="support-page"><p>' . esc_html__('Tweaks module not available.', 'brighterwebsites') . '</p></div>';
-        }
     } else {
         // Check if a custom tab handler wants to render content
         $custom_content = apply_filters('brighter_support_tab_content', '', $active_tab);
@@ -171,24 +155,6 @@ function brighter_support_render_manuals_tab() {
     settings_fields('brighter_support_settings');
     do_settings_sections('brighter_support_page');
     submit_button(esc_html__('Save Manual Links', 'brighterwebsites'));
-    echo '</form>';
-    echo '</div>';
-}
-
-/**
- * Render optimisation tab
- * SECURITY: Settings API provides nonce protection
- */
-function brighter_support_render_optimisation_tab() {
-    if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
-    }
-    
-    echo '<div class="support-page">';
-    echo '<form method="post" action="options.php">';
-    settings_fields('brighter_optimisation_settings');
-    do_settings_sections('brighter_optimisation_page');
-    submit_button(esc_html__('Save Optimisation Settings', 'brighterwebsites'));
     echo '</form>';
     echo '</div>';
 }

@@ -28,6 +28,7 @@ class Brighter_Tweaks {
     public static function boot() {
         // Admin
         add_action('admin_init', [__CLASS__, 'register_settings']);
+        add_action('admin_post_brighter_tweaks_save', [__CLASS__, 'handle_save_redirect']);
         
         // Frontend output - priority 1 for early loading
         add_action('wp_head', [__CLASS__, 'output_preloads'], 1);
@@ -78,7 +79,7 @@ class Brighter_Tweaks {
         // Settings section for post types
         add_settings_section(
             'preload_on_singles',
-            '??? Preload Featured Images on Singles',
+            'Preload Featured Images on Singles',
             function () { 
                 echo '<p>' . esc_html__('Select the post types where featured images should be preloaded on single pages.', 'brighterwebsites') . '</p>'; 
             },
@@ -115,54 +116,67 @@ class Brighter_Tweaks {
     }
 
     /**
-     * Admin page render
-     * SECURITY: Nonce verification, capability checks, output escaping
+     * Process form save (nonce check + option updates). Returns true if saved.
      */
-    public static function render_page() {
+    public static function process_save() {
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
+            return false;
         }
-
-        // Handle form submission
-        if (!empty($_POST['bw_tweaks_nonce']) && wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
-            // Theme colour
-            if (isset($_POST[self::OPT_THEME])) {
-                update_option(self::OPT_THEME, self::sanitise_hex(wp_unslash($_POST[self::OPT_THEME])));
-            }
-            
-            // Post types for featured image preload
-            if (isset($_POST[self::OPT_POST_TYPES]) && is_array($_POST[self::OPT_POST_TYPES])) {
-                $types = array_map('sanitize_text_field', $_POST[self::OPT_POST_TYPES]);
-                update_option(self::OPT_POST_TYPES, $types);
-            } else {
-                update_option(self::OPT_POST_TYPES, []);
-            }
-            
-            // Preloads map
-            $map = [];
-            if (!empty($_POST[self::OPT]) && is_array($_POST[self::OPT])) {
-                foreach ($_POST[self::OPT] as $pid => $raw) {
-                    $pid = (int)$pid;
-                    $lines = array_filter(array_map('trim', explode("\n", wp_unslash($raw))));
-                    if ($pid > 0 && $lines) {
-                        $map[$pid] = array_values(array_unique(array_map([__CLASS__, 'sanitise_url'], $lines)));
-                    }
+        if (empty($_POST['bw_tweaks_nonce']) || !wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
+            return false;
+        }
+        if (isset($_POST[self::OPT_THEME])) {
+            update_option(self::OPT_THEME, self::sanitise_hex(wp_unslash($_POST[self::OPT_THEME])));
+        }
+        if (isset($_POST[self::OPT_POST_TYPES]) && is_array($_POST[self::OPT_POST_TYPES])) {
+            $types = array_map('sanitize_text_field', $_POST[self::OPT_POST_TYPES]);
+            update_option(self::OPT_POST_TYPES, $types);
+        } else {
+            update_option(self::OPT_POST_TYPES, []);
+        }
+        $map = [];
+        if (!empty($_POST[self::OPT]) && is_array($_POST[self::OPT])) {
+            foreach ($_POST[self::OPT] as $pid => $raw) {
+                $pid = (int)$pid;
+                $lines = array_filter(array_map('trim', explode("\n", wp_unslash($raw))));
+                if ($pid > 0 && $lines) {
+                    $map[$pid] = array_values(array_unique(array_map([__CLASS__, 'sanitise_url'], $lines)));
                 }
             }
-            update_option(self::OPT, $map);
-            
-            echo '<div class="updated"><p>' . esc_html__('Brighter Tweaks saved.', 'brighterwebsites') . '</p></div>';
         }
+        update_option(self::OPT, $map);
+        return true;
+    }
 
-        // Load data
+    /**
+     * Redirect after save when form is submitted via admin-post (e.g. from Site Essentials).
+     */
+    public static function handle_save_redirect() {
+        if (self::process_save()) {
+            $redirect = wp_get_referer();
+            if (!$redirect || !wp_validate_redirect($redirect)) {
+                $redirect = admin_url('admin.php?page=brighter_support&tab=tweaks');
+            }
+            wp_safe_redirect(add_query_arg('tweaks_saved', '1', $redirect));
+            exit;
+        }
+        wp_safe_redirect(admin_url('admin.php'));
+        exit;
+    }
+
+    /**
+     * Render only the preload/tweaks form (for embedding in Site Essentials > Performance).
+     * When $embed is true, form posts to admin-post.php so save works from the embedded page.
+     */
+    public static function render_preload_form($embed = false) {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
         $theme = get_option(self::OPT_THEME, '');
         $map = get_option(self::OPT, []);
-
-        // Pagination
         $paged = max(1, isset($_GET['paged']) ? absint($_GET['paged']) : 1);
         $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
         $per_page = 20;
-
         $q = new WP_Query([
             'post_type' => 'page',
             'posts_per_page' => $per_page,
@@ -174,102 +188,124 @@ class Brighter_Tweaks {
             'fields' => 'ids',
         ]);
 
+        if ($embed) {
+            $form_action = admin_url('admin-post.php');
+            $form_method = 'post';
+            echo '<input type="hidden" name="action" value="brighter_tweaks_save">';
+        } else {
+            $form_action = '';
+            $form_method = 'post';
+        }
+        ?>
+        <form method="<?php echo esc_attr($form_method); ?>" action="<?php echo esc_url($form_action); ?>" style="margin-top:20px;">
+            <?php wp_nonce_field('bw_tweaks_save', 'bw_tweaks_nonce'); ?>
+            <?php if ($embed) { ?>
+                <input type="hidden" name="_wp_http_referer" value="<?php echo esc_url(wp_get_referer() ?: admin_url('admin.php')); ?>">
+            <?php } ?>
+
+            <h2 class="title"><?php esc_html_e('Theme Colour', 'brighterwebsites'); ?></h2>
+            <p><?php esc_html_e('Used across Brighter tools where a brand colour is needed.', 'brighterwebsites'); ?></p>
+            <input type="text" name="<?php echo esc_attr(self::OPT_THEME); ?>"
+                   value="<?php echo esc_attr($theme); ?>" class="regular-text" placeholder="#193b2d"
+                   pattern="^#?[0-9a-fA-F]{3,6}$" />
+            <p class="description"><?php esc_html_e('Accepts 3 or 6-digit hex. The hash is optional.', 'brighterwebsites'); ?></p>
+
+            <hr>
+
+            <?php do_settings_sections('brighter_tweaks'); ?>
+
+            <hr>
+
+            <h2 class="title"><?php esc_html_e('Per-Page Preloads', 'brighterwebsites'); ?></h2>
+            <p><?php esc_html_e('Enter one asset URL per line. These will be preloaded only on that page. Supports images, fonts, CSS and JS.', 'brighterwebsites'); ?></p>
+
+            <table class="widefat striped">
+                <thead>
+                    <tr>
+                        <th style="width:35%"><?php esc_html_e('Page', 'brighterwebsites'); ?></th>
+                        <th><?php esc_html_e('Assets to Preload (one per line)', 'brighterwebsites'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php
+                if ($q->have_posts()):
+                    foreach ($q->posts as $pid):
+                        $title = get_the_title($pid) ?: '(no title)';
+                        $url = get_permalink($pid);
+                        $val = isset($map[$pid]) ? implode("\n", $map[$pid]) : '';
+                        ?>
+                        <tr>
+                            <td>
+                                <strong><?php echo esc_html($title); ?></strong><br>
+                                <code><?php echo esc_html($url); ?></code><br>
+                                <small><?php echo esc_html(sprintf('ID: %d | Status: %s', $pid, get_post_status($pid))); ?></small>
+                            </td>
+                            <td>
+                                <textarea name="<?php echo esc_attr(self::OPT); ?>[<?php echo (int)$pid; ?>]"
+                                          rows="4" style="width:100%;font-family:monospace;"><?php echo esc_textarea($val); ?></textarea>
+                            </td>
+                        </tr>
+                        <?php
+                    endforeach;
+                else:
+                    echo '<tr><td colspan="2">' . esc_html__('No pages found.', 'brighterwebsites') . '</td></tr>';
+                endif;
+                ?>
+                </tbody>
+            </table>
+
+            <?php
+            $total_pages = $q->max_num_pages ?: 1;
+            if ($total_pages > 1) {
+                echo '<p>';
+                for ($i = 1; $i <= $total_pages; $i++) {
+                    $link = add_query_arg([
+                        'page' => $embed ? 'site-essentials-essentials' : 'brighter_support',
+                        'tab' => $embed ? 'asset-preloading' : 'tweaks',
+                        's' => $search,
+                        'paged' => $i,
+                    ], admin_url('admin.php'));
+                    if ($i === $paged) {
+                        echo '<span class="button button-primary" style="margin-right:6px;">' . esc_html($i) . '</span>';
+                    } else {
+                        echo '<a class="button" style="margin-right:6px;" href="' . esc_url($link) . '">' . esc_html($i) . '</a>';
+                    }
+                }
+                echo '</p>';
+            }
+            ?>
+
+            <p><button class="button button-primary"><?php esc_html_e('Save Tweaks', 'brighterwebsites'); ?></button></p>
+        </form>
+        <?php
+        wp_reset_postdata();
+    }
+
+    /**
+     * Admin page render
+     * SECURITY: Nonce verification, capability checks, output escaping
+     */
+    public static function render_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
+        }
+        if (self::process_save()) {
+            echo '<div class="updated"><p>' . esc_html__('Brighter Tweaks saved.', 'brighterwebsites') . '</p></div>';
+        }
+
+        $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Brighter Tweaks', 'brighterwebsites'); ?></h1>
-
             <form method="get" style="margin-top:10px;">
                 <input type="hidden" name="page" value="brighter_support">
                 <input type="hidden" name="tab" value="tweaks">
-                <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search pages…', 'brighterwebsites'); ?>">
+                <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search pages?', 'brighterwebsites'); ?>">
                 <button class="button"><?php esc_html_e('Search', 'brighterwebsites'); ?></button>
             </form>
-
-            <form method="post" style="margin-top:20px;">
-                <?php wp_nonce_field('bw_tweaks_save', 'bw_tweaks_nonce'); ?>
-
-                <h2 class="title"><?php esc_html_e('Theme Colour', 'brighterwebsites'); ?></h2>
-                <p><?php esc_html_e('Used across Brighter tools where a brand colour is needed.', 'brighterwebsites'); ?></p>
-                <input type="text" name="<?php echo esc_attr(self::OPT_THEME); ?>"
-                       value="<?php echo esc_attr($theme); ?>" class="regular-text" placeholder="#193b2d"
-                       pattern="^#?[0-9a-fA-F]{3,6}$" />
-                <p class="description"><?php esc_html_e('Accepts 3 or 6-digit hex. The hash is optional.', 'brighterwebsites'); ?></p>
-
-                <hr>
-
-                <?php 
-                // Output the featured image preload settings
-                do_settings_sections('brighter_tweaks');
-                ?>
-
-                <hr>
-
-                <h2 class="title"><?php esc_html_e('Per-Page Preloads', 'brighterwebsites'); ?></h2>
-                <p><?php esc_html_e('Enter one asset URL per line. These will be preloaded only on that page. Supports images, fonts, CSS and JS.', 'brighterwebsites'); ?></p>
-
-                <table class="widefat striped">
-                    <thead>
-                        <tr>
-                            <th style="width:35%"><?php esc_html_e('Page', 'brighterwebsites'); ?></th>
-                            <th><?php esc_html_e('Assets to Preload (one per line)', 'brighterwebsites'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php
-                    if ($q->have_posts()):
-                        foreach ($q->posts as $pid):
-                            $title = get_the_title($pid) ?: '(no title)';
-                            $url = get_permalink($pid);
-                            $val = isset($map[$pid]) ? implode("\n", $map[$pid]) : '';
-                            ?>
-                            <tr>
-                                <td>
-                                    <strong><?php echo esc_html($title); ?></strong><br>
-                                    <code><?php echo esc_html($url); ?></code><br>
-                                    <small><?php echo esc_html(sprintf('ID: %d | Status: %s', $pid, get_post_status($pid))); ?></small>
-                                </td>
-                                <td>
-                                    <textarea name="<?php echo esc_attr(self::OPT); ?>[<?php echo (int)$pid; ?>]"
-                                              rows="4" style="width:100%;font-family:monospace;"><?php echo esc_textarea($val); ?></textarea>
-                                </td>
-                            </tr>
-                            <?php
-                        endforeach;
-                    else:
-                        echo '<tr><td colspan="2">' . esc_html__('No pages found.', 'brighterwebsites') . '</td></tr>';
-                    endif;
-                    ?>
-                    </tbody>
-                </table>
-
-                <?php
-                // Pagination with correct tab parameter
-                $total_pages = $q->max_num_pages ?: 1;
-                if ($total_pages > 1) {
-                    echo '<p>';
-                    for ($i = 1; $i <= $total_pages; $i++) {
-                        $link = add_query_arg([
-                            'page' => 'brighter_support',
-                            'tab' => 'tweaks',
-                            's' => $search,
-                            'paged' => $i,
-                        ], admin_url('admin.php'));
-
-                        if ($i === $paged) {
-                            echo '<span class="button button-primary" style="margin-right:6px;">' . esc_html($i) . '</span>';
-                        } else {
-                            echo '<a class="button" style="margin-right:6px;" href="' . esc_url($link) . '">' . esc_html($i) . '</a>';
-                        }
-                    }
-                    echo '</p>';
-                }
-                ?>
-
-                <p><button class="button button-primary"><?php esc_html_e('Save Tweaks', 'brighterwebsites'); ?></button></p>
-            </form>
+            <?php self::render_preload_form(false); ?>
         </div>
         <?php
-        wp_reset_postdata();
     }
 
     /**

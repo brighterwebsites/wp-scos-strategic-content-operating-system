@@ -200,13 +200,31 @@ add_filter('comments_open', function ($open, $post_id) {
 
 
 // ==========================================
-// ? Force og-image (1200x630) for SEOPress OG tags
+// Force og-image (1200x630) for SEOPress OG tags
 // ==========================================
-// Priority 1: Filter the OG image URL (for SEOPress)
+/**
+ * Filter SEOPress OG image URL to use og-image size (1200x630) when the image is an attachment.
+ *
+ * @param string $url    Current OG image URL from SEOPress
+ * @param mixed  $context Optional second parameter from filter
+ * @return string OG image URL (og-image size if attachment, else unchanged)
+ */
+function brighter_force_og_image_size($url, $context = null) {
+    if (empty($url) || !is_string($url)) {
+        return $url;
+    }
+    $attachment_id = attachment_url_to_postid($url);
+    if (!$attachment_id) {
+        return $url;
+    }
+    $og_url = wp_get_attachment_image_url($attachment_id, 'og-image');
+    return $og_url ? $og_url : $url;
+}
 add_filter('seopress_social_og_image', 'brighter_force_og_image_size', 999, 2);
-add_filter('seopress_social_og_default_image', 'brighter_force_og_image_size', 999, 2); // ADD THIS LINE
+add_filter('seopress_social_og_default_image', 'brighter_force_og_image_size', 999, 2);
+
 // ==========================================
-// ? Force og:image meta tags directly (bypass SEOPress)
+// Force og:image meta tags directly (bypass SEOPress)
 // ==========================================
 
 add_action('wp_head', 'brighter_inject_og_image_tags', 1);

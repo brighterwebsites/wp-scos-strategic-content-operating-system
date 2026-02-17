@@ -593,9 +593,10 @@ function brighterweb_register_business_info_settings() {
         'brighterweb_business_info_page', 
         'brighterweb_contact_section', 
         [
-            'id' => BRIGHTER_OPTION_PREFIX . 'place_id', 
+            'id'   => BRIGHTER_OPTION_PREFIX . 'place_id', 
             'type' => 'text',
-            'note' => 'Find your Local Verified Location Business (no place ID for service area businesses)'
+            // Update the note line below:
+            'note' => '<a href="https://developers.google.com/places/web-service/place-id" target="_blank">Find your Local Verified Location Business</a> (no place ID for service area businesses)'
         ]
     );
 
@@ -773,7 +774,8 @@ function brighterweb_field_callback($args) {
     echo '<input type="' . esc_attr($type) . '" name="' . esc_attr($args['id']) . '" value="' . esc_attr($value) . '" class="regular-text" />';
     
     if (!empty($args['note'])) {
-        echo '<p class="description">' . esc_html($args['note']) . '</p>';
+        // Allow safe HTML (links, em, strong) in notes
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
     }
 }
 
@@ -793,7 +795,7 @@ function brighterweb_dropdown_callback($args) {
     echo '</select>';
     
     if (!empty($args['note'])) {
-        echo '<p class="description">' . esc_html($args['note']) . '</p>';
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
     }
 }
 
@@ -816,7 +818,7 @@ function brighterweb_select_field_callback($args) {
     echo '</select>';
     
     if (!empty($args['note'])) {
-        echo '<p class="description">' . esc_html($args['note']) . '</p>';
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
     }
 }
 
@@ -830,7 +832,7 @@ function brighterweb_textarea_callback($args) {
     $value = get_option($id, '');
     echo '<textarea name="' . esc_attr($id) . '" id="' . esc_attr($id) . '" rows="4" cols="50" class="large-text">' . esc_textarea($value) . '</textarea>';
     if (!empty($args['note'])) {
-        echo '<p class="description">' . esc_html($args['note']) . '</p>';
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
     }
 }
 
@@ -858,7 +860,7 @@ function brighterweb_image_upload_callback($args) {
     }
     
     if (!empty($args['note'])) {
-        echo '<p class="description">' . esc_html($args['note']) . '</p>';
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
     }
     
     // Special note for site icon

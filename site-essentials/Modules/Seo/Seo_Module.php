@@ -128,6 +128,9 @@ class Seo_Module implements Module_Interface {
         // Handle sitemap requests
         add_action('template_redirect', [$this, 'serve_sitemap'], 1);
 
+        // CRITICAL: Redirect wp-sitemap.xml to our sitemap.xml before WP core serves it
+        add_action('parse_request', [$this, 'redirect_core_sitemap'], 1);
+
         // Register HTML sitemap shortcode
         add_shortcode('site_essentials_sitemap', [$this, 'render_html_sitemap_shortcode']);
 
@@ -176,6 +179,24 @@ class Seo_Module implements Module_Interface {
     }
 
     /**
+     * Redirect core wp-sitemap.xml to our sitemap.xml (early hook before WP processes the request)
+     *
+     * @since 1.0.0
+     * @param WP $wp Current WordPress environment instance
+     * @return void
+     */
+    public function redirect_core_sitemap($wp) {
+        if (!isset($_SERVER['REQUEST_URI'])) {
+            return;
+        }
+        // Match any wp-sitemap request (wp-sitemap.xml, wp-sitemap-posts-*.xml, etc.)
+        if (preg_match('#/wp-sitemap.*\.xml$#i', $_SERVER['REQUEST_URI'])) {
+            wp_safe_redirect(home_url('/sitemap.xml'), 301);
+            exit;
+        }
+    }
+
+    /**
      * Serve sitemap based on request
      *
      * @since 1.0.0
@@ -185,11 +206,6 @@ class Seo_Module implements Module_Interface {
         $sitemap = get_query_var('se_sitemap');
 
         if (!$sitemap) {
-            // Check if this is a wp-sitemap.xml request (core WP sitemap); redirect to our sitemap.xml
-            if (isset($_SERVER['REQUEST_URI']) && preg_match('#/wp-sitemap.*\.xml$#i', $_SERVER['REQUEST_URI'])) {
-                wp_safe_redirect(home_url('/sitemap.xml'), 301);
-                exit;
-            }
             return;
         }
 

@@ -139,13 +139,20 @@ add_action('init', function() {
             \SiteEssentials\Modules\CustomPosts\Cpt_Module::class
         );
 
-        // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used
-        // when SEO module is enabled. Run unconditionally so wp-sitemap never appears.
-        // WordPress core registers: add_action('init', 'wp_sitemaps_get_server', 5)
+        // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used.
+        // WP core registers at init priority 5; we must run earlier. Use priority 0 so we run first.
         add_action('init', function() {
-            remove_action('init', 'wp_sitemaps_get_server', 5);
-        }, 1); // Priority 1 = runs BEFORE WP core (5)
-        add_filter('wp_sitemaps_enabled', '__return_false', 1);
+            $removed = remove_action('init', 'wp_sitemaps_get_server', 5);
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('[Site Essentials] wp_sitemaps disable: remove_action(init, wp_sitemaps_get_server, 5) = ' . ($removed ? 'true' : 'false'));
+            }
+        }, 0);
+        add_filter('wp_sitemaps_enabled', function() {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('[Site Essentials] wp_sitemaps_enabled filter called -> false');
+            }
+            return false;
+        }, 1);
 
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();

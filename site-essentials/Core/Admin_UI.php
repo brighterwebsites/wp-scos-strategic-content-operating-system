@@ -70,6 +70,8 @@ class Admin_UI {
         add_action('admin_post_site_essentials_save_tweaks', [$this, 'save_tweaks_settings']);
         add_action('admin_post_site_essentials_save_seo', [$this, 'save_seo_settings']);
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
+        // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
+        add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
     }
 
     /**
@@ -652,6 +654,43 @@ class Admin_UI {
         }
 
         wp_send_json_success(['message' => 'Settings imported successfully']);
+    }
+
+    /**
+     * Handle Asset Preload form when POSTed to Performance > Asset Preloading (same-page submit).
+     * Does not use admin-post.php so it works regardless of brighter-core load order.
+     *
+     * @since 1.0.0
+     */
+    public function maybe_save_asset_preload() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            return;
+        }
+        if (!isset($_GET['page']) || $_GET['page'] !== self::ESSENTIALS_PAGE_SLUG) {
+            return;
+        }
+        if (!isset($_GET['tab']) || $_GET['tab'] !== 'asset-preloading') {
+            return;
+        }
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        if (empty($_POST['bw_tweaks_nonce']) || !wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
+            return;
+        }
+        if (!class_exists('Brighter_Tweaks')) {
+            return;
+        }
+        if (!Brighter_Tweaks::process_save()) {
+            return;
+        }
+        $redirect = add_query_arg([
+            'page'           => self::ESSENTIALS_PAGE_SLUG,
+            'tab'            => 'asset-preloading',
+            'tweaks_saved'    => '1',
+        ], admin_url('admin.php'));
+        wp_safe_redirect($redirect);
+        exit;
     }
 
     /**

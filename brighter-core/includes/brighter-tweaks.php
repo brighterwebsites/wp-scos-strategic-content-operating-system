@@ -115,14 +115,26 @@ class Brighter_Tweaks {
         ]);
     }
 
+    /** @var bool Set to true to log Asset Preload save/redirect to error_log (WP_DEBUG_LOG) */
+    const DEBUG_SAVE = false;
+
     /**
      * Process form save (nonce check + option updates). Returns true if saved.
      */
     public static function process_save() {
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] process_save() called');
+        }
         if (!current_user_can('manage_options')) {
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] process_save FAIL: current_user_can(manage_options)=false');
+            }
             return false;
         }
         if (empty($_POST['bw_tweaks_nonce']) || !wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] process_save FAIL: nonce missing or invalid. POST keys: ' . implode(', ', array_keys($_POST)));
+            }
             return false;
         }
         if (isset($_POST[self::OPT_THEME])) {
@@ -153,6 +165,9 @@ class Brighter_Tweaks {
      * Uses redirect_to from POST when present and valid, else referer, else Support Hub tweaks.
      */
     public static function handle_save_redirect() {
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] handle_save_redirect() called. POST[action]=' . (isset($_POST['action']) ? $_POST['action'] : ''));
+        }
         if (self::process_save()) {
             $redirect = '';
             if (!empty($_POST['redirect_to'])) {
@@ -167,8 +182,15 @@ class Brighter_Tweaks {
             if (!$redirect || !wp_validate_redirect($redirect)) {
                 $redirect = admin_url('admin.php?page=brighter_support&tab=tweaks');
             }
-            wp_safe_redirect(add_query_arg('tweaks_saved', '1', $redirect));
+            $redirect = add_query_arg('tweaks_saved', '1', $redirect);
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] redirect (success): ' . $redirect);
+            }
+            wp_safe_redirect($redirect);
             exit;
+        }
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] redirect (save failed): admin.php');
         }
         wp_safe_redirect(admin_url('admin.php'));
         exit;
@@ -199,16 +221,10 @@ class Brighter_Tweaks {
             'fields' => 'ids',
         ]);
 
-        if ($embed) {
-            $form_action = admin_url('admin-post.php');
+        if ($embed && $redirect_to !== '') {
+            // POST to the Performance > Asset Preloading page; Site Essentials handles save (no admin-post.php)
+            $form_action = wp_validate_redirect($redirect_to, '') ? $redirect_to : '';
             $form_method = 'post';
-            echo '<input type="hidden" name="action" value="brighter_tweaks_save">';
-            if ($redirect_to !== '') {
-                $redirect_to = wp_validate_redirect($redirect_to, '') ? $redirect_to : '';
-                if ($redirect_to !== '') {
-                    echo '<input type="hidden" name="redirect_to" value="' . esc_url($redirect_to) . '">';
-                }
-            }
         } else {
             $form_action = '';
             $form_method = 'post';
@@ -216,9 +232,6 @@ class Brighter_Tweaks {
         ?>
         <form method="<?php echo esc_attr($form_method); ?>" action="<?php echo esc_url($form_action); ?>" style="margin-top:20px;">
             <?php wp_nonce_field('bw_tweaks_save', 'bw_tweaks_nonce'); ?>
-            <?php if ($embed) { ?>
-                <input type="hidden" name="_wp_http_referer" value="<?php echo esc_url(wp_get_referer() ?: admin_url('admin.php')); ?>">
-            <?php } ?>
 
             <h2 class="title"><?php esc_html_e('Theme Colour', 'brighterwebsites'); ?></h2>
             <p><?php esc_html_e('Used across Brighter tools where a brand colour is needed.', 'brighterwebsites'); ?></p>

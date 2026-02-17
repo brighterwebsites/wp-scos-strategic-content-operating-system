@@ -249,14 +249,48 @@ class Brighter_Tweaks {
             <h2 class="title"><?php esc_html_e('Per-Page Preloads', 'brighterwebsites'); ?></h2>
             <p><?php esc_html_e('Enter one asset URL per line. These will be preloaded only on that page. Supports images, fonts, CSS and JS.', 'brighterwebsites'); ?></p>
 
-            <table class="widefat striped">
-                <thead>
-                    <tr>
-                        <th style="width:35%"><?php esc_html_e('Page', 'brighterwebsites'); ?></th>
-                        <th><?php esc_html_e('Assets to Preload (one per line)', 'brighterwebsites'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
+            <style>
+                .bw-preload-row {
+                    background: #fff;
+                    border: 1px solid #c3c4c7;
+                    padding: 15px;
+                    margin-bottom: 12px;
+                    border-radius: 4px;
+                }
+                .bw-preload-row:nth-of-type(even) {
+                    background: #f6f7f7;
+                }
+                .bw-preload-page-info {
+                    margin-bottom: 10px;
+                }
+                .bw-preload-page-info strong {
+                    font-size: 14px;
+                    color: #1d2327;
+                }
+                .bw-preload-page-info a {
+                    text-decoration: none;
+                    color: #2271b1;
+                    font-size: 12px;
+                }
+                .bw-preload-page-info a:hover {
+                    text-decoration: underline;
+                }
+                .bw-preload-page-info small {
+                    color: #646970;
+                    font-size: 11px;
+                }
+                .bw-preload-textarea {
+                    width: 100%;
+                    font-family: Consolas, Monaco, monospace;
+                    font-size: 12px;
+                    padding: 8px;
+                    border: 1px solid #8c8f94;
+                    border-radius: 3px;
+                    box-sizing: border-box;
+                }
+            </style>
+
+            <div style="margin-top:12px;">
                 <?php
                 if ($q->have_posts()):
                     foreach ($q->posts as $pid):
@@ -264,25 +298,22 @@ class Brighter_Tweaks {
                         $url = get_permalink($pid);
                         $val = isset($map[$pid]) ? implode("\n", $map[$pid]) : '';
                         ?>
-                        <tr>
-                            <td>
+                        <div class="bw-preload-row">
+                            <div class="bw-preload-page-info">
                                 <strong><?php echo esc_html($title); ?></strong><br>
-                                <code><?php echo esc_html($url); ?></code><br>
+                                <a href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($url); ?></a><br>
                                 <small><?php echo esc_html(sprintf('ID: %d | Status: %s', $pid, get_post_status($pid))); ?></small>
-                            </td>
-                            <td>
-                                <textarea name="<?php echo esc_attr(self::OPT); ?>[<?php echo (int)$pid; ?>]"
-                                          rows="4" style="width:100%;font-family:monospace;"><?php echo esc_textarea($val); ?></textarea>
-                            </td>
-                        </tr>
+                            </div>
+                            <textarea name="<?php echo esc_attr(self::OPT); ?>[<?php echo (int)$pid; ?>]"
+                                      rows="4" class="bw-preload-textarea" placeholder="<?php esc_attr_e('Enter asset URLs (one per line)', 'brighterwebsites'); ?>"><?php echo esc_textarea($val); ?></textarea>
+                        </div>
                         <?php
                     endforeach;
                 else:
-                    echo '<tr><td colspan="2">' . esc_html__('No pages found.', 'brighterwebsites') . '</td></tr>';
+                    echo '<p>' . esc_html__('No pages found.', 'brighterwebsites') . '</p>';
                 endif;
                 ?>
-                </tbody>
-            </table>
+            </div>
 
             <?php
             $total_pages = $q->max_num_pages ?: 1;

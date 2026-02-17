@@ -173,10 +173,6 @@ add_action('admin_init', function () {
         set_transient($transient_key, $output, 5 * MINUTE_IN_SECONDS);
         echo $output;
     }, 'brighter_optimisation_page');
-
-    add_settings_section('other_optimisation_section', 'Other Optimisations', function () {
-        echo '<p>More performance tools coming soon...</p>';
-    }, 'brighter_optimisation_page');
 });
 
 /**

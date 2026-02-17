@@ -185,6 +185,11 @@ class Seo_Module implements Module_Interface {
         $sitemap = get_query_var('se_sitemap');
 
         if (!$sitemap) {
+            // Check if this is a wp-sitemap.xml request (core WP sitemap); redirect to our sitemap.xml
+            if (isset($_SERVER['REQUEST_URI']) && preg_match('#/wp-sitemap.*\.xml$#i', $_SERVER['REQUEST_URI'])) {
+                wp_safe_redirect(home_url('/sitemap.xml'), 301);
+                exit;
+            }
             return;
         }
 
@@ -1077,7 +1082,7 @@ class Seo_Module implements Module_Interface {
             }
             .site-essentials-html-sitemap .archive-link {
                 font-size: 0.8em;
-                color: #0073aa;
+                color: var(--bde-brand-primary-color);
                 text-decoration: none;
                 padding: 4px 8px;
                 background: #e5f2ff;
@@ -1085,7 +1090,7 @@ class Seo_Module implements Module_Interface {
                 transition: all 0.2s;
             }
             .site-essentials-html-sitemap .archive-link:hover {
-                background: #0073aa;
+                background:var(--bde-brand-primary-color-hover);
                 color: white;
             }
             .site-essentials-html-sitemap .sitemap-list {
@@ -1096,7 +1101,7 @@ class Seo_Module implements Module_Interface {
                 margin-bottom: 10px;
                 padding: 8px;
                 background: #f9f9f9;
-                border-left: 3px solid #0073aa;
+                border-left: 3px solid var(--bde-brand-primary-color-hover);
             }
             .site-essentials-html-sitemap .sitemap-dates {
                 display: block;

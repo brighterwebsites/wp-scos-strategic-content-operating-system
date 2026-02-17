@@ -84,6 +84,7 @@ function brighter_get_whitelisted_modules() {
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
             'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
+            'class-author-extension', // Module 15: Author Extension (E-E-A-T fields)
         ];
     }
 
@@ -184,6 +185,8 @@ function brighter_load_modules() {
  	'bw-support-cache-dashbrd',
         'bw-faq',
         'privacy-policy-style',
+        'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
+        
         // ALTC modules
         'class-altc-taxonomies',
         'class-altc-meta-boxes',

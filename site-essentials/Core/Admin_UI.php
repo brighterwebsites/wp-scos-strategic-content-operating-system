@@ -117,7 +117,7 @@ class Admin_UI {
         // Custom Posts (Recommended CPT) submenu
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
-            __('Recommended CPT', 'site-essentials'),           // Page title
+            __('Recommended Custom Posts & Fields', 'site-essentials'),  // Page title
             __('Custom Posts', 'site-essentials'),               // Menu title
             'manage_options',                                    // Capability
             self::CPT_PAGE_SLUG,                                // Menu slug
@@ -327,11 +327,11 @@ class Admin_UI {
         }
 
         if (isset($_GET['updated']) && $_GET['updated'] === 'true') {
-            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('CPT settings saved.', 'site-essentials') . '</p></div>';
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved.', 'site-essentials') . '</p></div>';
         }
 
         echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__('Recommended CPT', 'site-essentials') . '</h1>';
+        echo '<h1>' . esc_html__('Recommended Custom Posts & Fields', 'site-essentials') . '</h1>';
         echo '<div class="site-essentials-content">';
         echo '<div class="card se-module-settings-card" data-module-id="cpt">';
         $cpt_module->render_settings();
@@ -832,12 +832,22 @@ class Admin_UI {
         $cpt_options = isset($_POST['cpt_options']) && is_array($_POST['cpt_options']) ? $_POST['cpt_options'] : [];
 
         $opts = [
-            'customer_success_stories' => !empty($cpt_options['customer_success_stories']),
-            'include_categories'       => !empty($cpt_options['include_categories']),
-            'include_tags'             => !empty($cpt_options['include_tags']),
+            'customer_success_stories'  => !empty($cpt_options['customer_success_stories']),
+            'include_categories'        => !empty($cpt_options['include_categories']),
+            'include_tags'              => !empty($cpt_options['include_tags']),
+            'archive_slug'              => isset($cpt_options['archive_slug']) ? sanitize_title($cpt_options['archive_slug']) : 'projects',
+            'enable_faq'                => !empty($cpt_options['enable_faq']),
+            'enable_author_extension'   => !empty($cpt_options['enable_author_extension']),
         ];
 
         $this->settings->update_module_settings('cpt', $opts);
+        
+        // Module 15: Sync Author Extension enabled state
+        if (!empty($opts['enable_author_extension'])) {
+            update_option('bw_author_extension_enabled', true);
+        } else {
+            update_option('bw_author_extension_enabled', false);
+        }
 
         flush_rewrite_rules();
 

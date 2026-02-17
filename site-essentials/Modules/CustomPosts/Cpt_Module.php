@@ -70,7 +70,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_name() {
-        return __('Custom Posts', 'site-essentials');
+        return __('Recommended Custom Posts & Fields', 'site-essentials');
     }
 
     /**
@@ -80,7 +80,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_description() {
-        return __('Recommended custom post types: Customer Success Stories (projects), and optional WP Categories/Tags for them.', 'site-essentials');
+        return __('Enable recommended custom post types (FAQ, Projects/Success Stories), taxonomy support, and extended field sets (Author Extension for E-E-A-T).', 'site-essentials');
     }
 
     /**
@@ -121,9 +121,12 @@ class Cpt_Module implements Module_Interface {
      */
     private function get_default_options() {
         return [
-            'customer_success_stories' => true,
-            'include_categories'       => false,
-            'include_tags'             => false,
+            'customer_success_stories'  => true,
+            'include_categories'        => false,
+            'include_tags'              => false,
+            'archive_slug'              => 'projects',
+            'enable_faq'                => false,       // Placeholder for Module 8 integration
+            'enable_author_extension'   => false,       // Module 15: Author Extension
         ];
     }
 
@@ -151,17 +154,28 @@ class Cpt_Module implements Module_Interface {
                 add_action('init', [$this, 'register_projects_tags'], 25);
             }
         }
+        
+        // Module 15: Author Extension (enable/disable)
+        if (!empty($opts['enable_author_extension'])) {
+            update_option('bw_author_extension_enabled', true);
+        } else {
+            update_option('bw_author_extension_enabled', false);
+        }
     }
 
     /**
      * Register Projects CPT (Customer Success Stories)
      *
-     * post_type=projects, has_archive, rewrite slug=projects.
+     * post_type=projects, has_archive, rewrite slug=projects (or custom).
      *
      * @since 1.0.0
      * @return void
      */
     public function register_projects_cpt() {
+        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
+        $opts = wp_parse_args($opts, $this->get_default_options());
+        $archive_slug = !empty($opts['archive_slug']) ? sanitize_title($opts['archive_slug']) : 'projects';
+        
         $labels = [
             'name'               => _x('Customer Success Stories', 'post type general name', 'site-essentials'),
             'singular_name'      => _x('Customer Success Story', 'post type singular name', 'site-essentials'),
@@ -179,16 +193,16 @@ class Cpt_Module implements Module_Interface {
         ];
 
         $args = [
-            'labels'             => $labels,
+            'labels'              => $labels,
             'public'              => true,
             'publicly_queryable'  => true,
             'show_ui'             => true,
             'show_in_menu'        => true,
             'query_var'           => true,
-            'rewrite'             => ['slug' => 'projects'],
+            'rewrite'             => ['slug' => $archive_slug],
             'capability_type'     => 'post',
             'has_archive'         => true,
-            'hierarchical'       => false,
+            'hierarchical'        => false,
             'menu_position'       => 20,
             'menu_icon'           => 'dashicons-portfolio',
             'supports'            => ['title', 'editor', 'thumbnail', 'excerpt', 'revisions'],

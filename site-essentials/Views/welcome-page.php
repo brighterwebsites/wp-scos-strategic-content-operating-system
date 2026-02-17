@@ -53,10 +53,10 @@ if (file_exists(SITE_ESSENTIALS_PATH . '../.git/HEAD')) {
 
         <div class="se-welcome-card">
             <div class="dashicons dashicons-portfolio"></div>
-            <h2><?php esc_html_e('Custom Posts', 'site-essentials'); ?></h2>
-            <p><?php esc_html_e('Recommended CPT: Customer Success Stories (projects), WP Categories & Tags.', 'site-essentials'); ?></p>
+            <h2><?php esc_html_e('Custom Posts & Fields', 'site-essentials'); ?></h2>
+            <p><?php esc_html_e('Manage recommended custom post types (FAQ, Projects/Success Stories) and extended field sets (Author Extension).', 'site-essentials'); ?></p>
             <a href="<?php echo esc_url(admin_url('admin.php?page=site-essentials-cpt')); ?>" class="button button-primary">
-                <?php esc_html_e('Recommended CPT', 'site-essentials'); ?>
+                <?php esc_html_e('Manage Custom Posts & Fields', 'site-essentials'); ?>
             </a>
         </div>
 

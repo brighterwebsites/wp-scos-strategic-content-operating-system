@@ -140,6 +140,17 @@ add_action('admin_init', function () {
 });
 
 /**
+ * Check if user is a Brighter Websites team member
+ * 
+ * @return bool True if user has @brighterwebsites.com.au email
+ */
+function brighter_support_is_agency_user() {
+    $current_user = wp_get_current_user();
+    $email = $current_user->user_email;
+    return (bool) preg_match('/@brighterwebsites\.com\.au$/i', $email);
+}
+
+/**
  * Main support page renderer with tabs
  * SECURITY: Capability checks, nonce verification, output escaping
  */
@@ -151,7 +162,7 @@ function brighter_support_render_page() {
     
     $current_user = wp_get_current_user();
     $email = $current_user->user_email;
-    $admin_emails = ['team@brighterwebsites.com.au', 'support@brighterwebsites.com.au'];
+    $is_agency_user = brighter_support_is_agency_user();
     $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'support';
 
     echo '<div class="wrap">';
@@ -161,9 +172,9 @@ function brighter_support_render_page() {
     echo '<nav class="nav-tab-wrapper">';
     echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=support')) . '" class="nav-tab ' . ($active_tab == 'support' ? 'nav-tab-active' : '') . '">' . esc_html__('Support Info', 'brighterwebsites') . '</a>';
 
-    // Manual Links: show to site admins so they can add/edit support link URLs (Full Manual, Quick Guide, Ranking tools)
-    if (current_user_can('manage_options')) {
-        echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=manuals')) . '" class="nav-tab ' . ($active_tab == 'manuals' ? 'nav-tab-active' : '') . '">' . esc_html__('Manual Links', 'brighterwebsites') . '</a>';
+    // Agency Settings: Only show to @brighterwebsites.com.au users
+    if ($is_agency_user) {
+        echo '<a href="' . esc_url(admin_url('admin.php?page=brighter_support&tab=manuals')) . '" class="nav-tab ' . ($active_tab == 'manuals' ? 'nav-tab-active' : '') . '">' . esc_html__('Agency Settings', 'brighterwebsites') . '</a>';
     }
 
     // Allow other modules to add tabs (e.g., API Settings)
@@ -177,7 +188,7 @@ function brighter_support_render_page() {
     // Tab content
     echo '<div class="tab-content">';
 
-    if ($active_tab === 'manuals' && current_user_can('manage_options')) {
+    if ($active_tab === 'manuals' && $is_agency_user) {
         brighter_support_render_manuals_tab();
     } else {
         // Check if a custom tab handler wants to render content
@@ -196,11 +207,12 @@ function brighter_support_render_page() {
 }
 
 /**
- * Render manuals tab
+ * Render agency settings tab (formerly manual links)
  * SECURITY: Settings API provides nonce protection
+ * ACCESS: Only accessible to @brighterwebsites.com.au users
  */
 function brighter_support_render_manuals_tab() {
-    if (!current_user_can('manage_options')) {
+    if (!brighter_support_is_agency_user()) {
         wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
     }
 
@@ -208,7 +220,7 @@ function brighter_support_render_manuals_tab() {
     echo '<form method="post" action="options.php">';
     settings_fields('brighter_support_settings');
     do_settings_sections('brighter_support_page');
-    submit_button(esc_html__('Save Manual Links', 'brighterwebsites'));
+    submit_button(esc_html__('Save Agency Settings', 'brighterwebsites'));
     echo '</form>';
     echo '</div>';
 }

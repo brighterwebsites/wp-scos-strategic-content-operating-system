@@ -681,7 +681,7 @@ class Admin_UI {
         if (!class_exists('Brighter_Tweaks')) {
             return;
         }
-        if (!Brighter_Tweaks::process_save()) {
+        if (!\Brighter_Tweaks::process_save()) {
             return;
         }
         $redirect = add_query_arg([

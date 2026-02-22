@@ -283,6 +283,11 @@ function brighter_support_render_manuals_tab() {
         wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
     }
 
+    // Show success message
+    if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Agency Settings saved successfully!', 'brighterwebsites') . '</p></div>';
+    }
+
     echo '<div class="support-page">';
     echo '<style>.form-table th { width: 200px; vertical-align: top; padding-top: 20px; } .form-table td { padding-top: 15px; }</style>';
     echo '<form method="post" action="options.php">';

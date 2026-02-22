@@ -166,7 +166,7 @@ function brighter_get_business_info_fields() {
             'site_icon', 'business_logo', 'publisher_logo', 'business_image', 'mobile_theme_color',
             
             // Contact Information
-            'phone_number', 'email', 'contact_type', 'contact_option',
+            'phone_number', 'email', 'contact_name', 'contact_type', 'contact_option',
             'address', 'city', 'state', 'postcode', 'country', 'country_code',
             'lat', 'long', 'place_id',
             
@@ -179,7 +179,7 @@ function brighter_get_business_info_fields() {
             'business_hours', 'price_tier', 'provider_mobility', 'service_area',
             
             // Legacy/deprecated (keep for backwards compatibility)
-            'contact_name', 'social_link_google_review', 'area_served'
+            'social_link_google_review', 'area_served'
         ];
     }
     
@@ -489,6 +489,19 @@ function brighterweb_register_business_info_settings() {
         'brighterweb_business_info_page', 
         'brighterweb_contact_section', 
         ['id' => BRIGHTER_OPTION_PREFIX . 'email', 'type' => 'email']
+    );
+    
+    add_settings_field(
+        'contact_name', 
+        'DPO / Privacy Contact Name', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'contact_name', 
+            'type' => 'text',
+            'note' => 'Data Protection Officer or Privacy Contact (if different from founder)'
+        ]
     );
     
     add_settings_field(
@@ -1025,7 +1038,9 @@ function sp_schemas_mapping_select($mapping) {
         'values' => [
             // Basic Info (option prefix bw_)
             'bw_business_name' => __('Business Name', 'brighterwebsites'),
-            'bw_contact_name' => __('Contact Name', 'brighterwebsites'),
+            'bw_contact_name' => __('DPO / Privacy Contact Name', 'brighterwebsites'),
+            'bw_founder_contact_name' => __('Founder Contact Name', 'brighterwebsites'),
+            'bw_founding_date' => __('Founding Date', 'brighterwebsites'),
             'bw_abn' => __('ABN', 'brighterwebsites'),
             'bw_business_hours' => __('Business Hours', 'brighterwebsites'),
             'bw_organisation_type' => __('Organisation Type', 'brighterwebsites'),

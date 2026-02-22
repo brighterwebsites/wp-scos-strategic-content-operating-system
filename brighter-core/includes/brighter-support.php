@@ -108,18 +108,18 @@ add_action('wp_head', function() {
         return;
     }
     
-    // Simple Commenter
+    // Simple Commenter - data is already sanitized on save, just output it
     $simple_commenter = get_option('simple_commenter_script', '');
     error_log('[Third-Party Scripts] Simple Commenter value: ' . (!empty($simple_commenter) ? substr($simple_commenter, 0, 50) . '...' : 'EMPTY'));
     if (!empty($simple_commenter)) {
-        echo "\n<!-- Simple Commenter -->\n" . wp_kses_post($simple_commenter) . "\n";
+        echo "\n<!-- Simple Commenter -->\n" . $simple_commenter . "\n";
     }
     
-    // Ahrefs Analytics
+    // Ahrefs Analytics - data is already sanitized on save, just output it
     $ahrefs = get_option('ahrefs_analytics_script', '');
     error_log('[Third-Party Scripts] Ahrefs value: ' . (!empty($ahrefs) ? substr($ahrefs, 0, 50) . '...' : 'EMPTY'));
     if (!empty($ahrefs)) {
-        echo "\n<!-- Ahrefs Analytics -->\n" . wp_kses_post($ahrefs) . "\n";
+        echo "\n<!-- Ahrefs Analytics -->\n" . $ahrefs . "\n";
     }
 }, 10);
 

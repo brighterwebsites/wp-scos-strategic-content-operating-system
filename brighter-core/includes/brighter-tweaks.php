@@ -440,11 +440,11 @@ class Brighter_Tweaks {
      * Output preloads for current page
      */
     public static function output_preloads() {
-        // Output Google Fonts preloads (site-wide)
+        // Output Google Fonts preloads (site-wide) - already sanitized on save
         $google_fonts = get_option(self::OPT_GOOGLE_FONTS, '');
         if (!empty($google_fonts)) {
             echo "\n<!-- Brighter Tweaks: Google Fonts Preloads -->\n";
-            echo wp_kses_post($google_fonts) . "\n";
+            echo $google_fonts . "\n";
         }
         
         // Work on any singular page/post

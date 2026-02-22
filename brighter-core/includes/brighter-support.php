@@ -19,20 +19,25 @@ if (!defined('ABSPATH')) exit;
  * Inject third-party scripts from Agency Settings into <head>
  */
 add_action('wp_head', function() {
+    error_log('[Third-Party Scripts] wp_head hook called. is_admin=' . (is_admin() ? 'true' : 'false'));
+    
     if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
+        error_log('[Third-Party Scripts] Skipping (admin/feed/REST)');
         return;
     }
     
     // Simple Commenter
     $simple_commenter = get_option('simple_commenter_script', '');
+    error_log('[Third-Party Scripts] Simple Commenter value: ' . (!empty($simple_commenter) ? substr($simple_commenter, 0, 50) . '...' : 'EMPTY'));
     if (!empty($simple_commenter)) {
-        echo "\n" . wp_kses_post($simple_commenter) . "\n";
+        echo "\n<!-- Simple Commenter -->\n" . wp_kses_post($simple_commenter) . "\n";
     }
     
     // Ahrefs Analytics
     $ahrefs = get_option('ahrefs_analytics_script', '');
+    error_log('[Third-Party Scripts] Ahrefs value: ' . (!empty($ahrefs) ? substr($ahrefs, 0, 50) . '...' : 'EMPTY'));
     if (!empty($ahrefs)) {
-        echo "\n" . wp_kses_post($ahrefs) . "\n";
+        echo "\n<!-- Ahrefs Analytics -->\n" . wp_kses_post($ahrefs) . "\n";
     }
 }, 10);
 

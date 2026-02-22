@@ -205,10 +205,20 @@ class Brighter_Tweaks {
         
         // Save Google Fonts Preload
         if (isset($_POST[self::OPT_GOOGLE_FONTS])) {
-            $fonts_value = wp_kses_post(wp_unslash($_POST[self::OPT_GOOGLE_FONTS]));
-            update_option(self::OPT_GOOGLE_FONTS, $fonts_value);
+            $value = wp_unslash($_POST[self::OPT_GOOGLE_FONTS]);
+            $allowed_tags = [
+                'link' => [
+                    'rel' => true,
+                    'href' => true,
+                    'as' => true,
+                    'type' => true,
+                    'crossorigin' => true,
+                ]
+            ];
+            $sanitized = wp_kses($value, $allowed_tags);
+            update_option(self::OPT_GOOGLE_FONTS, $sanitized);
             if (self::DEBUG_SAVE) {
-                error_log('[Brighter_Tweaks] Saved Google Fonts: ' . substr($fonts_value, 0, 100) . '...');
+                error_log('[Brighter_Tweaks] Google Fonts - Raw length: ' . strlen($value) . ', Sanitized length: ' . strlen($sanitized));
             }
         }
         

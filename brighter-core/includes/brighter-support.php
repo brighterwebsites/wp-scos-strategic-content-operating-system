@@ -35,14 +35,36 @@ add_action('admin_init', function() {
     
     error_log('[Agency Settings] Custom save handler triggered');
     
-    // Save all the settings
+    // Save all the settings - use wp_kses with script tags allowed
+    $allowed_tags = [
+        'script' => [
+            'src' => true,
+            'type' => true,
+            'async' => true,
+            'defer' => true,
+            'data-key' => true,
+            'id' => true,
+        ],
+        'link' => [
+            'rel' => true,
+            'href' => true,
+            'as' => true,
+            'type' => true,
+            'crossorigin' => true,
+        ]
+    ];
+    
     if (isset($_POST['simple_commenter_script'])) {
-        update_option('simple_commenter_script', wp_kses_post(wp_unslash($_POST['simple_commenter_script'])));
-        error_log('[Agency Settings] Saved simple_commenter_script');
+        $value = wp_unslash($_POST['simple_commenter_script']);
+        $sanitized = wp_kses($value, $allowed_tags);
+        update_option('simple_commenter_script', $sanitized);
+        error_log('[Agency Settings] simple_commenter_script - Raw length: ' . strlen($value) . ', Sanitized length: ' . strlen($sanitized));
     }
     if (isset($_POST['ahrefs_analytics_script'])) {
-        update_option('ahrefs_analytics_script', wp_kses_post(wp_unslash($_POST['ahrefs_analytics_script'])));
-        error_log('[Agency Settings] Saved ahrefs_analytics_script');
+        $value = wp_unslash($_POST['ahrefs_analytics_script']);
+        $sanitized = wp_kses($value, $allowed_tags);
+        update_option('ahrefs_analytics_script', $sanitized);
+        error_log('[Agency Settings] ahrefs_analytics_script - Raw length: ' . strlen($value) . ', Sanitized length: ' . strlen($sanitized));
     }
     
     // Save all other fields

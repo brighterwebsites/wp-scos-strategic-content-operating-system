@@ -13,6 +13,52 @@
  * login styling, design credit, and branding elements.
  */
 
+/**
+ * Custom save handler for Agency Settings (bypasses WordPress Settings API issues)
+ */
+add_action('admin_init', function() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        return;
+    }
+    if (!isset($_GET['page']) || $_GET['page'] !== 'brighter_support') {
+        return;
+    }
+    if (!isset($_GET['tab']) || $_GET['tab'] !== 'manuals') {
+        return;
+    }
+    if (!current_user_can('manage_options') || !brighter_support_is_agency_user()) {
+        return;
+    }
+    if (empty($_POST['agency_settings_nonce']) || !wp_verify_nonce($_POST['agency_settings_nonce'], 'save_agency_settings')) {
+        return;
+    }
+    
+    error_log('[Agency Settings] Custom save handler triggered');
+    
+    // Save all the settings
+    if (isset($_POST['simple_commenter_script'])) {
+        update_option('simple_commenter_script', wp_kses_post(wp_unslash($_POST['simple_commenter_script'])));
+        error_log('[Agency Settings] Saved simple_commenter_script');
+    }
+    if (isset($_POST['ahrefs_analytics_script'])) {
+        update_option('ahrefs_analytics_script', wp_kses_post(wp_unslash($_POST['ahrefs_analytics_script'])));
+        error_log('[Agency Settings] Saved ahrefs_analytics_script');
+    }
+    
+    // Save all other fields
+    $fields = ['manual_full_link', 'manual_quick_link', 'website_ranking_link', 'map_ranking_link',
+               'ai_content_writing', 'ai_research', 'ai_social_media', 'ai_competitor_research', 'management_portal'];
+    foreach ($fields as $field) {
+        if (isset($_POST[$field])) {
+            update_option($field, esc_url_raw(wp_unslash($_POST[$field])));
+        }
+    }
+    
+    // Redirect back to the same tab
+    wp_safe_redirect(add_query_arg(['page' => 'brighter_support', 'tab' => 'manuals', 'saved' => '1'], admin_url('admin.php')));
+    exit;
+}, 1);
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -309,19 +355,17 @@ function brighter_support_render_manuals_tab() {
     }
 
     // Show success message
-    if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
+    if (isset($_GET['saved']) && $_GET['saved'] === '1') {
         echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Agency Settings saved successfully!', 'brighterwebsites') . '</p></div>';
     }
 
     echo '<div class="support-page">';
     echo '<style>.form-table th { width: 200px; vertical-align: top; padding-top: 20px; } .form-table td { padding-top: 15px; }</style>';
-    echo '<form method="post" action="options.php">';
     
-    // Add hidden field to preserve tab on redirect
-    echo '<input type="hidden" name="page" value="brighter_support">';
-    echo '<input type="hidden" name="tab" value="manuals">';
+    // Custom form (NOT using Settings API)
+    echo '<form method="post" action="">';
+    wp_nonce_field('save_agency_settings', 'agency_settings_nonce');
     
-    settings_fields('brighter_support_settings');
     do_settings_sections('brighter_support_page');
     submit_button(esc_html__('Save Agency Settings', 'brighterwebsites'));
     echo '</form>';

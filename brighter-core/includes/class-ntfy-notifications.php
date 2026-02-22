@@ -30,7 +30,11 @@ class Brighter_Ntfy_Notifications {
      * Initialize the notification system
      */
     public static function init() {
-        // Only initialize if enabled
+        // Always add admin UI hooks (so tab shows even if not configured yet)
+        add_filter('brighter_support_tabs', [__CLASS__, 'add_monitoring_tab'], 20);
+        add_filter('brighter_support_tab_content', [__CLASS__, 'render_monitoring_tab'], 10, 2);
+        
+        // Only initialize monitors if enabled
         if (!self::is_enabled()) {
             return;
         }
@@ -41,10 +45,6 @@ class Brighter_Ntfy_Notifications {
         
         // Load and initialize monitors
         self::load_monitors();
-        
-        // Add admin UI hooks
-        add_filter('brighter_support_tabs', [__CLASS__, 'add_monitoring_tab'], 20);
-        add_filter('brighter_support_tab_content', [__CLASS__, 'render_monitoring_tab'], 10, 2);
     }
     
     /**

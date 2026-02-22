@@ -143,9 +143,13 @@ class Brighter_Ntfy_Notifications {
     
     /**
      * Add monitoring tab to Agency Settings
+     * Only show to agency users (@brighterwebsites.com.au)
      */
     public static function add_monitoring_tab($tabs) {
-        $tabs['monitoring'] = 'Monitoring';
+        // Check if user is an agency user
+        if (function_exists('brighter_support_is_agency_user') && brighter_support_is_agency_user()) {
+            $tabs['monitoring'] = 'Monitoring';
+        }
         return $tabs;
     }
     

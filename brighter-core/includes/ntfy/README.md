@@ -15,12 +15,12 @@
 
 ### ✅ Implemented Monitors (Phase 2)
 1. **SMTP Monitor** 🟢 ACTIVE - Catches email failures immediately
-2. **robots.txt Monitor** 🟢 ACTIVE - Daily verification
-3. **Sitemap Monitor** 🟢 ACTIVE - Daily verification  
-4. **Form Monitor** 🟡 OPT-IN - Breakdance, CF7, Gravity Forms support
+2. **Downtime Monitor** 🟢 ACTIVE - 5-minute health checks (HTTP, DB, filesystem)
+3. **robots.txt Monitor** 🟢 ACTIVE - Daily verification
+4. **Sitemap Monitor** 🟢 ACTIVE - Daily verification  
+5. **Form Monitor** 🟡 OPT-IN - Breakdance, CF7, Gravity Forms support
 
 ### ⏳ Stubbed Monitors (Phase 3)
-5. **Downtime Monitor** 🟡 TODO - Needs external health check implementation
 6. **WP Cron Monitor** 🟡 TODO - Needs missed event detection logic
 
 ---
@@ -72,6 +72,7 @@ Open your ntfy app/web UI and subscribe to:
 | Monitor | Topic Pattern | When It Fires | Priority |
 |---------|---------------|---------------|----------|
 | SMTP | `{prefix}-smtp` | Email send failure | 🔴 Urgent |
+| Downtime | `{prefix}-downtime` | Health check issues | 🟠 High |
 | robots.txt | `{prefix}-robots` | robots.txt returns error | 🟡 Default |
 | Sitemap | `{prefix}-sitemap` | sitemap.xml returns error | 🟡 Default |
 | Forms | `{site-slug}-forms` | Form submission | 🟡 Default |
@@ -105,6 +106,14 @@ Visit: `yourdomain.com/?test_ntfy=1` (as admin)
 2. Click **"Send Test Notification"** button
 3. Check your ntfy app for message on `bw-test` topic
 
+### Test Downtime Monitor
+Temporarily cause an issue:
+- **Slow response:** Install a plugin that slows down the site
+- **Database issue:** Won't be easy to test without breaking things
+- **Filesystem:** Temporarily change uploads directory permissions
+
+Or wait 5 minutes for the cron to run and check debug.log
+
 ### Test SMTP Monitor
 Temporarily break SMTP settings and try sending an email
 
@@ -123,12 +132,12 @@ Enable with `NTFY_MONITOR_FORMS` and submit a form
 
 ### 🟢 Production Ready
 - **SMTP Monitor** - Hooks into `wp_mail_failed`, rate limited to 1 alert per 5 min
+- **Downtime Monitor** - 5-minute WP Cron health checks: HTTP response, DB connectivity, filesystem write
 - **robots.txt Monitor** - Daily cron check, alerts on non-200 status
 - **Sitemap Monitor** - Daily cron check, validates XML content type
 - **Form Monitor** - Supports Breakdance, CF7, Gravity Forms
 
 ### 🟡 Needs Implementation
-- **Downtime Monitor** - Stubbed, needs external health check approach
 - **WP Cron Monitor** - Stubbed, needs missed event detection logic
 
 ---
@@ -140,6 +149,7 @@ All monitors implement rate limiting to prevent notification spam:
 | Monitor | Rate Limit |
 |---------|------------|
 | SMTP | 1 alert per 5 minutes |
+| Downtime | 1 alert per 15 minutes |
 | robots.txt | 1 alert per 24 hours |
 | Sitemap | 1 alert per 24 hours |
 | Forms | No limit (can be noisy) |

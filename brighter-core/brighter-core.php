@@ -244,6 +244,11 @@ if (file_exists(BRIGHTER_CORE_PATH . 'includes/api/class-brighter-api.php')) {
     require_once BRIGHTER_CORE_PATH . 'includes/api/class-brighter-api.php';
 }
 
+// Load ntfy notification system
+if (file_exists(BRIGHTER_CORE_PATH . 'includes/class-ntfy-notifications.php')) {
+    require_once BRIGHTER_CORE_PATH . 'includes/class-ntfy-notifications.php';
+}
+
 // Load ntfy test helper (temporary - for testing ntfy connection)
 if (file_exists(BRIGHTER_CORE_PATH . 'includes/ntfy/test-ntfy.php')) {
     require_once BRIGHTER_CORE_PATH . 'includes/ntfy/test-ntfy.php';

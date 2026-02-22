@@ -184,7 +184,7 @@ add_action('admin_init', function () {
         'Simple Commenter Script',
         function($args) {
             $value = get_option($args['id'], '');
-            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code">' . esc_textarea($value) . '</textarea>';
+            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code" style="width:100%;max-width:600px;">' . esc_textarea($value) . '</textarea>';
             echo '<p class="description">' . esc_html__('Paste the full <script> tag from Simple Commenter.', 'brighterwebsites') . '<br><strong>' . esc_html__('Important:', 'brighterwebsites') . '</strong> ' . esc_html__('Add /js/comments.min.js to WP Rocket/LiteSpeed Cache JS Excludes.', 'brighterwebsites') . '</p>';
         },
         'brighter_support_page',
@@ -197,7 +197,7 @@ add_action('admin_init', function () {
         'Ahrefs Analytics Script',
         function($args) {
             $value = get_option($args['id'], '');
-            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code">' . esc_textarea($value) . '</textarea>';
+            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code" style="width:100%;max-width:600px;">' . esc_textarea($value) . '</textarea>';
             echo '<p class="description">' . esc_html__('Paste the full <script> tag from Ahrefs Analytics.', 'brighterwebsites') . '</p>';
         },
         'brighter_support_page',
@@ -284,6 +284,7 @@ function brighter_support_render_manuals_tab() {
     }
 
     echo '<div class="support-page">';
+    echo '<style>.form-table th { width: 200px; vertical-align: top; padding-top: 20px; } .form-table td { padding-top: 15px; }</style>';
     echo '<form method="post" action="options.php">';
     settings_fields('brighter_support_settings');
     do_settings_sections('brighter_support_page');

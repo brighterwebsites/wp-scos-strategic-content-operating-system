@@ -120,11 +120,31 @@ class Brighter_Tweaks {
         
         add_settings_field('bw_google_fonts_preload', 'Google Fonts Preload Tags', function () {
             $value = get_option(self::OPT_GOOGLE_FONTS, '');
-            echo '<style>.bw-google-fonts-wrap { max-width: 800px; } .bw-google-fonts-wrap textarea { font-family: Consolas, Monaco, monospace; font-size: 12px; }</style>';
+            echo '<style>
+                .bw-google-fonts-wrap { max-width: 800px; }
+                .bw-google-fonts-wrap textarea { 
+                    font-family: Consolas, Monaco, monospace; 
+                    font-size: 12px;
+                    width: 100%;
+                    display: block;
+                }
+                .bw-google-fonts-wrap .description {
+                    max-width: 800px;
+                }
+                .bw-google-fonts-wrap code {
+                    display: block;
+                    padding: 10px;
+                    background: #f6f7f7;
+                    border: 1px solid #dcdcde;
+                    margin-top: 8px;
+                    word-wrap: break-word;
+                    white-space: pre-wrap;
+                }
+            </style>';
             echo '<div class="bw-google-fonts-wrap">';
-            echo '<textarea name="' . esc_attr(self::OPT_GOOGLE_FONTS) . '" rows="8" class="large-text code" style="width:100%;" placeholder="' . esc_attr('<link rel="preload" href="https://fonts.gstatic.com/..." as="font" type="font/woff2" crossorigin>') . '">' . esc_textarea($value) . '</textarea>';
+            echo '<textarea name="' . esc_attr(self::OPT_GOOGLE_FONTS) . '" rows="8" placeholder="' . esc_attr('<link rel="preload" href="https://fonts.gstatic.com/..." as="font" type="font/woff2" crossorigin>') . '">' . esc_textarea($value) . '</textarea>';
             echo '<p class="description">' . esc_html__('Paste the full <link> tags, one per line. Example:', 'brighterwebsites') . '</p>';
-            echo '<p class="description"><code style="display:block;padding:8px;background:#f6f7f7;border:1px solid #dcdcde;margin-top:5px;">&lt;link rel="preload" href="https://fonts.gstatic.com/s/lato/v25/S6uyw4BMUTPHjx4wXg.woff2" as="font" type="font/woff2" crossorigin&gt;</code></p>';
+            echo '<code>&lt;link rel="preload" href="https://fonts.gstatic.com/s/lato/v25/S6uyw4BMUTPHjx4wXg.woff2"<br>&nbsp;&nbsp;as="font" type="font/woff2" crossorigin&gt;</code>';
             echo '</div>';
         }, 'brighter_tweaks', 'google_fonts_preload');
 

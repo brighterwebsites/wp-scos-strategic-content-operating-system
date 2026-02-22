@@ -16,6 +16,20 @@
 if (!defined('ABSPATH')) exit;
 
 /**
+ * Fix Settings API redirect to preserve tab parameter
+ */
+add_filter('wp_redirect', function($location) {
+    // Only modify redirects from our settings page
+    if (strpos($location, 'page=brighter_support') !== false && strpos($location, 'settings-updated=true') !== false) {
+        // If tab parameter is missing, add it back
+        if (strpos($location, 'tab=') === false && isset($_POST['tab'])) {
+            $location = add_query_arg('tab', sanitize_key($_POST['tab']), $location);
+        }
+    }
+    return $location;
+}, 10);
+
+/**
  * Inject third-party scripts from Agency Settings into <head>
  */
 add_action('wp_head', function() {

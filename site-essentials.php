@@ -147,12 +147,7 @@ add_action('init', function() {
                 error_log('[Site Essentials] wp_sitemaps disable: remove_action(init, wp_sitemaps_get_server, 5) = ' . ($removed ? 'true' : 'false'));
             }
         }, 0);
-        add_filter('wp_sitemaps_enabled', function() {
-            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-                error_log('[Site Essentials] wp_sitemaps_enabled filter called -> false');
-            }
-            return false;
-        }, 1);
+        add_filter('wp_sitemaps_enabled', '__return_false', 1);
 
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();

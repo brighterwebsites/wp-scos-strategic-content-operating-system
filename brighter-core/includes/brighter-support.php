@@ -188,27 +188,25 @@ add_action('admin_init', function () {
     add_settings_field(
         'simple_commenter_script',
         'Simple Commenter Script',
-        function($args) {
-            $value = get_option($args['id'], '');
-            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code" style="width:100%;max-width:600px;">' . esc_textarea($value) . '</textarea>';
+        function() {
+            $value = get_option('simple_commenter_script', '');
+            echo '<textarea name="simple_commenter_script" rows="3" class="large-text code" style="width:100%;max-width:600px;">' . esc_textarea($value) . '</textarea>';
             echo '<p class="description">' . esc_html__('Paste the full <script> tag from Simple Commenter.', 'brighterwebsites') . '<br><strong>' . esc_html__('Important:', 'brighterwebsites') . '</strong> ' . esc_html__('Add /js/comments.min.js to WP Rocket/LiteSpeed Cache JS Excludes.', 'brighterwebsites') . '</p>';
         },
         'brighter_support_page',
-        'brighter_scripts_section',
-        ['id' => 'simple_commenter_script']
+        'brighter_scripts_section'
     );
     
     add_settings_field(
         'ahrefs_analytics_script',
         'Ahrefs Analytics Script',
-        function($args) {
-            $value = get_option($args['id'], '');
-            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code" style="width:100%;max-width:600px;">' . esc_textarea($value) . '</textarea>';
+        function() {
+            $value = get_option('ahrefs_analytics_script', '');
+            echo '<textarea name="ahrefs_analytics_script" rows="3" class="large-text code" style="width:100%;max-width:600px;">' . esc_textarea($value) . '</textarea>';
             echo '<p class="description">' . esc_html__('Paste the full <script> tag from Ahrefs Analytics.', 'brighterwebsites') . '</p>';
         },
         'brighter_support_page',
-        'brighter_scripts_section',
-        ['id' => 'ahrefs_analytics_script']
+        'brighter_scripts_section'
     );
 });
 

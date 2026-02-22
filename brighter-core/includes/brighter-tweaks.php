@@ -119,6 +119,7 @@ class Brighter_Tweaks {
         );
         
         add_settings_field('bw_google_fonts_preload', 'Google Fonts Preload Tags', function () {
+            wp_cache_delete('bw_google_fonts_preload', 'options');
             $value = get_option(self::OPT_GOOGLE_FONTS, '');
             echo '<style>
                 .bw-google-fonts-wrap { max-width: 800px; }

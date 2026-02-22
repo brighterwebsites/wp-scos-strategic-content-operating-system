@@ -24,6 +24,7 @@ class Brighter_Tweaks {
     const OPT = 'bw_preloads_map';
     const OPT_THEME = 'theme_colour';
     const OPT_POST_TYPES = 'brighter_preload_post_types';
+    const OPT_GOOGLE_FONTS = 'bw_google_fonts_preload';
 
     public static function boot() {
         // Admin
@@ -75,6 +76,13 @@ class Brighter_Tweaks {
             },
             'default' => []
         ]);
+        
+        // Google Fonts preload
+        register_setting('brighter_tweaks', self::OPT_GOOGLE_FONTS, [
+            'type' => 'string',
+            'sanitize_callback' => 'wp_kses_post',
+            'default' => ''
+        ]);
 
         // Settings section for post types
         add_settings_section(
@@ -98,6 +106,22 @@ class Brighter_Tweaks {
                 echo '</label>';
             }
         }, 'brighter_tweaks', 'preload_on_singles');
+        
+        // Google Fonts Preload section
+        add_settings_section(
+            'google_fonts_preload',
+            'Google Fonts Preload',
+            function () { 
+                echo '<p>' . esc_html__('Add Google Fonts preload link tags to improve performance. Enter the full <link rel="preload"> tags.', 'brighterwebsites') . '</p>'; 
+            },
+            'brighter_tweaks'
+        );
+        
+        add_settings_field('bw_google_fonts_preload', 'Google Fonts Preload Tags', function () {
+            $value = get_option(self::OPT_GOOGLE_FONTS, '');
+            echo '<textarea name="' . esc_attr(self::OPT_GOOGLE_FONTS) . '" rows="5" class="large-text code" placeholder="' . esc_attr('<link rel="preload" href="https://fonts.gstatic.com/..." as="font" type="font/woff2" crossorigin>') . '">' . esc_textarea($value) . '</textarea>';
+            echo '<p class="description">' . esc_html__('Paste the full <link> tags, one per line. Example:', 'brighterwebsites') . '<br><code>&lt;link rel="preload" href="https://fonts.gstatic.com/s/lato/v25/S6uyw4BMUTPHjx4wXg.woff2" as="font" type="font/woff2" crossorigin&gt;</code></p>';
+        }, 'brighter_tweaks', 'google_fonts_preload');
 
         // Register post meta for per-page preloads
         register_post_meta('page', '_bw_preloads', [
@@ -233,15 +257,6 @@ class Brighter_Tweaks {
         <form method="<?php echo esc_attr($form_method); ?>" action="<?php echo esc_url($form_action); ?>" style="margin-top:20px;">
             <?php wp_nonce_field('bw_tweaks_save', 'bw_tweaks_nonce'); ?>
 
-            <h2 class="title"><?php esc_html_e('Theme Colour', 'brighterwebsites'); ?></h2>
-            <p><?php esc_html_e('Used across Brighter tools where a brand colour is needed.', 'brighterwebsites'); ?></p>
-            <input type="text" name="<?php echo esc_attr(self::OPT_THEME); ?>"
-                   value="<?php echo esc_attr($theme); ?>" class="regular-text" placeholder="#193b2d"
-                   pattern="^#?[0-9a-fA-F]{3,6}$" />
-            <p class="description"><?php esc_html_e('Accepts 3 or 6-digit hex. The hash is optional.', 'brighterwebsites'); ?></p>
-
-            <hr>
-
             <?php do_settings_sections('brighter_tweaks'); ?>
 
             <hr>
@@ -373,6 +388,13 @@ class Brighter_Tweaks {
      * Output preloads for current page
      */
     public static function output_preloads() {
+        // Output Google Fonts preloads (site-wide)
+        $google_fonts = get_option(self::OPT_GOOGLE_FONTS, '');
+        if (!empty($google_fonts)) {
+            echo "\n<!-- Brighter Tweaks: Google Fonts Preloads -->\n";
+            echo wp_kses_post($google_fonts) . "\n";
+        }
+        
         // Work on any singular page/post
         if (!is_singular()) return;
         
@@ -400,7 +422,7 @@ class Brighter_Tweaks {
         if (empty($urls)) return;
         
         // Output preloads
-        echo "\n<!-- Brighter Tweaks: Preloads -->\n";
+        echo "\n<!-- Brighter Tweaks: Per-Page Preloads -->\n";
         foreach ($urls as $u) {
             $u = self::normalise_url($u);
             if (empty($u)) continue;

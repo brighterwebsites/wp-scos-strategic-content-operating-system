@@ -160,7 +160,7 @@ function brighter_get_business_info_fields() {
     if ($fields === null) {
         $fields = [
             // Entity Identity
-            'organisation_type', 'business_name', 'business_category', 'service_description', 'abn',
+            'organisation_type', 'business_name', 'business_category', 'service_description', 'abn', 'founding_date', 'founder_contact_name',
             
             // Key Media
             'site_icon', 'business_logo', 'publisher_logo', 'business_image', 'mobile_theme_color',
@@ -358,6 +358,32 @@ function brighterweb_register_business_info_settings() {
             'id' => BRIGHTER_OPTION_PREFIX . 'abn', 
             'type' => 'text',
             'note' => 'VAT ID or ABN. Search: https://abr.business.gov.au/ABN/'
+        ]
+    );
+    
+    add_settings_field(
+        'founding_date', 
+        'Founding Date', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'founding_date', 
+            'type' => 'text',
+            'note' => 'ISO 8601 format: YYYY (e.g. 2020) or YYYY-MM or YYYY-MM-DD'
+        ]
+    );
+    
+    add_settings_field(
+        'founder_contact_name', 
+        'Founder Contact Name', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'founder_contact_name', 
+            'type' => 'text',
+            'note' => 'Full name (first and last) of the founder or primary contact'
         ]
     );
 

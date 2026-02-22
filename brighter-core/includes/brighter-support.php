@@ -16,6 +16,27 @@
 if (!defined('ABSPATH')) exit;
 
 /**
+ * Inject third-party scripts from Agency Settings into <head>
+ */
+add_action('wp_head', function() {
+    if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
+        return;
+    }
+    
+    // Simple Commenter
+    $simple_commenter = get_option('simple_commenter_script', '');
+    if (!empty($simple_commenter)) {
+        echo "\n" . wp_kses_post($simple_commenter) . "\n";
+    }
+    
+    // Ahrefs Analytics
+    $ahrefs = get_option('ahrefs_analytics_script', '');
+    if (!empty($ahrefs)) {
+        echo "\n" . wp_kses_post($ahrefs) . "\n";
+    }
+}, 10);
+
+/**
  * Add Support Hub menu page
  * SECURITY: Proper capability requirement
  */
@@ -73,6 +94,16 @@ add_action('admin_init', function () {
     ]);
     register_setting('brighter_support_settings', 'management_portal', [
         'sanitize_callback' => 'esc_url_raw',
+        'default' => ''
+    ]);
+    
+    // Third-party Scripts
+    register_setting('brighter_support_settings', 'simple_commenter_script', [
+        'sanitize_callback' => 'wp_kses_post',
+        'default' => ''
+    ]);
+    register_setting('brighter_support_settings', 'ahrefs_analytics_script', [
+        'sanitize_callback' => 'wp_kses_post',
         'default' => ''
     ]);
 
@@ -137,6 +168,42 @@ add_action('admin_init', function () {
             ['id' => $id]
         );
     }
+    
+    // Third-party scripts section
+    add_settings_section(
+        'brighter_scripts_section',
+        'Third-Party Scripts',
+        function() {
+            echo '<p>' . esc_html__('These scripts will be injected into the <head> section when populated.', 'brighterwebsites') . '</p>';
+        },
+        'brighter_support_page'
+    );
+    
+    add_settings_field(
+        'simple_commenter_script',
+        'Simple Commenter Script',
+        function($args) {
+            $value = get_option($args['id'], '');
+            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code">' . esc_textarea($value) . '</textarea>';
+            echo '<p class="description">' . esc_html__('Paste the full <script> tag from Simple Commenter.', 'brighterwebsites') . '<br><strong>' . esc_html__('Important:', 'brighterwebsites') . '</strong> ' . esc_html__('Add /js/comments.min.js to WP Rocket/LiteSpeed Cache JS Excludes.', 'brighterwebsites') . '</p>';
+        },
+        'brighter_support_page',
+        'brighter_scripts_section',
+        ['id' => 'simple_commenter_script']
+    );
+    
+    add_settings_field(
+        'ahrefs_analytics_script',
+        'Ahrefs Analytics Script',
+        function($args) {
+            $value = get_option($args['id'], '');
+            echo '<textarea name="' . esc_attr($args['id']) . '" rows="3" class="large-text code">' . esc_textarea($value) . '</textarea>';
+            echo '<p class="description">' . esc_html__('Paste the full <script> tag from Ahrefs Analytics.', 'brighterwebsites') . '</p>';
+        },
+        'brighter_support_page',
+        'brighter_scripts_section',
+        ['id' => 'ahrefs_analytics_script']
+    );
 });
 
 /**

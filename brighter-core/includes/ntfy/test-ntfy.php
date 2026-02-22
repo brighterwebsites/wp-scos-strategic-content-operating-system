@@ -7,13 +7,17 @@
  * This will be removed once the UI is built.
  */
 
+if (!defined('ABSPATH')) exit;
+
 add_action('init', function() {
     if (!isset($_GET['test_ntfy']) || !current_user_can('manage_options')) {
         return;
     }
     
-    // Load the client
-    require_once __DIR__ . '/class-ntfy-client.php';
+    // Load the client if not already loaded
+    if (!class_exists('Brighter_Ntfy_Client')) {
+        require_once BRIGHTER_CORE_PATH . 'includes/ntfy/class-ntfy-client.php';
+    }
     
     header('Content-Type: text/plain');
     

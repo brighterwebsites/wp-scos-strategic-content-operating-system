@@ -100,14 +100,14 @@ body.admin-bar a.skip-link.screen-reader-text {
     background: #f8f9fa;
     border-left: 4px solid var(--bde-brand-primary-color);
     padding: 1.5rem;
-    margin: 2rem 0;
+    margin: 0;
     border-radius: 4px;
 }
 
 .tldr-summary .tldr-heading {
     margin-top: 0;
     margin-bottom: 1rem;
-    font-size: 1.2em;
+    font-size: 1em;
     color: #303030;
     text-transform: uppercase;
     letter-spacing: 0.5px;

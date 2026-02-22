@@ -34,6 +34,7 @@ class Brighter_Tweaks {
         // Frontend output - priority 1 for early loading
         add_action('wp_head', [__CLASS__, 'output_preloads'], 1);
         add_action('wp_head', [__CLASS__, 'output_featured_image_preload'], 1);
+        add_action('wp_head', [__CLASS__, 'output_theme_color_meta'], 1);
         
         // Google Fonts removal - CRITICAL
         add_action('wp_loaded', [__CLASS__, 'remove_google_fonts']);
@@ -119,8 +120,12 @@ class Brighter_Tweaks {
         
         add_settings_field('bw_google_fonts_preload', 'Google Fonts Preload Tags', function () {
             $value = get_option(self::OPT_GOOGLE_FONTS, '');
-            echo '<textarea name="' . esc_attr(self::OPT_GOOGLE_FONTS) . '" rows="5" class="large-text code" placeholder="' . esc_attr('<link rel="preload" href="https://fonts.gstatic.com/..." as="font" type="font/woff2" crossorigin>') . '">' . esc_textarea($value) . '</textarea>';
-            echo '<p class="description">' . esc_html__('Paste the full <link> tags, one per line. Example:', 'brighterwebsites') . '<br><code>&lt;link rel="preload" href="https://fonts.gstatic.com/s/lato/v25/S6uyw4BMUTPHjx4wXg.woff2" as="font" type="font/woff2" crossorigin&gt;</code></p>';
+            echo '<style>.bw-google-fonts-wrap { max-width: 800px; } .bw-google-fonts-wrap textarea { font-family: Consolas, Monaco, monospace; font-size: 12px; }</style>';
+            echo '<div class="bw-google-fonts-wrap">';
+            echo '<textarea name="' . esc_attr(self::OPT_GOOGLE_FONTS) . '" rows="8" class="large-text code" style="width:100%;" placeholder="' . esc_attr('<link rel="preload" href="https://fonts.gstatic.com/..." as="font" type="font/woff2" crossorigin>') . '">' . esc_textarea($value) . '</textarea>';
+            echo '<p class="description">' . esc_html__('Paste the full <link> tags, one per line. Example:', 'brighterwebsites') . '</p>';
+            echo '<p class="description"><code style="display:block;padding:8px;background:#f6f7f7;border:1px solid #dcdcde;margin-top:5px;">&lt;link rel="preload" href="https://fonts.gstatic.com/s/lato/v25/S6uyw4BMUTPHjx4wXg.woff2" as="font" type="font/woff2" crossorigin&gt;</code></p>';
+            echo '</div>';
         }, 'brighter_tweaks', 'google_fonts_preload');
 
         // Register post meta for per-page preloads
@@ -170,6 +175,12 @@ class Brighter_Tweaks {
         } else {
             update_option(self::OPT_POST_TYPES, []);
         }
+        
+        // Save Google Fonts Preload
+        if (isset($_POST[self::OPT_GOOGLE_FONTS])) {
+            update_option(self::OPT_GOOGLE_FONTS, wp_kses_post(wp_unslash($_POST[self::OPT_GOOGLE_FONTS])));
+        }
+        
         $map = [];
         if (!empty($_POST[self::OPT]) && is_array($_POST[self::OPT])) {
             foreach ($_POST[self::OPT] as $pid => $raw) {
@@ -478,6 +489,26 @@ class Brighter_Tweaks {
                 esc_attr($mime)
             );
         }
+    }
+
+    /**
+     * Output theme-color meta tag from Business Info
+     */
+    public static function output_theme_color_meta() {
+        // Get theme color from Business Info
+        $theme_color = get_option('bw_mobile_theme_color', '');
+        
+        if (empty($theme_color)) {
+            return;
+        }
+        
+        // Ensure it has a hash
+        if ($theme_color[0] !== '#') {
+            $theme_color = '#' . $theme_color;
+        }
+        
+        echo "\n<!-- Brighter Tweaks: Theme Color -->\n";
+        echo '<meta name="theme-color" content="' . esc_attr($theme_color) . '">' . "\n";
     }
 
     /**

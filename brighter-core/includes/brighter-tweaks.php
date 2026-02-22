@@ -165,7 +165,7 @@ class Brighter_Tweaks {
     }
 
     /** @var bool Set to true to log Asset Preload save/redirect to error_log (WP_DEBUG_LOG) */
-    const DEBUG_SAVE = false;
+    const DEBUG_SAVE = true;
 
     /**
      * Process form save (nonce check + option updates). Returns true if saved.
@@ -173,6 +173,7 @@ class Brighter_Tweaks {
     public static function process_save() {
         if (self::DEBUG_SAVE) {
             error_log('[Brighter_Tweaks] process_save() called');
+            error_log('[Brighter_Tweaks] POST keys: ' . print_r(array_keys($_POST), true));
         }
         if (!current_user_can('manage_options')) {
             if (self::DEBUG_SAVE) {
@@ -186,6 +187,11 @@ class Brighter_Tweaks {
             }
             return false;
         }
+        
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] Nonce valid, proceeding with save...');
+        }
+        
         if (isset($_POST[self::OPT_THEME])) {
             update_option(self::OPT_THEME, self::sanitise_hex(wp_unslash($_POST[self::OPT_THEME])));
         }
@@ -198,7 +204,11 @@ class Brighter_Tweaks {
         
         // Save Google Fonts Preload
         if (isset($_POST[self::OPT_GOOGLE_FONTS])) {
-            update_option(self::OPT_GOOGLE_FONTS, wp_kses_post(wp_unslash($_POST[self::OPT_GOOGLE_FONTS])));
+            $fonts_value = wp_kses_post(wp_unslash($_POST[self::OPT_GOOGLE_FONTS]));
+            update_option(self::OPT_GOOGLE_FONTS, $fonts_value);
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] Saved Google Fonts: ' . substr($fonts_value, 0, 100) . '...');
+            }
         }
         
         $map = [];

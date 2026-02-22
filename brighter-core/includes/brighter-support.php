@@ -99,11 +99,17 @@ add_action('admin_init', function () {
     
     // Third-party Scripts
     register_setting('brighter_support_settings', 'simple_commenter_script', [
-        'sanitize_callback' => 'wp_kses_post',
+        'sanitize_callback' => function($value) {
+            error_log('[Agency Settings] Saving simple_commenter_script: ' . substr($value, 0, 50));
+            return wp_kses_post($value);
+        },
         'default' => ''
     ]);
     register_setting('brighter_support_settings', 'ahrefs_analytics_script', [
-        'sanitize_callback' => 'wp_kses_post',
+        'sanitize_callback' => function($value) {
+            error_log('[Agency Settings] Saving ahrefs_analytics_script: ' . substr($value, 0, 50));
+            return wp_kses_post($value);
+        },
         'default' => ''
     ]);
 

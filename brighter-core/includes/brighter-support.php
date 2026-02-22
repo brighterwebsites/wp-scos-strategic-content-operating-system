@@ -297,6 +297,11 @@ function brighter_support_render_manuals_tab() {
     echo '<div class="support-page">';
     echo '<style>.form-table th { width: 200px; vertical-align: top; padding-top: 20px; } .form-table td { padding-top: 15px; }</style>';
     echo '<form method="post" action="options.php">';
+    
+    // Add hidden field to preserve tab on redirect
+    echo '<input type="hidden" name="page" value="brighter_support">';
+    echo '<input type="hidden" name="tab" value="manuals">';
+    
     settings_fields('brighter_support_settings');
     do_settings_sections('brighter_support_page');
     submit_button(esc_html__('Save Agency Settings', 'brighterwebsites'));

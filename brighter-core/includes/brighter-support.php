@@ -85,9 +85,16 @@ if (!defined('ABSPATH')) exit;
 
 /**
  * Fix Settings API redirect to preserve tab parameter
+ * SECURITY: Only affects brighter_support pages to avoid conflicts with other plugins
  */
 add_filter('wp_redirect', function($location) {
-    // Only modify redirects from our settings page
+    // CRITICAL: Only modify redirects from our settings page
+    // Check that we're actually on our page before modifying anything
+    if (!isset($_GET['page']) || $_GET['page'] !== 'brighter_support') {
+        return $location; // Early return if not our page
+    }
+    
+    // Only modify if this is a settings-updated redirect
     if (strpos($location, 'page=brighter_support') !== false && strpos($location, 'settings-updated=true') !== false) {
         // If tab parameter is missing, add it back
         if (strpos($location, 'tab=') === false && isset($_POST['tab'])) {

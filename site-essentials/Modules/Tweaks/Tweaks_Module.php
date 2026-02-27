@@ -329,14 +329,30 @@ class Tweaks_Module implements Module_Interface {
      */
     private function disable_rest_api() {
         add_filter('rest_authentication_errors', function($result) {
-            if (!is_user_logged_in()) {
-                return new \WP_Error(
-                    'rest_not_logged_in',
-                    __('You are not currently logged in.', 'site-essentials'),
-                    ['status' => 401]
-                );
+            // Allow if user is logged in
+            if (is_user_logged_in()) {
+                return $result;
             }
-            return $result;
+            
+            // CRITICAL: Whitelist WooCommerce REST API endpoints
+            // WooCommerce needs unauthenticated access for:
+            // - Storefront product data
+            // - Add to cart operations
+            // - Checkout process
+            // - Payment webhooks (Stripe, PayPal, etc.)
+            $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+            
+            // Allow WooCommerce endpoints
+            if (strpos($request_uri, '/wp-json/wc/') !== false) {
+                return $result; // Allow WooCommerce
+            }
+            
+            // Block all other unauthenticated REST requests
+            return new \WP_Error(
+                'rest_not_logged_in',
+                __('You are not currently logged in.', 'site-essentials'),
+                ['status' => 401]
+            );
         });
     }
 

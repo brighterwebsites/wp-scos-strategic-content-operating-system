@@ -22,11 +22,9 @@ class BW_TLDR_Meta_Box {
      * Add meta box to post types
      */
     public static function add_meta_box() {
-        // Get all public post types dynamically
-        $post_types = get_post_types(['public' => true], 'names');
-        
-        // Remove attachment (media) - doesn't need TLDR
-        unset($post_types['attachment']);
+        // Use the same post type filter as content strategy for consistency
+        // This excludes WooCommerce products, orders, etc.
+        $post_types = function_exists('bw_cs_post_types') ? bw_cs_post_types() : ['post', 'page'];
         
         foreach ($post_types as $post_type) {
             add_meta_box(

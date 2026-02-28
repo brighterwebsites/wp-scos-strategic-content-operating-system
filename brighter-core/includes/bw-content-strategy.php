@@ -1273,12 +1273,16 @@ add_action('admin_footer-edit.php', function() {
     if (!$screen || !in_array($screen->post_type, bw_cs_post_types(), true)) return;
     ?>
     <script>
+    console.log('[Progress Debug] Content Strategy inline edit script loaded');
     jQuery(function($) {
+        console.log('[Progress Debug] jQuery ready, hooking inlineEditPost');
         var $qe = inlineEditPost.edit;
         inlineEditPost.edit = function(id) {
+            console.log('[Progress Debug] Inline edit triggered for ID:', id);
             $qe.apply(this, arguments);
             var postId = (typeof id === 'object') ? this.getId(id) : id;
             var $row = $('#post-' + postId);
+            console.log('[Progress Debug] Found row:', $row.length);
 
             // Primary Intent (bw_altc_notes)
             $('textarea[name="bw_altc_notes"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_altc_notes"]').text().trim());

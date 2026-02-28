@@ -1277,44 +1277,62 @@ add_action('admin_footer-edit.php', function() {
     jQuery(function($) {
         console.log('[Progress Debug] jQuery ready, using copy event approach');
         
-        // Use WordPress's copy event instead of wrapping the function
-        $('#the-list').on('click', '.editinline', function() {
-            var postId = $(this).closest('tr').attr('id').replace('post-', '');
-            console.log('[Progress Debug] Quick Edit clicked for post:', postId);
+        // Check if the-list exists
+        var listExists = $('#the-list').length;
+        console.log('[Progress Debug] #the-list found:', listExists);
+        
+        // Check for editinline buttons
+        var editButtons = $('.editinline').length;
+        console.log('[Progress Debug] .editinline buttons found:', editButtons);
+        
+        // Use WordPress's built-in copy event - this fires AFTER inline edit opens
+        $(document).on('click', '.editinline', function() {
+            console.log('[Progress Debug] !!!!! CLICK EVENT FIRED !!!!!');
+            var postId = $(this).closest('tr').attr('id');
+            console.log('[Progress Debug] Row ID:', postId);
             
-            // Wait for inline edit row to be created
-            setTimeout(function() {
-                var $row = $('#post-' + postId);
-                console.log('[Progress Debug] Processing post row:', $row.length);
+            if (postId) {
+                postId = postId.replace('post-', '');
+                console.log('[Progress Debug] Post ID:', postId);
                 
-                // Get Progress data
-                var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
-                console.log('[Progress Debug] Progress data:', progressData);
-                
-                // Always uncheck all first
-                $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row').prop('checked', false);
-                
-                if (progressData) {
-                    try {
-                        var progressValues = JSON.parse(progressData);
-                        console.log('[Progress Debug] Parsed values:', progressValues);
-                        
-                        // Check the saved ones
-                        if (Array.isArray(progressValues) && progressValues.length > 0) {
-                            progressValues.forEach(function(val) {
-                                var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
-                                $checkbox.prop('checked', true);
-                                console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
-                            });
+                // Wait for inline edit row to be created
+                setTimeout(function() {
+                    var $row = $('#post-' + postId);
+                    console.log('[Progress Debug] Processing post row, found:', $row.length);
+                    
+                    // Get Progress data
+                    var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+                    console.log('[Progress Debug] Progress data:', progressData);
+                    
+                    // Always uncheck all first
+                    var checkboxes = $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row');
+                    console.log('[Progress Debug] Found checkboxes:', checkboxes.length);
+                    checkboxes.prop('checked', false);
+                    
+                    if (progressData) {
+                        try {
+                            var progressValues = JSON.parse(progressData);
+                            console.log('[Progress Debug] Parsed values:', progressValues);
+                            
+                            // Check the saved ones
+                            if (Array.isArray(progressValues) && progressValues.length > 0) {
+                                progressValues.forEach(function(val) {
+                                    var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
+                                    $checkbox.prop('checked', true);
+                                    console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
+                                });
+                            }
+                        } catch(e) {
+                            console.error('[Progress Debug] Failed to parse:', e);
                         }
-                    } catch(e) {
-                        console.error('[Progress Debug] Failed to parse:', e);
+                    } else {
+                        console.log('[Progress Debug] No saved progress data');
                     }
-                } else {
-                    console.log('[Progress Debug] No saved progress data');
-                }
-            }, 200); // Increased timeout to ensure form is fully rendered
+                }, 300); // Increased timeout
+            }
         });
+        
+        console.log('[Progress Debug] Click handler attached');
     });
     </script>
     <?php

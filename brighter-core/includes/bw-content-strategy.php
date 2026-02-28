@@ -1274,6 +1274,14 @@ add_action('admin_footer-edit.php', function() {
     ?>
     <script>
     console.log('[Progress Debug] Content Strategy inline edit script loaded');
+    
+    // DIAGNOSTIC: Listen to ALL clicks at window level
+    window.addEventListener('click', function(e) {
+        if (e.target.classList.contains('editinline') || e.target.closest('.editinline')) {
+            console.log('[Progress Debug] >>>>>> WINDOW DETECTED EDITINLINE CLICK <<<<<<', e.target);
+        }
+    }, true); // Capture phase at window level
+    
     jQuery(function($) {
         console.log('[Progress Debug] jQuery ready, using NATIVE event listener');
         

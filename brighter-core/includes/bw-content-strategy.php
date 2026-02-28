@@ -1283,14 +1283,19 @@ add_action('admin_footer-edit.php', function() {
             console.log('[Progress Debug] Found buttons:', buttons.length);
             
             buttons.forEach(function(btn, index) {
+                console.log('[Progress Debug] Attaching to button', index, btn);
+                
                 // Remove old listener if exists (store handler reference)
                 if (btn._progressClickHandler) {
-                    btn.removeEventListener('click', btn._progressClickHandler);
+                    console.log('[Progress Debug] Removing old handler from button', index);
+                    btn.removeEventListener('click', btn._progressClickHandler, true);
                 }
                 
                 // Create new handler
                 btn._progressClickHandler = function(e) {
-                    console.log('[Progress Debug] !!!!! NATIVE CLICK FIRED !!!!!');
+                    console.log('[Progress Debug] !!!!! NATIVE CLICK FIRED !!!!!', e);
+                    console.log('[Progress Debug] Event target:', e.target);
+                    console.log('[Progress Debug] Current target:', e.currentTarget);
                     
                     var row = this.closest('tr');
                     var postId = row ? row.id : null;
@@ -1336,23 +1341,26 @@ add_action('admin_footer-edit.php', function() {
                 
                 // Add listener with capture phase (runs before bubble)
                 btn.addEventListener('click', btn._progressClickHandler, true);
+                console.log('[Progress Debug] Handler attached to button', index, 'with capture=true');
             });
             
             console.log('[Progress Debug] Native handlers attached to', buttons.length, 'buttons (capture phase)');
         }
         
         // Attach on load
+        console.log('[Progress Debug] Initial attach...');
         attachProgressHandlerNative();
         
-        // Re-attach after AJAX (but debounce to avoid spam)
-        var ajaxTimer;
-        $(document).ajaxComplete(function() {
-            clearTimeout(ajaxTimer);
-            ajaxTimer = setTimeout(function() {
-                console.log('[Progress Debug] AJAX complete, re-attaching native handlers');
-                attachProgressHandlerNative();
-            }, 100);
-        });
+        // TEMPORARILY DISABLED: Re-attach after AJAX
+        // The AJAX handler is too aggressive - disable it to test if basic click works
+        // var ajaxTimer;
+        // $(document).ajaxComplete(function() {
+        //     clearTimeout(ajaxTimer);
+        //     ajaxTimer = setTimeout(function() {
+        //         console.log('[Progress Debug] AJAX complete, re-attaching native handlers');
+        //         attachProgressHandlerNative();
+        //     }, 100);
+        // });
     });
     </script>
     <?php

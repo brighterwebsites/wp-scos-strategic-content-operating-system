@@ -1267,6 +1267,17 @@ function bw_cs_quick_bulk_box($col, $post_type) {
     <?php
 }
 
+// DIAGNOSTIC: Show version notice on edit.php
+add_action('admin_notices', function() {
+    $screen = get_current_screen();
+    if (!$screen || $screen->base !== 'edit') return;
+    if (!in_array($screen->post_type, bw_cs_post_types(), true)) return;
+    
+    echo '<div class="notice notice-info" style="background:#e7f3ff;border-left:4px solid #2196F3;padding:10px;">';
+    echo '<strong>[Progress Debug]</strong> Content Strategy inline edit version: <code>2026-02-10 @ 23:45 UTC</code>';
+    echo '</div>';
+});
+
 // Preload Quick Edit with current values
 add_action('admin_footer-edit.php', function() {
     $screen = get_current_screen();

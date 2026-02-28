@@ -1275,37 +1275,39 @@ add_action('admin_footer-edit.php', function() {
     <script>
     console.log('[Progress Debug] Content Strategy inline edit script loaded');
     jQuery(function($) {
-        console.log('[Progress Debug] jQuery ready, using direct button binding');
+        console.log('[Progress Debug] jQuery ready, using NATIVE event listener');
         
-        // Bind directly to each button (more aggressive)
-        function attachProgressHandler() {
-            $('.editinline').each(function(index) {
-                var $btn = $(this);
+        // Use native JavaScript addEventListener - can't be blocked by jQuery
+        function attachProgressHandlerNative() {
+            var buttons = document.querySelectorAll('.editinline');
+            console.log('[Progress Debug] Found buttons:', buttons.length);
+            
+            buttons.forEach(function(btn, index) {
+                // Remove old listener if exists (store handler reference)
+                if (btn._progressClickHandler) {
+                    btn.removeEventListener('click', btn._progressClickHandler);
+                }
                 
-                // Remove any existing handlers to avoid duplicates
-                $btn.off('click.progress-handler');
-                
-                // Bind with namespace
-                $btn.on('click.progress-handler', function(e) {
-                    console.log('[Progress Debug] !!!!! CLICK EVENT FIRED (direct binding) !!!!!');
+                // Create new handler
+                btn._progressClickHandler = function(e) {
+                    console.log('[Progress Debug] !!!!! NATIVE CLICK FIRED !!!!!');
                     
-                    var postId = $(this).closest('tr').attr('id');
+                    var row = this.closest('tr');
+                    var postId = row ? row.id : null;
                     console.log('[Progress Debug] Row ID:', postId);
                     
                     if (postId) {
                         postId = postId.replace('post-', '');
                         console.log('[Progress Debug] Post ID:', postId);
                         
-                        // Wait for inline edit row to be created
+                        // Wait for inline edit row
                         setTimeout(function() {
                             var $row = $('#post-' + postId);
                             console.log('[Progress Debug] Processing post row, found:', $row.length);
                             
-                            // Get Progress data
                             var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
                             console.log('[Progress Debug] Progress data:', progressData);
                             
-                            // Always uncheck all first
                             var checkboxes = $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row');
                             console.log('[Progress Debug] Found checkboxes:', checkboxes.length);
                             checkboxes.prop('checked', false);
@@ -1315,7 +1317,6 @@ add_action('admin_footer-edit.php', function() {
                                     var progressValues = JSON.parse(progressData);
                                     console.log('[Progress Debug] Parsed values:', progressValues);
                                     
-                                    // Check the saved ones
                                     if (Array.isArray(progressValues) && progressValues.length > 0) {
                                         progressValues.forEach(function(val) {
                                             var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
@@ -1331,19 +1332,26 @@ add_action('admin_footer-edit.php', function() {
                             }
                         }, 300);
                     }
-                });
+                };
+                
+                // Add listener with capture phase (runs before bubble)
+                btn.addEventListener('click', btn._progressClickHandler, true);
             });
             
-            console.log('[Progress Debug] Direct handlers attached to', $('.editinline').length, 'buttons');
+            console.log('[Progress Debug] Native handlers attached to', buttons.length, 'buttons (capture phase)');
         }
         
         // Attach on load
-        attachProgressHandler();
+        attachProgressHandlerNative();
         
-        // Also re-attach if AJAX pagination happens
+        // Re-attach after AJAX (but debounce to avoid spam)
+        var ajaxTimer;
         $(document).ajaxComplete(function() {
-            console.log('[Progress Debug] AJAX complete, re-attaching handlers');
-            attachProgressHandler();
+            clearTimeout(ajaxTimer);
+            ajaxTimer = setTimeout(function() {
+                console.log('[Progress Debug] AJAX complete, re-attaching native handlers');
+                attachProgressHandlerNative();
+            }, 100);
         });
     });
     </script>

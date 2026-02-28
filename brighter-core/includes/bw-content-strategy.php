@@ -1267,17 +1267,6 @@ function bw_cs_quick_bulk_box($col, $post_type) {
     <?php
 }
 
-// DIAGNOSTIC: Show version notice on edit.php
-add_action('admin_notices', function() {
-    $screen = get_current_screen();
-    if (!$screen || $screen->base !== 'edit') return;
-    if (!in_array($screen->post_type, bw_cs_post_types(), true)) return;
-    
-    echo '<div class="notice notice-info" style="background:#e7f3ff;border-left:4px solid #2196F3;padding:10px;">';
-    echo '<strong>[Progress Debug]</strong> Content Strategy inline edit version: <code>2026-02-10 @ 23:45 UTC</code>';
-    echo '</div>';
-});
-
 // Preload Quick Edit with current values
 add_action('admin_footer-edit.php', function() {
     $screen = get_current_screen();
@@ -1286,56 +1275,37 @@ add_action('admin_footer-edit.php', function() {
     <script>
     console.log('[Progress Debug] Content Strategy inline edit script loaded');
     
-    // DIAGNOSTIC: Listen to ALL clicks at window level
-    window.addEventListener('click', function(e) {
-        if (e.target.classList.contains('editinline') || e.target.closest('.editinline')) {
-            console.log('[Progress Debug] >>>>>> WINDOW DETECTED EDITINLINE CLICK <<<<<<', e.target);
-        }
-    }, true); // Capture phase at window level
-    
     jQuery(function($) {
-        console.log('[Progress Debug] jQuery ready, using NATIVE event listener');
-        
-        // Use native JavaScript addEventListener - can't be blocked by jQuery
-        function attachProgressHandlerNative() {
-            var buttons = document.querySelectorAll('.editinline');
-            console.log('[Progress Debug] Found buttons:', buttons.length);
-            
-            buttons.forEach(function(btn, index) {
-                console.log('[Progress Debug] Attaching to button', index, btn);
-                
-                // Remove old listener if exists (store handler reference)
-                if (btn._progressClickHandler) {
-                    console.log('[Progress Debug] Removing old handler from button', index);
-                    btn.removeEventListener('click', btn._progressClickHandler, true);
-                }
-                
-                // Create new handler
-                btn._progressClickHandler = function(e) {
-                    console.log('[Progress Debug] !!!!! NATIVE CLICK FIRED !!!!!', e);
-                    console.log('[Progress Debug] Event target:', e.target);
-                    console.log('[Progress Debug] Current target:', e.currentTarget);
-                    
-                    var row = this.closest('tr');
-                    var postId = row ? row.id : null;
-                    console.log('[Progress Debug] Row ID:', postId);
-                    
-                    if (postId) {
-                        postId = postId.replace('post-', '');
-                        console.log('[Progress Debug] Post ID:', postId);
+        // Use MutationObserver to watch for inline edit row appearing
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    // Check if this is an inline edit row
+                    if (node.nodeType === 1 && $(node).hasClass('inline-edit-row')) {
+                        console.log('[Progress Debug] Inline edit row detected!', node);
                         
-                        // Wait for inline edit row
-                        setTimeout(function() {
-                            var $row = $('#post-' + postId);
-                            console.log('[Progress Debug] Processing post row, found:', $row.length);
+                        // Get the post ID from the row
+                        var postId = $(node).attr('id');
+                        if (postId) {
+                            postId = postId.replace('edit-', '');
+                            console.log('[Progress Debug] Post ID:', postId);
                             
-                            var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+                            // Find the original post row
+                            var $originalRow = $('#post-' + postId);
+                            console.log('[Progress Debug] Original row found:', $originalRow.length);
+                            
+                            // Get saved progress values
+                            var progressData = $originalRow.find('.bw-cs-progress').attr('data-progress-values');
                             console.log('[Progress Debug] Progress data:', progressData);
                             
-                            var checkboxes = $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row');
-                            console.log('[Progress Debug] Found checkboxes:', checkboxes.length);
-                            checkboxes.prop('checked', false);
+                            // Find checkboxes in the inline edit row
+                            var $checkboxes = $(node).find('.bw-progress-checkboxes-edit input[type="checkbox"]');
+                            console.log('[Progress Debug] Found checkboxes:', $checkboxes.length);
                             
+                            // Uncheck all first
+                            $checkboxes.prop('checked', false);
+                            
+                            // Check the saved ones
                             if (progressData) {
                                 try {
                                     var progressValues = JSON.parse(progressData);
@@ -1343,7 +1313,7 @@ add_action('admin_footer-edit.php', function() {
                                     
                                     if (Array.isArray(progressValues) && progressValues.length > 0) {
                                         progressValues.forEach(function(val) {
-                                            var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
+                                            var $checkbox = $(node).find('.bw-progress-checkboxes-edit input[value="' + val + '"]');
                                             $checkbox.prop('checked', true);
                                             console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
                                         });
@@ -1354,32 +1324,20 @@ add_action('admin_footer-edit.php', function() {
                             } else {
                                 console.log('[Progress Debug] No saved progress data');
                             }
-                        }, 300);
+                        }
                     }
-                };
-                
-                // Add listener with capture phase (runs before bubble)
-                btn.addEventListener('click', btn._progressClickHandler, true);
-                console.log('[Progress Debug] Handler attached to button', index, 'with capture=true');
+                });
             });
-            
-            console.log('[Progress Debug] Native handlers attached to', buttons.length, 'buttons (capture phase)');
+        });
+        
+        // Start observing the posts list for new rows
+        var $list = document.querySelector('#the-list');
+        if ($list) {
+            observer.observe($list, { childList: true, subtree: true });
+            console.log('[Progress Debug] MutationObserver watching #the-list');
+        } else {
+            console.error('[Progress Debug] #the-list not found!');
         }
-        
-        // Attach on load
-        console.log('[Progress Debug] Initial attach...');
-        attachProgressHandlerNative();
-        
-        // TEMPORARILY DISABLED: Re-attach after AJAX
-        // The AJAX handler is too aggressive - disable it to test if basic click works
-        // var ajaxTimer;
-        // $(document).ajaxComplete(function() {
-        //     clearTimeout(ajaxTimer);
-        //     ajaxTimer = setTimeout(function() {
-        //         console.log('[Progress Debug] AJAX complete, re-attaching native handlers');
-        //         attachProgressHandlerNative();
-        //     }, 100);
-        // });
     });
     </script>
     <?php

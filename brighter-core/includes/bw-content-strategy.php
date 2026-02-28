@@ -1275,8 +1275,17 @@ add_action('admin_footer-edit.php', function() {
     <script>
     console.log('[Progress Debug] Content Strategy inline edit script loaded');
     jQuery(function($) {
-        console.log('[Progress Debug] jQuery ready, hooking inlineEditPost');
+        console.log('[Progress Debug] jQuery ready, checking for inlineEditPost');
+        
+        // Check if inlineEditPost exists
+        if (typeof inlineEditPost === 'undefined') {
+            console.error('[Progress Debug] inlineEditPost is not defined! Quick edit may not work.');
+            return;
+        }
+        
+        console.log('[Progress Debug] inlineEditPost found, hooking into edit function');
         var $qe = inlineEditPost.edit;
+        
         inlineEditPost.edit = function(id) {
             console.log('[Progress Debug] Inline edit triggered for ID:', id);
             $qe.apply(this, arguments);

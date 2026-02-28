@@ -1275,54 +1275,21 @@ add_action('admin_footer-edit.php', function() {
     <script>
     console.log('[Progress Debug] Content Strategy inline edit script loaded');
     jQuery(function($) {
-        console.log('[Progress Debug] jQuery ready, checking for inlineEditPost');
+        console.log('[Progress Debug] jQuery ready, using copy event approach');
         
-        // Check if inlineEditPost exists
-        if (typeof inlineEditPost === 'undefined') {
-            console.error('[Progress Debug] inlineEditPost is not defined! Quick edit may not work.');
-            return;
-        }
-        
-        console.log('[Progress Debug] inlineEditPost found, hooking into edit function');
-        var $qe = inlineEditPost.edit;
-        
-        inlineEditPost.edit = function(id) {
-            console.log('[Progress Debug] Inline edit triggered for ID:', id);
-            $qe.apply(this, arguments);
-            var postId = (typeof id === 'object') ? this.getId(id) : id;
-            var $row = $('#post-' + postId);
-            console.log('[Progress Debug] Found row:', $row.length);
-
-            // Primary Intent (bw_altc_notes)
-            $('textarea[name="bw_altc_notes"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_altc_notes"]').text().trim());
+        // Use WordPress's copy event instead of wrapping the function
+        $('#the-list').on('click', '.editinline', function() {
+            var postId = $(this).closest('tr').attr('id').replace('post-', '');
+            console.log('[Progress Debug] Quick Edit clicked for post:', postId);
             
-            var intent = $row.find('.bw-cs-select[data-field="bw_intent"]').text().trim();
-            $('select[name="bw_intent"] option', '.inline-edit-row').filter(function() {
-                return $(this).text() === intent;
-            }).prop('selected', true);
-            
-            var purpose = $row.find('.bw-cs-select[data-field="bw_purpose"]').text().trim();
-            $('select[name="bw_purpose"] option', '.inline-edit-row').filter(function() {
-                return $(this).text() === purpose;
-            }).prop('selected', true);
-            
-            var optVal = $row.find('.bw-opt-badge').data('value') || '';
-            $('select[name="_brt_opt_status"]', '.inline-edit-row').val(optVal);
-
-            var indexStatus = $row.find('.bw-cs-select[data-field="bw_index_status"]').text().trim();
-            $('select[name="bw_index_status"] option', '.inline-edit-row').filter(function() {
-                return $(this).text() === indexStatus;
-            }).prop('selected', true);
-            
-            // Next Step
-            var nextStepVal = $row.find('.bw-cs-next-step').data('value') || '';
-            $('select[name="content_plan"]', '.inline-edit-row').val(nextStepVal);
-            
-            // FIX: Progress checkboxes - populate from hidden data attribute
-            // Use setTimeout to ensure inline edit form is fully rendered
+            // Wait for inline edit row to be created
             setTimeout(function() {
+                var $row = $('#post-' + postId);
+                console.log('[Progress Debug] Processing post row:', $row.length);
+                
+                // Get Progress data
                 var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
-                console.log('[Progress Debug] Post ID:', postId, 'Data:', progressData);
+                console.log('[Progress Debug] Progress data:', progressData);
                 
                 // Always uncheck all first
                 $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row').prop('checked', false);
@@ -1346,8 +1313,8 @@ add_action('admin_footer-edit.php', function() {
                 } else {
                     console.log('[Progress Debug] No saved progress data');
                 }
-            }, 100);
-        };
+            }, 200); // Increased timeout to ensure form is fully rendered
+        });
     });
     </script>
     <?php

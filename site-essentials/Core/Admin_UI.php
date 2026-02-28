@@ -838,6 +838,7 @@ class Admin_UI {
             'archive_slug'              => isset($cpt_options['archive_slug']) ? sanitize_title($cpt_options['archive_slug']) : 'projects',
             'enable_faq'                => !empty($cpt_options['enable_faq']),
             'enable_author_extension'   => !empty($cpt_options['enable_author_extension']),
+            'enable_reviews'            => !empty($cpt_options['enable_reviews']),
         ];
 
         $this->settings->update_module_settings('cpt', $opts);

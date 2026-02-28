@@ -3,7 +3,8 @@
  * Custom Posts (Recommended CPT) Module
  *
  * Registers optional custom post types and taxonomy support:
- * - Customer Success Stories (post type: projects, has_archive, slug: projects)
+ * - Customer Success Stories (post type: projects, has_archive, slug: configurable)
+ * - Reviews (post type: bw_reviews, SSOT data source only, no public URLs)
  * - Include WP Categories for projects
  * - Include WP Tags for projects
  *
@@ -11,7 +12,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts
- * @version    1.0.0
+ * @version    1.1.0
  * @since      1.0.0
  */
 
@@ -43,6 +44,16 @@ class Cpt_Module implements Module_Interface {
      * Post type slug for Customer Success Stories
      */
     const POST_TYPE_PROJECTS = 'projects';
+
+    /**
+     * Post type slug for Reviews (SSOT data source — no public URLs)
+     */
+    const POST_TYPE_REVIEWS = 'bw_reviews';
+
+    /**
+     * Taxonomy slug for Review Platform
+     */
+    const TAXONOMY_REVIEW_PLATFORM = 'bw_review_platform';
 
     /**
      * Constructor
@@ -80,7 +91,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_description() {
-        return __('Enable recommended custom post types (FAQ, Projects/Success Stories), taxonomy support, and extended field sets (Author Extension for E-E-A-T).', 'site-essentials');
+        return __('Enable recommended custom post types (FAQ, Projects/Success Stories, Reviews), taxonomy support, and extended field sets (Author Extension for E-E-A-T).', 'site-essentials');
     }
 
     /**
@@ -110,7 +121,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_version() {
-        return '1.0.0';
+        return '1.1.0';
     }
 
     /**
@@ -127,6 +138,7 @@ class Cpt_Module implements Module_Interface {
             'archive_slug'              => 'projects',
             'enable_faq'                => false,       // Placeholder for Module 8 integration
             'enable_author_extension'   => false,       // Module 15: Author Extension
+            'enable_reviews'            => false,       // Reviews SSOT CPT
         ];
     }
 
@@ -142,11 +154,10 @@ class Cpt_Module implements Module_Interface {
         $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
         $opts = wp_parse_args($opts, $this->get_default_options());
 
+        // ─── Projects CPT ────────────────────────────────────────────────────
         if (!empty($opts['customer_success_stories'])) {
             add_action('init', [$this, 'register_projects_cpt'], 20);
-        }
 
-        if (!empty($opts['customer_success_stories'])) {
             if (!empty($opts['include_categories'])) {
                 add_action('init', [$this, 'register_projects_categories'], 25);
             }
@@ -154,8 +165,33 @@ class Cpt_Module implements Module_Interface {
                 add_action('init', [$this, 'register_projects_tags'], 25);
             }
         }
-        
-        // Module 15: Author Extension (enable/disable)
+
+        // ─── Reviews CPT ─────────────────────────────────────────────────────
+        if (!empty($opts['enable_reviews'])) {
+            add_action('init', [$this, 'register_reviews_cpt'], 20);
+            add_action('init', [$this, 'register_review_platform_taxonomy'], 25);
+            add_action('init', [$this, 'seed_review_platform_terms'], 30);
+            add_action('init', [$this, 'register_reviews_shortcodes'], 30);
+
+            if (is_admin()) {
+                add_action('add_meta_boxes', [$this, 'register_reviews_meta_boxes']);
+                // Priority 10: save standard meta fields from $_POST
+                add_action('save_post_bw_reviews', [$this, 'save_reviews_meta'], 10, 2);
+                // Priority 20: auto-generate schema ID after meta + taxonomy are saved
+                add_action('save_post_bw_reviews', [$this, 'auto_generate_schema_id'], 20, 2);
+                add_filter('enter_title_here', [$this, 'reviews_title_placeholder'], 10, 2);
+                add_filter('manage_bw_reviews_posts_columns', [$this, 'reviews_admin_columns']);
+                add_action('manage_bw_reviews_posts_custom_column', [$this, 'reviews_admin_column_content'], 10, 2);
+            }
+
+            // ACF relationship field — fires after ACF is fully loaded
+            add_action('acf/init', [$this, 'register_reviews_acf_fields']);
+
+            // CSV import — must be registered outside is_admin() so admin-post.php can call it
+            add_action('admin_post_site_essentials_reviews_csv_import', [$this, 'handle_reviews_csv_import']);
+        }
+
+        // ─── Author Extension ─────────────────────────────────────────────────
         if (!empty($opts['enable_author_extension'])) {
             update_option('bw_author_extension_enabled', true);
         } else {
@@ -163,10 +199,17 @@ class Cpt_Module implements Module_Interface {
         }
     }
 
+    // =========================================================================
+    // PROJECTS CPT
+    // =========================================================================
+
     /**
      * Register Projects CPT (Customer Success Stories)
      *
-     * post_type=projects, has_archive, rewrite slug=projects (or custom).
+     * Fix 1: Labels now derived dynamically from archive_slug so that changing
+     *        the rename field propagates to admin menu labels immediately.
+     * Fix 2: Breadcrumbs read $post_type_obj->labels->name — fixing Fix 1
+     *        automatically fixes the "hardcoded Customer Success" breadcrumb bug.
      *
      * @since 1.0.0
      * @return void
@@ -175,21 +218,27 @@ class Cpt_Module implements Module_Interface {
         $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
         $opts = wp_parse_args($opts, $this->get_default_options());
         $archive_slug = !empty($opts['archive_slug']) ? sanitize_title($opts['archive_slug']) : 'projects';
-        
+
+        // Derive human-readable display name from the slug (Fix 1 + Fix 2)
+        $display_name = ucwords(str_replace(['-', '_'], ' ', $archive_slug));
+        if (empty(trim($display_name))) {
+            $display_name = 'Projects';
+        }
+
         $labels = [
-            'name'               => _x('Customer Success Stories', 'post type general name', 'site-essentials'),
-            'singular_name'      => _x('Customer Success Story', 'post type singular name', 'site-essentials'),
-            'menu_name'          => _x('Success Stories', 'admin menu', 'site-essentials'),
-            'name_admin_bar'     => _x('Success Story', 'add new on admin bar', 'site-essentials'),
+            'name'               => $display_name,
+            'singular_name'      => $display_name,
+            'menu_name'          => $display_name,
+            'name_admin_bar'     => $display_name,
             'add_new'            => _x('Add New', 'project', 'site-essentials'),
-            'add_new_item'       => __('Add New Success Story', 'site-essentials'),
-            'new_item'           => __('New Success Story', 'site-essentials'),
-            'edit_item'          => __('Edit Success Story', 'site-essentials'),
-            'view_item'          => __('View Success Story', 'site-essentials'),
-            'all_items'          => __('Customer Success Stories', 'site-essentials'),
-            'search_items'       => __('Search Success Stories', 'site-essentials'),
-            'not_found'          => __('No success stories found.', 'site-essentials'),
-            'not_found_in_trash' => __('No success stories found in Trash.', 'site-essentials'),
+            'add_new_item'       => sprintf(/* translators: %s: display name */ __('Add New %s', 'site-essentials'), $display_name),
+            'new_item'           => sprintf(/* translators: %s: display name */ __('New %s', 'site-essentials'), $display_name),
+            'edit_item'          => sprintf(/* translators: %s: display name */ __('Edit %s', 'site-essentials'), $display_name),
+            'view_item'          => sprintf(/* translators: %s: display name */ __('View %s', 'site-essentials'), $display_name),
+            'all_items'          => $display_name,
+            'search_items'       => sprintf(/* translators: %s: display name */ __('Search %s', 'site-essentials'), $display_name),
+            'not_found'          => sprintf(/* translators: %s: lowercase display name */ __('No %s found.', 'site-essentials'), strtolower($display_name)),
+            'not_found_in_trash' => sprintf(/* translators: %s: lowercase display name */ __('No %s found in Trash.', 'site-essentials'), strtolower($display_name)),
         ];
 
         $args = [
@@ -231,6 +280,848 @@ class Cpt_Module implements Module_Interface {
     public function register_projects_tags() {
         register_taxonomy_for_object_type('post_tag', self::POST_TYPE_PROJECTS);
     }
+
+    // =========================================================================
+    // REVIEWS CPT REGISTRATION
+    // =========================================================================
+
+    /**
+     * Register Reviews CPT
+     *
+     * SSOT data source only — no public-facing pages, no archive, no singles.
+     *
+     * Key flags:
+     *   query_var: true   — Required for WP_Query in BDE loops
+     *   show_in_rest: true — Required for ACF and BDE field access
+     *   public: false     — Excluded from all sitemaps automatically (public=false)
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function register_reviews_cpt() {
+        $labels = [
+            'name'               => _x('Reviews', 'post type general name', 'site-essentials'),
+            'singular_name'      => _x('Review', 'post type singular name', 'site-essentials'),
+            'menu_name'          => _x('Reviews', 'admin menu', 'site-essentials'),
+            'name_admin_bar'     => _x('Review', 'add new on admin bar', 'site-essentials'),
+            'add_new'            => _x('Add New', 'review', 'site-essentials'),
+            'add_new_item'       => __('Add New Review', 'site-essentials'),
+            'new_item'           => __('New Review', 'site-essentials'),
+            'edit_item'          => __('Edit Review', 'site-essentials'),
+            'view_item'          => __('View Review', 'site-essentials'),
+            'all_items'          => __('All Reviews', 'site-essentials'),
+            'search_items'       => __('Search Reviews', 'site-essentials'),
+            'not_found'          => __('No reviews found.', 'site-essentials'),
+            'not_found_in_trash' => __('No reviews found in Trash.', 'site-essentials'),
+        ];
+
+        $args = [
+            'labels'              => $labels,
+            'public'              => false,         // No public-facing pages
+            'publicly_queryable'  => false,         // No front-end URL access
+            'query_var'           => true,          // REQUIRED for WP_Query in BDE loops
+            'show_in_rest'        => true,          // REQUIRED for ACF and BDE field access
+            'has_archive'         => false,
+            'rewrite'             => false,         // No URLs
+            'show_in_nav_menus'   => false,
+            'exclude_from_search' => true,
+            'show_ui'             => true,
+            'show_in_menu'        => true,
+            'hierarchical'        => false,
+            'menu_position'       => 21,
+            'menu_icon'           => 'dashicons-star-filled',
+            'supports'            => ['title', 'editor'],
+            'capability_type'     => 'post',
+        ];
+
+        register_post_type(self::POST_TYPE_REVIEWS, $args);
+    }
+
+    /**
+     * Register Review Platform taxonomy
+     *
+     * Non-hierarchical (tag-like). No archive, no public URLs.
+     * Queryable via tax_query in WP_Query / BDE loops.
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function register_review_platform_taxonomy() {
+        $labels = [
+            'name'          => _x('Review Platforms', 'taxonomy general name', 'site-essentials'),
+            'singular_name' => _x('Review Platform', 'taxonomy singular name', 'site-essentials'),
+            'menu_name'     => _x('Platforms', 'admin menu', 'site-essentials'),
+            'all_items'     => __('All Platforms', 'site-essentials'),
+            'edit_item'     => __('Edit Platform', 'site-essentials'),
+            'view_item'     => __('View Platform', 'site-essentials'),
+            'add_new_item'  => __('Add New Platform', 'site-essentials'),
+            'new_item_name' => __('New Platform Name', 'site-essentials'),
+            'search_items'  => __('Search Platforms', 'site-essentials'),
+            'not_found'     => __('No platforms found.', 'site-essentials'),
+        ];
+
+        register_taxonomy(self::TAXONOMY_REVIEW_PLATFORM, self::POST_TYPE_REVIEWS, [
+            'labels'            => $labels,
+            'hierarchical'      => false,
+            'show_in_rest'      => true,
+            'show_admin_column' => true,
+            'has_archive'       => false,
+            'rewrite'           => false,
+            'show_ui'           => true,
+            'public'            => false,
+            'query_var'         => true,
+        ]);
+    }
+
+    /**
+     * Seed default Review Platform terms on init
+     *
+     * Inserts Google, Facebook, Trustpilot only if they do not already exist.
+     * Safe to run on every request — term_exists() uses WordPress object cache.
+     * Admin can add, rename, or delete terms after initial seeding.
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function seed_review_platform_terms() {
+        if (!taxonomy_exists(self::TAXONOMY_REVIEW_PLATFORM)) {
+            return;
+        }
+
+        $default_terms = [
+            ['name' => 'Google',     'slug' => 'google'],
+            ['name' => 'Facebook',   'slug' => 'facebook'],
+            ['name' => 'Trustpilot', 'slug' => 'trustpilot'],
+        ];
+
+        foreach ($default_terms as $term) {
+            if (!term_exists($term['slug'], self::TAXONOMY_REVIEW_PLATFORM)) {
+                wp_insert_term($term['name'], self::TAXONOMY_REVIEW_PLATFORM, [
+                    'slug' => $term['slug'],
+                ]);
+            }
+        }
+    }
+
+    // =========================================================================
+    // REVIEWS META BOXES
+    // =========================================================================
+
+    /**
+     * Register Reviews meta box
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function register_reviews_meta_boxes() {
+        add_meta_box(
+            'bw_reviews_details',
+            __('Review Details', 'site-essentials'),
+            [$this, 'render_reviews_meta_box'],
+            self::POST_TYPE_REVIEWS,
+            'normal',
+            'high'
+        );
+    }
+
+    /**
+     * Render Reviews meta box HTML
+     *
+     * @since 1.1.0
+     * @param WP_Post $post Current post object
+     * @return void
+     */
+    public function render_reviews_meta_box($post) {
+        wp_nonce_field('bw_reviews_meta_save', 'bw_reviews_meta_nonce');
+
+        $rating          = get_post_meta($post->ID, 'bw_rating', true);
+        $date            = get_post_meta($post->ID, 'bw_date', true);
+        $date_precision  = get_post_meta($post->ID, 'bw_date_precision', true) ?: 'full';
+        $verify_url      = get_post_meta($post->ID, 'bw_verify_url', true);
+        $schema_id       = get_post_meta($post->ID, 'bw_schema_id', true);
+        $success_outcome = get_post_meta($post->ID, 'bw_success_outcome', true);
+        $customer_detail = get_post_meta($post->ID, 'bw_customer_detail', true);
+        $is_featured     = get_post_meta($post->ID, 'bw_is_featured', true);
+        $review_excerpt  = get_post_meta($post->ID, 'bw_review_excerpt', true);
+
+        include __DIR__ . '/views/reviews-meta-box.php';
+    }
+
+    /**
+     * Save Reviews meta fields from $_POST
+     *
+     * Fires at priority 10 on save_post_bw_reviews.
+     * auto_generate_schema_id() fires at priority 20 (after this).
+     *
+     * @since 1.1.0
+     * @param int     $post_id Post ID
+     * @param WP_Post $post    Post object
+     * @return void
+     */
+    public function save_reviews_meta($post_id, $post) {
+        if (!isset($_POST['bw_reviews_meta_nonce']) ||
+            !wp_verify_nonce($_POST['bw_reviews_meta_nonce'], 'bw_reviews_meta_save')) {
+            return;
+        }
+
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        // bw_rating: integer 1–5
+        if (isset($_POST['bw_rating'])) {
+            $rating = intval($_POST['bw_rating']);
+            update_post_meta($post_id, 'bw_rating', max(1, min(5, $rating)));
+        }
+
+        // bw_date: YYYY-MM-DD or empty
+        if (isset($_POST['bw_date'])) {
+            $date = sanitize_text_field($_POST['bw_date']);
+            update_post_meta($post_id, 'bw_date', preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $date : '');
+        }
+
+        // bw_date_precision: year | month-year | full
+        if (isset($_POST['bw_date_precision'])) {
+            $precision = sanitize_text_field($_POST['bw_date_precision']);
+            update_post_meta($post_id, 'bw_date_precision', in_array($precision, ['year', 'month-year', 'full'], true) ? $precision : 'full');
+        }
+
+        // bw_verify_url: URL
+        if (isset($_POST['bw_verify_url'])) {
+            update_post_meta($post_id, 'bw_verify_url', esc_url_raw($_POST['bw_verify_url']));
+        }
+
+        // bw_schema_id: text (manual override — auto-gen handled at priority 20)
+        if (isset($_POST['bw_schema_id'])) {
+            update_post_meta($post_id, 'bw_schema_id', sanitize_text_field($_POST['bw_schema_id']));
+        }
+
+        // bw_success_outcome: short text ~100 chars
+        if (isset($_POST['bw_success_outcome'])) {
+            update_post_meta($post_id, 'bw_success_outcome', sanitize_text_field($_POST['bw_success_outcome']));
+        }
+
+        // bw_customer_detail: short text ~100 chars
+        if (isset($_POST['bw_customer_detail'])) {
+            update_post_meta($post_id, 'bw_customer_detail', sanitize_text_field($_POST['bw_customer_detail']));
+        }
+
+        // bw_is_featured: checkbox → 1/0
+        update_post_meta($post_id, 'bw_is_featured', !empty($_POST['bw_is_featured']) ? '1' : '0');
+
+        // bw_review_excerpt: textarea ~150 chars
+        if (isset($_POST['bw_review_excerpt'])) {
+            update_post_meta($post_id, 'bw_review_excerpt', sanitize_textarea_field($_POST['bw_review_excerpt']));
+        }
+    }
+
+    /**
+     * Auto-generate bw_schema_id on first save
+     *
+     * Fires at priority 20 (after save_reviews_meta at priority 10).
+     * Only generates when bw_schema_id is empty after the priority-10 save.
+     *
+     * Format: {firstname}-{lastname}-{platform-slug}
+     * On duplicate: appends -{post_id}
+     *
+     * This ID must be stable — once set it is not overwritten. Changing it
+     * manually breaks any schema/AI references that use it.
+     *
+     * @since 1.1.0
+     * @param int     $post_id Post ID
+     * @param WP_Post $post    Post object
+     * @return void
+     */
+    public function auto_generate_schema_id($post_id, $post) {
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        $existing = get_post_meta($post_id, 'bw_schema_id', true);
+        if (!empty($existing)) {
+            return; // Already set — do not overwrite
+        }
+
+        $schema_id = $this->generate_schema_id($post_id, $post);
+        if (!empty($schema_id)) {
+            update_post_meta($post_id, 'bw_schema_id', $schema_id);
+        }
+    }
+
+    /**
+     * Generate a schema ID from customer name + platform slug
+     *
+     * @since 1.1.0
+     * @param int          $post_id  Post ID
+     * @param WP_Post|null $post     Post object (optional; loaded if null)
+     * @return string Generated ID, or empty string on failure
+     */
+    private function generate_schema_id($post_id, $post = null) {
+        if (!$post) {
+            $post = get_post($post_id);
+        }
+        if (!$post || empty($post->post_title)) {
+            return '';
+        }
+
+        // Parse first / last name from post title (customer name)
+        $parts = preg_split('/\s+/', trim($post->post_title), 2);
+        $first = sanitize_title($parts[0] ?? '');
+        $last  = sanitize_title($parts[1] ?? '');
+
+        // Get platform slug from taxonomy (first assigned term)
+        $platform_slug = '';
+        $terms = get_the_terms($post_id, self::TAXONOMY_REVIEW_PLATFORM);
+        if ($terms && !is_wp_error($terms) && !empty($terms)) {
+            $platform_slug = $terms[0]->slug;
+        }
+
+        // Build base: firstname-lastname or firstname
+        if ($first && $last) {
+            $base = $first . '-' . $last;
+        } elseif ($first) {
+            $base = $first;
+        } else {
+            return '';
+        }
+
+        $schema_id = $base . ($platform_slug ? '-' . $platform_slug : '');
+
+        // Append post_id on duplicate
+        $duplicates = get_posts([
+            'post_type'   => self::POST_TYPE_REVIEWS,
+            'post_status' => 'any',
+            'meta_key'    => 'bw_schema_id',
+            'meta_value'  => $schema_id,
+            'exclude'     => [$post_id],
+            'numberposts' => 1,
+            'fields'      => 'ids',
+        ]);
+
+        if (!empty($duplicates)) {
+            $schema_id .= '-' . $post_id;
+        }
+
+        return $schema_id;
+    }
+
+    // =========================================================================
+    // REVIEWS ADMIN UI
+    // =========================================================================
+
+    /**
+     * Override title field placeholder for Reviews CPT
+     *
+     * Changes "Add title" to "Customer Name".
+     *
+     * @since 1.1.0
+     * @param string  $placeholder Default placeholder
+     * @param WP_Post $post        Current post
+     * @return string
+     */
+    public function reviews_title_placeholder($placeholder, $post) {
+        if ($post->post_type === self::POST_TYPE_REVIEWS) {
+            return __('Customer Name', 'site-essentials');
+        }
+        return $placeholder;
+    }
+
+    /**
+     * Add custom admin list columns for Reviews
+     *
+     * @since 1.1.0
+     * @param array $columns Existing columns
+     * @return array
+     */
+    public function reviews_admin_columns($columns) {
+        $new = [];
+        foreach ($columns as $key => $label) {
+            $new[$key] = $label;
+            if ($key === 'title') {
+                $new['bw_review_platform'] = __('Platform', 'site-essentials');
+                $new['bw_rating']          = __('Rating', 'site-essentials');
+                $new['bw_date']            = __('Review Date', 'site-essentials');
+                $new['bw_is_featured']     = __('Featured', 'site-essentials');
+            }
+        }
+        return $new;
+    }
+
+    /**
+     * Populate custom admin column content for Reviews
+     *
+     * @since 1.1.0
+     * @param string $column  Column key
+     * @param int    $post_id Post ID
+     * @return void
+     */
+    public function reviews_admin_column_content($column, $post_id) {
+        switch ($column) {
+            case 'bw_review_platform':
+                $terms = get_the_terms($post_id, self::TAXONOMY_REVIEW_PLATFORM);
+                echo ($terms && !is_wp_error($terms)) ? esc_html($terms[0]->name) : '&mdash;';
+                break;
+
+            case 'bw_rating':
+                $rating = get_post_meta($post_id, 'bw_rating', true);
+                echo $rating !== '' ? esc_html($rating) . '/5' : '&mdash;';
+                break;
+
+            case 'bw_date':
+                $date = get_post_meta($post_id, 'bw_date', true);
+                echo $date ? esc_html($date) : '&mdash;';
+                break;
+
+            case 'bw_is_featured':
+                $featured = get_post_meta($post_id, 'bw_is_featured', true);
+                echo $featured === '1' ? '&#9733;' : '&mdash;';
+                break;
+        }
+    }
+
+    // =========================================================================
+    // REVIEWS ACF RELATIONSHIP FIELD
+    // =========================================================================
+
+    /**
+     * Register ACF Relationship Field: Related Project
+     *
+     * Requires ACF (function acf_add_local_field_group must exist).
+     * If ACF Extended (ACFE) is active: registers bidirectional relationship so
+     * that linking a Review to a Project also links the Project back to the Review.
+     * If ACF Extended is NOT active: registers standard post_object field only and
+     * shows an admin notice on Review and Project edit screens.
+     *
+     * Do not build a custom bidirectional hook — use ACF Extended or standard field.
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function register_reviews_acf_fields() {
+        if (!function_exists('acf_add_local_field_group')) {
+            return;
+        }
+
+        $is_acfe_active = defined('ACFE_VERSION') || function_exists('acfe_add_local_field_group');
+
+        // Reviews side: Related Project field
+        $related_project_field = [
+            'key'          => 'field_bw_related_project',
+            'label'        => __('Related Project', 'site-essentials'),
+            'name'         => 'bw_related_project',
+            'type'         => 'post_object',
+            'post_type'    => [self::POST_TYPE_PROJECTS],
+            'return_format' => 'id',
+            'multiple'     => 0,
+            'allow_null'   => 1,
+            'ui'           => 1,
+            'instructions' => __('Link this review to a project/success story.', 'site-essentials'),
+        ];
+
+        if ($is_acfe_active) {
+            $related_project_field['bidirectional']        = 1;
+            $related_project_field['bidirectional_target'] = ['field_bw_reviews_related'];
+        }
+
+        acf_add_local_field_group([
+            'key'      => 'group_bw_reviews_relationship',
+            'title'    => __('Related Project', 'site-essentials'),
+            'fields'   => [$related_project_field],
+            'location' => [
+                [
+                    [
+                        'param'    => 'post_type',
+                        'operator' => '==',
+                        'value'    => self::POST_TYPE_REVIEWS,
+                    ],
+                ],
+            ],
+            'position' => 'side',
+        ]);
+
+        if ($is_acfe_active) {
+            // Projects side: Related Reviews field (reverse of bidirectional)
+            acf_add_local_field_group([
+                'key'   => 'group_projects_reviews',
+                'title' => __('Related Reviews', 'site-essentials'),
+                'fields' => [
+                    [
+                        'key'                  => 'field_bw_reviews_related',
+                        'label'                => __('Related Reviews', 'site-essentials'),
+                        'name'                 => 'bw_reviews_related',
+                        'type'                 => 'post_object',
+                        'post_type'            => [self::POST_TYPE_REVIEWS],
+                        'return_format'        => 'id',
+                        'multiple'             => 1,
+                        'allow_null'           => 1,
+                        'ui'                   => 1,
+                        'instructions'         => __('Reviews linked to this project (synced automatically).', 'site-essentials'),
+                        'bidirectional'        => 1,
+                        'bidirectional_target' => ['field_bw_related_project'],
+                    ],
+                ],
+                'location' => [
+                    [
+                        [
+                            'param'    => 'post_type',
+                            'operator' => '==',
+                            'value'    => self::POST_TYPE_PROJECTS,
+                        ],
+                    ],
+                ],
+                'position' => 'side',
+            ]);
+        } else {
+            // ACF Extended not active — show a notice on Review/Project edit screens
+            $pt_reviews  = self::POST_TYPE_REVIEWS;
+            $pt_projects = self::POST_TYPE_PROJECTS;
+            add_action('admin_notices', function() use ($pt_reviews, $pt_projects) {
+                $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+                if (!$screen || $screen->base !== 'post') {
+                    return;
+                }
+                if (!in_array($screen->post_type, [$pt_reviews, $pt_projects], true)) {
+                    return;
+                }
+                echo '<div class="notice notice-warning is-dismissible"><p>';
+                printf(
+                    /* translators: 1: opening link tag, 2: closing link tag */
+                    esc_html__('ACF Extended is not active. The "Related Project" field is available on Reviews but bidirectional sync to Projects is disabled. %1$sLearn more about ACF Extended.%2$s', 'site-essentials'),
+                    '<a href="https://www.acf-extended.com/" target="_blank" rel="noopener">',
+                    '</a>'
+                );
+                echo '</p></div>';
+            });
+        }
+    }
+
+    // =========================================================================
+    // REVIEWS SHORTCODES
+    // =========================================================================
+
+    /**
+     * Register all Reviews shortcodes
+     *
+     * Usage: [bw_review_rating id="42"]
+     * If id is omitted, current post ID is used (for use inside WP_Query loops).
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function register_reviews_shortcodes() {
+        add_shortcode('bw_review_rating',          [$this, 'shortcode_review_rating']);
+        add_shortcode('bw_review_date',            [$this, 'shortcode_review_date']);
+        add_shortcode('bw_review_verify_url',      [$this, 'shortcode_review_verify_url']);
+        add_shortcode('bw_review_schema_id',       [$this, 'shortcode_review_schema_id']);
+        add_shortcode('bw_review_outcome',         [$this, 'shortcode_review_outcome']);
+        add_shortcode('bw_review_customer_detail', [$this, 'shortcode_review_customer_detail']);
+        add_shortcode('bw_review_excerpt',         [$this, 'shortcode_review_excerpt']);
+        add_shortcode('bw_review_featured',        [$this, 'shortcode_review_featured']);
+    }
+
+    /**
+     * Resolve post ID from shortcode attributes
+     *
+     * @since 1.1.0
+     * @param array $atts Shortcode attributes
+     * @return int
+     */
+    private function get_shortcode_post_id($atts) {
+        return !empty($atts['id']) ? absint($atts['id']) : (get_the_ID() ?: 0);
+    }
+
+    /** Returns star rating as integer string. @since 1.1.0 */
+    public function shortcode_review_rating($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        $val     = get_post_meta($post_id, 'bw_rating', true);
+        return $val !== '' ? esc_html($val) : '';
+    }
+
+    /** Returns formatted date respecting bw_date_precision. @since 1.1.0 */
+    public function shortcode_review_date($atts) {
+        $atts      = shortcode_atts(['id' => ''], $atts);
+        $post_id   = $this->get_shortcode_post_id($atts);
+        $date      = get_post_meta($post_id, 'bw_date', true);
+        $precision = get_post_meta($post_id, 'bw_date_precision', true) ?: 'full';
+
+        if (empty($date)) {
+            return '';
+        }
+        $ts = strtotime($date);
+        if (!$ts) {
+            return esc_html($date);
+        }
+        switch ($precision) {
+            case 'year':       return date_i18n('Y', $ts);
+            case 'month-year': return date_i18n('F Y', $ts);
+            default:           return date_i18n(get_option('date_format'), $ts);
+        }
+    }
+
+    /** Returns raw verify URL. @since 1.1.0 */
+    public function shortcode_review_verify_url($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        return esc_url(get_post_meta($post_id, 'bw_verify_url', true));
+    }
+
+    /** Returns schema ID string. @since 1.1.0 */
+    public function shortcode_review_schema_id($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        return esc_html(get_post_meta($post_id, 'bw_schema_id', true));
+    }
+
+    /** Returns success outcome text. @since 1.1.0 */
+    public function shortcode_review_outcome($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        return esc_html(get_post_meta($post_id, 'bw_success_outcome', true));
+    }
+
+    /** Returns customer second-line detail. @since 1.1.0 */
+    public function shortcode_review_customer_detail($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        return esc_html(get_post_meta($post_id, 'bw_customer_detail', true));
+    }
+
+    /**
+     * Returns bw_review_excerpt, or auto-truncates post_content (~150 chars) as fallback.
+     *
+     * @since 1.1.0
+     */
+    public function shortcode_review_excerpt($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        $excerpt = get_post_meta($post_id, 'bw_review_excerpt', true);
+
+        if (!empty($excerpt)) {
+            return esc_html($excerpt);
+        }
+
+        // Fallback: auto-truncate post_content to ~150 chars (25 words)
+        $post = get_post($post_id);
+        if ($post && !empty($post->post_content)) {
+            return esc_html(wp_trim_words(wp_strip_all_tags($post->post_content), 25, '&hellip;'));
+        }
+
+        return '';
+    }
+
+    /** Returns 1 or 0 based on bw_is_featured. @since 1.1.0 */
+    public function shortcode_review_featured($atts) {
+        $atts    = shortcode_atts(['id' => ''], $atts);
+        $post_id = $this->get_shortcode_post_id($atts);
+        return get_post_meta($post_id, 'bw_is_featured', true) === '1' ? '1' : '0';
+    }
+
+    // =========================================================================
+    // REVIEWS CSV IMPORT
+    // =========================================================================
+
+    /**
+     * Handle Reviews CSV import form submission
+     *
+     * Expected CSV columns (case-sensitive headers):
+     *   customer_name, review_text, rating, platform, date, date_precision,
+     *   verify_url, success_outcome, customer_detail, is_featured, review_excerpt
+     *
+     * Rules:
+     * - Rows where customer_name is empty are skipped
+     * - platform: case-insensitive name match; creates new term if no match
+     * - date_precision: year|month-year|full; defaults to full if empty/invalid
+     * - is_featured: 1/yes/true (case-insensitive) → 1; everything else → 0
+     * - bw_schema_id is auto-generated using same logic as manual save
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function handle_reviews_csv_import() {
+        if (!isset($_POST['bw_reviews_csv_nonce']) ||
+            !wp_verify_nonce($_POST['bw_reviews_csv_nonce'], 'bw_reviews_csv_import')) {
+            wp_die(__('Security check failed.', 'site-essentials'));
+        }
+
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions.', 'site-essentials'));
+        }
+
+        $redirect_base = add_query_arg('page', 'site-essentials-cpt', admin_url('admin.php'));
+
+        if (empty($_FILES['bw_reviews_csv']['tmp_name'])) {
+            wp_safe_redirect(add_query_arg([
+                'reviews_import' => 'error',
+                'error_msg'      => rawurlencode(__('No file uploaded.', 'site-essentials')),
+            ], $redirect_base));
+            exit;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        $handle = fopen($_FILES['bw_reviews_csv']['tmp_name'], 'r');
+        if ($handle === false) {
+            wp_safe_redirect(add_query_arg([
+                'reviews_import' => 'error',
+                'error_msg'      => rawurlencode(__('Could not read uploaded file.', 'site-essentials')),
+            ], $redirect_base));
+            exit;
+        }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+            fclose($handle);
+            wp_safe_redirect(add_query_arg([
+                'reviews_import' => 'error',
+                'error_msg'      => rawurlencode(__('CSV file is empty or could not be parsed.', 'site-essentials')),
+            ], $redirect_base));
+            exit;
+        }
+
+        $header    = array_map('trim', $header);
+        $expected  = [
+            'customer_name', 'review_text', 'rating', 'platform', 'date',
+            'date_precision', 'verify_url', 'success_outcome', 'customer_detail',
+            'is_featured', 'review_excerpt',
+        ];
+        $col_map = [];
+        foreach ($expected as $col) {
+            $idx = array_search($col, $header, true);
+            $col_map[$col] = ($idx !== false) ? $idx : -1;
+        }
+
+        $imported    = 0;
+        $skipped     = 0;
+        $skip_detail = [];
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $get = static function($col) use ($row, $col_map) {
+                $idx = $col_map[$col];
+                return ($idx >= 0 && isset($row[$idx])) ? trim($row[$idx]) : '';
+            };
+
+            $customer_name = $get('customer_name');
+            if (empty($customer_name)) {
+                $skipped++;
+                $skip_detail[] = __('Row skipped: customer_name is empty', 'site-essentials');
+                continue;
+            }
+
+            $post_id = wp_insert_post([
+                'post_type'    => self::POST_TYPE_REVIEWS,
+                'post_title'   => sanitize_text_field($customer_name),
+                'post_content' => sanitize_textarea_field($get('review_text')),
+                'post_status'  => 'publish',
+            ]);
+
+            if (is_wp_error($post_id)) {
+                $skipped++;
+                $skip_detail[] = sprintf(
+                    /* translators: 1: customer name, 2: error message */
+                    __('Row skipped for "%1$s": %2$s', 'site-essentials'),
+                    $customer_name,
+                    $post_id->get_error_message()
+                );
+                continue;
+            }
+
+            // Platform taxonomy
+            $platform_name = $get('platform');
+            if (!empty($platform_name)) {
+                $term = get_term_by('name', $platform_name, self::TAXONOMY_REVIEW_PLATFORM);
+                if (!$term) {
+                    $all_terms = get_terms(['taxonomy' => self::TAXONOMY_REVIEW_PLATFORM, 'hide_empty' => false]);
+                    if (!is_wp_error($all_terms)) {
+                        foreach ($all_terms as $t) {
+                            if (strcasecmp($t->name, $platform_name) === 0) {
+                                $term = $t;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!$term) {
+                    $new_term = wp_insert_term(sanitize_text_field($platform_name), self::TAXONOMY_REVIEW_PLATFORM);
+                    if (!is_wp_error($new_term)) {
+                        $term = get_term($new_term['term_id'], self::TAXONOMY_REVIEW_PLATFORM);
+                    }
+                }
+                if ($term && !is_wp_error($term)) {
+                    wp_set_object_terms($post_id, [$term->term_id], self::TAXONOMY_REVIEW_PLATFORM);
+                }
+            }
+
+            // Rating 1–5
+            $rating = intval($get('rating'));
+            if ($rating >= 1 && $rating <= 5) {
+                update_post_meta($post_id, 'bw_rating', $rating);
+            }
+
+            // Date YYYY-MM-DD
+            $date = $get('date');
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                update_post_meta($post_id, 'bw_date', $date);
+            }
+
+            // Date precision
+            $precision = $get('date_precision');
+            update_post_meta($post_id, 'bw_date_precision', in_array($precision, ['year', 'month-year', 'full'], true) ? $precision : 'full');
+
+            // Verify URL
+            $verify_url = esc_url_raw($get('verify_url'));
+            if (!empty($verify_url)) {
+                update_post_meta($post_id, 'bw_verify_url', $verify_url);
+            }
+
+            // Success outcome
+            $outcome = sanitize_text_field($get('success_outcome'));
+            if (!empty($outcome)) {
+                update_post_meta($post_id, 'bw_success_outcome', $outcome);
+            }
+
+            // Customer detail
+            $detail = sanitize_text_field($get('customer_detail'));
+            if (!empty($detail)) {
+                update_post_meta($post_id, 'bw_customer_detail', $detail);
+            }
+
+            // Is featured: 1/yes/true → 1, else → 0
+            update_post_meta($post_id, 'bw_is_featured', in_array(strtolower($get('is_featured')), ['1', 'yes', 'true'], true) ? '1' : '0');
+
+            // Review excerpt
+            $exc = sanitize_textarea_field($get('review_excerpt'));
+            if (!empty($exc)) {
+                update_post_meta($post_id, 'bw_review_excerpt', $exc);
+            }
+
+            // Auto-generate schema ID
+            $schema_id = $this->generate_schema_id($post_id, get_post($post_id));
+            if (!empty($schema_id)) {
+                update_post_meta($post_id, 'bw_schema_id', $schema_id);
+            }
+
+            $imported++;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+        fclose($handle);
+
+        wp_safe_redirect(add_query_arg([
+            'reviews_import' => 'success',
+            'imported'       => $imported,
+            'skipped'        => $skipped,
+        ], $redirect_base));
+        exit;
+    }
+
+    // =========================================================================
+    // SETTINGS
+    // =========================================================================
 
     /**
      * Register settings (placeholder)

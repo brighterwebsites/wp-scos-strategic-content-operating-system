@@ -1306,26 +1306,34 @@ add_action('admin_footer-edit.php', function() {
             $('select[name="content_plan"]', '.inline-edit-row').val(nextStepVal);
             
             // FIX: Progress checkboxes - populate from hidden data attribute
-            // Get the saved progress values from the row's data attribute
-            var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
-            if (progressData) {
-                try {
-                    var progressValues = JSON.parse(progressData);
-                    // Uncheck all first
-                    $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row').prop('checked', false);
-                    // Check the saved ones
-                    if (Array.isArray(progressValues)) {
-                        progressValues.forEach(function(val) {
-                            $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row').prop('checked', true);
-                        });
-                    }
-                } catch(e) {
-                    console.error('Failed to parse progress data:', e);
-                }
-            } else {
-                // No saved progress, uncheck all
+            // Use setTimeout to ensure inline edit form is fully rendered
+            setTimeout(function() {
+                var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+                console.log('[Progress Debug] Post ID:', postId, 'Data:', progressData);
+                
+                // Always uncheck all first
                 $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row').prop('checked', false);
-            }
+                
+                if (progressData) {
+                    try {
+                        var progressValues = JSON.parse(progressData);
+                        console.log('[Progress Debug] Parsed values:', progressValues);
+                        
+                        // Check the saved ones
+                        if (Array.isArray(progressValues) && progressValues.length > 0) {
+                            progressValues.forEach(function(val) {
+                                var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
+                                $checkbox.prop('checked', true);
+                                console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
+                            });
+                        }
+                    } catch(e) {
+                        console.error('[Progress Debug] Failed to parse:', e);
+                    }
+                } else {
+                    console.log('[Progress Debug] No saved progress data');
+                }
+            }, 100);
         };
     });
     </script>

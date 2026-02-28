@@ -20,8 +20,12 @@ class BW_ALTC_Migration {
      * Initialize migration tool
      */
     public static function init() {
-        add_action('admin_menu', [__CLASS__, 'add_migration_page']);
-        add_action('admin_post_bw_altc_run_migration', [__CLASS__, 'run_migration']);
+        // COMMENTED OUT: Migration tool no longer needed in production
+        // Can be re-enabled if needed for future migrations or repurposed for new modular system
+        // Uncomment the lines below to restore the migration tool
+        
+        // add_action('admin_menu', [__CLASS__, 'add_migration_page']);
+        // add_action('admin_post_bw_altc_run_migration', [__CLASS__, 'run_migration']);
     }
 
     /**

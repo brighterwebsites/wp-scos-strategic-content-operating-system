@@ -390,7 +390,8 @@ add_action('admin_init', function() {
                     $values = get_post_meta($post_id, 'workflow_progress', true);
                     $opts = bw_cs_workflow_progress_options();
                     if (!empty($values) && is_array($values)) {
-                        echo '<span class="bw-cs-progress" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;">';
+                        // Store values as JSON in data attribute for inline edit
+                        echo '<span class="bw-cs-progress" data-post="' . esc_attr($post_id) . '" data-progress-values="' . esc_attr(wp_json_encode($values)) . '" style="cursor:pointer;">';
                         $tags = [];
                         foreach ($values as $val) {
                             if (isset($opts[$val])) {
@@ -1303,6 +1304,28 @@ add_action('admin_footer-edit.php', function() {
             // Next Step
             var nextStepVal = $row.find('.bw-cs-next-step').data('value') || '';
             $('select[name="content_plan"]', '.inline-edit-row').val(nextStepVal);
+            
+            // FIX: Progress checkboxes - populate from hidden data attribute
+            // Get the saved progress values from the row's data attribute
+            var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+            if (progressData) {
+                try {
+                    var progressValues = JSON.parse(progressData);
+                    // Uncheck all first
+                    $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row').prop('checked', false);
+                    // Check the saved ones
+                    if (Array.isArray(progressValues)) {
+                        progressValues.forEach(function(val) {
+                            $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row').prop('checked', true);
+                        });
+                    }
+                } catch(e) {
+                    console.error('Failed to parse progress data:', e);
+                }
+            } else {
+                // No saved progress, uncheck all
+                $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row').prop('checked', false);
+            }
         };
     });
     </script>
@@ -1332,8 +1355,6 @@ add_action('save_post', function($post_id) {
         'bw_altc_notes'         => 'sanitize_textarea_field',
         'bw_intent'             => 'sanitize_text_field',
         'bw_purpose'            => 'sanitize_text_field',
-        'bw_pillar_page_id'     => 'absint',
-        'bw_service_pathway_id' => 'absint',
         '_brt_opt_status'       => 'sanitize_text_field',
         'bw_index_status'       => 'sanitize_text_field',
         'content_plan'          => 'sanitize_text_field',
@@ -1352,6 +1373,32 @@ add_action('save_post', function($post_id) {
         }
     }
     
+    // FIX: Pillar Page ID and Service Pathway ID - Handle separately to prevent clearing on bulk edit
+    // These are integer fields, so we need special handling for empty strings
+    if (isset($_REQUEST['bw_pillar_page_id'])) {
+        $value = $_REQUEST['bw_pillar_page_id'];
+        // For bulk edit: empty string means "No Change", don't update
+        if ($is_bulk_edit && $value === '') {
+            // Skip - don't clear existing value
+        } else {
+            // For quick edit or bulk edit with actual value
+            $value = absint($value);
+            update_post_meta($post_id, 'bw_pillar_page_id', $value);
+        }
+    }
+    
+    if (isset($_REQUEST['bw_service_pathway_id'])) {
+        $value = $_REQUEST['bw_service_pathway_id'];
+        // For bulk edit: empty string means "No Change", don't update
+        if ($is_bulk_edit && $value === '') {
+            // Skip - don't clear existing value
+        } else {
+            // For quick edit or bulk edit with actual value
+            $value = absint($value);
+            update_post_meta($post_id, 'bw_service_pathway_id', $value);
+        }
+    }
+    
     // Handle workflow_progress (multi-select checkboxes)
     // Only update if the progress field was actually rendered in the form (marker field present)
     if (isset($_REQUEST['workflow_progress'])) {
@@ -1362,6 +1409,7 @@ add_action('save_post', function($post_id) {
         }
     } elseif (!$is_bulk_edit && isset($_REQUEST['workflow_progress_touched'])) {
         // Only clear if the progress section was rendered but no boxes checked
+        // AND this is NOT a bulk edit
         update_post_meta($post_id, 'workflow_progress', []);
     }
     // If neither condition met, leave existing workflow_progress unchanged

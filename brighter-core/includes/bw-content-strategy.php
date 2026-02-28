@@ -1275,64 +1275,76 @@ add_action('admin_footer-edit.php', function() {
     <script>
     console.log('[Progress Debug] Content Strategy inline edit script loaded');
     jQuery(function($) {
-        console.log('[Progress Debug] jQuery ready, using copy event approach');
+        console.log('[Progress Debug] jQuery ready, using direct button binding');
         
-        // Check if the-list exists
-        var listExists = $('#the-list').length;
-        console.log('[Progress Debug] #the-list found:', listExists);
-        
-        // Check for editinline buttons
-        var editButtons = $('.editinline').length;
-        console.log('[Progress Debug] .editinline buttons found:', editButtons);
-        
-        // Use WordPress's built-in copy event - this fires AFTER inline edit opens
-        $(document).on('click', '.editinline', function() {
-            console.log('[Progress Debug] !!!!! CLICK EVENT FIRED !!!!!');
-            var postId = $(this).closest('tr').attr('id');
-            console.log('[Progress Debug] Row ID:', postId);
-            
-            if (postId) {
-                postId = postId.replace('post-', '');
-                console.log('[Progress Debug] Post ID:', postId);
+        // Bind directly to each button (more aggressive)
+        function attachProgressHandler() {
+            $('.editinline').each(function(index) {
+                var $btn = $(this);
                 
-                // Wait for inline edit row to be created
-                setTimeout(function() {
-                    var $row = $('#post-' + postId);
-                    console.log('[Progress Debug] Processing post row, found:', $row.length);
+                // Remove any existing handlers to avoid duplicates
+                $btn.off('click.progress-handler');
+                
+                // Bind with namespace
+                $btn.on('click.progress-handler', function(e) {
+                    console.log('[Progress Debug] !!!!! CLICK EVENT FIRED (direct binding) !!!!!');
                     
-                    // Get Progress data
-                    var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
-                    console.log('[Progress Debug] Progress data:', progressData);
+                    var postId = $(this).closest('tr').attr('id');
+                    console.log('[Progress Debug] Row ID:', postId);
                     
-                    // Always uncheck all first
-                    var checkboxes = $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row');
-                    console.log('[Progress Debug] Found checkboxes:', checkboxes.length);
-                    checkboxes.prop('checked', false);
-                    
-                    if (progressData) {
-                        try {
-                            var progressValues = JSON.parse(progressData);
-                            console.log('[Progress Debug] Parsed values:', progressValues);
+                    if (postId) {
+                        postId = postId.replace('post-', '');
+                        console.log('[Progress Debug] Post ID:', postId);
+                        
+                        // Wait for inline edit row to be created
+                        setTimeout(function() {
+                            var $row = $('#post-' + postId);
+                            console.log('[Progress Debug] Processing post row, found:', $row.length);
                             
-                            // Check the saved ones
-                            if (Array.isArray(progressValues) && progressValues.length > 0) {
-                                progressValues.forEach(function(val) {
-                                    var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
-                                    $checkbox.prop('checked', true);
-                                    console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
-                                });
+                            // Get Progress data
+                            var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+                            console.log('[Progress Debug] Progress data:', progressData);
+                            
+                            // Always uncheck all first
+                            var checkboxes = $('.bw-progress-checkboxes-edit input[type="checkbox"]', '.inline-edit-row');
+                            console.log('[Progress Debug] Found checkboxes:', checkboxes.length);
+                            checkboxes.prop('checked', false);
+                            
+                            if (progressData) {
+                                try {
+                                    var progressValues = JSON.parse(progressData);
+                                    console.log('[Progress Debug] Parsed values:', progressValues);
+                                    
+                                    // Check the saved ones
+                                    if (Array.isArray(progressValues) && progressValues.length > 0) {
+                                        progressValues.forEach(function(val) {
+                                            var $checkbox = $('.bw-progress-checkboxes-edit input[value="' + val + '"]', '.inline-edit-row');
+                                            $checkbox.prop('checked', true);
+                                            console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
+                                        });
+                                    }
+                                } catch(e) {
+                                    console.error('[Progress Debug] Failed to parse:', e);
+                                }
+                            } else {
+                                console.log('[Progress Debug] No saved progress data');
                             }
-                        } catch(e) {
-                            console.error('[Progress Debug] Failed to parse:', e);
-                        }
-                    } else {
-                        console.log('[Progress Debug] No saved progress data');
+                        }, 300);
                     }
-                }, 300); // Increased timeout
-            }
-        });
+                });
+            });
+            
+            console.log('[Progress Debug] Direct handlers attached to', $('.editinline').length, 'buttons');
+        }
         
-        console.log('[Progress Debug] Click handler attached');
+        // Attach on load
+        attachProgressHandler();
+        
+        // Also re-attach if AJAX pagination happens
+        $(document).ajaxComplete(function() {
+            console.log('[Progress Debug] AJAX complete, re-attaching handlers');
+            attachProgressHandler();
+        });
     });
     </script>
     <?php

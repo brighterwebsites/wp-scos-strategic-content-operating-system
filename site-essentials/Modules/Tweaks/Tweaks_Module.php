@@ -341,6 +341,7 @@ class Tweaks_Module implements Module_Interface {
             $whitelist_patterns = [
                 '/wp-json/wc/',           // WooCommerce endpoints
                 '/wp-json/brighter/',     // Brighter custom endpoints (GPT, Make, etc.)
+                '/wp-json/brighter-core/', // Brighter Core endpoints (social amplification, etc.)
                 '/wp-json/brighter-x/',   // Brighter-X endpoints
             ];
             

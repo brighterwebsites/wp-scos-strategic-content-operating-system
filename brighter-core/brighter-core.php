@@ -85,6 +85,7 @@ function brighter_get_whitelisted_modules() {
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
             'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
             'class-author-extension', // Module 15: Author Extension (E-E-A-T fields)
+            'post-type-enhancements', // Add author support to custom post types
         ];
     }
 

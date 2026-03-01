@@ -244,11 +244,15 @@ class BW_Social_Webhook_Trigger {
         }
 
         // Get aggregated content (post + ACF + Breakdance)
-        $content = class_exists('BW_Content_Analysis') 
+        $raw_content = class_exists('BW_Content_Analysis') 
             ? BW_Content_Analysis::get_aggregated_content($post_id) 
             : $post->post_content;
         
-        $content_plain = wp_strip_all_tags($content);
+        // Plain text version (fully stripped)
+        $content_plain = wp_strip_all_tags($raw_content);
+        
+        // Source material version (with H2 as markdown for AI context)
+        $source_material = $this->sanitize_content_for_prompt($raw_content);
 
         // Get featured image data
         $featured_image = null;
@@ -270,6 +274,7 @@ class BW_Social_Webhook_Trigger {
 
         return array(
             'content' => $content_plain,
+            'source_material' => $source_material, // Formatted with H2 as markdown
             'tldr' => $tldr,
             'featured_image' => $featured_image,
             'attached_images' => $attached_images,
@@ -279,6 +284,51 @@ class BW_Social_Webhook_Trigger {
                 'total' => ($featured_image ? 1 : 0) + count($attached_images)
             )
         );
+    }
+
+    /**
+     * Sanitize post content for prompt data (with H2 as markdown)
+     *
+     * @param string $content Raw post content (HTML)
+     * @return string Cleaned content with H2 as markdown
+     */
+    private function sanitize_content_for_prompt($content) {
+        if (empty($content) || !is_string($content)) {
+            return '';
+        }
+
+        // Convert H2 headings to markdown format (## Heading)
+        $content = preg_replace('/<h2[^>]*>(.*?)<\/h2>/is', '## $1', $content);
+
+        // Convert paragraph tags to single newlines
+        $content = preg_replace('/<p[^>]*>(.*?)<\/p>/is', "$1\n", $content);
+
+        // Convert other block-level elements to newlines
+        $content = preg_replace('/<br\s*\/?>/i', "\n", $content);
+        $content = preg_replace('/<\/?(div|section|article|header|footer|aside|nav)[^>]*>/i', "\n", $content);
+
+        // Strip all remaining HTML tags
+        $content = wp_strip_all_tags($content);
+
+        // Decode HTML entities
+        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Normalize whitespace
+        $content = preg_replace('/[ \t]+/', ' ', $content);
+        $content = preg_replace('/\n{3,}/', "\n\n", $content);
+        
+        // Remove leading/trailing whitespace from each line and blank lines
+        $lines = explode("\n", $content);
+        $lines = array_map('trim', $lines);
+        $cleaned_lines = array();
+        foreach ($lines as $line) {
+            if ($line !== '') {
+                $cleaned_lines[] = $line;
+            }
+        }
+
+        $content = implode("\n", $cleaned_lines);
+        return trim($content);
     }
 
     /**

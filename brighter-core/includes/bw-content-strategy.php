@@ -1273,70 +1273,45 @@ add_action('admin_footer-edit.php', function() {
     if (!$screen || !in_array($screen->post_type, bw_cs_post_types(), true)) return;
     ?>
     <script>
-    console.log('[Progress Debug] Content Strategy inline edit script loaded');
-    
     jQuery(function($) {
-        // Use MutationObserver to watch for inline edit row appearing
-        var observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                mutation.addedNodes.forEach(function(node) {
-                    // Check if this is an inline edit row
-                    if (node.nodeType === 1 && $(node).hasClass('inline-edit-row')) {
-                        console.log('[Progress Debug] Inline edit row detected!', node);
-                        
-                        // Get the post ID from the row
-                        var postId = $(node).attr('id');
-                        if (postId) {
-                            postId = postId.replace('edit-', '');
-                            console.log('[Progress Debug] Post ID:', postId);
+        // Hook into WordPress's inlineEditPost.edit function (the official way)
+        if (typeof inlineEditPost !== 'undefined') {
+            var $wp_inline_edit = inlineEditPost.edit;
+            inlineEditPost.edit = function(id) {
+                // Call original function
+                $wp_inline_edit.apply(this, arguments);
+                
+                // Get post ID
+                var postId = 0;
+                if (typeof(id) === 'object') {
+                    postId = parseInt(this.getId(id));
+                }
+                
+                if (postId > 0) {
+                    // Get saved progress values from the table row
+                    var $row = $('#post-' + postId);
+                    var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+                    
+                    if (progressData) {
+                        try {
+                            var progressValues = JSON.parse(progressData);
                             
-                            // Find the original post row
-                            var $originalRow = $('#post-' + postId);
-                            console.log('[Progress Debug] Original row found:', $originalRow.length);
-                            
-                            // Get saved progress values
-                            var progressData = $originalRow.find('.bw-cs-progress').attr('data-progress-values');
-                            console.log('[Progress Debug] Progress data:', progressData);
-                            
-                            // Find checkboxes in the inline edit row
-                            var $checkboxes = $(node).find('.bw-progress-checkboxes-edit input[type="checkbox"]');
-                            console.log('[Progress Debug] Found checkboxes:', $checkboxes.length);
-                            
-                            // Uncheck all first
-                            $checkboxes.prop('checked', false);
-                            
-                            // Check the saved ones
-                            if (progressData) {
-                                try {
-                                    var progressValues = JSON.parse(progressData);
-                                    console.log('[Progress Debug] Parsed values:', progressValues);
-                                    
-                                    if (Array.isArray(progressValues) && progressValues.length > 0) {
-                                        progressValues.forEach(function(val) {
-                                            var $checkbox = $(node).find('.bw-progress-checkboxes-edit input[value="' + val + '"]');
-                                            $checkbox.prop('checked', true);
-                                            console.log('[Progress Debug] Checked:', val, 'Found:', $checkbox.length);
-                                        });
-                                    }
-                                } catch(e) {
-                                    console.error('[Progress Debug] Failed to parse:', e);
+                            // Wait a moment for inline edit form to render
+                            setTimeout(function() {
+                                $('.bw-progress-checkboxes-edit input[type="checkbox"]').prop('checked', false);
+                                
+                                if (Array.isArray(progressValues) && progressValues.length > 0) {
+                                    progressValues.forEach(function(val) {
+                                        $('.bw-progress-checkboxes-edit input[value="' + val + '"]').prop('checked', true);
+                                    });
                                 }
-                            } else {
-                                console.log('[Progress Debug] No saved progress data');
-                            }
+                            }, 50);
+                        } catch(e) {
+                            // Silent fail
                         }
                     }
-                });
-            });
-        });
-        
-        // Start observing the posts list for new rows
-        var $list = document.querySelector('#the-list');
-        if ($list) {
-            observer.observe($list, { childList: true, subtree: true });
-            console.log('[Progress Debug] MutationObserver watching #the-list');
-        } else {
-            console.error('[Progress Debug] #the-list not found!');
+                }
+            };
         }
     });
     </script>

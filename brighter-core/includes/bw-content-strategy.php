@@ -54,14 +54,6 @@ add_action('init', function() {
         'auth_callback'     => function() { return current_user_can('edit_posts'); },
     ]);
     
-    // Optimization status (DEPRECATED - kept for backwards compatibility)
-    register_post_meta('', '_brt_opt_status', [
-        'type'          => 'string',
-        'single'        => true,
-        'show_in_rest'  => false,
-        'auth_callback' => function() { return current_user_can('edit_posts'); },
-    ]);
-
     // Index status
     register_post_meta('', 'bw_index_status', [
         'type'          => 'string',
@@ -241,32 +233,6 @@ function bw_cs_content_plan_options() {
     ];
 }
 //this is ready to be depreciated fully please also search for other instances and uses of this and remove it, flag if we need to rework any other sections. 
-function bw_cs_opt_status_options() {
-    return [
-        ''              => ['label' => '� No status �', 'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
-
-        // --- Workflow Stages (In Progress) ---
-        'idea'          => ['label' => 'ℹ️ Idea', 'color' => '#4338ca', 'bg' => '#e0e7ff'],  // Indigo-700: Early planning / concept
-        'draft'         => ['label' => '🆕 Drafted', 'color' => '#4f46e5', 'bg' => '#eef2ff'],  // Indigo-600: In progress content, not yet ready for publishing
-
-        // --- Testing & Strategic Action ---
-        'cont'          => ['label' => '🧾 Content Only', 'color' => '#be185d', 'bg' => '#fce7f3'],  // Rose-700: Content done is published
-        'seo_basic'     => ['label' => '🚀 SEO Basic', 'color' => '#b45309', 'bg' => '#fef3c7'],  // Amber-700: Basic Onpage SEO is done
-        'cro'           => ['label' => '📲 Conversion', 'color' => '#1d4ed8', 'bg' => '#dbeafe'],  // Blue-700: Analytics/UX optimisation is done
-
-        // --- SEO Optimised Status (Green Zone) ---
-        'op60'          => ['label' => '⭐ Optimised 60+', 'color' => '#15803d', 'bg' => '#dcfce7'],  // Green-700: At or Above target NeuronWriter keyword optimised
-        'op70'          => ['label' => '🎯 Optimised 70+', 'color' => '#065f46', 'bg' => '#a7f3d0'],  // Emerald-800: Tech SEO Implemented
-        'op80'          => ['label' => '💎 Optimised 80+', 'color' => '#7e22ce', 'bg' => '#f3e8ff'],  // Purple-700: Tech SEO + Conversion
-
-        // --- Content Inventory Decisions (Archival) ---
-        'attention'     => ['label' => '📉 Low Perf', 'color' => '#9d174d', 'bg' => '#fbcfe8'],  // Rose-800: Low Performing + Needs investigation
-        'urgent'        => ['label' => '📌 Urgent Attention', 'color' => '#b91c1c', 'bg' => '#fee2e2'],  // Red-700: High Pri Low Performing any status
-        'ctr'           => ['label' => '🚩 Visibility', 'color' => '#0f766e', 'bg' => '#ccfbf1'],  // Teal-700: Pri for Meta and or Tech SEO Needs improvement + is planned
-        'repurpose'     => ['label' => '🔄 Repurpose', 'color' => '#b45309', 'bg' => '#fcefd5'],  // Pri for Content improvement + is planned
-    ];
-}
-
 // ==========================
 // Admin Columns
 // ==========================
@@ -282,7 +248,6 @@ add_action('admin_init', function() {
                     $new['bw_intent']          = 'Intent';
                     $new['bw_purpose']         = 'Purpose';
                     $new['bw_index']           = 'Index Status';
-                    $new['bw_opt']             = 'Optimization';
                     $new['bw_progress']        = 'Progress';
                     $new['bw_next_step']       = 'Next Step';
                     $new['bw_altc_notes']      = 'Primary Intent';
@@ -317,21 +282,6 @@ add_action('admin_init', function() {
                          . esc_html($opts[$val] ?? 'NA') . '</span>';
                     break;
                     
-                case 'bw_opt':
-                    $val = get_post_meta($post_id, '_brt_opt_status', true);
-                    $opts = bw_cs_opt_status_options();
-                    if (!isset($opts[$val])) $val = '';
-                    $cfg = $opts[$val];
-                    printf(
-                        '<span class="bw-opt-badge" data-post="%d" data-value="%s" title="Click to edit" style="display:inline-block;border-radius:999px;padding:.2em .6em;font-size:12px;font-weight:600;color:%s;background:%s;cursor:pointer;">%s</span>',
-                        $post_id,
-                        esc_attr($val),
-                        esc_attr($cfg['color']),
-                        esc_attr($cfg['bg']),
-                        esc_html($cfg['label'])
-                    );
-                    break;
-
                 case 'bw_index':
                     $val = get_post_meta($post_id, 'bw_index_status', true);
                     $opts = bw_cs_index_status_options();
@@ -472,7 +422,6 @@ foreach (['post', 'page'] as $pt) {
         // DEPRECATED: bw_topic removed - use ALTC Topic taxonomy instead
         $cols['bw_intent']          = 'bw_intent';
         $cols['bw_purpose']         = 'bw_purpose';
-        $cols['bw_opt']             = '_brt_opt_status';
         $cols['bw_index']           = 'bw_index_status';
         $cols['bw_pillar']          = 'bw_pillar_page_id';
         $cols['bw_service_pathway'] = 'bw_service_pathway_id';
@@ -493,7 +442,7 @@ add_action('pre_get_posts', function($q) {
 
     // Text-based meta fields
     // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
-    if (in_array($orderby, ['bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id', 'bw_service_pathway_id', 'content_plan'], true)) {
+    if (in_array($orderby, ['bw_intent', 'bw_purpose', 'bw_index_status', 'bw_pillar_page_id', 'bw_service_pathway_id', 'content_plan'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
     }
@@ -598,7 +547,6 @@ add_action('admin_enqueue_scripts', function($hook) {
         const nonce = "' . esc_js(wp_create_nonce('bw_cs_inline')) . '";
         const intentOpts = ' . wp_json_encode(bw_cs_intent_options()) . ';
         const purposeOpts = ' . wp_json_encode(bw_cs_purpose_options()) . ';
-        const optOpts = ' . wp_json_encode(bw_cs_opt_status_options()) . ';
         const indexOpts = ' . wp_json_encode(bw_cs_index_status_options()) . ';
         const pillarOpts = ' . wp_json_encode($pillar_opts) . ';
         const servicePathwayOpts = ' . wp_json_encode($service_pathway_opts) . ';
@@ -737,65 +685,6 @@ add_action('admin_enqueue_scripts', function($hook) {
                         "data-field": field,
                         text: opts[value] || "NA",
                         css: spanStyle
-                    });
-                    $select.replaceWith($span);
-                } else {
-                    alert("Save failed");
-                    $select.prop("disabled", false).focus();
-                }
-            });
-        });
-        
-        // Optimization status
-        $(document).on("click", ".bw-opt-badge", function(e) {
-            e.preventDefault();
-            const $span = $(this);
-            const postId = $span.data("post");
-            const current = $span.data("value") || "";
-            
-            const $select = $("<select>", {
-                class: "bw-opt-dropdown",
-                "data-post": postId,
-                css: { fontSize: "12px" }
-            });
-            
-            $.each(optOpts, function(key, cfg) {
-                $select.append($("<option>", {
-                    value: key,
-                    text: cfg.label,
-                    selected: key === current
-                }));
-            });
-            
-            $span.replaceWith($select);
-            $select.focus();
-        });
-        
-        $(document).on("change blur", ".bw-opt-dropdown", function(e) {
-            const $select = $(this);
-            const postId = $select.data("post");
-            const value = $select.val();
-            const cfg = optOpts[value] || optOpts[""];
-            
-            $select.prop("disabled", true);
-            saveField(postId, "_brt_opt_status", value).done(function(resp) {
-                if (resp && resp.success) {
-                    const $span = $("<span>", {
-                        class: "bw-opt-badge",
-                        "data-post": postId,
-                        "data-value": value,
-                        title: "Click to edit",
-                        text: cfg.label,
-                        css: {
-                            display: "inline-block",
-                            borderRadius: "999px",
-                            padding: ".2em .6em",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            color: cfg.color,
-                            background: cfg.bg,
-                            cursor: "pointer"
-                        }
                     });
                     $select.replaceWith($span);
                 } else {
@@ -1067,7 +956,7 @@ add_action('wp_ajax_bw_cs_save_field', function() {
     }
     
     // Allowed fields for inline editing
-    $allowed = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', 'bw_service_pathway_id', '_brt_opt_status', 'bw_index_status', 'workflow_progress', 'content_plan'];
+    $allowed = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', 'bw_service_pathway_id', 'bw_index_status', 'workflow_progress', 'content_plan'];
     if (!in_array($field, $allowed, true)) {
         wp_send_json_error('Invalid field');
     }
@@ -1239,17 +1128,6 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                         <?php endforeach; ?>
                     </select>
                 </label>
-            <?php elseif ($col === 'bw_opt'): ?>
-                <label><span class="title">Optimization</span>
-                    <select name="_brt_opt_status">
-                        <?php if ($is_bulk): ?>
-                            <option value="">-- No Change --</option>
-                        <?php endif; ?>
-                        <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
-                            <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($cfg['label']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
             <?php elseif ($col === 'bw_index'): ?>
                 <label><span class="title">Index Status</span>
                     <select name="bw_index_status">
@@ -1341,7 +1219,6 @@ add_action('save_post', function($post_id) {
         'bw_altc_notes'         => 'sanitize_textarea_field',
         'bw_intent'             => 'sanitize_text_field',
         'bw_purpose'            => 'sanitize_text_field',
-        '_brt_opt_status'       => 'sanitize_text_field',
         'bw_index_status'       => 'sanitize_text_field',
         'content_plan'          => 'sanitize_text_field',
     ];
@@ -1424,7 +1301,6 @@ function bw_cs_render_metabox($post) {
     $intent = get_post_meta($post->ID, 'bw_intent', true);
     $purpose = get_post_meta($post->ID, 'bw_purpose', true);
     $pillar = get_post_meta($post->ID, 'bw_pillar_page_id', true);
-    $opt = get_post_meta($post->ID, '_brt_opt_status', true);
     $index_status = get_post_meta($post->ID, 'bw_index_status', true);
     $workflow_progress = get_post_meta($post->ID, 'workflow_progress', true);
     $content_plan = get_post_meta($post->ID, 'content_plan', true);
@@ -1529,18 +1405,6 @@ function bw_cs_render_metabox($post) {
     </div>
     
     <div class="bw-cs-field">
-        <label for="_brt_opt_status">Optimization Status <em style="font-weight:normal;color:#999;">(Legacy)</em></label>
-        <select id="_brt_opt_status" name="_brt_opt_status" style="width:100%;">
-            <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
-                <option value="<?php echo esc_attr($key); ?>" <?php selected($opt, $key); ?>>
-                    <?php echo esc_html($cfg['label']); ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <p class="bw-cs-help">Legacy field - to be deprecated</p>
-    </div>
-    
-    <div class="bw-cs-field">
         <label>Progress</label>
         <div class="bw-progress-tags">
             <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): 
@@ -1618,7 +1482,6 @@ add_action('save_post', function($post_id) {
         'bw_intent'             => 'sanitize_text_field',
         'bw_purpose'            => 'sanitize_text_field',
         'bw_pillar_page_id'     => 'absint',
-        '_brt_opt_status'       => 'sanitize_text_field',
         'bw_index_status'       => 'sanitize_text_field',
         'content_plan'          => 'sanitize_text_field',
     ];
@@ -1649,7 +1512,6 @@ add_action('save_post', function($post_id) {
  * bw_page_topic       → content_topic         → "SEO Services" [DEPRECATED - kept for GA4 legacy data]
  * bw_intent           → content_intent        → "informational"
  * bw_purpose          → content_purpose       → "pillar"
- * _brt_opt_status     → optimization_status   → "cro"
  * bw_pillar_page_id   → pillar_page           → "About Us"
  *
  * These dimensions are automatically included in ALL GA4 events:

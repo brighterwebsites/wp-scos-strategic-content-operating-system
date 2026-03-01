@@ -859,11 +859,6 @@ class Brighter_API_Endpoints {
             $data['notes'] = $notes;
         }
 
-        $opt_status = get_post_meta($post_id, '_brt_opt_status', true);
-        if ($opt_status) {
-            $data['optimization_status'] = $opt_status;
-        }
-
         $index_status = get_post_meta($post_id, 'bw_index_status', true);
         if ($index_status) {
             $data['index_status'] = $index_status;

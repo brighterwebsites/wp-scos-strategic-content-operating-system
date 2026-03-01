@@ -334,17 +334,20 @@ class Tweaks_Module implements Module_Interface {
                 return $result;
             }
             
-            // CRITICAL: Whitelist WooCommerce REST API endpoints
-            // WooCommerce needs unauthenticated access for:
-            // - Storefront product data
-            // - Add to cart operations
-            // - Checkout process
-            // - Payment webhooks (Stripe, PayPal, etc.)
+            // CRITICAL: Whitelist specific REST API endpoints that need unauthenticated access
             $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
             
-            // Allow WooCommerce endpoints
-            if (strpos($request_uri, '/wp-json/wc/') !== false) {
-                return $result; // Allow WooCommerce
+            // Whitelist patterns:
+            $whitelist_patterns = [
+                '/wp-json/wc/',           // WooCommerce endpoints
+                '/wp-json/brighter/',     // Brighter custom endpoints (GPT, Make, etc.)
+                '/wp-json/brighter-x/',   // Brighter-X endpoints
+            ];
+            
+            foreach ($whitelist_patterns as $pattern) {
+                if (strpos($request_uri, $pattern) !== false) {
+                    return $result; // Allow this endpoint
+                }
             }
             
             // Block all other unauthenticated REST requests

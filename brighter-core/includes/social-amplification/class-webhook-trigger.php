@@ -87,6 +87,9 @@ class BW_Social_Webhook_Trigger {
         $breadcrumb = BW_Breadcrumbs_Meta::get_breadcrumb($post_id);
         $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
 
+        // Get image optimization data
+        $image_data = $this->get_image_optimization_data($post_id);
+
         // Prepare payload
         $payload = array(
             'post_id' => $post_id,
@@ -100,6 +103,7 @@ class BW_Social_Webhook_Trigger {
             'content_type' => $content_type,
             'site_url' => get_site_url(),
             'trigger_time' => current_time('mysql'),
+            'image_optimization' => $image_data, // Added for bulk image optimization
         );
 
         // Send webhook
@@ -223,5 +227,87 @@ class BW_Social_Webhook_Trigger {
         ));
         
         return true;
+    }
+
+    /**
+     * Get image optimization data for webhook payload
+     *
+     * @param int $post_id Post ID
+     * @return array Image data including featured and attached images
+     */
+    private function get_image_optimization_data($post_id) {
+        // Get post content
+        $post = get_post($post_id);
+        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_the_excerpt($post_id) ?: '';
+        }
+
+        // Get aggregated content (post + ACF + Breakdance)
+        $content = class_exists('BW_Content_Analysis') 
+            ? BW_Content_Analysis::get_aggregated_content($post_id) 
+            : $post->post_content;
+        
+        $content_plain = wp_strip_all_tags($content);
+
+        // Get featured image data
+        $featured_image = null;
+        $featured_image_id = get_post_thumbnail_id($post_id);
+        if ($featured_image_id) {
+            $featured_image = $this->get_single_image_data($featured_image_id);
+        }
+
+        // Get all attached images
+        $attached_images = array();
+        $attachments = get_attached_media('image', $post_id);
+        foreach ($attachments as $attachment) {
+            // Skip featured image (already included)
+            if ($attachment->ID === $featured_image_id) {
+                continue;
+            }
+            $attached_images[] = $this->get_single_image_data($attachment->ID);
+        }
+
+        return array(
+            'content' => $content_plain,
+            'tldr' => $tldr,
+            'featured_image' => $featured_image,
+            'attached_images' => $attached_images,
+            'image_count' => array(
+                'featured' => $featured_image ? 1 : 0,
+                'attached' => count($attached_images),
+                'total' => ($featured_image ? 1 : 0) + count($attached_images)
+            )
+        );
+    }
+
+    /**
+     * Get single image data
+     *
+     * @param int $attachment_id Image attachment ID
+     * @return array Image metadata
+     */
+    private function get_single_image_data($attachment_id) {
+        $attachment = get_post($attachment_id);
+        if (!$attachment) {
+            return null;
+        }
+
+        $image_meta = wp_get_attachment_metadata($attachment_id);
+        
+        return array(
+            'id' => (int) $attachment_id,
+            'url' => wp_get_attachment_url($attachment_id),
+            'title' => $attachment->post_title,
+            'alt' => get_post_meta($attachment_id, '_wp_attachment_image_alt', true),
+            'caption' => $attachment->post_excerpt,
+            'description' => $attachment->post_content,
+            'filename' => basename(get_attached_file($attachment_id)),
+            'mime_type' => $attachment->post_mime_type,
+            'dimensions' => array(
+                'width' => isset($image_meta['width']) ? (int) $image_meta['width'] : null,
+                'height' => isset($image_meta['height']) ? (int) $image_meta['height'] : null
+            )
+        );
     }
 }

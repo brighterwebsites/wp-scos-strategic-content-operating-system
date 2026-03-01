@@ -187,6 +187,7 @@ function brighter_load_modules() {
         'bw-faq',
         'privacy-policy-style',
         'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
+        'post-type-enhancements',       // Add author support to custom post types
         
         // ALTC modules
         'class-altc-taxonomies',

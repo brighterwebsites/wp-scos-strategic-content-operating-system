@@ -436,6 +436,38 @@ foreach (['post', 'page'] as $pt) {
     });
 }
 
+// ==========================
+// Hidden Columns by Default
+// ==========================
+// Make specified columns unchecked by default for ALL users
+foreach (bw_cs_post_types() as $pt) {
+    add_filter("default_hidden_columns", function($hidden, $screen) use ($pt) {
+        // Only apply to our post types' edit screens
+        if ($screen->id !== "edit-{$pt}") {
+            return $hidden;
+        }
+        
+        // Columns to hide by default
+        $hide_by_default = [
+            'bw_pillar',          // Pillar
+            'bw_service_pathway', // Service Pathway
+            'bw_intent',          // Intent
+            'bw_purpose',         // Purpose
+            'bw_index',           // Index Status
+            'bw_progress',        // Progress
+            'bw_next_step',       // Next Step
+            'bw_altc_notes',      // Primary Intent
+            'taxonomy-bw_topic',  // ALTC Topic
+            'taxonomy-bw_role',   // Role
+            'taxonomy-bw_maturity', // Maturity
+            'taxonomy-bw_social', // Social
+        ];
+        
+        // Merge with existing hidden columns (don't override user preferences)
+        return array_unique(array_merge($hidden, $hide_by_default));
+    }, 10, 2);
+}
+
 add_action('pre_get_posts', function($q) {
     if (!is_admin() || !$q->is_main_query()) return;
     $orderby = $q->get('orderby');

@@ -806,3 +806,9 @@ class Brighter_Tweaks {
 }
 
 Brighter_Tweaks::boot();
+
+/**
+ * Disable SEOPress Content Analysis meta box
+ * TEMPORARY: Can be removed once SEOPress is configured properly
+ */
+add_filter('seopress_metabox_content_analysis', '__return_false');

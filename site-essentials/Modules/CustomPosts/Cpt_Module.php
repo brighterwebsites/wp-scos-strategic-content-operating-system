@@ -845,6 +845,10 @@ class Cpt_Module implements Module_Interface {
         add_shortcode('bw_review_customer_detail', [$this, 'shortcode_review_customer_detail']);
         add_shortcode('bw_review_excerpt',         [$this, 'shortcode_review_excerpt']);
         add_shortcode('bw_review_featured',        [$this, 'shortcode_review_featured']);
+        
+        // Statistics shortcodes
+        add_shortcode('bw_review_count',           [$this, 'shortcode_review_count']);
+        add_shortcode('bw_review_average',         [$this, 'shortcode_review_average']);
     }
 
     /**
@@ -943,6 +947,133 @@ class Cpt_Module implements Module_Interface {
         $atts    = shortcode_atts(['id' => ''], $atts);
         $post_id = $this->get_shortcode_post_id($atts);
         return get_post_meta($post_id, 'bw_is_featured', true) === '1' ? '1' : '0';
+    }
+
+    /**
+     * Returns total count of published reviews
+     *
+     * Optional attributes:
+     *   platform: Filter by platform slug (e.g., platform="google")
+     *   featured: Filter by featured status (featured="1")
+     *
+     * Usage: [bw_review_count] or [bw_review_count platform="google"]
+     *
+     * @since 1.1.0
+     */
+    public function shortcode_review_count($atts) {
+        $atts = shortcode_atts([
+            'platform' => '',
+            'featured' => '',
+        ], $atts);
+
+        $args = [
+            'post_type'      => self::POST_TYPE_REVIEWS,
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ];
+
+        // Filter by platform
+        if (!empty($atts['platform'])) {
+            $args['tax_query'] = [
+                [
+                    'taxonomy' => self::TAXONOMY_REVIEW_PLATFORM,
+                    'field'    => 'slug',
+                    'terms'    => sanitize_title($atts['platform']),
+                ],
+            ];
+        }
+
+        // Filter by featured
+        if (!empty($atts['featured'])) {
+            $args['meta_query'] = [
+                [
+                    'key'   => 'bw_is_featured',
+                    'value' => $atts['featured'] === '1' ? '1' : '0',
+                ],
+            ];
+        }
+
+        $query = new \WP_Query($args);
+        $count = $query->post_count;
+
+        return '<div class="bw-review-count">' . absint($count) . '</div>';
+    }
+
+    /**
+     * Returns average star rating across all reviews
+     *
+     * Optional attributes:
+     *   platform: Filter by platform slug (e.g., platform="google")
+     *   featured: Filter by featured status (featured="1")
+     *   decimals: Number of decimal places (default: 1)
+     *
+     * Usage: [bw_review_average] or [bw_review_average decimals="2"]
+     *
+     * @since 1.1.0
+     */
+    public function shortcode_review_average($atts) {
+        $atts = shortcode_atts([
+            'platform' => '',
+            'featured' => '',
+            'decimals' => '1',
+        ], $atts);
+
+        $args = [
+            'post_type'      => self::POST_TYPE_REVIEWS,
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ];
+
+        // Filter by platform
+        if (!empty($atts['platform'])) {
+            $args['tax_query'] = [
+                [
+                    'taxonomy' => self::TAXONOMY_REVIEW_PLATFORM,
+                    'field'    => 'slug',
+                    'terms'    => sanitize_title($atts['platform']),
+                ],
+            ];
+        }
+
+        // Filter by featured
+        if (!empty($atts['featured'])) {
+            $args['meta_query'] = [
+                [
+                    'key'   => 'bw_is_featured',
+                    'value' => $atts['featured'] === '1' ? '1' : '0',
+                ],
+            ];
+        }
+
+        $query = new \WP_Query($args);
+        
+        if (empty($query->posts)) {
+            return '<div class="bw-review-average">0</div>';
+        }
+
+        $total = 0;
+        $count = 0;
+
+        foreach ($query->posts as $post_id) {
+            $rating = get_post_meta($post_id, 'bw_rating', true);
+            if ($rating !== '' && is_numeric($rating)) {
+                $total += floatval($rating);
+                $count++;
+            }
+        }
+
+        if ($count === 0) {
+            return '<div class="bw-review-average">0</div>';
+        }
+
+        $average = $total / $count;
+        $decimals = max(0, min(2, intval($atts['decimals'])));
+
+        return '<div class="bw-review-average">' . number_format($average, $decimals) . '</div>';
     }
 
     // =========================================================================

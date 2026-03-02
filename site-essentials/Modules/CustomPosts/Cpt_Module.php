@@ -4,7 +4,7 @@
  *
  * Registers optional custom post types and taxonomy support:
  * - Customer Success Stories (post type: projects, has_archive, slug: configurable)
- * - Reviews (post type: bw_reviews, SSOT data source only, no public URLs)
+ * - Reviews (post type: bw_reviews, queryable SSOT data source, no public URLs or archive)
  * - Include WP Categories for projects
  * - Include WP Tags for projects
  *
@@ -46,7 +46,7 @@ class Cpt_Module implements Module_Interface {
     const POST_TYPE_PROJECTS = 'projects';
 
     /**
-     * Post type slug for Reviews (SSOT data source — no public URLs)
+     * Post type slug for Reviews (queryable SSOT — no archive/URLs)
      */
     const POST_TYPE_REVIEWS = 'bw_reviews';
 
@@ -288,12 +288,15 @@ class Cpt_Module implements Module_Interface {
     /**
      * Register Reviews CPT
      *
-     * SSOT data source only — no public-facing pages, no archive, no singles.
+     * Queryable SSOT data source — no archive page, no single URLs, but queryable via WP_Query/BDE.
      *
      * Key flags:
-     *   query_var: true   — Required for WP_Query in BDE loops
-     *   show_in_rest: true — Required for ACF and BDE field access
-     *   public: false     — Excluded from all sitemaps automatically (public=false)
+     *   publicly_queryable: true — REQUIRED for WP_Query and Breakdance loops to work
+     *   query_var: true          — Required for query parameter parsing
+     *   show_in_rest: true       — Required for ACF and BDE field access
+     *   public: false            — Excludes from sitemaps (no URLs needed)
+     *   has_archive: false       — No /reviews/ archive page
+     *   rewrite: false           — No single post URLs
      *
      * @since 1.1.0
      * @return void
@@ -317,11 +320,11 @@ class Cpt_Module implements Module_Interface {
 
         $args = [
             'labels'              => $labels,
-            'public'              => false,         // No public-facing pages
-            'publicly_queryable'  => false,         // No front-end URL access
+            'public'              => false,         // No public-facing pages or sitemaps
+            'publicly_queryable'  => true,          // REQUIRED: Allows WP_Query and BDE loops to work
             'query_var'           => true,          // REQUIRED for WP_Query in BDE loops
             'show_in_rest'        => true,          // REQUIRED for ACF and BDE field access
-            'has_archive'         => false,
+            'has_archive'         => false,         // No archive page
             'rewrite'             => false,         // No URLs
             'show_in_nav_menus'   => false,
             'exclude_from_search' => true,

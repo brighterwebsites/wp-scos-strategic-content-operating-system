@@ -110,10 +110,10 @@ if ($import_status === 'success') {
                                        name="cpt_options[enable_reviews]"
                                        value="1"
                                        <?php checked($reviews_enabled); ?>>
-                                <?php esc_html_e('Enable Reviews (SSOT data source — no public URLs)', 'site-essentials'); ?>
+                                <?php esc_html_e('Enable Reviews (queryable SSOT — no archive/URLs)', 'site-essentials'); ?>
                             </label>
                             <p class="description">
-                                <?php esc_html_e('Registers bw_reviews CPT and bw_review_platform taxonomy. Reviews have no front-end pages or archive but are queryable via WP_Query and BDE loops.', 'site-essentials'); ?>
+                                <?php esc_html_e('Registers bw_reviews CPT and bw_review_platform taxonomy. Reviews have no front-end archive or single URLs, but are queryable via WP_Query and Breakdance loops. Recommendation: Exclude from sitemap, add /reviews/ to robots.txt.', 'site-essentials'); ?>
                             </p>
                         </td>
                     </tr>

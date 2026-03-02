@@ -172,6 +172,9 @@ class Cpt_Module implements Module_Interface {
             add_action('init', [$this, 'register_review_platform_taxonomy'], 25);
             add_action('init', [$this, 'seed_review_platform_terms'], 30);
             add_action('init', [$this, 'register_reviews_shortcodes'], 30);
+            
+            // Exclude from XML sitemaps (public=true makes it queryable but we don't want URLs)
+            add_filter('wp_sitemaps_post_types', [$this, 'exclude_reviews_from_sitemap']);
 
             if (is_admin()) {
                 add_action('add_meta_boxes', [$this, 'register_reviews_meta_boxes']);
@@ -291,12 +294,15 @@ class Cpt_Module implements Module_Interface {
      * Queryable SSOT data source — no archive page, no single URLs, but queryable via WP_Query/BDE.
      *
      * Key flags:
-     *   publicly_queryable: true — REQUIRED for WP_Query and Breakdance loops to work
+     *   public: true             — REQUIRED for front-end queryability in Breakdance loops
+     *   publicly_queryable: true — REQUIRED for WP_Query and BDE to find posts
      *   query_var: true          — Required for query parameter parsing
-     *   show_in_rest: true       — Required for ACF and BDE field access
-     *   public: false            — Excludes from sitemaps (no URLs needed)
+     *   show_in_rest: true       — Required for ACF, BDE field access, and Gutenberg
      *   has_archive: false       — No /reviews/ archive page
      *   rewrite: false           — No single post URLs
+     *
+     * Note: public=true would normally include posts in sitemaps, but we exclude via
+     *       wp_sitemaps_post_types filter (see exclude_reviews_from_sitemap method).
      *
      * @since 1.1.0
      * @return void
@@ -320,16 +326,16 @@ class Cpt_Module implements Module_Interface {
 
         $args = [
             'labels'              => $labels,
-            'public'              => false,         // No public-facing pages or sitemaps
+            'public'              => true,          // REQUIRED: Makes post type queryable on front-end (for BDE loops)
             'publicly_queryable'  => true,          // REQUIRED: Allows WP_Query and BDE loops to work
-            'query_var'           => true,          // REQUIRED for WP_Query in BDE loops
-            'show_in_rest'        => true,          // REQUIRED for ACF and BDE field access
-            'has_archive'         => false,         // No archive page
-            'rewrite'             => false,         // No URLs
-            'show_in_nav_menus'   => false,
-            'exclude_from_search' => true,
-            'show_ui'             => true,
-            'show_in_menu'        => true,
+            'query_var'           => true,          // REQUIRED: Enables query_posts() and WP_Query
+            'show_in_rest'        => true,          // REQUIRED: For ACF, BDE field access, and Gutenberg
+            'has_archive'         => false,         // Disable archive page (/reviews/)
+            'rewrite'             => false,         // Disable single post URLs
+            'show_in_nav_menus'   => false,         // Hide from nav menu UI
+            'exclude_from_search' => true,          // Exclude from front-end search
+            'show_ui'             => true,          // Show in admin
+            'show_in_menu'        => true,          // Show in admin menu
             'hierarchical'        => false,
             'menu_position'       => 21,
             'menu_icon'           => 'dashicons-star-filled',
@@ -338,6 +344,21 @@ class Cpt_Module implements Module_Interface {
         ];
 
         register_post_type(self::POST_TYPE_REVIEWS, $args);
+    }
+
+    /**
+     * Exclude Reviews CPT from XML sitemaps
+     *
+     * Reviews are set to public=true for front-end queryability (BDE loops),
+     * but we don't want them in sitemaps since they have no URLs.
+     *
+     * @since 1.1.0
+     * @param array $post_types Post types included in sitemap
+     * @return array
+     */
+    public function exclude_reviews_from_sitemap($post_types) {
+        unset($post_types[self::POST_TYPE_REVIEWS]);
+        return $post_types;
     }
 
     /**

@@ -171,6 +171,7 @@ function brighter_load_modules() {
         'brighter-frontend',
         'brighter-support',
         'brighter-admin-branding',
+        'login-styling',
         'brighter-support-image-settings',
         'bw-admin-tweaks',
         'image-optimisation',

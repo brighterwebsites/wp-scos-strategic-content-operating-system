@@ -30,9 +30,9 @@ error_log('[Brighter OG Meta] Module loaded');
 
 /**
  * Main Open Graph & Meta Tags Output
- * Priority 10 = After image tags (priority 1) but before most plugins
+ * Priority 2 = Right after image tags (priority 1) to avoid output buffering issues
  */
-add_action('wp_head', 'brighter_output_og_meta_tags', 10);
+add_action('wp_head', 'brighter_output_og_meta_tags', 2);
 function brighter_output_og_meta_tags() {
     // Debug: Log that function is being called
     error_log('[Brighter OG Meta] wp_head hook fired');

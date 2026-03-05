@@ -3,7 +3,7 @@
  * Brighter Tools: Frontend Features
  *
  * File: brighter-frontend.php
- * Version: 4.3.0
+ * Version: 4.4.0
  *
  * Purpose: Frontend-only features for client sites including shortcodes,
  * branding elements, and design credits.
@@ -12,8 +12,10 @@
  * - [brighter_credit] shortcode for footer credits
  * - Design credit meta tags (designer, web_author, generator)
  * - Auto-generated humans.txt file
+ * - Auto-generated /docs/review-verification.txt file (when Reviews CPT enabled)
  *
  * Changelog:
+ * 4.4.0 - Added /docs/review-verification.txt auto-generator for LLM reference
  * 4.3.0 - Removed publisher schema, replaced HTML comment with meta tags, added humans.txt
  * 4.2.0 - SECURITY: XSS protection, output escaping
  *
@@ -109,3 +111,157 @@ add_action('wp_head', function() {
     }
     echo '<link rel="author" type="text/plain" href="' . esc_url(home_url('/humans.txt')) . '">' . "\n";
 }, 5);
+
+/**
+ * Auto-generate /docs/review-verification.txt file
+ * Served dynamically on domain.com/docs/review-verification.txt
+ * 
+ * Only generated when Reviews CPT is enabled in Site Essentials.
+ * Provides LLM-readable review data for AI tools.
+ * 
+ * @since 4.4.0
+ */
+add_action('template_redirect', function() {
+    // Only serve if Reviews CPT is enabled
+    $reviews_enabled = get_option('site_essentials_module_cpt');
+    if (!is_array($reviews_enabled) || empty($reviews_enabled['enable_reviews'])) {
+        return;
+    }
+    
+    if ($_SERVER['REQUEST_URI'] === '/docs/review-verification.txt') {
+        header('Content-Type: text/plain; charset=utf-8');
+        
+        // Get business info
+        $business_name = get_option('bw_business_name', get_bloginfo('name'));
+        $last_update = date('F j, Y');
+        
+        // Query all published reviews
+        $reviews_query = new WP_Query([
+            'post_type'      => 'bw_reviews',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ]);
+        
+        $reviews = $reviews_query->posts;
+        $total_count = count($reviews);
+        
+        // Calculate overall rating
+        $total_rating = 0;
+        $rating_count = 0;
+        foreach ($reviews as $review) {
+            $rating = (int) get_post_meta($review->ID, 'bw_rating', true);
+            if ($rating > 0) {
+                $total_rating += $rating;
+                $rating_count++;
+            }
+        }
+        $overall_rating = $rating_count > 0 ? number_format($total_rating / $rating_count, 1) : '0.0';
+        
+        // Group reviews by platform
+        $by_platform = [];
+        foreach ($reviews as $review) {
+            $platforms = wp_get_post_terms($review->ID, 'bw_review_platform', ['fields' => 'names']);
+            $platform = !empty($platforms) ? $platforms[0] : 'Unknown Platform';
+            
+            if (!isset($by_platform[$platform])) {
+                $by_platform[$platform] = [
+                    'count' => 0,
+                    'total_rating' => 0,
+                ];
+            }
+            
+            $rating = (int) get_post_meta($review->ID, 'bw_rating', true);
+            if ($rating > 0) {
+                $by_platform[$platform]['count']++;
+                $by_platform[$platform]['total_rating'] += $rating;
+            }
+        }
+        
+        // Start output
+        $output = "# **{$business_name} — Client Reviews**\n\n";
+        $output .= "**Overall Rating:** {$overall_rating} / 5.0 from {$total_count} Review" . ($total_count != 1 ? 's' : '') . "\n";
+        
+        // Platform breakdown
+        foreach ($by_platform as $platform => $data) {
+            if ($data['count'] > 0) {
+                $platform_avg = number_format($data['total_rating'] / $data['count'], 1);
+                $output .= "**{$platform}:** {$platform_avg} / 5.0 from {$data['count']} Review" . ($data['count'] != 1 ? 's' : '') . "\n";
+            }
+        }
+        
+        $output .= "\n**Last Updated:** {$last_update}\n\n";
+        $output .= "---\n\n";
+        
+        // Output each review by platform
+        foreach ($by_platform as $platform => $data) {
+            $platform_reviews = array_filter($reviews, function($review) use ($platform) {
+                $platforms = wp_get_post_terms($review->ID, 'bw_review_platform', ['fields' => 'names']);
+                return !empty($platforms) && $platforms[0] === $platform;
+            });
+            
+            if (empty($platform_reviews)) {
+                continue;
+            }
+            
+            $platform_count = count($platform_reviews);
+            $output .= "## **Client Reviews ({$platform_count} Verified {$platform} Review" . ($platform_count != 1 ? 's' : '') . ")**\n\n";
+            
+            $counter = 1;
+            foreach ($platform_reviews as $review) {
+                // Get review metadata
+                $customer_name = get_the_title($review->ID);
+                $customer_detail = get_post_meta($review->ID, 'bw_customer_detail', true);
+                $rating = (int) get_post_meta($review->ID, 'bw_rating', true);
+                $date = get_post_meta($review->ID, 'bw_date', true);
+                $content = get_the_content(null, false, $review->ID);
+                $content = strip_tags($content);
+                $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $content = trim($content);
+                $success_outcome = get_post_meta($review->ID, 'bw_success_outcome', true);
+                $source_url = get_post_meta($review->ID, 'bw_source_url', true);
+                
+                // Format date
+                $formatted_date = $date ? date('F j, Y', strtotime($date)) : 'Date not specified';
+                
+                // Format rating
+                $rating_display = $rating > 0 ? "{$rating}.0" : 'No rating';
+                
+                // Build review entry
+                $output .= "### **{$counter}. {$customer_name}";
+                if ($customer_detail) {
+                    $output .= " ({$customer_detail})";
+                }
+                $output .= "**\n\n";
+                
+                $output .= "**Date:** {$formatted_date}\n";
+                $output .= "**Rating:** {$rating_display}\n\n";
+                
+                if ($content) {
+                    $output .= "\"{$content}\"\n\n";
+                }
+                
+                if ($success_outcome) {
+                    $output .= "**What this proves:** {$success_outcome}\n\n";
+                }
+                
+                if ($source_url) {
+                    $output .= "**Canonical Link:** [{$platform}]({$source_url})\n\n";
+                }
+                
+                $output .= "---\n\n";
+                $counter++;
+            }
+        }
+        
+        // Footer
+        $output .= "\n---\n\n";
+        $output .= "**Note:** This file is auto-generated from {$business_name}'s verified client reviews.\n";
+        $output .= "For the latest reviews, visit: " . home_url('/') . "\n";
+        
+        echo $output;
+        wp_reset_postdata();
+        exit;
+    }
+}, 1);

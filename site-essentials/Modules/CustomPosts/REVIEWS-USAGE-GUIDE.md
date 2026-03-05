@@ -12,6 +12,7 @@ Complete guide for using the Reviews custom post type in Breakdance loops with P
 4. [Projects Loop - Display Related Reviews](#projects-loop---display-related-reviews)
 5. [Statistics & Aggregation](#statistics--aggregation)
 6. [Common Patterns](#common-patterns)
+7. [LLM-Ready Review Verification File](#llm-ready-review-verification-file)
 
 ---
 
@@ -641,9 +642,73 @@ get_the_post_thumbnail($project_id, array(400, 300)) // Custom size
 
 ---
 
+## LLM-Ready Review Verification File
+
+### Overview
+
+When Reviews CPT is enabled, an auto-generated review verification file is available at:
+
+```
+https://yourdomain.com/docs/review-verification.txt
+```
+
+### Purpose
+
+This file provides:
+- **LLM-readable format** for AI tools like ChatGPT, Claude, and Gemini
+- **Complete review data** including ratings, dates, outcomes, and source URLs
+- **Platform-grouped reviews** (Google, Facebook, etc.)
+- **Overall statistics** (average ratings per platform, total count)
+
+### Example Output
+
+```
+# **Business Name — Client Reviews**
+
+**Overall Rating:** 5.0 / 5.0 from 9 Reviews
+**Google:** 5.0 / 5.0 from 7 Reviews
+**Facebook:** 5.0 / 5.0 from 2 Reviews
+
+**Last Updated:** February 10, 2026
+
+---
+
+## **Client Reviews (7 Verified Google Reviews)**
+
+### **1. John Smith (Business Owner)**
+
+**Date:** January 15, 2025
+**Rating:** 5.0
+
+"Exceptional service and attention to detail. Highly recommend!"
+
+**What this proves:** Improved conversion rate by 300%
+
+**Canonical Link:** [Google](https://g.page/r/...)
+
+---
+```
+
+### Usage
+
+1. **Manual reference**: Copy the URL and provide it to LLMs for context about your reviews
+2. **Future automation**: Can be integrated with AI tools for automated review analysis
+3. **Documentation**: Share with team members or stakeholders for review summaries
+
+### Technical Details
+
+- **Format**: Plain text with Markdown formatting
+- **Updates**: Generated dynamically on each request (always current)
+- **Requires**: Reviews CPT enabled in Site Essentials
+- **Data source**: All published reviews in `bw_reviews` post type
+- **Business name**: Uses `bw_business_name` option (from Business Info), falls back to site name
+
+---
+
 ## Need Help?
 
 - **Review all custom fields**: `wp-admin/post.php?post={review_id}&action=edit`
 - **Manage platforms**: `wp-admin/edit-tags.php?taxonomy=bw_review_platform&post_type=bw_reviews`
 - **CSV Import**: `wp-admin/admin.php?page=site-essentials-cpt`
 - **View this guide**: `/wp-content/mu-plugins/site-essentials/Modules/CustomPosts/REVIEWS-USAGE-GUIDE.md`
+- **Review verification file**: `/docs/review-verification.txt` (when Reviews CPT enabled)

@@ -78,7 +78,6 @@ function brighter_get_whitelisted_modules() {
             'class-content-stats-page',
             'class-column-toggles',
             'class-field-tooltips',
-            'migrate-reading-time-fields', // One-time migration
             'migrate-tldr-field', // One-time migration (ACF → bw_tldr)
             'class-tldr-meta-box', // TLDR field meta box (admin only)
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
@@ -201,7 +200,6 @@ function brighter_load_modules() {
         'class-content-analysis',
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-reading-time-fields', // One-time migration (admin only)
         'migrate-tldr-field', // One-time migration (admin only)
         'class-tldr-meta-box', // TLDR field meta box (admin only)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
@@ -225,7 +223,6 @@ function brighter_load_modules() {
         // Content Analysis (admin-only)
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-reading-time-fields', // One-time migration (admin only)
         'migrate-tldr-field', // One-time migration (admin only)
         'class-tldr-meta-box', // TLDR field meta box (admin only)
        // 'brighter-tweaks',

@@ -143,6 +143,8 @@ class Seo_Module implements Module_Interface {
         // Add admin notices for conflicting plugins
         if (is_admin()) {
             add_action('admin_notices', [$this, 'check_conflicts']);
+            add_action('admin_init', [$this, 'handle_dismiss_notice']);
+            add_action('wp_ajax_se_dismiss_seo_notice', [$this, 'ajax_dismiss_notice']);
             
             // Initialize Schema Meta Box for post/page editors
             require_once __DIR__ . '/Schema_Meta_Box.php';
@@ -813,10 +815,17 @@ class Seo_Module implements Module_Interface {
     /**
      * Check for conflicting plugins
      *
+     * Shows dismissible notice if other SEO plugins are detected.
+     *
      * @since 1.0.0
      * @return void
      */
     public function check_conflicts() {
+        // Check if already dismissed
+        if (get_user_meta(get_current_user_id(), 'se_seo_plugin_notice_dismissed', true)) {
+            return;
+        }
+
         $conflicts = [];
 
         // Check for SEOPress
@@ -835,11 +844,70 @@ class Seo_Module implements Module_Interface {
         }
 
         if (!empty($conflicts)) {
-            echo '<div class="notice notice-warning"><p>';
-            echo '<strong>Site Essentials SEO:</strong> Detected sitemap conflict with: ' . implode(', ', $conflicts) . '. ';
-            echo 'Please disable their sitemap feature to avoid duplicate sitemaps.';
-            echo '</p></div>';
+            $plugin_names = implode(', ', $conflicts);
+            $dismiss_url = add_query_arg([
+                'se_dismiss_seo_notice' => '1',
+                'nonce' => wp_create_nonce('se_dismiss_seo_notice')
+            ]);
+            
+            echo '<div class="notice notice-info is-dismissible" data-se-notice="seo-plugin">';
+            echo '<p>';
+            echo '<strong>Site Essentials SEO:</strong> Detected ' . esc_html($plugin_names) . ' installed. ';
+            echo 'Ensure only one system is managing each feature (like sitemaps or schema) to avoid duplicate/competing settings.';
+            echo '</p>';
+            echo '<p><a href="' . esc_url($dismiss_url) . '" class="button button-small">Dismiss</a></p>';
+            echo '</div>';
+            
+            // Add JavaScript to handle AJAX dismiss
+            ?>
+            <script>
+            jQuery(document).ready(function($) {
+                $('[data-se-notice="seo-plugin"] .notice-dismiss').on('click', function() {
+                    $.post(ajaxurl, {
+                        action: 'se_dismiss_seo_notice',
+                        nonce: '<?php echo wp_create_nonce('se_dismiss_seo_notice'); ?>'
+                    });
+                });
+            });
+            </script>
+            <?php
         }
+    }
+
+    /**
+     * Handle dismiss notice via URL
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function handle_dismiss_notice() {
+        if (!isset($_GET['se_dismiss_seo_notice'])) {
+            return;
+        }
+
+        if (!isset($_GET['nonce']) || !wp_verify_nonce($_GET['nonce'], 'se_dismiss_seo_notice')) {
+            return;
+        }
+
+        update_user_meta(get_current_user_id(), 'se_seo_plugin_notice_dismissed', true);
+        
+        // Redirect to remove query args
+        wp_safe_redirect(remove_query_arg(['se_dismiss_seo_notice', 'nonce']));
+        exit;
+    }
+
+    /**
+     * Handle AJAX dismiss notice
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function ajax_dismiss_notice() {
+        check_ajax_referer('se_dismiss_seo_notice', 'nonce');
+        
+        update_user_meta(get_current_user_id(), 'se_seo_plugin_notice_dismissed', true);
+        
+        wp_send_json_success();
     }
 
     /**

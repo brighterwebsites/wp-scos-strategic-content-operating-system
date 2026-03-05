@@ -44,6 +44,7 @@ function brighter_get_whitelisted_modules() {
             'brighter-business-info',
             'brighter-support',
             'brighter-frontend',
+            'brighter-og-meta',             // Open Graph & Meta Tags
             'brighter-admin-branding',
             'brighter-support-image-settings',
             'bw-admin-tweaks',

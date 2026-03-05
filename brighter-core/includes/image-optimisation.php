@@ -6,9 +6,10 @@
  * Purpose: Core logic for resizing uploads, managing registered sizes,
  * thumbnail control, comment disable on attachments, and LiteSpeed fade-in CSS. and OG image injection.
  *  
- * Version: 4.1.0
+ * Version: 4.2.0
  *
  * Changelog:
+ * 4.2.0 - Removed og:image:secure_url (not needed for HTTPS sites), added Twitter card output after image
  * 4.1.0 - Added direct OG image meta tag injection (bypasses SEOPress filter issues)
  * 4.0.0 - Initial release
  *
@@ -278,15 +279,16 @@ function brighter_inject_og_image_tags() {
         }
         
         // Output the meta tags directly
-        echo "\n";
+        echo "\n<!-- OG Image Tags -->\n";
         echo '<meta property="og:image" content="' . esc_url($og_image_url) . '">' . "\n";
-        echo '<meta property="og:image:secure_url" content="' . esc_url($og_image_url) . '">' . "\n";
         echo '<meta property="og:image:type" content="' . esc_attr($image_type) . '">' . "\n";
         echo '<meta property="og:image:width" content="' . esc_attr($width) . '">' . "\n";
         echo '<meta property="og:image:height" content="' . esc_attr($height) . '">' . "\n";
         if ($alt_text) {
             echo '<meta property="og:image:alt" content="' . esc_attr($alt_text) . '">' . "\n";
         }
+        echo "\n<!-- Twitter Card (after image) -->\n";
+        echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
     }
 }
 

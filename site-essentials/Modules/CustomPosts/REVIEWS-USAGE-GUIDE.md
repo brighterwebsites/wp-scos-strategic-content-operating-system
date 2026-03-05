@@ -389,6 +389,8 @@ if ($review_ids && is_array($review_ids)) {
 ## Common Patterns
 
 ### Star Rating Display (Visual Stars)
+
+#### Option 1: Simple Emoji Stars
 ```php
 <?php
 $rating = get_post_meta(get_the_ID(), 'bw_rating', true);
@@ -402,6 +404,105 @@ if ($rating && is_numeric($rating)) {
     echo '</div>';
 }
 ?>
+```
+
+#### Option 2: SVG Stars (Styleable with CSS)
+```php
+<?php
+$rating = get_post_meta(get_the_ID(), 'bw_rating', true);
+if ($rating && is_numeric($rating)) {
+    $stars = intval($rating);
+    $empty = 5 - $stars;
+    
+    // SVG star icon (FontAwesome)
+    $svg_star = '<svg aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" class="bw-star"><path d="M259.3 17.8L194 150.2 47.9 171.5c-26.2 3.8-36.7 36.1-17.7 54.6l105.7 103-25 145.5c-4.5 26.3 23.2 46 46.4 33.7L288 439.6l130.7 68.7c23.2 12.2 50.9-7.4 46.4-33.7l-25-145.5 105.7-103c19-18.5 8.5-50.8-17.7-54.6L382 150.2 316.7 17.8c-11.7-23.6-45.6-23.9-57.4 0z"></path></svg>';
+    
+    echo '<div class="bw-star-rating">';
+    
+    // Filled stars
+    for ($i = 0; $i < $stars; $i++) {
+        echo '<span class="bw-star-filled">' . $svg_star . '</span>';
+    }
+    
+    // Empty stars
+    for ($i = 0; $i < $empty; $i++) {
+        echo '<span class="bw-star-empty">' . $svg_star . '</span>';
+    }
+    
+    echo '</div>';
+}
+?>
+```
+
+**Add this CSS to Breakdance Global Styles:**
+```css
+/* Star Rating Container */
+.bw-star-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* Base star SVG styling */
+.bw-star-rating .bw-star {
+    width: 1em;
+    height: 1em;
+    display: block;
+}
+
+/* Filled stars - customize color here */
+.bw-star-rating .bw-star-filled .bw-star {
+    fill: #FFD700; /* Gold color */
+}
+
+/* Empty stars - customize color here */
+.bw-star-rating .bw-star-empty .bw-star {
+    fill: #E0E0E0; /* Light gray */
+}
+
+/* Optional: Different sizes */
+.bw-star-rating.size-small .bw-star {
+    width: 0.875em;
+    height: 0.875em;
+}
+
+.bw-star-rating.size-large .bw-star {
+    width: 1.5em;
+    height: 1.5em;
+}
+
+/* Optional: Hover effect */
+.bw-star-rating .bw-star-filled:hover .bw-star {
+    fill: #FFA500; /* Orange on hover */
+}
+```
+
+**Usage with size modifier:**
+```php
+echo '<div class="bw-star-rating size-large">'; // or size-small
+```
+
+**Common Color Schemes:**
+```css
+/* Gold & Gray (default) */
+.bw-star-filled .bw-star { fill: #FFD700; }
+.bw-star-empty .bw-star { fill: #E0E0E0; }
+
+/* Orange & Light Orange */
+.bw-star-filled .bw-star { fill: #FF9800; }
+.bw-star-empty .bw-star { fill: #FFE0B2; }
+
+/* Blue (Brand) */
+.bw-star-filled .bw-star { fill: #2196F3; }
+.bw-star-empty .bw-star { fill: #BBDEFB; }
+
+/* Purple (Accent) */
+.bw-star-filled .bw-star { fill: #9C27B0; }
+.bw-star-empty .bw-star { fill: #E1BEE7; }
+
+/* Dark Mode */
+.bw-star-filled .bw-star { fill: #FFD700; }
+.bw-star-empty .bw-star { fill: #424242; }
 ```
 
 ### Formatted Date Display

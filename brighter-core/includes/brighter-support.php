@@ -528,8 +528,8 @@ function brighter_support_output_main() {
                 <p><strong><?php esc_html_e('Backups:', 'brighterwebsites'); ?></strong> 
                     <a href="<?php echo esc_url(admin_url('admin.php?page=WPvivid')); ?>"><?php esc_html_e('Go to Backups', 'brighterwebsites'); ?></a>
                 </p>
-                <p><em><?php esc_html_e('Create a backup of your website before making any changes.', 'brighterwebsites'); ?></em></p>
-                <p><?php esc_html_e('Your website is automatically backed up from the server weekly - we keep the last 2 backups by default. If something goes wrong, contact us to restore a previous version.', 'brighterwebsites'); ?></p>
+                <p><em><?php esc_html_e('Create a backup of your website before making any changes so you can make restorations yourself if needed.', 'brighterwebsites'); ?></em></p>
+                <p><?php esc_html_e('Your website is automatically backed up on your managed hosting server weekly - The last 2 backups are kept by default. If something goes wrong, contact us to restore a previous version. - Care Plans have at least 4 restore from server backups each year', 'brighterwebsites'); ?></p>
             </div>
             
             <?php if ($has_ai_tools): ?>
@@ -637,3 +637,26 @@ function brighter_support_output_main() {
     </div>
     <?php
 }
+
+/**
+ * Grant Editors access to WPvivid Backup Plugin
+ * 
+ * Allows users with the 'editor' role to create and manage backups.
+ * This enables editors to backup before making content changes.
+ * 
+ * @since 4.2.1
+ */
+add_filter('option_page_capability_wpvivid_setting', function($capability) {
+    if (current_user_can('editor')) {
+        return 'edit_pages'; // Editors have this capability
+    }
+    return $capability;
+});
+
+// Alternative filter (try both to ensure compatibility)
+add_filter('wpvivid_current_user_can', function($can) {
+    if (!$can && current_user_can('editor')) {
+        return true;
+    }
+    return $can;
+}, 10, 1);

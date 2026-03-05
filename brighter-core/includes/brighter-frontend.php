@@ -116,18 +116,12 @@ add_action('wp_head', function() {
  * Auto-generate /docs/review-verification.txt file
  * Served dynamically on domain.com/docs/review-verification.txt
  * 
- * Only generated when Reviews CPT is enabled in Site Essentials.
  * Provides LLM-readable review data for AI tools.
+ * Will show placeholder message if no reviews exist.
  * 
  * @since 4.4.0
  */
 add_action('template_redirect', function() {
-    // Only serve if Reviews CPT is enabled
-    $reviews_enabled = get_option('site_essentials_module_cpt');
-    if (!is_array($reviews_enabled) || empty($reviews_enabled['enable_reviews'])) {
-        return;
-    }
-    
     if ($_SERVER['REQUEST_URI'] === '/docs/review-verification.txt') {
         header('Content-Type: text/plain; charset=utf-8');
         
@@ -146,6 +140,17 @@ add_action('template_redirect', function() {
         
         $reviews = $reviews_query->posts;
         $total_count = count($reviews);
+        
+        // If no reviews exist, show placeholder
+        if ($total_count === 0) {
+            echo "# **{$business_name} — Client Reviews**\n\n";
+            echo "**Status:** No reviews found\n\n";
+            echo "This file will auto-populate when reviews are added to the Reviews CPT.\n";
+            echo "To add reviews, visit: " . admin_url('edit.php?post_type=bw_reviews') . "\n\n";
+            echo "**Last Updated:** {$last_update}\n";
+            wp_reset_postdata();
+            exit;
+        }
         
         // Calculate overall rating
         $total_rating = 0;

@@ -169,6 +169,7 @@ function brighter_load_modules() {
     $modules = [
         'brighter-business-info',
         'brighter-frontend',
+        'brighter-og-meta',             // Open Graph & Meta Tags
         'brighter-support',
         'brighter-admin-branding',
         'login-styling',

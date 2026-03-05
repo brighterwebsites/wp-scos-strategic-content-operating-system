@@ -25,15 +25,24 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Debug: Log that this module is being loaded
+error_log('[Brighter OG Meta] Module loaded');
+
 /**
  * Main Open Graph & Meta Tags Output
  * Priority 10 = After image tags (priority 1) but before most plugins
  */
 add_action('wp_head', 'brighter_output_og_meta_tags', 10);
 function brighter_output_og_meta_tags() {
+    // Debug: Log that function is being called
+    error_log('[Brighter OG Meta] wp_head hook fired');
+    
     if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
+        error_log('[Brighter OG Meta] Skipped - admin/feed/REST');
         return;
     }
+    
+    error_log('[Brighter OG Meta] Outputting OG tags');
 
     // Get business info
     $business_name = get_option('bw_business_name', get_bloginfo('name'));

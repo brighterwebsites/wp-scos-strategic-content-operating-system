@@ -263,7 +263,11 @@ add_action('template_redirect', function() {
         // Footer
         $output .= "\n---\n\n";
         $output .= "**Note:** This file is auto-generated from {$business_name}'s verified client reviews.\n";
-        $output .= "For the latest reviews, visit: " . home_url('/') . "\n";
+        
+        // Use Google Maps Share URL if available, otherwise use home URL
+        $google_maps_url = get_option('bw_google_maps_share', '');
+        $review_link = !empty($google_maps_url) ? $google_maps_url : home_url('/');
+        $output .= "For the latest reviews, visit: " . $review_link . "\n";
         
         echo $output;
         wp_reset_postdata();

@@ -44,92 +44,105 @@ function brighter_output_og_meta_tags() {
     
     error_log('[Brighter OG Meta] Outputting OG tags');
 
-    // Get business info
-    $business_name = get_option('bw_business_name', get_bloginfo('name'));
-    $site_name = get_bloginfo('name');
-    
-    // Determine locale (default to en_AU, can be extended)
-    $locale = get_locale();
-    $og_locale = str_replace('-', '_', $locale);
-    if (empty($og_locale)) {
-        $og_locale = 'en_AU';
-    }
+    try {
+        // Get business info
+        $business_name = get_option('bw_business_name', get_bloginfo('name'));
+        $site_name = get_bloginfo('name');
+        error_log('[Brighter OG Meta] Got business name: ' . $business_name);
+        
+        // Determine locale (default to en_AU, can be extended)
+        $locale = get_locale();
+        $og_locale = str_replace('-', '_', $locale);
+        if (empty($og_locale)) {
+            $og_locale = 'en_AU';
+        }
 
-    // Get current URL
-    $current_url = home_url(add_query_arg(null, null));
-    
-    // =========================================
-    // OG: URL, Site Name, Locale
-    // =========================================
-    echo "\n<!-- Open Graph Meta Tags -->\n";
-    echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
-    echo '<meta property="og:site_name" content="' . esc_attr($business_name) . '">' . "\n";
-    echo '<meta property="og:locale" content="' . esc_attr($og_locale) . '">' . "\n";
-    
-    // =========================================
-    // OG: Type (website vs article)
-    // =========================================
-    $og_type = 'website'; // Default for pages and archives
-    $is_article = false;
-    
-    if (is_singular() && !is_page()) {
-        // Posts and CPTs (non-pages) are articles
-        $og_type = 'article';
-        $is_article = true;
-    }
-    
-    echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
-    
-    // =========================================
-    // OG: Title
-    // =========================================
-    $og_title = brighter_get_og_title();
-    if ($og_title) {
-        echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
-    }
-    
-    // =========================================
-    // OG: Description
-    // =========================================
-    $og_description = brighter_get_og_description();
-    if ($og_description) {
-        echo '<meta property="og:description" content="' . esc_attr($og_description) . '">' . "\n";
-    }
-    
-    // =========================================
-    // Article or Website Time Meta
-    // =========================================
-    if ($is_article && is_singular()) {
-        global $post;
+        // Get current URL
+        $current_url = home_url(add_query_arg(null, null));
+        error_log('[Brighter OG Meta] About to echo tags...');
         
-        // article:published_time
-        $published_time = get_the_date('c', $post->ID); // ISO 8601 format
-        echo '<meta property="article:published_time" content="' . esc_attr($published_time) . '">' . "\n";
+        // =========================================
+        // OG: URL, Site Name, Locale
+        // =========================================
+        echo "\n<!-- Open Graph Meta Tags -->\n";
+        echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
+        echo '<meta property="og:site_name" content="' . esc_attr($business_name) . '">' . "\n";
+        echo '<meta property="og:locale" content="' . esc_attr($og_locale) . '">' . "\n";
+        error_log('[Brighter OG Meta] Basic tags echoed');
         
-        // article:modified_time
-        $modified_time = get_the_modified_date('c', $post->ID); // ISO 8601 format
-        echo '<meta property="article:modified_time" content="' . esc_attr($modified_time) . '">' . "\n";
+        // =========================================
+        // OG: Type (website vs article)
+        // =========================================
+        $og_type = 'website'; // Default for pages and archives
+        $is_article = false;
         
-    } elseif (is_singular()) {
-        // For pages (og:type=website), use og:updated_time
-        global $post;
-        $updated_time = get_the_modified_date('c', $post->ID);
-        echo '<meta property="og:updated_time" content="' . esc_attr($updated_time) . '">' . "\n";
+        if (is_singular() && !is_page()) {
+            // Posts and CPTs (non-pages) are articles
+            $og_type = 'article';
+            $is_article = true;
+        }
+        
+        echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
+        error_log('[Brighter OG Meta] Type tag echoed: ' . $og_type);
+        
+        // =========================================
+        // OG: Title
+        // =========================================
+        $og_title = brighter_get_og_title();
+        error_log('[Brighter OG Meta] Got title: ' . $og_title);
+        if ($og_title) {
+            echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
+        }
+        
+        // =========================================
+        // OG: Description
+        // =========================================
+        $og_description = brighter_get_og_description();
+        error_log('[Brighter OG Meta] Got description: ' . substr($og_description, 0, 50));
+        if ($og_description) {
+            echo '<meta property="og:description" content="' . esc_attr($og_description) . '">' . "\n";
+        }
+        
+        // =========================================
+        // Article or Website Time Meta
+        // =========================================
+        if ($is_article && is_singular()) {
+            global $post;
+            
+            // article:published_time
+            $published_time = get_the_date('c', $post->ID); // ISO 8601 format
+            echo '<meta property="article:published_time" content="' . esc_attr($published_time) . '">' . "\n";
+            
+            // article:modified_time
+            $modified_time = get_the_modified_date('c', $post->ID); // ISO 8601 format
+            echo '<meta property="article:modified_time" content="' . esc_attr($modified_time) . '">' . "\n";
+            
+        } elseif (is_singular()) {
+            // For pages (og:type=website), use og:updated_time
+            global $post;
+            $updated_time = get_the_modified_date('c', $post->ID);
+            echo '<meta property="og:updated_time" content="' . esc_attr($updated_time) . '">' . "\n";
+        }
+        
+        // =========================================
+        // OG: Image Tags
+        // =========================================
+        // NOTE: Image tags are handled by brighter_inject_og_image_tags() in image-optimisation.php
+        // This runs at priority 1, so images appear before these tags
+        // We'll enhance that function to remove og:image:secure_url per requirements
+        
+        // =========================================
+        // Twitter Card
+        // =========================================
+        echo "\n<!-- Twitter Card Meta Tags -->\n";
+        echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+        echo "<!-- /Open Graph Meta Tags -->\n\n";
+        
+        error_log('[Brighter OG Meta] All tags output successfully');
+        
+    } catch (Exception $e) {
+        error_log('[Brighter OG Meta] ERROR: ' . $e->getMessage());
     }
-    
-    // =========================================
-    // OG: Image Tags
-    // =========================================
-    // NOTE: Image tags are handled by brighter_inject_og_image_tags() in image-optimisation.php
-    // This runs at priority 1, so images appear before these tags
-    // We'll enhance that function to remove og:image:secure_url per requirements
-    
-    // =========================================
-    // Twitter Card
-    // =========================================
-    echo "\n<!-- Twitter Card Meta Tags -->\n";
-    echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
-    echo "<!-- /Open Graph Meta Tags -->\n\n";
 }
 
 /**

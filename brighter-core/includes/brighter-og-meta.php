@@ -104,7 +104,7 @@ function brighter_output_og_meta_tags() {
         }
         
         // =========================================
-        // Article or Website Time Meta
+        // Article or Website Time Meta + Author + Section
         // =========================================
         if ($is_article && is_singular()) {
             global $post;
@@ -116,6 +116,20 @@ function brighter_output_og_meta_tags() {
             // article:modified_time
             $modified_time = get_the_modified_date('c', $post->ID); // ISO 8601 format
             echo '<meta property="article:modified_time" content="' . esc_attr($modified_time) . '">' . "\n";
+            
+            // article:author (author archive URL)
+            $author_id = $post->post_author;
+            $author_url = get_author_posts_url($author_id);
+            if ($author_url) {
+                echo '<meta property="article:author" content="' . esc_url($author_url) . '">' . "\n";
+            }
+            
+            // article:section (Topic Cluster from ALTC taxonomy)
+            $topics = wp_get_post_terms($post->ID, 'altc_topic', ['fields' => 'names']);
+            if (!empty($topics) && !is_wp_error($topics)) {
+                // Use the first topic as the section
+                echo '<meta property="article:section" content="' . esc_attr($topics[0]) . '">' . "\n";
+            }
             
         } elseif (is_singular()) {
             // For pages (og:type=website), use og:updated_time

@@ -36,7 +36,7 @@ class Brighter_Image_Settings_Cache {
             "SELECT option_name, option_value 
             FROM {$wpdb->options} 
             WHERE option_name LIKE 'enable_size_%' 
-               OR option_name IN ('enable_image_resize', 'image_max_dimension', 'jpeg_quality')",
+               OR option_name IN ('enable_image_resize', 'image_max_dimension', 'jpeg_quality', 'disable_big_image_threshold')",
             OBJECT_K
         );
         
@@ -97,6 +97,7 @@ add_action('admin_init', function () {
     register_setting('brighter_optimisation_settings', 'enable_image_resize');
     register_setting('brighter_optimisation_settings', 'image_max_dimension');
     register_setting('brighter_optimisation_settings', 'jpeg_quality');
+    register_setting('brighter_optimisation_settings', 'disable_big_image_threshold');
 
     // Register settings for each image size
     $sizes = array_keys(brighter_get_image_sizes_config());
@@ -104,27 +105,50 @@ add_action('admin_init', function () {
         register_setting('brighter_optimisation_settings', "enable_size_$size");
     }
 
+    // =========================================
     // Section: Image Settings
+    // =========================================
     add_settings_section(
-        'image_optimisation_section',
+        'image_settings_section',
         'Image Settings',
-        '__return_false',
+        function() {
+            echo '<p>Max upload dimension, resize on upload, JPEG quality, and registered image sizes (including OG 1200×630).</p>';
+        },
         'brighter_optimisation_page'
     );
 
-    // Register: Enable image resize toggle
+    // Enable image resize toggle
     add_settings_field('enable_image_resize', 'Enable Image Resizing?', function () {
         $enabled = Brighter_Image_Settings_Cache::get('enable_image_resize', 'yes');
         echo '<label><input type="checkbox" name="enable_image_resize" value="yes" ' . checked('yes', $enabled, false) . '> Resize uploaded images</label>';
         echo '<p class="description">If unchecked, original images will be stored without resizing.</p>';
-    }, 'brighter_optimisation_page', 'image_optimisation_section');
+    }, 'brighter_optimisation_page', 'image_settings_section');
 
-    // Register: Max upload dimension
+    // Max upload dimension
     add_settings_field('image_max_dimension', 'Max Upload Dimension (px)', function () {
         $value = Brighter_Image_Settings_Cache::get('image_max_dimension', 2480);
         echo '<input type="number" name="image_max_dimension" value="' . esc_attr($value) . '" class="small-text" min="500" step="10">';
         echo '<p class="description">Maximum dimension for uploaded images (longest side).</p>';
-    }, 'brighter_optimisation_page', 'image_optimisation_section');
+    }, 'brighter_optimisation_page', 'image_settings_section');
+
+    // Disable big image threshold
+    add_settings_field('disable_big_image_threshold', 'Disable Big Image Size Threshold', function () {
+        $disabled = Brighter_Image_Settings_Cache::get('disable_big_image_threshold', 0);
+        echo '<label><input type="checkbox" name="disable_big_image_threshold" value="1" ' . checked(1, $disabled, false) . '> Disable WordPress 2560px threshold</label>';
+        echo '<p class="description">Recommended for media-rich sites or when needing image metadata on larger uploads. WordPress by default scales down images larger than 2560px.</p>';
+    }, 'brighter_optimisation_page', 'image_settings_section');
+
+    // =========================================
+    // Section: Manage Image Thumbnails & Sizes
+    // =========================================
+    add_settings_section(
+        'image_thumbnails_section',
+        'Manage Image Thumbnails & Sizes',
+        function() {
+            echo '<p>Enable or disable specific thumbnail sizes generated when images are uploaded.</p>';
+        },
+        'brighter_optimisation_page'
+    );
 
     // Register: Checkboxes for each image size
     $size_config = brighter_get_image_sizes_config();
@@ -133,7 +157,7 @@ add_action('admin_init', function () {
         add_settings_field("enable_size_$size", "Enable $label", function () use ($size) {
             $enabled = Brighter_Image_Settings_Cache::get("enable_size_$size", 1);
             echo '<input type="checkbox" name="enable_size_' . esc_attr($size) . '" value="1" ' . checked(1, $enabled, false) . '> ' . ucfirst($size);
-        }, 'brighter_optimisation_page', 'image_optimisation_section');
+        }, 'brighter_optimisation_page', 'image_thumbnails_section');
     }
 
     // Register: JPEG quality field
@@ -141,7 +165,7 @@ add_action('admin_init', function () {
         $quality = Brighter_Image_Settings_Cache::get('jpeg_quality', 75);
         echo '<input type="number" min="30" max="100" step="1" name="jpeg_quality" value="' . esc_attr($quality) . '" />';
         echo '<p class="description">Lower = smaller files, higher = better quality. Recommended: 75-85</p>';
-    }, 'brighter_optimisation_page', 'image_optimisation_section');
+    }, 'brighter_optimisation_page', 'image_thumbnails_section');
 
     // Section: Registered sizes overview (cached for performance)
     add_settings_section('registered_sizes_section', 'Registered Image Sizes', function () {
@@ -180,7 +204,7 @@ add_action('admin_init', function () {
  */
 add_action('update_option', function($option_name) {
     if (strpos($option_name, 'enable_size_') === 0 || 
-        in_array($option_name, ['enable_image_resize', 'image_max_dimension', 'jpeg_quality'])) {
+        in_array($option_name, ['enable_image_resize', 'image_max_dimension', 'jpeg_quality', 'disable_big_image_threshold'])) {
         Brighter_Image_Settings_Cache::clear();
         delete_transient('brighter_registered_sizes_html');
     }

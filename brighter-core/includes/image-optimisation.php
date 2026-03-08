@@ -6,9 +6,10 @@
  * Purpose: Core logic for resizing uploads, managing registered sizes,
  * thumbnail control, comment disable on attachments, and LiteSpeed fade-in CSS. and OG image injection.
  *  
- * Version: 4.2.0
+ * Version: 4.3.0
  *
  * Changelog:
+ * 4.3.0 - Added option to disable WordPress big_image_size_threshold (2560px scaling)
  * 4.2.0 - Removed og:image:secure_url (not needed for HTTPS sites), added Twitter card output after image
  * 4.1.0 - Added direct OG image meta tag injection (bypasses SEOPress filter issues)
  * 4.0.0 - Initial release
@@ -19,6 +20,7 @@
  * - Enforce thumbnail generation preferences
  * - Disable comments on attachment pages
  * - Add lazyload fade-in CSS for LiteSpeed
+ * - Control WordPress big image threshold
  *
  * Notes:
  * - Settings for these features are managed in brighter-support-image-settings.php
@@ -28,6 +30,20 @@
 
 
 if (!defined('ABSPATH')) exit;
+
+// ==========================================
+// ✅ Disable big image size threshold (2560px)
+// ==========================================
+add_filter('big_image_size_threshold', function($threshold) {
+    // Check if admin has disabled the threshold
+    $disabled = get_option('disable_big_image_threshold', 0);
+    
+    if ($disabled) {
+        return false; // Disable WordPress 2560px scaling
+    }
+    
+    return $threshold; // Keep default WordPress behavior (2560px)
+});
 
 // ==========================================
 // ✅ Resize images on upload

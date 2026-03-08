@@ -32,7 +32,10 @@ class Brighter_Ntfy_Cron_Monitor {
         // 2. Monitor specific critical cron jobs
         // 3. Use external cron monitoring service
         
-        error_log('[ntfy Cron Monitor] Initialized - TODO: Implement monitoring logic');
+        // Debug logging (can be disabled via wp-config.php: define('BRIGHTER_DEBUG_NTFY', false);)
+        if (!defined('BRIGHTER_DEBUG_NTFY') || BRIGHTER_DEBUG_NTFY !== false) {
+            error_log('[ntfy Cron Monitor] Initialized - TODO: Implement monitoring logic');
+        }
     }
     
     /**

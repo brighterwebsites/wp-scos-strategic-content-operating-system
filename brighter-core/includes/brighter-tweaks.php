@@ -89,6 +89,12 @@ class Brighter_Tweaks {
             'default' => 0
         ]);
         
+        // OG image size option for preloads
+        register_setting('brighter_tweaks', 'brighter_preload_use_og_image', [
+            'type' => 'integer',
+            'default' => 1 // Default to ON
+        ]);
+        
         // Google Fonts preload
         register_setting('brighter_tweaks', self::OPT_GOOGLE_FONTS, [
             'type' => 'string',
@@ -135,6 +141,18 @@ class Brighter_Tweaks {
             echo '</label>';
             
             echo '<p class="description">*Replace will take preference if both options selected.</p>';
+        }, 'brighter_tweaks', 'preload_on_singles');
+        
+        // Option to use OG image for preload
+        add_settings_field('brighter_preload_use_og_image', 'Preload Image Size', function () {
+            $use_og = get_option('brighter_preload_use_og_image', 1); // Default to ON
+            
+            echo '<label style="display:block;margin-bottom:8px">';
+            echo '<input type="checkbox" name="brighter_preload_use_og_image" value="1" ' . checked(1, $use_og, false) . '> ';
+            echo 'Preload Featured OG 1200×630 image type for all selected singles';
+            echo '</label>';
+            
+            echo '<p class="description">If checked: Uses og-image (1200×630) size for preload. If unchecked: Uses original image size. <br><strong>Recommended:</strong> Keep enabled to match OG meta tags and improve consistency.</p>';
         }, 'brighter_tweaks', 'preload_on_singles');
         
         // Google Fonts Preload section
@@ -235,6 +253,7 @@ class Brighter_Tweaks {
         // Save WebP options
         update_option('brighter_preload_webp_append', isset($_POST['brighter_preload_webp_append']) ? 1 : 0);
         update_option('brighter_preload_webp_replace', isset($_POST['brighter_preload_webp_replace']) ? 1 : 0);
+        update_option('brighter_preload_use_og_image', isset($_POST['brighter_preload_use_og_image']) ? 1 : 0);
         
         // Save Google Fonts Preload
         if (isset($_POST[self::OPT_GOOGLE_FONTS])) {
@@ -538,12 +557,21 @@ class Brighter_Tweaks {
         
         $id = get_post_thumbnail_id();
         
-        // Try to use 'og-image' size first (1200x630), fallback to 'full'
-        $size = 'og-image';
-        $src = wp_get_attachment_image_url($id, $size);
+        // Check if we should use og-image or original
+        $use_og_image = get_option('brighter_preload_use_og_image', 1);
         
-        // If og-image doesn't exist, use full
-        if (!$src) {
+        if ($use_og_image) {
+            // Try to use 'og-image' size first (1200x630), fallback to 'full'
+            $size = 'og-image';
+            $src = wp_get_attachment_image_url($id, $size);
+            
+            // If og-image doesn't exist, use full
+            if (!$src) {
+                $size = 'full';
+                $src = wp_get_attachment_image_url($id, $size);
+            }
+        } else {
+            // Use original/full size
             $size = 'full';
             $src = wp_get_attachment_image_url($id, $size);
         }

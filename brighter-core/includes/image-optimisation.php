@@ -303,6 +303,7 @@ function brighter_inject_og_image_tags() {
         if ($alt_text) {
             echo '<meta property="og:image:alt" content="' . esc_attr($alt_text) . '">' . "\n";
         }
+        
         echo "\n<!-- Twitter Card (after image) -->\n";
         echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
     }

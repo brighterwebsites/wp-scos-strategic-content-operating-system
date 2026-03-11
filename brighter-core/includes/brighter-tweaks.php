@@ -78,6 +78,17 @@ class Brighter_Tweaks {
             'default' => []
         ]);
         
+        // WebP conversion options for preloads
+        register_setting('brighter_tweaks', 'brighter_preload_webp_append', [
+            'type' => 'integer',
+            'default' => 0
+        ]);
+        
+        register_setting('brighter_tweaks', 'brighter_preload_webp_replace', [
+            'type' => 'integer',
+            'default' => 0
+        ]);
+        
         // Google Fonts preload
         register_setting('brighter_tweaks', self::OPT_GOOGLE_FONTS, [
             'type' => 'string',
@@ -90,7 +101,7 @@ class Brighter_Tweaks {
             'preload_on_singles',
             'Preload Featured Images on Singles',
             function () { 
-                echo '<p>' . esc_html__('Select the post types where featured images should be preloaded on single pages.', 'brighterwebsites') . '</p>'; 
+                echo '<p>' . esc_html__('Select the post types to Preload the OG 1200×630 Image version of Featured Images on Singles. *Requires OG image to be selected in Image Optimization.', 'brighterwebsites') . '</p>'; 
             },
             'brighter_tweaks'
         );
@@ -106,6 +117,24 @@ class Brighter_Tweaks {
                 echo esc_html($obj->labels->singular_name . " ($type)");
                 echo '</label>';
             }
+        }, 'brighter_tweaks', 'preload_on_singles');
+        
+        // WebP options for featured image preloads
+        add_settings_field('brighter_preload_webp_options', 'WebP Auto-Conversion', function () {
+            $append = get_option('brighter_preload_webp_append', 0);
+            $replace = get_option('brighter_preload_webp_replace', 0);
+            
+            echo '<label style="display:block;margin-bottom:8px">';
+            echo '<input type="checkbox" name="brighter_preload_webp_append" value="1" ' . checked(1, $append, false) . '> ';
+            echo 'Append .webp for auto preload (LiteSpeed e.g., image.jpg.webp)';
+            echo '</label>';
+            
+            echo '<label style="display:block;margin-bottom:4px">';
+            echo '<input type="checkbox" name="brighter_preload_webp_replace" value="1" ' . checked(1, $replace, false) . '> ';
+            echo 'Replace with .webp for auto preloads (ShortPixel e.g., image.webp)';
+            echo '</label>';
+            
+            echo '<p class="description">*Replace will take preference if both options selected.</p>';
         }, 'brighter_tweaks', 'preload_on_singles');
         
         // Google Fonts Preload section
@@ -202,6 +231,10 @@ class Brighter_Tweaks {
         } else {
             update_option(self::OPT_POST_TYPES, []);
         }
+        
+        // Save WebP options
+        update_option('brighter_preload_webp_append', isset($_POST['brighter_preload_webp_append']) ? 1 : 0);
+        update_option('brighter_preload_webp_replace', isset($_POST['brighter_preload_webp_replace']) ? 1 : 0);
         
         // Save Google Fonts Preload
         if (isset($_POST[self::OPT_GOOGLE_FONTS])) {
@@ -443,8 +476,7 @@ class Brighter_Tweaks {
         // Output Google Fonts preloads (site-wide) - already sanitized on save
         $google_fonts = get_option(self::OPT_GOOGLE_FONTS, '');
         if (!empty($google_fonts)) {
-            echo "\n<!-- Brighter Tweaks: Google Fonts Preloads -->\n";
-            echo $google_fonts . "\n";
+           echo $google_fonts . "\n";
         }
         
         // Work on any singular page/post
@@ -474,7 +506,6 @@ class Brighter_Tweaks {
         if (empty($urls)) return;
         
         // Output preloads
-        echo "\n<!-- Brighter Tweaks: Per-Page Preloads -->\n";
         foreach ($urls as $u) {
             $u = self::normalise_url($u);
             if (empty($u)) continue;
@@ -490,7 +521,6 @@ class Brighter_Tweaks {
                 !empty($attr['crossorigin']) ? ' crossorigin' : ''
             );
         }
-        echo "<!-- /Brighter Tweaks: Preloads -->\n";
     }
 
     /**
@@ -518,8 +548,27 @@ class Brighter_Tweaks {
             $src = wp_get_attachment_image_url($id, $size);
         }
         
+        // Apply WebP conversion if enabled
+        $webp_replace = get_option('brighter_preload_webp_replace', 0);
+        $webp_append = get_option('brighter_preload_webp_append', 0);
+        
+        if ($webp_replace) {
+            // ShortPixel style: replace extension (image.jpg → image.webp)
+            $src = preg_replace('/\.(jpe?g|png)$/i', '.webp', $src);
+        } elseif ($webp_append) {
+            // LiteSpeed style: append .webp (image.jpg → image.jpg.webp)
+            if (preg_match('/\.(jpe?g|png)$/i', $src)) {
+                $src .= '.webp';
+            }
+        }
+        
         $srcset = wp_get_attachment_image_srcset($id, $size);
         $mime = get_post_mime_type($id) ?: 'image/*';
+        
+        // Update mime type if using WebP
+        if ($webp_replace || $webp_append) {
+            $mime = 'image/webp';
+        }
         
         if ($src) {
             $src = self::normalise_url($src);

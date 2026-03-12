@@ -243,7 +243,11 @@ function bw_render_schema_graph() {
     // ============================================
     
     $current_url = home_url($_SERVER['REQUEST_URI']);
-    $post_id = is_singular() ? get_the_ID() : 0;
+    // Use get_queried_object_id() for reliable singular ID in wp_head context
+    $post_id = is_singular() ? get_queried_object_id() : 0;
+    if ($post_id && !get_post_status($post_id)) {
+        $post_id = 0;
+    }
     
     // WebPage - always add
     $webpage = [
@@ -645,16 +649,16 @@ function bw_render_schema_graph() {
         }
     }
     
-    // Product — on single post only when post ID is in the list
+    // Product — on single post only when post ID is in the list (post type "post", not page)
     if (is_singular('post') && $post_id) {
-        $product_post_ids = get_option('bw_product_post_ids', '');
+        $product_post_ids = trim((string) get_option('bw_product_post_ids', ''));
         $product_schema = get_option('bw_product_schema', '');
-        if (!empty($product_schema) && !empty($product_post_ids)) {
-            $ids = array_filter(array_map('absint', preg_split('/[\s,]+/', $product_post_ids, -1, PREG_SPLIT_NO_EMPTY)));
+        if ($product_schema !== '' && $product_post_ids !== '') {
+            $ids = array_values(array_filter(array_map('absint', preg_split('/[\s,]+/', $product_post_ids, -1, PREG_SPLIT_NO_EMPTY))));
             if (in_array((int) $post_id, $ids, true)) {
                 $decoded = json_decode($product_schema, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    if (isset($decoded[0])) {
+                    if (isset($decoded[0]) && is_array($decoded[0])) {
                         $graph = array_merge($graph, $decoded);
                     } else {
                         $graph[] = $decoded;
@@ -664,16 +668,16 @@ function bw_render_schema_graph() {
         }
     }
     
-    // Service — on single post only when post ID is in the list
+    // Service — on single post only when post ID is in the list (post type "post", not page)
     if (is_singular('post') && $post_id) {
-        $service_post_ids = get_option('bw_service_post_ids', '');
+        $service_post_ids = trim((string) get_option('bw_service_post_ids', ''));
         $service_schema = get_option('bw_service_schema', '');
-        if (!empty($service_schema) && !empty($service_post_ids)) {
-            $ids = array_filter(array_map('absint', preg_split('/[\s,]+/', $service_post_ids, -1, PREG_SPLIT_NO_EMPTY)));
+        if ($service_schema !== '' && $service_post_ids !== '') {
+            $ids = array_values(array_filter(array_map('absint', preg_split('/[\s,]+/', $service_post_ids, -1, PREG_SPLIT_NO_EMPTY))));
             if (in_array((int) $post_id, $ids, true)) {
                 $decoded = json_decode($service_schema, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    if (isset($decoded[0])) {
+                    if (isset($decoded[0]) && is_array($decoded[0])) {
                         $graph = array_merge($graph, $decoded);
                     } else {
                         $graph[] = $decoded;

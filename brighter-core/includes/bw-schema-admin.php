@@ -22,14 +22,8 @@ add_action('admin_init', function() {
     foreach ($schema_options as $option => $label) {
         register_setting('bw_schema_settings', $option, [
             'type' => 'string',
-            'sanitize_callback' => function($value) use ($option, $label) {
-                if (empty($value)) return '';
-                $decoded = json_decode($value, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    add_settings_error($option, 'invalid_json', sprintf('Invalid JSON in %s. Please check your schema.', $label));
-                    return get_option($option, '');
-                }
-                return $value;
+            'sanitize_callback' => function($value) {
+                return is_string($value) ? $value : '';
             },
             'default' => ''
         ]);
@@ -87,24 +81,23 @@ function bw_schema_render_page() {
     $current_tab = isset($_GET['tab']) && array_key_exists($_GET['tab'], $tabs) ? $_GET['tab'] : 'local-business';
     $base_url = add_query_arg('page', 'brighter-schema', admin_url('admin.php'));
 
-    // Handle form submission (all options in one form)
+    // Handle form submission (all options in one form) — always save raw value so user never loses input
     if (isset($_POST['bw_schema_settings_nonce']) && wp_verify_nonce($_POST['bw_schema_settings_nonce'], 'bw_schema_settings')) {
-        $errors = [];
+        $invalid = [];
         $saved = [];
 
         foreach (['bw_local_business_schema', 'bw_success_stories_schema', 'bw_product_schema', 'bw_service_schema'] as $key) {
             if (!isset($_POST[$key])) continue;
             $schema = wp_unslash($_POST[$key]);
             $schema = trim($schema);
-            if (!empty($schema)) {
-                $decoded = json_decode($schema, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    $errors[] = $key . ': Invalid JSON.';
-                    continue;
-                }
-            }
             update_option($key, $schema);
             $saved[] = $key;
+            if (!empty($schema)) {
+                $decoded = json_decode($schema, true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    $invalid[] = $key;
+                }
+            }
         }
         if (isset($_POST['bw_product_post_ids'])) {
             update_option('bw_product_post_ids', bw_schema_sanitize_post_ids(wp_unslash($_POST['bw_product_post_ids'])));
@@ -115,11 +108,18 @@ function bw_schema_render_page() {
             $saved[] = 'bw_service_post_ids';
         }
 
-        if (!empty($errors)) {
-            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html(implode(' ', $errors)) . '</p></div>';
-        }
         if (!empty($saved)) {
-            echo '<div class="notice notice-success is-dismissible"><p>Schema settings saved.</p></div>';
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Schema settings saved. You can edit until JSON is valid; invalid blocks are stored but not output on the site.', 'brighterwebsites') . '</p></div>';
+        }
+        if (!empty($invalid)) {
+            $labels = [
+                'bw_local_business_schema'  => __('Local Business', 'brighterwebsites'),
+                'bw_success_stories_schema' => __('Success Stories', 'brighterwebsites'),
+                'bw_product_schema'         => __('Product', 'brighterwebsites'),
+                'bw_service_schema'         => __('Service', 'brighterwebsites'),
+            ];
+            $list = array_map(function($k) use ($labels) { return $labels[$k] ?? $k; }, $invalid);
+            echo '<div class="notice notice-warning is-dismissible"><p><strong>' . esc_html__('Invalid JSON (not output until fixed):', 'brighterwebsites') . '</strong> ' . esc_html(implode(', ', $list)) . '</p></div>';
         }
     }
 
@@ -160,8 +160,9 @@ function bw_schema_render_page() {
                         <tr>
                             <th scope="row"><label for="bw_local_business_schema"><?php esc_html_e('Local Business Schema (JSON-LD)', 'brighterwebsites'); ?></label></th>
                             <td>
-                                <textarea id="bw_local_business_schema" name="bw_local_business_schema" rows="22" class="large-text code" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
+                                <textarea id="bw_local_business_schema" name="bw_local_business_schema" rows="22" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "LocalBusiness", "@id": "<?php echo esc_js(home_url('/#organization')); ?>", "name": "Your Business", "url": "<?php echo esc_js(home_url('/')); ?>"}'><?php echo esc_textarea($local_business_schema); ?></textarea>
+                                <div id="bw_local_business_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
                             </td>
                         </tr>
                     </table>
@@ -177,9 +178,10 @@ function bw_schema_render_page() {
                         <tr>
                             <th scope="row"><label for="bw_success_stories_schema"><?php esc_html_e('Success Stories Schema (JSON-LD)', 'brighterwebsites'); ?></label></th>
                             <td>
-                                <textarea id="bw_success_stories_schema" name="bw_success_stories_schema" rows="22" class="large-text code" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
+                                <textarea id="bw_success_stories_schema" name="bw_success_stories_schema" rows="22" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "CreativeWork", "name": "Example Success Story"}'><?php echo esc_textarea($success_stories_schema); ?></textarea>
-                                <p class="description"><?php esc_html_e('Single block or array of blocks. Validated on save.', 'brighterwebsites'); ?></p>
+                                <div id="bw_success_stories_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
+                                <p class="description"><?php esc_html_e('Single block or array of blocks. Edit until the box shows valid JSON; invalid blocks are saved but not output.', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                     </table>
@@ -203,8 +205,9 @@ function bw_schema_render_page() {
                         <tr>
                             <th scope="row"><label for="bw_product_schema"><?php esc_html_e('Product Schema (JSON-LD)', 'brighterwebsites'); ?></label></th>
                             <td>
-                                <textarea id="bw_product_schema" name="bw_product_schema" rows="18" class="large-text code" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
+                                <textarea id="bw_product_schema" name="bw_product_schema" rows="18" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "Product", "name": "Product Name"}'><?php echo esc_textarea($product_schema); ?></textarea>
+                                <div id="bw_product_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
                             </td>
                         </tr>
                     </table>
@@ -228,8 +231,9 @@ function bw_schema_render_page() {
                         <tr>
                             <th scope="row"><label for="bw_service_schema"><?php esc_html_e('Service Schema (JSON-LD)', 'brighterwebsites'); ?></label></th>
                             <td>
-                                <textarea id="bw_service_schema" name="bw_service_schema" rows="18" class="large-text code" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
+                                <textarea id="bw_service_schema" name="bw_service_schema" rows="18" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "Service", "name": "Service Name"}'><?php echo esc_textarea($service_schema); ?></textarea>
+                                <div id="bw_service_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
                             </td>
                         </tr>
                     </table>
@@ -248,5 +252,48 @@ function bw_schema_render_page() {
             <li><a href="https://validator.schema.org/" target="_blank" rel="noopener">Schema.org Validator</a></li>
         </ul>
     </div>
+    <style>
+        .bw-schema-validation.valid { background: #d4edda; color: #155724; display: block; }
+        .bw-schema-validation.invalid { background: #f8d7da; color: #721c24; display: block; }
+    </style>
+    <script>
+    (function() {
+        document.querySelectorAll('.bw-schema-json').forEach(function(textarea) {
+            var id = textarea.id;
+            var validation = document.getElementById(id + '-validation');
+            if (!validation) return;
+            function validate() {
+                var value = textarea.value.trim();
+                validation.className = 'bw-schema-validation';
+                validation.textContent = '';
+                validation.style.display = 'none';
+                if (!value) return;
+                try {
+                    var parsed = JSON.parse(value);
+                    validation.style.display = 'block';
+                    validation.className = 'bw-schema-validation valid';
+                    if (Array.isArray(parsed)) {
+                        validation.textContent = '✓ Valid JSON – ' + parsed.length + ' block(s)';
+                    } else if (parsed && parsed['@type']) {
+                        validation.textContent = '✓ Valid JSON – @type: ' + parsed['@type'];
+                    } else {
+                        validation.textContent = '✓ Valid JSON';
+                    }
+                } catch (e) {
+                    validation.style.display = 'block';
+                    validation.className = 'bw-schema-validation invalid';
+                    validation.textContent = '✗ Invalid JSON: ' + e.message;
+                }
+            }
+            textarea.addEventListener('blur', validate);
+            var timeout;
+            textarea.addEventListener('input', function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(validate, 400);
+            });
+            if (textarea.value.trim()) validate();
+        });
+    })();
+    </script>
     <?php
 }

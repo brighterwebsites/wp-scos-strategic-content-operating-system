@@ -189,17 +189,17 @@ function bw_schema_render_page() {
 
                 <?php if ($current_tab === 'product') : ?>
                     <h2><?php esc_html_e('Product Schema', 'brighterwebsites'); ?></h2>
-                    <p><?php esc_html_e('This template is merged into the schema graph on Post single pages whose ID is in the list below.', 'brighterwebsites'); ?></p>
+                    <p><?php esc_html_e('This template is merged into the schema graph on single post or page when its ID is in the list below.', 'brighterwebsites'); ?></p>
                     <div class="notice notice-info inline">
-                        <p><strong><?php esc_html_e('Where it appears:', 'brighterwebsites'); ?></strong> <?php esc_html_e('Single post pages only, when the post ID is in the "Post IDs" list.', 'brighterwebsites'); ?></p>
+                        <p><strong><?php esc_html_e('Where it appears:', 'brighterwebsites'); ?></strong> <?php esc_html_e('Single post or page only, when its ID is in the "Post/Page IDs" list.', 'brighterwebsites'); ?></p>
                     </div>
                     <table class="form-table">
                         <tr>
-                            <th scope="row"><label for="bw_product_post_ids"><?php esc_html_e('Post IDs', 'brighterwebsites'); ?></label></th>
+                            <th scope="row"><label for="bw_product_post_ids"><?php esc_html_e('Post/Page IDs', 'brighterwebsites'); ?></label></th>
                             <td>
                                 <input type="text" id="bw_product_post_ids" name="bw_product_post_ids" value="<?php echo esc_attr($product_post_ids); ?>"
                                        class="regular-text" placeholder="123, 456, 789"/>
-                                <p class="description"><?php esc_html_e('Comma-separated Post IDs that should output Product schema.', 'brighterwebsites'); ?></p>
+                                <p class="description"><?php esc_html_e('Comma-separated post or page IDs that should output Product schema.', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                         <tr>
@@ -215,17 +215,17 @@ function bw_schema_render_page() {
 
                 <?php if ($current_tab === 'service') : ?>
                     <h2><?php esc_html_e('Service Schema', 'brighterwebsites'); ?></h2>
-                    <p><?php esc_html_e('This template is merged into the schema graph on Post single pages whose ID is in the list below.', 'brighterwebsites'); ?></p>
+                    <p><?php esc_html_e('This template is merged into the schema graph on single post or page when its ID is in the list below.', 'brighterwebsites'); ?></p>
                     <div class="notice notice-info inline">
-                        <p><strong><?php esc_html_e('Where it appears:', 'brighterwebsites'); ?></strong> <?php esc_html_e('Single post pages only, when the post ID is in the "Post IDs" list.', 'brighterwebsites'); ?></p>
+                        <p><strong><?php esc_html_e('Where it appears:', 'brighterwebsites'); ?></strong> <?php esc_html_e('Single post or page only, when its ID is in the "Post/Page IDs" list.', 'brighterwebsites'); ?></p>
                     </div>
                     <table class="form-table">
                         <tr>
-                            <th scope="row"><label for="bw_service_post_ids"><?php esc_html_e('Post IDs', 'brighterwebsites'); ?></label></th>
+                            <th scope="row"><label for="bw_service_post_ids"><?php esc_html_e('Post/Page IDs', 'brighterwebsites'); ?></label></th>
                             <td>
                                 <input type="text" id="bw_service_post_ids" name="bw_service_post_ids" value="<?php echo esc_attr($service_post_ids); ?>"
                                        class="regular-text" placeholder="123, 456, 789"/>
-                                <p class="description"><?php esc_html_e('Comma-separated Post IDs that should output Service schema.', 'brighterwebsites'); ?></p>
+                                <p class="description"><?php esc_html_e('Comma-separated post or page IDs that should output Service schema.', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                         <tr>

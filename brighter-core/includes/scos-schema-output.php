@@ -167,6 +167,38 @@ function bw_schema_resolve_variable($name, $post_id) {
         return $map[$name];
     }
 
+    // Featured image: URL string or ImageObject for schema
+    if ($name === 'post_thumbnail_url') {
+        $thumb_id = (int) get_post_thumbnail_id($post_id);
+        if (!$thumb_id) {
+            return '';
+        }
+        $url = wp_get_attachment_image_url($thumb_id, 'full');
+        return $url ? $url : '';
+    }
+    if ($name === 'post_thumbnail') {
+        $thumb_id = (int) get_post_thumbnail_id($post_id);
+        if (!$thumb_id) {
+            return '';
+        }
+        $url = wp_get_attachment_image_url($thumb_id, 'full');
+        if (!$url) {
+            return '';
+        }
+        $meta = wp_get_attachment_metadata($thumb_id, true);
+        $w = isset($meta['width']) ? (int) $meta['width'] : 0;
+        $h = isset($meta['height']) ? (int) $meta['height'] : 0;
+        $img = [
+            '@type' => 'ImageObject',
+            'url'   => $url,
+        ];
+        if ($w && $h) {
+            $img['width'] = $w;
+            $img['height'] = $h;
+        }
+        return $img;
+    }
+
     // Custom meta: %%_cmeta_meta_key%% → get_post_meta($post_id, 'meta_key', true)
     if (strpos($name, '_cmeta_') === 0) {
         $meta_key = substr($name, 7);

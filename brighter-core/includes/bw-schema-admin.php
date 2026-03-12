@@ -163,6 +163,7 @@ function bw_schema_render_page() {
                                 <textarea id="bw_local_business_schema" name="bw_local_business_schema" rows="22" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "LocalBusiness", "@id": "<?php echo esc_js(home_url('/#organization')); ?>", "name": "Your Business", "url": "<?php echo esc_js(home_url('/')); ?>"}'><?php echo esc_textarea($local_business_schema); ?></textarea>
                                 <div id="bw_local_business_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
+                                <p class="description"><?php esc_html_e('Single block: { }. Multiple blocks: [ { }, { } ].', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                     </table>
@@ -181,7 +182,7 @@ function bw_schema_render_page() {
                                 <textarea id="bw_success_stories_schema" name="bw_success_stories_schema" rows="22" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "CreativeWork", "name": "Example Success Story"}'><?php echo esc_textarea($success_stories_schema); ?></textarea>
                                 <div id="bw_success_stories_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
-                                <p class="description"><?php esc_html_e('Single block or array of blocks. Edit until the box shows valid JSON; invalid blocks are saved but not output.', 'brighterwebsites'); ?></p>
+                                <p class="description"><?php esc_html_e('Single block: one object { }. Multiple blocks: one array [ { }, { } ]. Edit until the box shows valid JSON; invalid blocks are saved but not output.', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                     </table>
@@ -208,6 +209,7 @@ function bw_schema_render_page() {
                                 <textarea id="bw_product_schema" name="bw_product_schema" rows="18" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "Product", "name": "Product Name"}'><?php echo esc_textarea($product_schema); ?></textarea>
                                 <div id="bw_product_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
+                                <p class="description"><?php esc_html_e('Single block: { }. Multiple blocks: [ { }, { } ].', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                     </table>
@@ -234,6 +236,7 @@ function bw_schema_render_page() {
                                 <textarea id="bw_service_schema" name="bw_service_schema" rows="18" class="large-text code bw-schema-json" style="font-family: monospace; font-size: 12px; width: 100%; max-width: 800px;"
                                           placeholder='{"@type": "Service", "name": "Service Name"}'><?php echo esc_textarea($service_schema); ?></textarea>
                                 <div id="bw_service_schema-validation" class="bw-schema-validation" aria-live="polite" style="margin-top:6px;padding:8px 12px;border-radius:4px;display:none;"></div>
+                                <p class="description"><?php esc_html_e('Single block: { }. Multiple blocks: [ { }, { } ].', 'brighterwebsites'); ?></p>
                             </td>
                         </tr>
                     </table>
@@ -256,11 +259,14 @@ function bw_schema_render_page() {
                 <li><code>%%post_date%%</code>, <code>%%post_modified%%</code> <?php esc_html_e('– Date (ISO 8601)', 'brighterwebsites'); ?></li>
                 <li><code>%%post_url%%</code>, <code>%%post_id%%</code>, <code>%%post_name%%</code></li>
                 <li><code>%%post_author%%</code> <?php esc_html_e('– Author display name', 'brighterwebsites'); ?></li>
+                <li><code>%%post_thumbnail_url%%</code> <?php esc_html_e('– Featured image URL', 'brighterwebsites'); ?></li>
+                <li><code>%%post_thumbnail%%</code> <?php esc_html_e('– Featured image as ImageObject (use as whole value for "image")', 'brighterwebsites'); ?></li>
                 <li><code>%%site_name%%</code>, <code>%%site_url%%</code> <?php esc_html_e('– Site info (any context)', 'brighterwebsites'); ?></li>
                 <li><code>%%_cmeta_meta_key%%</code> <?php esc_html_e('– Custom meta (replace meta_key)', 'brighterwebsites'); ?></li>
                 <li><code>%%_acf_field_name%%</code> <?php esc_html_e('– ACF field (replace field_name)', 'brighterwebsites'); ?></li>
             </ul>
             <p class="description"><?php esc_html_e('Example: "name": "%%post_title%%". Per-post schema (Success Stories, Product, Service, Custom schema) use the current post; Local Business uses site_name/site_url only.', 'brighterwebsites'); ?></p>
+            <p class="description"><strong><?php esc_html_e('Multiple blocks:', 'brighterwebsites'); ?></strong> <?php esc_html_e('Use a single array with comma-separated objects: [ { "@type": "CreativeWork", ... }, { "@type": "Product", ... } ]. One object without brackets is valid; two objects need wrapping [ ].', 'brighterwebsites'); ?></p>
         </details>
         <h3><?php esc_html_e('Schema resources', 'brighterwebsites'); ?></h3>
         <ul style="line-height: 1.8;">
@@ -298,7 +304,11 @@ function bw_schema_render_page() {
                 } catch (e) {
                     validation.style.display = 'block';
                     validation.className = 'bw-schema-validation invalid';
-                    validation.textContent = '✗ Invalid JSON: ' + e.message;
+                    var msg = '✗ Invalid JSON: ' + e.message;
+                    if (/Unexpected token|Expected|end of JSON/.test(e.message) && /\}\s*,?\s*\{/.test(value)) {
+                        msg += ' — For multiple blocks wrap in square brackets: [ { ... }, { ... } ]';
+                    }
+                    validation.textContent = msg;
                 }
             }
             textarea.addEventListener('blur', validate);

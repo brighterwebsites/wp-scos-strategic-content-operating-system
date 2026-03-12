@@ -611,7 +611,7 @@ function bw_render_schema_graph() {
     // PROJECTS - CreativeWork
     // ============================================
     
-    if (is_singular('project')) {
+    if (is_singular('projects')) {
         $graph[] = [
             "@type" => "CreativeWork",
             "@id" => get_permalink() . '#creative-work',
@@ -624,6 +624,63 @@ function bw_render_schema_graph() {
             "dateCreated" => get_the_date('c'),
             "image" => has_post_thumbnail() ? get_the_post_thumbnail_url($post_id, 'large') : null
         ];
+    }
+    
+    // ============================================
+    // ADMIN TEMPLATES: Success Stories | Product | Service
+    // ============================================
+    
+    // Success Stories — on single project (CPT) only
+    if (is_singular('projects')) {
+        $success_stories_schema = get_option('bw_success_stories_schema', '');
+        if (!empty($success_stories_schema)) {
+            $decoded = json_decode($success_stories_schema, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                if (isset($decoded[0])) {
+                    $graph = array_merge($graph, $decoded);
+                } else {
+                    $graph[] = $decoded;
+                }
+            }
+        }
+    }
+    
+    // Product — on single post only when post ID is in the list
+    if (is_singular('post') && $post_id) {
+        $product_post_ids = get_option('bw_product_post_ids', '');
+        $product_schema = get_option('bw_product_schema', '');
+        if (!empty($product_schema) && !empty($product_post_ids)) {
+            $ids = array_filter(array_map('absint', preg_split('/[\s,]+/', $product_post_ids, -1, PREG_SPLIT_NO_EMPTY)));
+            if (in_array((int) $post_id, $ids, true)) {
+                $decoded = json_decode($product_schema, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    if (isset($decoded[0])) {
+                        $graph = array_merge($graph, $decoded);
+                    } else {
+                        $graph[] = $decoded;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Service — on single post only when post ID is in the list
+    if (is_singular('post') && $post_id) {
+        $service_post_ids = get_option('bw_service_post_ids', '');
+        $service_schema = get_option('bw_service_schema', '');
+        if (!empty($service_schema) && !empty($service_post_ids)) {
+            $ids = array_filter(array_map('absint', preg_split('/[\s,]+/', $service_post_ids, -1, PREG_SPLIT_NO_EMPTY)));
+            if (in_array((int) $post_id, $ids, true)) {
+                $decoded = json_decode($service_schema, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    if (isset($decoded[0])) {
+                        $graph = array_merge($graph, $decoded);
+                    } else {
+                        $graph[] = $decoded;
+                    }
+                }
+            }
+        }
     }
     
     // ============================================

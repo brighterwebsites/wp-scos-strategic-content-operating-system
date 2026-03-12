@@ -264,8 +264,9 @@ function bw_schema_render_page() {
                 <li><code>%%site_name%%</code>, <code>%%site_url%%</code> <?php esc_html_e('– Site info (any context)', 'brighterwebsites'); ?></li>
                 <li><code>%%_cmeta_meta_key%%</code> <?php esc_html_e('– Custom meta (replace meta_key)', 'brighterwebsites'); ?></li>
                 <li><code>%%_acf_field_name%%</code> <?php esc_html_e('– ACF field (replace field_name)', 'brighterwebsites'); ?></li>
+                <li><code>%%_rating_json%%</code>, <code>%%_acf_offers_json%%</code> <?php esc_html_e('– JSON/repeater: use unquoted as value (e.g. "aggregateRating": %%_rating_json%%). Custom PHP supplies the array via filter bw_schema_resolve_variable.', 'brighterwebsites'); ?></li>
             </ul>
-            <p class="description"><?php esc_html_e('Example: "name": "%%post_title%%". Per-post schema (Success Stories, Product, Service, Custom schema) use the current post; Local Business uses site_name/site_url only.', 'brighterwebsites'); ?></p>
+            <p class="description"><?php esc_html_e('Example: "name": "%%post_title%%". For object/array injection use unquoted: "aggregateRating": %%_rating_json%%. Per-post schema use the current post; Local Business uses site_name/site_url only.', 'brighterwebsites'); ?></p>
             <p class="description"><strong><?php esc_html_e('Multiple blocks:', 'brighterwebsites'); ?></strong> <?php esc_html_e('Use a single array with comma-separated objects: [ { "@type": "CreativeWork", ... }, { "@type": "Product", ... } ]. One object without brackets is valid; two objects need wrapping [ ].', 'brighterwebsites'); ?></p>
         </details>
         <h3><?php esc_html_e('Schema resources', 'brighterwebsites'); ?></h3>
@@ -290,23 +291,36 @@ function bw_schema_render_page() {
                 validation.textContent = '';
                 validation.style.display = 'none';
                 if (!value) return;
+                var parsed = null;
+                var usedPlaceholderNorm = false;
                 try {
-                    var parsed = JSON.parse(value);
+                    parsed = JSON.parse(value);
+                } catch (e1) {
+                    var normalized = value.replace(/:\s*%%[^%]+%%/g, ': null');
+                    if (normalized !== value) {
+                        try {
+                            parsed = JSON.parse(normalized);
+                            usedPlaceholderNorm = true;
+                        } catch (e2) { }
+                    }
+                }
+                if (parsed !== null) {
                     validation.style.display = 'block';
                     validation.className = 'bw-schema-validation valid';
                     if (Array.isArray(parsed)) {
-                        validation.textContent = '✓ Valid JSON – ' + parsed.length + ' block(s)';
+                        validation.textContent = '✓ Valid JSON – ' + parsed.length + ' block(s)' + (usedPlaceholderNorm ? ' (unquoted %%…%% allowed)' : '');
                     } else if (parsed && parsed['@type']) {
-                        validation.textContent = '✓ Valid JSON – @type: ' + parsed['@type'];
+                        validation.textContent = '✓ Valid JSON – @type: ' + parsed['@type'] + (usedPlaceholderNorm ? ' (unquoted %%…%% allowed)' : '');
                     } else {
-                        validation.textContent = '✓ Valid JSON';
+                        validation.textContent = '✓ Valid JSON' + (usedPlaceholderNorm ? ' (unquoted %%…%% allowed)' : '');
                     }
-                } catch (e) {
+                } else {
                     validation.style.display = 'block';
                     validation.className = 'bw-schema-validation invalid';
-                    var msg = '✗ Invalid JSON: ' + e.message;
-                    if (/Unexpected token|Expected|end of JSON/.test(e.message) && /\}\s*,?\s*\{/.test(value)) {
-                        msg += ' — For multiple blocks wrap in square brackets: [ { ... }, { ... } ]';
+                    var msg = '✗ Invalid JSON';
+                    try { JSON.parse(value); } catch (e) { msg = '✗ Invalid JSON: ' + e.message; }
+                    if (/\}\s*,?\s*\{/.test(value)) {
+                        msg += ' — For multiple blocks use [ { ... }, { ... } ]';
                     }
                     validation.textContent = msg;
                 }

@@ -106,6 +106,21 @@ function bw_schema_get_singular_id() {
 }
 
 /**
+ * Normalize schema JSON string so unquoted %%variable%% values become quoted.
+ * Allows "aggregateRating": %%_rating_json%% (invalid JSON) to decode; at output
+ * the quoted "%%_rating_json%%" is then replaced by the resolved array/object.
+ *
+ * @param string $json Raw schema JSON (may contain unquoted %%...%%)
+ * @return string JSON string safe for json_decode
+ */
+function bw_schema_normalize_json_placeholders($json) {
+    if (!is_string($json) || strpos($json, '%%') === false) {
+        return $json;
+    }
+    return preg_replace('/:\s*%%([^%]+)%%/', ': "%%$1%%"', $json);
+}
+
+/**
  * Parse comma/space-separated post IDs from option string.
  *
  * @param string $value Option value
@@ -346,7 +361,7 @@ function bw_render_schema_graph() {
     // LocalBusiness - Loaded from admin options (Site Essentials > SEO > Schema)
     $local_business_schema = get_option('bw_local_business_schema', '');
     if (!empty($local_business_schema)) {
-        $decoded = json_decode($local_business_schema, true);
+        $decoded = json_decode(bw_schema_normalize_json_placeholders($local_business_schema), true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
             $decoded = bw_schema_replace_variables($decoded, 0);
             if (!isset($decoded['@id'])) {
@@ -801,33 +816,14 @@ function bw_render_schema_graph() {
     }
     
     // ============================================
-    // PROJECTS - CreativeWork
-    // ============================================
-    
-    if (is_singular('projects')) {
-        $graph[] = [
-            "@type" => "CreativeWork",
-            "@id" => get_permalink() . '#creative-work',
-            "name" => get_the_title(),
-            "description" => get_the_excerpt(),
-            "url" => get_permalink(),
-            "creator" => [
-                "@id" => home_url('/#organization')
-            ],
-            "dateCreated" => get_the_date('c'),
-            "image" => has_post_thumbnail() ? get_the_post_thumbnail_url($post_id, 'large') : null
-        ];
-    }
-    
-    // ============================================
     // ADMIN TEMPLATES: Success Stories | Product | Service
     // ============================================
     
-    // Success Stories — on single project (CPT) only
+    // Success Stories — on single project (CPT) only (CreativeWork removed; use Success Stories tab)
     if (is_singular('projects') && $post_id) {
         $success_stories_schema = get_option('bw_success_stories_schema', '');
         if (!empty($success_stories_schema)) {
-            $decoded = json_decode($success_stories_schema, true);
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($success_stories_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $decoded = bw_schema_replace_variables($decoded, $post_id);
                 if (isset($decoded[0])) {
@@ -848,7 +844,7 @@ function bw_render_schema_graph() {
         $ids = apply_filters('bw_schema_product_post_ids', $ids, $singular_id);
         $include_product = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_product', false, $singular_id);
         if ($include_product && $product_schema !== '') {
-            $decoded = json_decode($product_schema, true);
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($product_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $decoded = bw_schema_replace_variables($decoded, $singular_id);
                 if (isset($decoded[0]) && is_array($decoded[0])) {
@@ -868,7 +864,7 @@ function bw_render_schema_graph() {
         $ids = apply_filters('bw_schema_service_post_ids', $ids, $singular_id);
         $include_service = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_service', false, $singular_id);
         if ($include_service && $service_schema !== '') {
-            $decoded = json_decode($service_schema, true);
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($service_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $decoded = bw_schema_replace_variables($decoded, $singular_id);
                 if (isset($decoded[0]) && is_array($decoded[0])) {
@@ -993,7 +989,7 @@ function bw_render_schema_graph() {
         $custom_schema = get_post_meta($post_id, 'bw_custom_schema', true);
         
         if (!empty($custom_schema)) {
-            $decoded = json_decode($custom_schema, true);
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($custom_schema), true);
             
             if (json_last_error() === JSON_ERROR_NONE) {
                 $decoded = bw_schema_replace_variables($decoded, $post_id);

@@ -246,6 +246,22 @@ function bw_schema_render_page() {
         </form>
 
         <hr style="margin: 30px 0;">
+        <h3><?php esc_html_e('Schema variables', 'brighterwebsites'); ?></h3>
+        <p><?php esc_html_e('Use these placeholders in your JSON; they are replaced when the schema is output.', 'brighterwebsites'); ?></p>
+        <details style="margin-bottom: 1em;">
+            <summary style="cursor: pointer; font-weight: 600;"><?php esc_html_e('Available variables (click to expand)', 'brighterwebsites'); ?></summary>
+            <ul style="line-height: 1.9; margin-top: 8px; margin-left: 1em;">
+                <li><code>%%post_title%%</code> <?php esc_html_e('– Post/page title', 'brighterwebsites'); ?></li>
+                <li><code>%%post_excerpt%%</code> <?php esc_html_e('– Excerpt', 'brighterwebsites'); ?></li>
+                <li><code>%%post_date%%</code>, <code>%%post_modified%%</code> <?php esc_html_e('– Date (ISO 8601)', 'brighterwebsites'); ?></li>
+                <li><code>%%post_url%%</code>, <code>%%post_id%%</code>, <code>%%post_name%%</code></li>
+                <li><code>%%post_author%%</code> <?php esc_html_e('– Author display name', 'brighterwebsites'); ?></li>
+                <li><code>%%site_name%%</code>, <code>%%site_url%%</code> <?php esc_html_e('– Site info (any context)', 'brighterwebsites'); ?></li>
+                <li><code>%%_cmeta_meta_key%%</code> <?php esc_html_e('– Custom meta (replace meta_key)', 'brighterwebsites'); ?></li>
+                <li><code>%%_acf_field_name%%</code> <?php esc_html_e('– ACF field (replace field_name)', 'brighterwebsites'); ?></li>
+            </ul>
+            <p class="description"><?php esc_html_e('Example: "name": "%%post_title%%". Per-post schema (Success Stories, Product, Service, Custom schema) use the current post; Local Business uses site_name/site_url only.', 'brighterwebsites'); ?></p>
+        </details>
         <h3><?php esc_html_e('Schema resources', 'brighterwebsites'); ?></h3>
         <ul style="line-height: 1.8;">
             <li><a href="https://schema.org/LocalBusiness" target="_blank" rel="noopener">Schema.org LocalBusiness</a></li>

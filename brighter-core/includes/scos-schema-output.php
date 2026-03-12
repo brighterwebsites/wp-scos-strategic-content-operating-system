@@ -137,6 +137,35 @@ function bw_schema_parse_post_id_list($value) {
 }
 
 /**
+ * Get featured image URL for a post (tries full, large, then attachment permalink).
+ * Works in wp_head / outside the loop.
+ *
+ * @param int $post_id Post ID
+ * @return string URL or empty
+ */
+function bw_schema_get_post_thumbnail_url($post_id) {
+    $post_id = (int) $post_id;
+    if (!$post_id) {
+        return '';
+    }
+    $thumb_id = (int) get_post_thumbnail_id($post_id);
+    if (!$thumb_id) {
+        return '';
+    }
+    foreach (['full', 'large', 'medium_large'] as $size) {
+        $url = wp_get_attachment_image_url($thumb_id, $size);
+        if ($url) {
+            return $url;
+        }
+    }
+    $url = get_the_post_thumbnail_url($post_id, 'full');
+    if ($url) {
+        return $url;
+    }
+    return (string) get_permalink($thumb_id);
+}
+
+/**
  * Resolve a single schema variable for a given post/context.
  * Used by bw_schema_replace_variables. Variable names are case-sensitive.
  *
@@ -182,27 +211,25 @@ function bw_schema_resolve_variable($name, $post_id) {
         return $map[$name];
     }
 
-    // Featured image: URL string or ImageObject for schema
+    // Featured image: URL string or ImageObject for schema (post-centric, size fallbacks)
     if ($name === 'post_thumbnail_url') {
-        $thumb_id = (int) get_post_thumbnail_id($post_id);
-        if (!$thumb_id) {
-            return '';
-        }
-        $url = wp_get_attachment_image_url($thumb_id, 'full');
-        return $url ? $url : '';
+        $url = bw_schema_get_post_thumbnail_url($post_id);
+        $url = apply_filters('bw_schema_post_thumbnail_url', $url, $post_id);
+        return is_string($url) && $url !== '' ? $url : '';
     }
     if ($name === 'post_thumbnail') {
-        $thumb_id = (int) get_post_thumbnail_id($post_id);
-        if (!$thumb_id) {
-            return '';
-        }
-        $url = wp_get_attachment_image_url($thumb_id, 'full');
+        $url = bw_schema_get_post_thumbnail_url($post_id);
         if (!$url) {
             return '';
         }
-        $meta = wp_get_attachment_metadata($thumb_id, true);
-        $w = isset($meta['width']) ? (int) $meta['width'] : 0;
-        $h = isset($meta['height']) ? (int) $meta['height'] : 0;
+        $thumb_id = (int) get_post_thumbnail_id($post_id);
+        $w = 0;
+        $h = 0;
+        if ($thumb_id) {
+            $meta = wp_get_attachment_metadata($thumb_id, true);
+            $w = isset($meta['width']) ? (int) $meta['width'] : 0;
+            $h = isset($meta['height']) ? (int) $meta['height'] : 0;
+        }
         $img = [
             '@type' => 'ImageObject',
             'url'   => $url,
@@ -1006,10 +1033,10 @@ function bw_render_schema_graph() {
     // OUTPUT
     // ============================================
     
-    // Filter out any null values from image fields etc.
+    // Filter out null and empty string so we don't output "image": "" etc.
     $graph = array_map(function($block) {
         return array_filter($block, function($value) {
-            return $value !== null;
+            return $value !== null && $value !== '';
         });
     }, $graph);
     

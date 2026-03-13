@@ -274,13 +274,22 @@ class Brighter_Tweaks {
             }
         }
         
-        $map = [];
+        // Merge per-page preloads with existing map so saving one pagination page
+        // doesn't wipe URLs for pages that weren't visible on this screen.
+        $existing = get_option(self::OPT, []);
+        if (!is_array($existing)) {
+            $existing = [];
+        }
+        $map = $existing;
         if (!empty($_POST[self::OPT]) && is_array($_POST[self::OPT])) {
             foreach ($_POST[self::OPT] as $pid => $raw) {
-                $pid = (int)$pid;
+                $pid = (int) $pid;
                 $lines = array_filter(array_map('trim', explode("\n", wp_unslash($raw))));
                 if ($pid > 0 && $lines) {
                     $map[$pid] = array_values(array_unique(array_map([__CLASS__, 'sanitise_url'], $lines)));
+                } elseif ($pid > 0 && isset($map[$pid])) {
+                    // Explicitly cleared textarea on this page: remove entry.
+                    unset($map[$pid]);
                 }
             }
         }

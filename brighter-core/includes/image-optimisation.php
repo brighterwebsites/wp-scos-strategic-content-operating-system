@@ -143,6 +143,21 @@ add_action('init', function () {
             update_option("{$prefix}_crop", false);
         }
     }
+
+    // Custom Hero size (user-defined dimensions from options)
+    if (get_option('brighter_enable_custom_hero') && get_option('brighter_custom_hero_width')) {
+        add_image_size(
+            'custom_hero',
+            (int) get_option('brighter_custom_hero_width'),
+            (int) get_option('brighter_custom_hero_height', 0),
+            false
+        );
+    } else {
+        remove_image_size('custom_hero');
+        if (isset($_wp_additional_image_sizes['custom_hero'])) {
+            unset($_wp_additional_image_sizes['custom_hero']);
+        }
+    }
 }, 10);
 
 // ==========================================
@@ -163,15 +178,21 @@ add_filter('wp_editor_set_quality', function($quality, $mime_type) {
 // ✅ Filter: remove disabled sizes during generation
 // ==========================================
 add_filter('intermediate_image_sizes', function ($sizes) {
-    $core = ['thumbnail', 'medium', 'medium_large', 'large'];
     return array_filter($sizes, function ($s) {
+        if ($s === 'custom_hero') {
+            return get_option('brighter_enable_custom_hero') && get_option('brighter_custom_hero_width');
+        }
         return get_option("enable_size_$s", 0);
     });
 });
 
 add_filter('intermediate_image_sizes_advanced', function ($sizes) {
     foreach ($sizes as $name => $settings) {
-        if (!get_option("enable_size_$name", 1)) {
+        if ($name === 'custom_hero') {
+            if (!get_option('brighter_enable_custom_hero') || !get_option('brighter_custom_hero_width')) {
+                unset($sizes[$name]);
+            }
+        } elseif (!get_option("enable_size_$name", 1)) {
             unset($sizes[$name]);
         }
     }
@@ -191,6 +212,11 @@ add_filter('image_size_names_choose', function ($sizes) {
         if (get_option("enable_size_$key", 0)) {
             $sizes[$key] = $label;
         }
+    }
+    if (get_option('brighter_enable_custom_hero') && get_option('brighter_custom_hero_width')) {
+        $w = (int) get_option('brighter_custom_hero_width');
+        $h = (int) get_option('brighter_custom_hero_height', 0);
+        $sizes['custom_hero'] = $h ? "Custom Hero ({$w}×{$h})" : "Custom Hero ({$w}w)";
     }
     return $sizes;
 });

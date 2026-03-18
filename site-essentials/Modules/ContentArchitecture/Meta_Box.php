@@ -244,18 +244,21 @@ class Meta_Box {
 			return;
 		}
 
+		$css_path = SITE_ESSENTIALS_PATH . 'Modules/ContentArchitecture/assets/meta-box.css';
+		$js_path  = SITE_ESSENTIALS_PATH . 'Modules/ContentArchitecture/assets/meta-box.js';
+
 		wp_enqueue_style(
 			'scos-ca-meta-box',
 			SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/meta-box.css',
 			[],
-			'1.0.0'
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.0'
 		);
 
 		wp_enqueue_script(
 			'scos-ca-meta-box',
 			SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/meta-box.js',
 			[ 'jquery' ],
-			'1.0.0',
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0',
 			true
 		);
 

@@ -777,18 +777,21 @@ class Admin_Columns {
 	public static function enqueue_assets( $hook ) {
 		if ( 'edit.php' !== $hook ) { return; }
 
+		$css_path = SITE_ESSENTIALS_PATH . 'Modules/ContentArchitecture/assets/admin-columns.css';
+		$js_path  = SITE_ESSENTIALS_PATH . 'Modules/ContentArchitecture/assets/admin-columns.js';
+
 		wp_enqueue_style(
 			'scos-ca-admin-columns',
 			SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/admin-columns.css',
 			[],
-			'1.0.4'
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.4'
 		);
 
 		wp_enqueue_script(
 			'scos-ca-admin-columns',
 			SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/admin-columns.js',
 			[ 'jquery', 'inline-edit-post' ],
-			'1.0.4',
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.4',
 			true
 		);
 

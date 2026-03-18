@@ -124,12 +124,25 @@ class Admin_Columns {
 				// Single aggregated data container read by Quick Edit JS
 				$progress = get_post_meta( $post_id, 'scos_ca_optimization_progress', true );
 				if ( ! is_array( $progress ) ) { $progress = []; }
+				// Helper: read new scos_ key, fall back to legacy bw_ key for unmigrated posts.
+				// Only works when the slug values are identical between old and new systems.
+				$scos_or_legacy = function( $scos_key, $legacy_key ) use ( $post_id ) {
+					$val = get_post_meta( $post_id, $scos_key, true );
+					if ( $val !== '' && $val !== null && $val !== false ) {
+						return (string) $val;
+					}
+					return (string) get_post_meta( $post_id, $legacy_key, true );
+				};
+
 				$qe_data = [
 					'cluster'      => $term   ? (int) $term->term_id   : 0,
 					'topic'        => $t_term ? (int) $t_term->term_id  : 0,
+					// intent: legacy system stored term IDs (not slugs) — no usable fallback
 					'intent'       => (string) get_post_meta( $post_id, 'scos_ca_intent', true ),
-					'purpose'      => (string) get_post_meta( $post_id, 'scos_ca_purpose', true ),
-					'maturity'     => (string) get_post_meta( $post_id, 'scos_ca_maturity', true ),
+					// purpose: legacy key bw_purpose shares the same slugs (pillar, supporting, etc.)
+					'purpose'      => $scos_or_legacy( 'scos_ca_purpose',  'bw_purpose' ),
+					// maturity: legacy key bw_cont_maturity shares the same slugs
+					'maturity'     => $scos_or_legacy( 'scos_ca_maturity', 'bw_cont_maturity' ),
 					'index-status' => (string) get_post_meta( $post_id, 'scos_ca_index_status', true ),
 					'next-step'    => (string) get_post_meta( $post_id, 'scos_ca_next_step', true ),
 					'pillar'       => (int) get_post_meta( $post_id, 'scos_ca_pillar_page_id', true ),

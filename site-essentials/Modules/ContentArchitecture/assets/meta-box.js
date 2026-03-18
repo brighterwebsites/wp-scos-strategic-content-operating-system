@@ -80,29 +80,33 @@
 
 	// ─── Quick-add Term ──────────────────────────────────────────────────────
 
-	var $quickAdd  = $('#scos-ca-quick-add');
-	var $qaLabel   = $('#scos-ca-quick-add-label');
-	var $qaInput   = $('#scos-ca-quick-add-name');
-	var $qaSave    = $('#scos-ca-quick-add-save');
-	var $qaCancel  = $('#scos-ca-quick-add-cancel');
-	var currentTax    = '';
-	var currentTarget = '';
+	var $quickAdd = $('#scos-ca-quick-add');
+
+	function getQA() {
+		// Always get fresh references so DOM moves don't break anything.
+		return {
+			$label:  $('#scos-ca-quick-add-label'),
+			$input:  $('#scos-ca-quick-add-name'),
+			$save:   $('#scos-ca-quick-add-save'),
+			$cancel: $('#scos-ca-quick-add-cancel'),
+		};
+	}
 
 	function showQuickAdd($btn) {
-		currentTax    = $btn.data('taxonomy');
-		currentTarget = $btn.data('target');
-		var labelText = $btn.data('label') || scosCA.i18n.add;
+		var qa = getQA();
+		// Store taxonomy + target directly on the panel so no closure variable needed.
+		$quickAdd
+			.data('taxonomy', $btn.data('taxonomy'))
+			.data('target',   $btn.data('target'));
 
-		$qaLabel.text(labelText);
-		$qaInput.val('');
+		qa.$label.text($btn.data('label') || scosCA.i18n.add);
+		qa.$input.val('');
 		$quickAdd.removeAttr('hidden').insertAfter($btn);
-		$qaInput.focus();
+		qa.$input.focus();
 	}
 
 	function hideQuickAdd() {
-		$quickAdd.attr('hidden', 'hidden');
-		currentTax    = '';
-		currentTarget = '';
+		$quickAdd.attr('hidden', 'hidden').removeData('taxonomy').removeData('target');
 	}
 
 	$(document).on('click', '.scos-ca-add-term', function (e) {
@@ -110,41 +114,42 @@
 		showQuickAdd($(this));
 	});
 
-	$qaCancel.on('click', hideQuickAdd);
+	$(document).on('click', '#scos-ca-quick-add-cancel', hideQuickAdd);
 
-	$qaInput.on('keydown', function (e) {
-		if (e.which === 13) { e.preventDefault(); $qaSave.trigger('click'); }
+	$(document).on('keydown', '#scos-ca-quick-add-name', function (e) {
+		if (e.which === 13) { e.preventDefault(); $('#scos-ca-quick-add-save').trigger('click'); }
 		if (e.which === 27) { hideQuickAdd(); }
 	});
 
-	$qaSave.on('click', function () {
-		var name = $.trim($qaInput.val());
+	$(document).on('click', '#scos-ca-quick-add-save', function () {
+		var qa         = getQA();
+		var name       = $.trim(qa.$input.val());
+		var taxonomy   = $quickAdd.data('taxonomy');
+		var target     = $quickAdd.data('target');
+
 		if (!name) {
 			alert(scosCA.i18n.errorEmpty);
-			$qaInput.focus();
+			qa.$input.focus();
 			return;
 		}
 
-		$qaSave.prop('disabled', true).text(scosCA.i18n.adding);
+		qa.$save.prop('disabled', true).text(scosCA.i18n.adding);
 
 		$.post(
 			scosCA.ajaxurl,
 			{
-				action:   'scos_ca_add_term',
-				taxonomy: currentTax,
-				name:     name,
+				action:      'scos_ca_add_term',
+				taxonomy:    taxonomy,
+				name:        name,
 				_ajax_nonce: scosCA.nonce,
 			},
 			function (resp) {
 				if (resp.success && resp.data && resp.data.term_id) {
-					// Append the new option and select it.
-					var $select = $('#' + currentTarget);
 					$('<option>', {
 						value:    resp.data.term_id,
 						text:     resp.data.name,
 						selected: true,
-					}).appendTo($select);
-
+					}).appendTo($('#' + target));
 					hideQuickAdd();
 				} else {
 					alert(resp.data || scosCA.i18n.errorFailed);
@@ -153,7 +158,7 @@
 		).fail(function () {
 			alert(scosCA.i18n.errorFailed);
 		}).always(function () {
-			$qaSave.prop('disabled', false).text(scosCA.i18n.add);
+			qa.$save.prop('disabled', false).text(scosCA.i18n.add);
 		});
 	});
 

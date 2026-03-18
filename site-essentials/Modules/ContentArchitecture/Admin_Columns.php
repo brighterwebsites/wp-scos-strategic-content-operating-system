@@ -330,8 +330,10 @@ class Admin_Columns {
 		if ( is_wp_error( $clusters ) ) { $clusters = []; }
 		if ( is_wp_error( $topics ) )   { $topics   = []; }
 
-		wp_nonce_field( 'scos_ca_quick_edit', '_scos_ca_qe_nonce' );
+		// No custom nonce needed — WordPress verifies _inline_edit before save_post fires.
+		// The sentinel field lets PHP know progress was intentionally submitted.
 		?>
+		<input type="hidden" name="scos_ca_qe_progress_submitted" value="1" />
 		<fieldset class="scos-qe-fieldset inline-edit-col">
 			<div class="inline-edit-col">
 				<h4 class="scos-qe-title"><?php esc_html_e( 'Content Architecture', 'site-essentials' ); ?></h4>
@@ -594,15 +596,19 @@ class Admin_Columns {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) { return; }
 		if ( ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) { return; }
 
-		// Quick Edit — has its own nonce in the panel
-		if ( isset( $_POST['_scos_ca_qe_nonce'] )
-			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_scos_ca_qe_nonce'] ) ), 'scos_ca_quick_edit' ) ) {
+		// Quick Edit — fired via admin-ajax.php?action=inline-save
+		// WordPress already verifies _inline_edit nonce before save_post fires,
+		// so we just need to detect the context and that our fields are present.
+		if ( wp_doing_ajax()
+			&& isset( $_POST['action'] ) && 'inline-save' === $_POST['action']
+			&& isset( $_POST['scos_ca_qe_cluster'] ) ) {
 			self::save_quick_edit_fields( $post_id );
 			return;
 		}
 
-		// Bulk Edit — WordPress already verified _wpnonce before save_post fires
-		if ( isset( $_REQUEST['bulk_edit'] ) ) {
+		// Bulk Edit — regular form POST to edit.php (not AJAX)
+		// WordPress verifies _wpnonce before processing bulk actions and firing save_post.
+		if ( ! wp_doing_ajax() && isset( $_REQUEST['bulk_edit'] ) ) {
 			self::save_bulk_edit_fields( $post_id );
 		}
 	}
@@ -640,11 +646,14 @@ class Admin_Columns {
 			update_post_meta( $post_id, 'scos_ca_service_pathway_id', absint( $_POST['scos_ca_qe_service_pathway_id'] ) );
 		}
 
-		// Progress — replace with exactly what was selected (pre-populated in panel, so state is explicit)
-		$progress = isset( $_POST['scos_ca_qe_progress'] ) && is_array( $_POST['scos_ca_qe_progress'] )
-			? array_map( 'sanitize_text_field', wp_unslash( $_POST['scos_ca_qe_progress'] ) )
-			: [];
-		update_post_meta( $post_id, 'scos_ca_optimization_progress', $progress );
+		// Progress — only update if the sentinel field was present (confirms our panel was rendered
+		// and JS had the chance to pre-populate checkboxes; prevents silent clear on JS failure).
+		if ( isset( $_POST['scos_ca_qe_progress_submitted'] ) ) {
+			$progress = isset( $_POST['scos_ca_qe_progress'] ) && is_array( $_POST['scos_ca_qe_progress'] )
+				? array_map( 'sanitize_text_field', wp_unslash( $_POST['scos_ca_qe_progress'] ) )
+				: [];
+			update_post_meta( $post_id, 'scos_ca_optimization_progress', $progress );
+		}
 	}
 
 	private static function save_bulk_edit_fields( $post_id ) {

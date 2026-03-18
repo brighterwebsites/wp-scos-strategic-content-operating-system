@@ -689,28 +689,34 @@ class Admin_Columns {
 	}
 
 	private static function save_bulk_edit_fields( $post_id ) {
+		// IMPORTANT: Read from $_REQUEST not $_POST.
+		// WordPress's bulk_edit_posts() takes $post_data = &$_POST (by reference) and mutates
+		// the array during iteration, so $_POST is unreliable by the time save_post fires.
+		// $_REQUEST is computed once at request start and is never modified.
+		$req = $_REQUEST; // phpcs:ignore WordPress.Security.NonceVerification
+
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			error_log( sprintf(
 				'[SCOS BE:bulk] post_id=%d  intent=%s  purpose=%s  cluster=%s  maturity=%s',
 				$post_id,
-				isset( $_POST['scos_ca_be_intent'] )   ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_intent'] ) )   : '(not set)',
-				isset( $_POST['scos_ca_be_purpose'] )  ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_purpose'] ) )  : '(not set)',
-				isset( $_POST['scos_ca_be_cluster'] )  ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_cluster'] ) )  : '(not set)',
-				isset( $_POST['scos_ca_be_maturity'] ) ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_maturity'] ) ) : '(not set)'
+				isset( $req['scos_ca_be_intent'] )   ? sanitize_text_field( wp_unslash( $req['scos_ca_be_intent'] ) )   : '(not set)',
+				isset( $req['scos_ca_be_purpose'] )  ? sanitize_text_field( wp_unslash( $req['scos_ca_be_purpose'] ) )  : '(not set)',
+				isset( $req['scos_ca_be_cluster'] )  ? sanitize_text_field( wp_unslash( $req['scos_ca_be_cluster'] ) )  : '(not set)',
+				isset( $req['scos_ca_be_maturity'] ) ? sanitize_text_field( wp_unslash( $req['scos_ca_be_maturity'] ) ) : '(not set)'
 			) );
 		}
 
-		// Taxonomy: empty = no change, '0' = remove, int = set
-		if ( isset( $_POST['scos_ca_be_cluster'] ) && '' !== $_POST['scos_ca_be_cluster'] ) {
-			$id = absint( $_POST['scos_ca_be_cluster'] );
+		// Taxonomy: empty string = no change, '0' = remove, positive int = set
+		if ( isset( $req['scos_ca_be_cluster'] ) && '' !== $req['scos_ca_be_cluster'] ) {
+			$id = absint( $req['scos_ca_be_cluster'] );
 			wp_set_post_terms( $post_id, $id > 0 ? [ $id ] : [], 'scos_content_cluster' );
 		}
-		if ( isset( $_POST['scos_ca_be_topic'] ) && '' !== $_POST['scos_ca_be_topic'] ) {
-			$id = absint( $_POST['scos_ca_be_topic'] );
+		if ( isset( $req['scos_ca_be_topic'] ) && '' !== $req['scos_ca_be_topic'] ) {
+			$id = absint( $req['scos_ca_be_topic'] );
 			wp_set_post_terms( $post_id, $id > 0 ? [ $id ] : [], 'scos_topic' );
 		}
 
-		// Simple meta: empty = no change
+		// Simple meta: empty string = no change
 		$meta_map = [
 			'scos_ca_be_intent'       => 'scos_ca_intent',
 			'scos_ca_be_purpose'      => 'scos_ca_purpose',
@@ -718,15 +724,15 @@ class Admin_Columns {
 			'scos_ca_be_index_status' => 'scos_ca_index_status',
 			'scos_ca_be_next_step'    => 'scos_ca_next_step',
 		];
-		foreach ( $meta_map as $post_key => $meta_key ) {
-			if ( isset( $_POST[ $post_key ] ) && '' !== $_POST[ $post_key ] ) {
-				update_post_meta( $post_id, $meta_key, sanitize_text_field( wp_unslash( $_POST[ $post_key ] ) ) );
+		foreach ( $meta_map as $req_key => $meta_key ) {
+			if ( isset( $req[ $req_key ] ) && '' !== $req[ $req_key ] ) {
+				update_post_meta( $post_id, $meta_key, sanitize_text_field( wp_unslash( $req[ $req_key ] ) ) );
 			}
 		}
 
 		// Progress: only replace if at least one tag is checked; otherwise leave untouched
-		if ( ! empty( $_POST['scos_ca_be_progress'] ) && is_array( $_POST['scos_ca_be_progress'] ) ) {
-			$progress = array_map( 'sanitize_text_field', wp_unslash( $_POST['scos_ca_be_progress'] ) );
+		if ( ! empty( $req['scos_ca_be_progress'] ) && is_array( $req['scos_ca_be_progress'] ) ) {
+			$progress = array_map( 'sanitize_text_field', wp_unslash( $req['scos_ca_be_progress'] ) );
 			update_post_meta( $post_id, 'scos_ca_optimization_progress', $progress );
 		}
 	}

@@ -91,9 +91,9 @@ class Content_Analysis {
 	 * @return string Raw HTML/text.
 	 */
 	private static function get_content( $post_id, $post ) {
-		if ( class_exists( 'BW_Content_Analysis' )
-			&& method_exists( 'BW_Content_Analysis', 'get_aggregated_content' ) ) {
-			$content = BW_Content_Analysis::get_aggregated_content( $post_id );
+		if ( class_exists( '\BW_Content_Analysis' )
+			&& method_exists( '\BW_Content_Analysis', 'get_aggregated_content' ) ) {
+			$content = \BW_Content_Analysis::get_aggregated_content( $post_id );
 			if ( $content ) {
 				return $content;
 			}

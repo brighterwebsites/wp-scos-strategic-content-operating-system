@@ -25,6 +25,11 @@ class BW_Breadcrumbs_Meta {
      * Add breadcrumbs meta box to posts and pages
      */
     public function add_meta_box() {
+        // Suppressed when the new SEO Meta module is active (Breadcrumb Label is in its Core SEO tab).
+        if ( defined( 'SCOS_SEO_ACTIVE' ) ) {
+            return;
+        }
+
         $post_types = array('post', 'page', 'folio', 'projects');
 
         foreach ($post_types as $post_type) {

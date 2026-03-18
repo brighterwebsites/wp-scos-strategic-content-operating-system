@@ -1,0 +1,129 @@
+/* =====================================================
+   SEO Meta Box Styles
+   ===================================================== */
+
+.scos-seo-wrap {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+/* ── Tabs ── */
+.scos-seo-tabs {
+	display: flex;
+	gap: 2px;
+	border-bottom: 2px solid #dcdcde;
+	margin-bottom: 16px;
+}
+.scos-seo-tab-btn {
+	position: relative;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -2px;
+	padding: 8px 16px;
+	font-size: 13px;
+	font-weight: 500;
+	color: #646970;
+	cursor: pointer;
+	transition: color 0.15s, border-color 0.15s;
+}
+.scos-seo-tab-btn:hover { color: #1d2327; }
+.scos-seo-tab-btn.is-active {
+	color: #1d2327;
+	border-bottom-color: #2271b1;
+}
+
+/* ── Tab panels ── */
+.scos-seo-tab-panel { display: none; }
+.scos-seo-tab-panel.is-active { display: block; }
+
+/* ── Fields ── */
+.scos-seo-field {
+	margin-bottom: 16px;
+}
+.scos-seo-field label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-weight: 500;
+	font-size: 12px;
+	color: #3c434a;
+	margin-bottom: 5px;
+}
+.scos-seo-field input[type="text"],
+.scos-seo-field input[type="url"],
+.scos-seo-field textarea {
+	width: 100%;
+}
+.scos-seo-field textarea { min-height: 64px; resize: vertical; }
+.scos-seo-help {
+	font-size: 11px;
+	color: #8c8f94;
+	margin: 4px 0 0;
+}
+
+/* ── Character counter ── */
+.scos-seo-counter {
+	font-size: 11px;
+	font-weight: 400;
+	color: #8c8f94;
+	white-space: nowrap;
+	margin-left: auto;
+}
+.scos-seo-counter.is-over { color: #dc2626; }
+.scos-seo-counter.is-good { color: #15803d; }
+
+/* Progress bar */
+.scos-seo-bar {
+	height: 3px;
+	background: #e5e7eb;
+	border-radius: 2px;
+	margin-top: 4px;
+	overflow: hidden;
+}
+.scos-seo-bar__fill {
+	height: 100%;
+	width: 0;
+	background: #2271b1;
+	border-radius: 2px;
+	transition: width 0.15s, background 0.15s;
+}
+.scos-seo-bar.is-over .scos-seo-bar__fill { background: #dc2626; }
+.scos-seo-bar.is-good .scos-seo-bar__fill { background: #15803d; }
+
+/* ── Checkbox groups ── */
+.scos-seo-checks {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.scos-seo-check-label {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	font-weight: 400;
+	cursor: pointer;
+	font-size: 13px;
+}
+.scos-seo-check-label input { margin-top: 2px; flex-shrink: 0; }
+.scos-seo-check-label code {
+	background: #f0f0f1;
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 11px;
+	color: #1d2327;
+	flex-shrink: 0;
+}
+.scos-seo-check-label span { color: #646970; }
+.scos-seo-check-label--danger input:checked ~ code { background: #fee2e2; color: #dc2626; }
+
+/* ── Phase 2 placeholder ── */
+.scos-seo-phase2-notice {
+	padding: 16px;
+	background: #f6f7f7;
+	border: 1px dashed #dcdcde;
+	border-radius: 4px;
+	color: #646970;
+}
+.scos-seo-phase2-notice strong { display: block; margin-bottom: 6px; color: #1d2327; }
+.scos-seo-phase2-notice p { margin: 0 0 6px; font-size: 12px; }

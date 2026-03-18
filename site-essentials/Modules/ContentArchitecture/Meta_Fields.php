@@ -237,6 +237,49 @@ class Meta_Fields {
 	}
 
 	/**
+	 * Intent colour map for admin column badges.
+	 *
+	 * @return array<string, array{color: string, bg: string}>
+	 */
+	public static function intent_colors() {
+		return [
+			'informational'   => [ 'color' => '#1d4ed8', 'bg' => '#dbeafe' ],
+			'informational_p' => [ 'color' => '#1d4ed8', 'bg' => '#dbeafe' ],
+			'informational_s' => [ 'color' => '#0369a1', 'bg' => '#e0f2fe' ],
+			'commercial'      => [ 'color' => '#b45309', 'bg' => '#fef3c7' ],
+			'commercial_ds'   => [ 'color' => '#92400e', 'bg' => '#fef3c7' ],
+			'transactional'   => [ 'color' => '#15803d', 'bg' => '#dcfce7' ],
+			'transact_lead'   => [ 'color' => '#166534', 'bg' => '#dcfce7' ],
+			'trust'           => [ 'color' => '#7c3aed', 'bg' => '#ede9fe' ],
+			'navigational'    => [ 'color' => '#374151', 'bg' => '#f3f4f6' ],
+			'functional'      => [ 'color' => '#4b5563', 'bg' => '#f9fafb' ],
+		];
+	}
+
+	/**
+	 * Purpose colour map for admin column badges.
+	 *
+	 * @return array<string, array{color: string, bg: string}>
+	 */
+	public static function purpose_colors() {
+		return [
+			'pillar'              => [ 'color' => '#6d28d9', 'bg' => '#ede9fe' ],
+			'service-page'        => [ 'color' => '#15803d', 'bg' => '#dcfce7' ],
+			'product-page'        => [ 'color' => '#166534', 'bg' => '#bbf7d0' ],
+			'conversion-hub'      => [ 'color' => '#0f766e', 'bg' => '#ccfbf1' ],
+			'conversion-event'    => [ 'color' => '#0e7490', 'bg' => '#cffafe' ],
+			'conversion-endpoint' => [ 'color' => '#0369a1', 'bg' => '#e0f2fe' ],
+			'case-study'          => [ 'color' => '#1d4ed8', 'bg' => '#dbeafe' ],
+			'authority-page'      => [ 'color' => '#4f46e5', 'bg' => '#e0e7ff' ],
+			'supporting'          => [ 'color' => '#0891b2', 'bg' => '#cffafe' ],
+			'content-collection'  => [ 'color' => '#7c3aed', 'bg' => '#f5f3ff' ],
+			'resource-guide'      => [ 'color' => '#6d28d9', 'bg' => '#f5f3ff' ],
+			'terms'               => [ 'color' => '#4b5563', 'bg' => '#f3f4f6' ],
+			'functional'          => [ 'color' => '#374151', 'bg' => '#f9fafb' ],
+		];
+	}
+
+	/**
 	 * Next step options (single-select colour badge).
 	 *
 	 * @return array<string, array{label: string, color: string, bg: string}>

@@ -7,89 +7,77 @@
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Extend WordPress's Quick Edit open handler to populate our custom fields.
+	 * WordPress's list table click handler calls inlineEditPost.edit(this),
+	 * where `this` is the "Quick Edit" anchor element.
+	 * We extend .edit (not .open) to match what actually fires in WP.
 	 *
-	 * WordPress uses `inlineEditPost.open` in WP ≥ 5.9 and `inlineEditPost.edit`
-	 * in older versions. We wrap whichever is present.
-	 *
-	 * The `id` argument can be:
-	 *   - a numeric post ID
-	 *   - a string like "post-123"
-	 *   - a DOM element (row TR)
-	 * Use `inlineEditPost.getId()` which handles all three cases reliably.
+	 * inlineEditPost.getId() handles DOM elements, strings, and numbers.
 	 */
-	function getPostId( id ) {
-		if ( typeof inlineEditPost.getId === 'function' ) {
-			return inlineEditPost.getId( id );
-		}
-		// Fallback: parse digits from whatever was passed
-		var num = parseInt( id, 10 );
-		if ( ! isNaN( num ) ) { return num; }
-		var match = String( id ).match( /(\d+)/ );
-		return match ? parseInt( match[1], 10 ) : 0;
-	}
+	if ( typeof inlineEditPost !== 'undefined' && typeof inlineEditPost.edit === 'function' ) {
 
-	function populateQuickEdit( id ) {
-		var postId = getPostId( id );
-		if ( ! postId ) { return; }
+		var $origEdit = inlineEditPost.edit;
 
-		// Data container rendered in scos_ca_cluster column cell
-		var $data = $( '#scos-col-data-' + postId );
-		if ( ! $data.length ) { return; }
+		inlineEditPost.edit = function ( id ) {
+			// Call WordPress's original handler first (opens the panel)
+			$origEdit.apply( this, arguments );
 
-		var data = $data.data( 'qe' );
-		if ( ! data ) { return; }
+			// Resolve post ID using WP's own helper (handles element/string/number)
+			var postId = ( typeof id === 'object' ) ? this.getId( id ) : parseInt( id, 10 );
+			if ( ! postId ) { return; }
 
-		// The quick-edit panel for this row
-		var $panel = $( '#edit-' + postId );
-		if ( ! $panel.length ) { return; }
+			// Data container is rendered in the scos_ca_cluster column cell
+			var $dataEl = $( '#scos-col-data-' + postId );
+			if ( ! $dataEl.length ) { return; }
 
-		// ---- Selects ----
-		var selectMap = {
-			'cluster':      'scos_ca_qe_cluster',
-			'topic':        'scos_ca_qe_topic',
-			'intent':       'scos_ca_qe_intent',
-			'purpose':      'scos_ca_qe_purpose',
-			'maturity':     'scos_ca_qe_maturity',
-			'index-status': 'scos_ca_qe_index_status',
-			'next-step':    'scos_ca_qe_next_step',
-			'pillar':       'scos_ca_qe_pillar_page_id',
-			'pathway':      'scos_ca_qe_service_pathway_id',
-		};
+			// Read attribute directly and parse — more reliable than $.data() auto-parse
+			var raw = $dataEl.attr( 'data-qe' );
+			if ( ! raw ) { return; }
 
-		$.each( selectMap, function ( dataKey, fieldName ) {
-			var val = data[ dataKey ];
-			if ( val !== undefined && val !== null ) {
-				$panel.find( 'select[name="' + fieldName + '"]' ).val( String( val ) );
+			var data;
+			try {
+				data = JSON.parse( raw );
+			} catch ( e ) {
+				return;
 			}
-		} );
 
-		// ---- Progress checkboxes ----
-		var progress = Array.isArray( data.progress ) ? data.progress : [];
-		$panel.find( '.scos-qe-progress-tags .scos-qe-progress-tag' ).each( function () {
-			var $tag = $( this );
-			var $cb  = $tag.find( 'input[type="checkbox"]' );
-			var checked = progress.indexOf( $cb.val() ) !== -1;
-			$cb.prop( 'checked', checked );
-			$tag.toggleClass( 'is-selected', checked );
-		} );
-	}
+			// ---- Populate select fields ----
+			// Search within the specific panel row for this post
+			var $panel = $( '#edit-' + postId );
+			if ( ! $panel.length ) {
+				// Fallback: any open inline-edit row (only one is open at a time)
+				$panel = $( 'tr.inline-edit-row:visible' ).last();
+			}
+			if ( ! $panel.length ) { return; }
 
-	// Wrap whichever method WordPress exposes (try `open` first, fall back to `edit`)
-	if ( typeof inlineEditPost !== 'undefined' ) {
-		if ( typeof inlineEditPost.open === 'function' ) {
-			var origOpen = inlineEditPost.open;
-			inlineEditPost.open = function ( id ) {
-				origOpen.apply( this, arguments );
-				populateQuickEdit( id );
+			var selectMap = {
+				'cluster':      'scos_ca_qe_cluster',
+				'topic':        'scos_ca_qe_topic',
+				'intent':       'scos_ca_qe_intent',
+				'purpose':      'scos_ca_qe_purpose',
+				'maturity':     'scos_ca_qe_maturity',
+				'index-status': 'scos_ca_qe_index_status',
+				'next-step':    'scos_ca_qe_next_step',
+				'pillar':       'scos_ca_qe_pillar_page_id',
+				'pathway':      'scos_ca_qe_service_pathway_id',
 			};
-		} else if ( typeof inlineEditPost.edit === 'function' ) {
-			var origEdit = inlineEditPost.edit;
-			inlineEditPost.edit = function ( id ) {
-				origEdit.apply( this, arguments );
-				populateQuickEdit( id );
-			};
-		}
+
+			$.each( selectMap, function ( dataKey, fieldName ) {
+				var val = data[ dataKey ];
+				if ( val !== undefined && val !== null ) {
+					$panel.find( 'select[name="' + fieldName + '"]' ).val( String( val ) );
+				}
+			} );
+
+			// ---- Populate progress checkboxes ----
+			var progress = Array.isArray( data.progress ) ? data.progress : [];
+			$panel.find( '.scos-qe-progress-tags .scos-qe-progress-tag' ).each( function () {
+				var $tag = $( this );
+				var $cb  = $tag.find( 'input[type="checkbox"]' );
+				var checked = progress.indexOf( $cb.val() ) !== -1;
+				$cb.prop( 'checked', checked );
+				$tag.toggleClass( 'is-selected', checked );
+			} );
+		};
 	}
 
 	// -------------------------------------------------------------------------

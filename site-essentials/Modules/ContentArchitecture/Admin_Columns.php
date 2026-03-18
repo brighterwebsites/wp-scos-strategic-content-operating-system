@@ -596,20 +596,16 @@ class Admin_Columns {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) { return; }
 		if ( ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) { return; }
 
-		// Quick Edit — fired via admin-ajax.php?action=inline-save
-		// WordPress already verifies _inline_edit nonce before save_post fires,
-		// so we just need to detect the context and that our fields are present.
-		if ( wp_doing_ajax()
-			&& isset( $_POST['action'] ) && 'inline-save' === $_POST['action']
-			&& isset( $_POST['scos_ca_qe_cluster'] ) ) {
-			self::save_quick_edit_fields( $post_id );
+		// If neither Quick Edit nor Bulk Edit, bail early
+		if ( ! isset( $_REQUEST['_inline_edit'] ) && ! isset( $_REQUEST['bulk_edit'] ) ) {
 			return;
 		}
 
-		// Bulk Edit — regular form POST to edit.php (not AJAX)
-		// WordPress verifies _wpnonce before processing bulk actions and firing save_post.
-		if ( ! wp_doing_ajax() && isset( $_REQUEST['bulk_edit'] ) ) {
+		if ( isset( $_REQUEST['bulk_edit'] ) ) {
 			self::save_bulk_edit_fields( $post_id );
+		} else {
+			// Quick Edit — WordPress already verified _inline_edit nonce before save_post fires
+			self::save_quick_edit_fields( $post_id );
 		}
 	}
 

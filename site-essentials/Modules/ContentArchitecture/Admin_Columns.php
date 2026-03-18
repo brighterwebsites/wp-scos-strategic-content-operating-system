@@ -574,6 +574,47 @@ class Admin_Columns {
 						</select>
 					</label>
 
+					<?php
+					$be_pillar_pages = get_posts( [
+						'post_type'   => get_post_types( [ 'public' => true ], 'names' ),
+						'numberposts' => -1,
+						'orderby'     => 'title',
+						'order'       => 'ASC',
+						'meta_query'  => [ [ 'key' => 'scos_ca_purpose', 'value' => 'pillar' ] ],
+						'fields'      => 'ids',
+					] );
+					$be_pathway_pages = get_posts( [
+						'post_type'   => get_post_types( [ 'public' => true ], 'names' ),
+						'numberposts' => -1,
+						'orderby'     => 'title',
+						'order'       => 'ASC',
+						'meta_query'  => [ [ 'key' => 'scos_ca_purpose', 'value' => [ 'service-page', 'product-page', 'conversion-hub' ], 'compare' => 'IN' ] ],
+						'fields'      => 'ids',
+					] );
+					?>
+
+					<label class="scos-qe-label">
+						<span class="title"><?php esc_html_e( 'Pillar Page', 'site-essentials' ); ?></span>
+						<select name="scos_ca_be_pillar_page_id">
+							<option value=""><?php esc_html_e( '— No Change —', 'site-essentials' ); ?></option>
+							<option value="0"><?php esc_html_e( '✕ Remove', 'site-essentials' ); ?></option>
+							<?php foreach ( $be_pillar_pages as $pid ) : ?>
+								<option value="<?php echo esc_attr( $pid ); ?>"><?php echo esc_html( get_the_title( $pid ) ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+
+					<label class="scos-qe-label">
+						<span class="title"><?php esc_html_e( 'Service Pathway', 'site-essentials' ); ?></span>
+						<select name="scos_ca_be_service_pathway_id">
+							<option value=""><?php esc_html_e( '— No Change —', 'site-essentials' ); ?></option>
+							<option value="0"><?php esc_html_e( '✕ Remove', 'site-essentials' ); ?></option>
+							<?php foreach ( $be_pathway_pages as $pid ) : ?>
+								<option value="<?php echo esc_attr( $pid ); ?>"><?php echo esc_html( get_the_title( $pid ) ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+
 				</div><!-- .scos-qe-grid -->
 
 				<div class="scos-qe-progress-wrap">
@@ -728,6 +769,14 @@ class Admin_Columns {
 			if ( isset( $req[ $req_key ] ) && '' !== $req[ $req_key ] ) {
 				update_post_meta( $post_id, $meta_key, sanitize_text_field( wp_unslash( $req[ $req_key ] ) ) );
 			}
+		}
+
+		// Int page links: empty string = no change, '0' = remove
+		if ( isset( $req['scos_ca_be_pillar_page_id'] ) && '' !== $req['scos_ca_be_pillar_page_id'] ) {
+			update_post_meta( $post_id, 'scos_ca_pillar_page_id', absint( $req['scos_ca_be_pillar_page_id'] ) );
+		}
+		if ( isset( $req['scos_ca_be_service_pathway_id'] ) && '' !== $req['scos_ca_be_service_pathway_id'] ) {
+			update_post_meta( $post_id, 'scos_ca_service_pathway_id', absint( $req['scos_ca_be_service_pathway_id'] ) );
 		}
 
 		// Progress: only replace if at least one tag is checked; otherwise leave untouched

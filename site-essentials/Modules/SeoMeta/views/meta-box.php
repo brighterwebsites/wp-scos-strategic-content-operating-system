@@ -48,8 +48,8 @@ defined( 'ABSPATH' ) || exit;
 				name="scos_seo_breadcrumb_title"
 				id="scos_seo_breadcrumb_title"
 				value="<?php echo esc_attr( $breadcrumb_title ); ?>"
-				placeholder="<?php esc_attr_e( 'e.g. seo-signals (used in breadcrumbs and shortlinks)', 'site-essentials' ); ?>">
-			<p class="scos-seo-help"><?php esc_html_e( 'Short label for breadcrumb navigation and YOURLS shortlinks. Slug format, no spaces.', 'site-essentials' ); ?></p>
+				placeholder="<?php esc_attr_e( 'e.g. SEO Signals', 'site-essentials' ); ?>">
+			<p class="scos-seo-help"><?php esc_html_e( 'Short label for breadcrumb navigation. Plain text — can include spaces. (YOURLS shortlink slug is set separately in the Social Amplification metabox.)', 'site-essentials' ); ?></p>
 		</div>
 
 		<!-- TLDR Summary -->

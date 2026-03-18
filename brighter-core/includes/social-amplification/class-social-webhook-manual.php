@@ -79,6 +79,11 @@ class BW_Social_Webhook_Manual {
      * Add meta box to post editor
      */
     public function add_meta_box() {
+        // Suppressed when the new Social Amplification module is active.
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            return;
+        }
+
         foreach ($this->get_post_types() as $post_type) {
             add_meta_box(
                 'bw_social_webhook_trigger',
@@ -160,6 +165,11 @@ class BW_Social_Webhook_Manual {
      * Runs on init:20 so CPTs (faq, projects, etc.) are registered
      */
     public function register_admin_columns() {
+        // Suppressed when the new Social Amplification module is active.
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            return;
+        }
+
         foreach ($this->get_post_types() as $post_type) {
             add_action("manage_{$post_type}_posts_columns", array($this, 'add_admin_column'));
             add_action("manage_{$post_type}_posts_custom_column", array($this, 'render_admin_column'), 10, 2);
@@ -330,82 +340,48 @@ class BW_Social_Webhook_Manual {
      * AJAX handler for manual webhook trigger
      */
     public function ajax_trigger_webhook() {
-        error_log('=== BW SOCIAL AJAX DEBUG START ===');
-        error_log('AJAX handler called');
-        error_log('POST data: ' . print_r($_POST, true));
-        
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'bw_social_webhook')) {
-            error_log('AJAX ERROR: Nonce verification failed');
             wp_send_json_error(array('message' => 'Security check failed'));
         }
-        error_log('Nonce verified');
-        
-        // Check permissions
+
         if (!current_user_can('edit_posts')) {
-            error_log('AJAX ERROR: User lacks permissions');
             wp_send_json_error(array('message' => 'Insufficient permissions'));
         }
-        error_log('Permissions OK');
-        
-        // Get post ID
+
         $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
-        error_log('Post ID: ' . $post_id);
         if (!$post_id) {
-            error_log('AJAX ERROR: Invalid post ID');
             wp_send_json_error(array('message' => 'Invalid post ID'));
         }
-        
-        // Get post
+
         $post = get_post($post_id);
         if (!$post) {
-            error_log('AJAX ERROR: Post not found');
             wp_send_json_error(array('message' => 'Post not found'));
         }
-        error_log('Post found: ' . $post->post_title);
-        
-        // Check if published
+
         if ($post->post_status !== 'publish') {
-            error_log('AJAX ERROR: Post not published (status: ' . $post->post_status . ')');
             wp_send_json_error(array('message' => 'Post must be published'));
         }
-        error_log('Post is published');
-        
-        // Check if webhook URL is configured
+
         $webhook_url = get_option('bw_social_webhook_url', '');
-        error_log('Webhook URL from settings: ' . ($webhook_url ? $webhook_url : '(empty)'));
         if (empty($webhook_url)) {
-            error_log('AJAX ERROR: Webhook URL not configured');
             wp_send_json_error(array('message' => 'Webhook URL not configured in settings'));
         }
-        
-        // Trigger webhook via the BW_Social_Webhook_Trigger class
+
         global $bw_social_webhook_trigger;
-        error_log('Global webhook trigger exists: ' . (isset($bw_social_webhook_trigger) ? 'YES' : 'NO'));
         if (!$bw_social_webhook_trigger || !method_exists($bw_social_webhook_trigger, 'manual_trigger')) {
-            error_log('AJAX ERROR: Webhook trigger class not available');
             wp_send_json_error(array('message' => 'Webhook trigger not available'));
         }
-        
-        error_log('Calling manual_trigger() method...');
-        // Call manual trigger
+
         $success = $bw_social_webhook_trigger->manual_trigger($post_id);
-        error_log('manual_trigger() returned: ' . ($success ? 'true' : 'false'));
-        
+
         if ($success) {
-            // Update last trigger time
             update_post_meta($post_id, '_bw_social_last_trigger', current_time('mysql'));
-            error_log('SUCCESS: Webhook sent, timestamp updated');
-            error_log('=== BW SOCIAL AJAX DEBUG END ===');
-            
             wp_send_json_success(array(
-                'message' => 'Social post sent to Make.com! Check your scenario for processing.',
-                'timestamp' => current_time('mysql')
+                'message'   => 'Social post sent to Make.com!',
+                'timestamp' => current_time('mysql'),
             ));
         } else {
-            error_log('AJAX ERROR: manual_trigger() returned false');
-            error_log('=== BW SOCIAL AJAX DEBUG END ===');
-            wp_send_json_error(array('message' => 'Failed to trigger webhook. Check error logs for details.'));
+            wp_send_json_error(array('message' => 'Failed to send webhook. Check server error logs.'));
         }
     }
 }

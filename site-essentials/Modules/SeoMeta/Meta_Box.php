@@ -59,7 +59,8 @@ class Meta_Box {
 
 		$breadcrumb_title = get_post_meta( $post->ID, 'scos_seo_breadcrumb_title', true );
 		if ( empty( $breadcrumb_title ) ) {
-			$breadcrumb_title = get_post_meta( $post->ID, '_bw_breadcrumb', true );
+			// Fallback: SEOPress stores the breadcrumb label in _seopress_robots_breadcrumbs.
+			$breadcrumb_title = get_post_meta( $post->ID, '_seopress_robots_breadcrumbs', true );
 		}
 
 		$tldr = get_post_meta( $post->ID, 'scos_seo_tldr', true );
@@ -109,12 +110,12 @@ class Meta_Box {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) { return; }
 		if ( ! in_array( $post->post_type, Meta_Fields::get_post_types(), true ) ) { return; }
 
-		// ---- Breadcrumb title ----
+		// ---- Breadcrumb title (human-readable label for nav, NOT the YOURLS slug) ----
 		if ( isset( $_POST['scos_seo_breadcrumb_title'] ) ) {
-			$val = sanitize_title( $_POST['scos_seo_breadcrumb_title'] );
+			$val = sanitize_text_field( $_POST['scos_seo_breadcrumb_title'] );
 			self::update_or_delete( $post_id, 'scos_seo_breadcrumb_title', $val );
-			// Dual-write: legacy keys used by breadcrumb shortcode and YOURLS
-			self::update_or_delete( $post_id, '_bw_breadcrumb', $val );
+			// Dual-write: SEOPress reads _seopress_robots_breadcrumbs for breadcrumb display.
+			// _bw_breadcrumb (YOURLS shortlink slug) is managed by the Social Amplification module.
 			self::update_or_delete( $post_id, '_seopress_robots_breadcrumbs', $val );
 		}
 

@@ -1,0 +1,88 @@
+/* =====================================================
+   Social Amplification Meta Box Styles
+   ===================================================== */
+
+.scos-sa-wrap { font-size: 13px; line-height: 1.5; }
+
+/* ── Sections ── */
+.scos-sa-section {
+	margin-bottom: 16px;
+	padding-bottom: 14px;
+	border-bottom: 1px solid #f0f0f1;
+}
+.scos-sa-section:last-child { border-bottom: none; margin-bottom: 0; }
+.scos-sa-section--trigger { padding-top: 2px; }
+
+/* ── Field ── */
+.scos-sa-field { display: flex; flex-direction: column; gap: 5px; }
+.scos-sa-field label {
+	font-weight: 500;
+	font-size: 12px;
+	color: #3c434a;
+}
+.scos-sa-help { font-size: 11px; color: #8c8f94; margin: 0; }
+
+/* Slug row */
+.scos-sa-slug-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.scos-sa-slug-prefix {
+	font-size: 12px;
+	color: #8c8f94;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+.scos-sa-slug-input { flex: 1; min-width: 0; }
+.scos-sa-link-out {
+	flex-shrink: 0;
+	color: #2271b1;
+	text-decoration: none;
+	line-height: 1;
+}
+.scos-sa-link-out:hover { color: #135e96; }
+.scos-sa-link-out .dashicons { font-size: 16px; width: 16px; height: 16px; }
+
+/* ── Status notices ── */
+.scos-sa-status {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	padding: 7px 10px;
+	border-radius: 3px;
+	margin-bottom: 10px;
+}
+.scos-sa-status .dashicons { font-size: 14px; width: 14px; height: 14px; flex-shrink: 0; }
+.scos-sa-status--warn { background: #fff8e5; color: #996800; border-left: 3px solid #dba617; }
+.scos-sa-status--info { background: #f0f6fc; color: #2271b1; border-left: 3px solid #72aee6; }
+.scos-sa-status a { color: inherit; font-weight: 500; }
+
+/* ── Trigger button ── */
+.scos-sa-trigger-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	height: 36px;
+	padding: 0 14px;
+}
+.scos-sa-trigger-btn .dashicons { font-size: 16px; width: 16px; height: 16px; }
+
+/* ── Last trigger time ── */
+.scos-sa-last-trigger {
+	font-size: 11px;
+	color: #8c8f94;
+	margin: 8px 0 0;
+	font-style: italic;
+}
+
+/* ── Result message ── */
+.scos-sa-result {
+	margin-top: 8px;
+	padding: 8px 10px;
+	border-radius: 3px;
+	font-size: 12px;
+}
+.scos-sa-result.is-success { background: #edfaef; color: #008a20; border-left: 3px solid #00a32a; }
+.scos-sa-result.is-error   { background: #fce8e8; color: #d63638; border-left: 3px solid #d63638; }

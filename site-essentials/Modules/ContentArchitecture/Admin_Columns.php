@@ -596,15 +596,27 @@ class Admin_Columns {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) { return; }
 		if ( ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) { return; }
 
-		// If neither Quick Edit nor Bulk Edit, bail early
-		if ( ! isset( $_REQUEST['_inline_edit'] ) && ! isset( $_REQUEST['bulk_edit'] ) ) {
+		$is_inline = isset( $_REQUEST['_inline_edit'] );
+		$is_bulk   = isset( $_REQUEST['bulk_edit'] );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf(
+				'[SCOS Admin_Columns] handle_edit_save post_id=%d  action=%s  is_inline=%s  is_bulk=%s  REQUEST keys=%s',
+				$post_id,
+				isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : '(none)',
+				$is_inline ? 'yes' : 'no',
+				$is_bulk   ? 'yes' : 'no',
+				implode( ',', array_filter( array_keys( $_REQUEST ), function( $k ) { return strpos( $k, 'scos_ca_' ) === 0; } ) )
+			) );
+		}
+
+		if ( ! $is_inline && ! $is_bulk ) {
 			return;
 		}
 
-		if ( isset( $_REQUEST['bulk_edit'] ) ) {
+		if ( $is_bulk ) {
 			self::save_bulk_edit_fields( $post_id );
 		} else {
-			// Quick Edit — WordPress already verified _inline_edit nonce before save_post fires
 			self::save_quick_edit_fields( $post_id );
 		}
 	}
@@ -653,6 +665,16 @@ class Admin_Columns {
 	}
 
 	private static function save_bulk_edit_fields( $post_id ) {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf(
+				'[SCOS Admin_Columns] save_bulk_edit_fields post_id=%d  be_intent=%s  be_purpose=%s  be_cluster=%s',
+				$post_id,
+				isset( $_POST['scos_ca_be_intent'] )  ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_intent'] ) )  : '(not set)',
+				isset( $_POST['scos_ca_be_purpose'] ) ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_purpose'] ) ) : '(not set)',
+				isset( $_POST['scos_ca_be_cluster'] ) ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_cluster'] ) ) : '(not set)'
+			) );
+		}
+
 		// Taxonomy: empty = no change, '0' = remove, int = set
 		if ( isset( $_POST['scos_ca_be_cluster'] ) && '' !== $_POST['scos_ca_be_cluster'] ) {
 			$id = absint( $_POST['scos_ca_be_cluster'] );

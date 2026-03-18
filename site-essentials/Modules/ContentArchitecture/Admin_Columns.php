@@ -339,9 +339,7 @@ class Admin_Columns {
 		if ( ! in_array( $post_type, Taxonomies::get_post_types(), true ) ) { return; }
 
 		$clusters = get_terms( [ 'taxonomy' => 'scos_content_cluster', 'hide_empty' => false ] );
-		$topics   = get_terms( [ 'taxonomy' => 'scos_topic',           'hide_empty' => false ] );
 		if ( is_wp_error( $clusters ) ) { $clusters = []; }
-		if ( is_wp_error( $topics ) )   { $topics   = []; }
 
 		// No custom nonce needed — WordPress verifies _inline_edit before save_post fires.
 		// The sentinel field lets PHP know progress was intentionally submitted.
@@ -362,15 +360,13 @@ class Admin_Columns {
 						</select>
 					</label>
 
-					<label class="scos-qe-label">
-						<span class="title"><?php esc_html_e( 'Topic', 'site-essentials' ); ?></span>
-						<select name="scos_ca_qe_topic" data-scos-field="topic">
-							<option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
-							<?php foreach ( $topics as $t ) : ?>
-								<option value="<?php echo esc_attr( $t->term_id ); ?>"><?php echo esc_html( $t->name ); ?></option>
-							<?php endforeach; ?>
-						</select>
-					</label>
+				<label class="scos-qe-label">
+					<span class="title"><?php esc_html_e( 'Topic', 'site-essentials' ); ?></span>
+					<select name="scos_ca_qe_topic" data-scos-field="topic">
+						<option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
+						<?php Taxonomies::render_hierarchical_options( 'scos_topic' ); ?>
+					</select>
+				</label>
 
 					<label class="scos-qe-label">
 						<span class="title"><?php esc_html_e( 'Intent', 'site-essentials' ); ?></span>
@@ -488,9 +484,7 @@ class Admin_Columns {
 		if ( ! in_array( $post_type, Taxonomies::get_post_types(), true ) ) { return; }
 
 		$clusters = get_terms( [ 'taxonomy' => 'scos_content_cluster', 'hide_empty' => false ] );
-		$topics   = get_terms( [ 'taxonomy' => 'scos_topic',           'hide_empty' => false ] );
 		if ( is_wp_error( $clusters ) ) { $clusters = []; }
-		if ( is_wp_error( $topics ) )   { $topics   = []; }
 		?>
 		<fieldset class="scos-qe-fieldset inline-edit-col">
 			<div class="inline-edit-col">
@@ -508,16 +502,14 @@ class Admin_Columns {
 						</select>
 					</label>
 
-					<label class="scos-qe-label">
-						<span class="title"><?php esc_html_e( 'Topic', 'site-essentials' ); ?></span>
-						<select name="scos_ca_be_topic">
-							<option value=""><?php esc_html_e( '— No Change —', 'site-essentials' ); ?></option>
-							<option value="0"><?php esc_html_e( '✕ Remove', 'site-essentials' ); ?></option>
-							<?php foreach ( $topics as $t ) : ?>
-								<option value="<?php echo esc_attr( $t->term_id ); ?>"><?php echo esc_html( $t->name ); ?></option>
-							<?php endforeach; ?>
-						</select>
-					</label>
+				<label class="scos-qe-label">
+					<span class="title"><?php esc_html_e( 'Topic', 'site-essentials' ); ?></span>
+					<select name="scos_ca_be_topic">
+						<option value=""><?php esc_html_e( '— No Change —', 'site-essentials' ); ?></option>
+						<option value="0"><?php esc_html_e( '✕ Remove', 'site-essentials' ); ?></option>
+						<?php Taxonomies::render_hierarchical_options( 'scos_topic' ); ?>
+					</select>
+				</label>
 
 					<label class="scos-qe-label">
 						<span class="title"><?php esc_html_e( 'Intent', 'site-essentials' ); ?></span>

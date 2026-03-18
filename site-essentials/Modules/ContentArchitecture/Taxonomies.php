@@ -84,10 +84,12 @@ class Taxonomies {
 					'update_item'       => __( 'Update Topic', 'site-essentials' ),
 					'add_new_item'      => __( 'Add New Topic', 'site-essentials' ),
 					'new_item_name'     => __( 'New Topic Name', 'site-essentials' ),
+					'parent_item'       => __( 'Parent Topic', 'site-essentials' ),
+					'parent_item_colon' => __( 'Parent Topic:', 'site-essentials' ),
 					'search_items'      => __( 'Search Topics', 'site-essentials' ),
 					'not_found'         => __( 'No topics found.', 'site-essentials' ),
 				],
-				'hierarchical'       => false,
+				'hierarchical'       => true,
 				'show_ui'            => true,
 				'meta_box_cb'        => false,
 				'show_in_nav_menus'  => false,
@@ -111,6 +113,44 @@ class Taxonomies {
 		foreach ( self::get_post_types() as $post_type ) {
 			register_taxonomy_for_object_type( 'scos_content_cluster', $post_type );
 			register_taxonomy_for_object_type( 'scos_topic', $post_type );
+		}
+	}
+
+	/**
+	 * Output <option> elements for a hierarchical taxonomy select.
+	 *
+	 * Renders parent terms first, then children indented with em-dashes,
+	 * matching the style WordPress uses for category dropdowns.
+	 *
+	 * @param string $taxonomy  Taxonomy slug.
+	 * @param int    $parent_id Parent term ID to start from (0 = root).
+	 * @param int    $depth     Current recursion depth (used for indentation).
+	 * @return void
+	 */
+	public static function render_hierarchical_options( $taxonomy, $parent_id = 0, $depth = 0 ) {
+		$terms = get_terms( [
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false,
+			'parent'     => $parent_id,
+			'orderby'    => 'name',
+			'order'      => 'ASC',
+		] );
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return;
+		}
+
+		$pad = $depth > 0 ? str_repeat( '&nbsp;&nbsp;&mdash;&nbsp;', $depth ) : '';
+
+		foreach ( $terms as $term ) {
+			printf(
+				'<option value="%d">%s%s</option>',
+				$term->term_id,
+				$pad, // phpcs:ignore WordPress.Security.EscapeOutput — pad contains only safe HTML entities
+				esc_html( $term->name )
+			);
+			// Recurse into children
+			self::render_hierarchical_options( $taxonomy, $term->term_id, $depth + 1 );
 		}
 	}
 

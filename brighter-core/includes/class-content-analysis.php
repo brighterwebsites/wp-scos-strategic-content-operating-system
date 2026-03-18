@@ -102,26 +102,26 @@ class BW_Content_Analysis {
     }
 
     /**
-     * Aggregate content from all sources
+     * Aggregate content from all sources.
+     * When _breakdance_data is present and non-empty, use it as the primary content (Breakdance overwrites editor content).
+     * When empty, use post_content. ACF is always appended when available.
      */
     private static function aggregate_content($post_id, $post) {
-        $content = '';
+        $bd_content = self::get_breakdance_content($post_id);
 
-        // 1. Post content (always present)
-        $content .= $post->post_content;
+        if ($bd_content !== '') {
+            // Breakdance data exists: use it as primary content (do not double-count with post_content)
+            $content = $bd_content;
+        } else {
+            $content = $post->post_content;
+        }
 
-        // 2. ACF fields (if ACF is active)
+        // ACF fields (if ACF is active)
         if (function_exists('get_fields')) {
             $fields = get_fields($post_id);
             if ($fields) {
                 $content .= ' ' . self::extract_acf_content($fields);
             }
-        }
-
-        // 3. Breakdance content (if Breakdance is active)
-        $bd_content = self::get_breakdance_content($post_id);
-        if ($bd_content) {
-            $content .= ' ' . $bd_content;
         }
 
         return $content;
@@ -358,68 +358,101 @@ class BW_Content_Analysis {
     }
 
     /**
-     * Get Breakdance content (if Breakdance is active)
+     * Get Breakdance content from post meta _breakdance_data.
+     * When present and non-empty, returns HTML extracted from the tree_json_string (headings, text, rich text, etc.).
+     * Does not require Breakdance plugin class so it works in all contexts (save_post, REST, cron).
      */
     private static function get_breakdance_content($post_id) {
-        // Check if Breakdance is active
-        if (!class_exists('Breakdance\PluginBootstrap')) {
+        $bd_data = get_post_meta($post_id, '_breakdance_data', true);
+        if (empty($bd_data) || !is_string($bd_data)) {
+            $bd_data = get_post_meta($post_id, 'breakdance_data', true);
+        }
+        if (empty($bd_data) || !is_string($bd_data)) {
             return '';
         }
-
-        // Breakdance typically stores in post meta
-        // Common keys: _breakdance_data, breakdance_data, bd_post_content
-        $possible_keys = ['_breakdance_data', 'breakdance_data', 'bd_post_content'];
-
-        foreach ($possible_keys as $key) {
-            $bd_data = get_post_meta($post_id, $key, true);
-            if ($bd_data) {
-                return self::parse_breakdance_structure($bd_data);
-            }
-        }
-
-        // Also check options table
-        $bd_data = get_option('breakdance_post_' . $post_id);
-        if ($bd_data) {
-            return self::parse_breakdance_structure($bd_data);
-        }
-
-        return '';
+        return self::parse_breakdance_structure($bd_data);
     }
 
     /**
-     * Parse Breakdance structure (implement when Breakdance is installed)
+     * Parse Breakdance _breakdance_data: outer JSON has tree_json_string containing inner JSON tree.
+     * Walks the tree and extracts readable text/HTML from Heading, Text, RichText, Button, Badge, FancyTestimonial, etc.
+     * Returns HTML so calculate_stats (word count, h2 count) and link analysis work.
      */
     private static function parse_breakdance_structure($data) {
-        // If string, try to decode
         if (is_string($data)) {
             $decoded = json_decode($data, true);
-            if ($decoded) {
-                $data = $decoded;
-            } else {
-                $unserialized = maybe_unserialize($data);
-                if ($unserialized) {
-                    $data = $unserialized;
+            if (!is_array($decoded)) {
+                return '';
+            }
+            $data = $decoded;
+        }
+
+        // Breakdance stores tree in tree_json_string (inner JSON as string)
+        $tree_json = isset($data['tree_json_string']) ? $data['tree_json_string'] : null;
+        if (empty($tree_json) || !is_string($tree_json)) {
+            return '';
+        }
+
+        $tree = json_decode($tree_json, true);
+        if (!is_array($tree) || empty($tree['root'])) {
+            return '';
+        }
+
+        return self::extract_breakdance_tree_to_html($tree['root']);
+    }
+
+    /**
+     * Recursively walk Breakdance tree and build HTML from node content (headings, text, rich text, etc.)
+     */
+    private static function extract_breakdance_tree_to_html($node) {
+        if (!is_array($node)) {
+            return '';
+        }
+
+        $html = '';
+        $data = isset($node['data']) ? $node['data'] : [];
+        $props = isset($data['properties']) ? $data['properties'] : [];
+        $content = isset($props['content']) ? $props['content'] : [];
+        $inner = isset($content['content']) ? $content['content'] : [];
+
+        // Extract text/HTML from known element shapes (one path per node to avoid double output)
+        if (!empty($inner)) {
+            // Heading: content.content.text + content.content.tags (h1, h2, h3)
+            if (isset($inner['tags']) && is_string($inner['text'])) {
+                $tag = preg_match('/^h[1-6]$/i', $inner['tags']) ? strtolower($inner['tags']) : 'h2';
+                $text = trim($inner['text']);
+                if ($text !== '') {
+                    $html .= '<' . $tag . '>' . esc_html($text) . '</' . $tag . '>';
+                }
+            }
+            // RichText: content.content.text is HTML (paragraphs, lists)
+            elseif (isset($inner['text']) && is_string($inner['text']) && strpos($inner['text'], '<') !== false) {
+                $html .= wp_kses_post($inner['text']);
+            }
+            // Plain text: Text, Button, Badge, etc.
+            elseif (isset($inner['text']) && is_string($inner['text'])) {
+                $text = trim(strip_tags($inner['text']));
+                if ($text !== '') {
+                    $html .= '<p>' . esc_html($text) . '</p>';
+                }
+            }
+
+            // FancyTestimonial: testimonial, title, name, occupation (no 'text' or different shape)
+            foreach (['testimonial', 'title', 'name', 'occupation'] as $key) {
+                if (isset($inner[$key]) && is_string($inner[$key]) && trim($inner[$key]) !== '') {
+                    $html .= '<p>' . esc_html(trim($inner[$key])) . '</p>';
                 }
             }
         }
 
-        // If still string, return as is
-        if (is_string($data)) {
-            return $data;
+        // Recurse into children
+        if (!empty($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as $child) {
+                $html .= self::extract_breakdance_tree_to_html($child);
+            }
         }
 
-        // If array, recursively extract text
-        if (is_array($data)) {
-            $content = '';
-            array_walk_recursive($data, function($value) use (&$content) {
-                if (is_string($value) && strlen($value) > 0) {
-                    $content .= ' ' . $value;
-                }
-            });
-            return $content;
-        }
-
-        return '';
+        return $html;
     }
 
     /**

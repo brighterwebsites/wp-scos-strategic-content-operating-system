@@ -5,14 +5,14 @@
  * Version: 1.0.0
  * 
  * Purpose:
- * - Single source of truth for content metadata injection
+ * - Defines semantic intent and topical authority mapping
  * - Consolidates data from bw-content-strategy.php + class-altc-ga4-integration.php
  * - Creates machine-readable content architecture for AI agents
  * - Provides backwards-compatible data structure for GA4 tracking
  * 
  * Responsibilities:
  * - Inject SCOS CAR data into <head> as window.brighterSCOS
- * - Single source of truth for all content metadata
+ * - Defines semantic intent and topical authority mapping
  * - Used by GA4 tracking scripts and AI agents
  * - Loads on all page types (singular, archive, home)
  * 
@@ -54,20 +54,18 @@ add_action('wp_head', function() {
         ?>
         <!-- SCOS CAR - Minimal for archive/home pages -->
         <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
-        // SCOS Content Architecture Record (CAR) - Minimal for archive/home pages
+        // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
         window.brighterSCOS = {
             car: {
                 cluster: 'not_set',
                 topic: 'not_set',
                 maturity: 'not_set',
                 intent: 'not_set',
+                'search-intent': 'not_set',
                 purpose: 'not_set',
-                optimization_status: 'not_set',
-                content_plan: 'none'
+                pillar: null,
+                service_pathway: null
             },
-            pillar: null,
-            service_pathway: null,
-            breadcrumb_schema: '',
             tracking: {
                 ga4_id: <?php echo json_encode($ga4_id); ?>,
                 consent_given: false
@@ -142,7 +140,7 @@ add_action('wp_head', function() {
     $intent = get_post_meta($post_id, 'bw_intent', true) ?: 'not_set';
     $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: 'not_set';
     $maturity = get_post_meta($post_id, 'bw_cont_maturity', true) ?: 'not_set';
-    $opt_status = get_post_meta($post_id, '_brt_opt_status', true) ?: 'not_set';  //deprecated replaced by content_plan- ok to remove.
+    $search_intent = get_post_meta($post_id, 'bw_search_intent', true) ?: 'not_set';
     
     // ============================================
     // GATHER PILLAR RELATIONSHIP
@@ -178,11 +176,6 @@ add_action('wp_head', function() {
         ];
     }
     
-    // Content Plan (replaces deprecated optimization_status)
-    $content_plan = get_post_meta($post_id, 'content_plan', true) ?: 'none';
-    
-    // Breadcrumb schema (for short page title)
-    $breadcrumb_schema = get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: '';
     
     // ============================================
     // GATHER CONTENT METRICS (Internal use only)
@@ -209,22 +202,16 @@ add_action('wp_head', function() {
             
             // Content Strategy
             'intent' => $intent,
+            'search-intent' => $search_intent,
             'purpose' => $purpose,
-            'optimization_status' => $opt_status,
+            
+            // Relationships
+            'pillar' => $pillar,
+            'service_pathway' => $service_pathway,
             
             // Metrics (internal only - not sent to GA4)
             'metrics' => $metrics
         ],
-        
-        // Content workflow
-        'content_plan' => $content_plan,
-        
-        // Relationships
-        'pillar' => $pillar,
-        'service_pathway' => $service_pathway,
-        
-        // Display
-        'breadcrumb_schema' => $breadcrumb_schema,
         
         // GA4 tracking config
         'tracking' => [
@@ -243,14 +230,14 @@ add_action('wp_head', function() {
     
     // ============================================
     // OUTPUT JAVASCRIPT
-    // SCOS Content Architecture Record (CAR) - Single source of truth for content metadata
+    // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
     // Used by: GA4 tracking scripts, content strategy tools, AI agents
     // ============================================
     ?>
     <!-- SCOS CAR - Full data for singular pages -->
     <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
-    // SCOS Content Architecture Record (CAR) - Single source of truth for content metadata
-    window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES); ?>;
+    // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
+    window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT); ?>;
     
     // Note: window.brighterGA4 is created by brighter-ga4-tracking.php (runs on ALL pages)
     // We don't create it here to avoid conflicts and ensure skipTracking property is preserved

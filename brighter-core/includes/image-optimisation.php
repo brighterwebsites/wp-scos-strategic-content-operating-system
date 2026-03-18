@@ -6,9 +6,11 @@
  * Purpose: Core logic for resizing uploads, managing registered sizes,
  * thumbnail control, comment disable on attachments, and LiteSpeed fade-in CSS. and OG image injection.
  *  
- * Version: 4.1.0
+ * Version: 4.3.0
  *
  * Changelog:
+ * 4.3.0 - Added option to disable WordPress big_image_size_threshold (2560px scaling)
+ * 4.2.0 - Removed og:image:secure_url (not needed for HTTPS sites), added Twitter card output after image
  * 4.1.0 - Added direct OG image meta tag injection (bypasses SEOPress filter issues)
  * 4.0.0 - Initial release
  *
@@ -18,6 +20,7 @@
  * - Enforce thumbnail generation preferences
  * - Disable comments on attachment pages
  * - Add lazyload fade-in CSS for LiteSpeed
+ * - Control WordPress big image threshold
  *
  * Notes:
  * - Settings for these features are managed in brighter-support-image-settings.php
@@ -27,6 +30,20 @@
 
 
 if (!defined('ABSPATH')) exit;
+
+// ==========================================
+// ✅ Disable big image size threshold (2560px)
+// ==========================================
+add_filter('big_image_size_threshold', function($threshold) {
+    // Check if admin has disabled the threshold
+    $disabled = get_option('disable_big_image_threshold', 0);
+    
+    if ($disabled) {
+        return false; // Disable WordPress 2560px scaling
+    }
+    
+    return $threshold; // Keep default WordPress behavior (2560px)
+});
 
 // ==========================================
 // ✅ Resize images on upload
@@ -126,6 +143,21 @@ add_action('init', function () {
             update_option("{$prefix}_crop", false);
         }
     }
+
+    // Custom Hero size (user-defined dimensions from options)
+    if (get_option('brighter_enable_custom_hero') && get_option('brighter_custom_hero_width')) {
+        add_image_size(
+            'custom_hero',
+            (int) get_option('brighter_custom_hero_width'),
+            (int) get_option('brighter_custom_hero_height', 0),
+            false
+        );
+    } else {
+        remove_image_size('custom_hero');
+        if (isset($_wp_additional_image_sizes['custom_hero'])) {
+            unset($_wp_additional_image_sizes['custom_hero']);
+        }
+    }
 }, 10);
 
 // ==========================================
@@ -146,15 +178,21 @@ add_filter('wp_editor_set_quality', function($quality, $mime_type) {
 // ✅ Filter: remove disabled sizes during generation
 // ==========================================
 add_filter('intermediate_image_sizes', function ($sizes) {
-    $core = ['thumbnail', 'medium', 'medium_large', 'large'];
     return array_filter($sizes, function ($s) {
+        if ($s === 'custom_hero') {
+            return get_option('brighter_enable_custom_hero') && get_option('brighter_custom_hero_width');
+        }
         return get_option("enable_size_$s", 0);
     });
 });
 
 add_filter('intermediate_image_sizes_advanced', function ($sizes) {
     foreach ($sizes as $name => $settings) {
-        if (!get_option("enable_size_$name", 1)) {
+        if ($name === 'custom_hero') {
+            if (!get_option('brighter_enable_custom_hero') || !get_option('brighter_custom_hero_width')) {
+                unset($sizes[$name]);
+            }
+        } elseif (!get_option("enable_size_$name", 1)) {
             unset($sizes[$name]);
         }
     }
@@ -174,6 +212,11 @@ add_filter('image_size_names_choose', function ($sizes) {
         if (get_option("enable_size_$key", 0)) {
             $sizes[$key] = $label;
         }
+    }
+    if (get_option('brighter_enable_custom_hero') && get_option('brighter_custom_hero_width')) {
+        $w = (int) get_option('brighter_custom_hero_width');
+        $h = (int) get_option('brighter_custom_hero_height', 0);
+        $sizes['custom_hero'] = $h ? "Custom Hero ({$w}×{$h})" : "Custom Hero ({$w}w)";
     }
     return $sizes;
 });
@@ -200,13 +243,31 @@ add_filter('comments_open', function ($open, $post_id) {
 
 
 // ==========================================
-// ? Force og-image (1200x630) for SEOPress OG tags
+// Force og-image (1200x630) for SEOPress OG tags
 // ==========================================
-// Priority 1: Filter the OG image URL (for SEOPress)
+/**
+ * Filter SEOPress OG image URL to use og-image size (1200x630) when the image is an attachment.
+ *
+ * @param string $url    Current OG image URL from SEOPress
+ * @param mixed  $context Optional second parameter from filter
+ * @return string OG image URL (og-image size if attachment, else unchanged)
+ */
+function brighter_force_og_image_size($url, $context = null) {
+    if (empty($url) || !is_string($url)) {
+        return $url;
+    }
+    $attachment_id = attachment_url_to_postid($url);
+    if (!$attachment_id) {
+        return $url;
+    }
+    $og_url = wp_get_attachment_image_url($attachment_id, 'og-image');
+    return $og_url ? $og_url : $url;
+}
 add_filter('seopress_social_og_image', 'brighter_force_og_image_size', 999, 2);
-add_filter('seopress_social_og_default_image', 'brighter_force_og_image_size', 999, 2); // ADD THIS LINE
+add_filter('seopress_social_og_default_image', 'brighter_force_og_image_size', 999, 2);
+
 // ==========================================
-// ? Force og:image meta tags directly (bypass SEOPress)
+// Force og:image meta tags directly (bypass SEOPress)
 // ==========================================
 
 add_action('wp_head', 'brighter_inject_og_image_tags', 1);
@@ -260,15 +321,17 @@ function brighter_inject_og_image_tags() {
         }
         
         // Output the meta tags directly
-        echo "\n";
+        echo "\n<!-- OG Image Tags -->\n";
         echo '<meta property="og:image" content="' . esc_url($og_image_url) . '">' . "\n";
-        echo '<meta property="og:image:secure_url" content="' . esc_url($og_image_url) . '">' . "\n";
         echo '<meta property="og:image:type" content="' . esc_attr($image_type) . '">' . "\n";
         echo '<meta property="og:image:width" content="' . esc_attr($width) . '">' . "\n";
         echo '<meta property="og:image:height" content="' . esc_attr($height) . '">' . "\n";
         if ($alt_text) {
             echo '<meta property="og:image:alt" content="' . esc_attr($alt_text) . '">' . "\n";
         }
+        
+        echo "\n<!-- Twitter Card (after image) -->\n";
+        echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
     }
 }
 

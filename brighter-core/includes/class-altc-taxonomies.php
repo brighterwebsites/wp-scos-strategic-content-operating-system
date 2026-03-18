@@ -42,7 +42,20 @@ class BW_ALTC_Taxonomies {
         ], 'names');
 
         // Exclude post types that shouldn't have ALTC
-        $exclude = ['attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation'];
+        $exclude = [
+            'attachment', 
+            'nav_menu_item', 
+            'wp_block', 
+            'wp_template', 
+            'wp_template_part', 
+            'wp_navigation',
+            // WooCommerce post types
+            'product',
+            'product_variation',
+            'shop_order',
+            'shop_coupon',
+            'shop_webhook',
+        ];
 
         return array_values(array_diff($post_types, $exclude));
     }

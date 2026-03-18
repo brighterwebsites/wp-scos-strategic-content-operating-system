@@ -128,6 +128,9 @@ class Seo_Module implements Module_Interface {
         // Handle sitemap requests
         add_action('template_redirect', [$this, 'serve_sitemap'], 1);
 
+        // CRITICAL: Redirect wp-sitemap.xml to our sitemap.xml before WP core serves it
+        add_action('parse_request', [$this, 'redirect_core_sitemap'], 1);
+
         // Register HTML sitemap shortcode
         add_shortcode('site_essentials_sitemap', [$this, 'render_html_sitemap_shortcode']);
 
@@ -140,6 +143,8 @@ class Seo_Module implements Module_Interface {
         // Add admin notices for conflicting plugins
         if (is_admin()) {
             add_action('admin_notices', [$this, 'check_conflicts']);
+            add_action('admin_init', [$this, 'handle_dismiss_notice']);
+            add_action('wp_ajax_se_dismiss_seo_notice', [$this, 'ajax_dismiss_notice']);
             
             // Initialize Schema Meta Box for post/page editors
             require_once __DIR__ . '/Schema_Meta_Box.php';
@@ -173,6 +178,24 @@ class Seo_Module implements Module_Interface {
             $vars[] = 'se_sitemap';
             return $vars;
         });
+    }
+
+    /**
+     * Redirect core wp-sitemap.xml to our sitemap.xml (early hook before WP processes the request)
+     *
+     * @since 1.0.0
+     * @param WP $wp Current WordPress environment instance
+     * @return void
+     */
+    public function redirect_core_sitemap($wp) {
+        if (!isset($_SERVER['REQUEST_URI'])) {
+            return;
+        }
+        // Match any wp-sitemap request (wp-sitemap.xml, wp-sitemap-posts-*.xml, etc.)
+        if (preg_match('#/wp-sitemap.*\.xml$#i', $_SERVER['REQUEST_URI'])) {
+            wp_safe_redirect(home_url('/sitemap.xml'), 301);
+            exit;
+        }
     }
 
     /**
@@ -792,10 +815,17 @@ class Seo_Module implements Module_Interface {
     /**
      * Check for conflicting plugins
      *
+     * Shows dismissible notice if other SEO plugins are detected.
+     *
      * @since 1.0.0
      * @return void
      */
     public function check_conflicts() {
+        // Check if already dismissed
+        if (get_user_meta(get_current_user_id(), 'se_seo_plugin_notice_dismissed', true)) {
+            return;
+        }
+
         $conflicts = [];
 
         // Check for SEOPress
@@ -814,11 +844,70 @@ class Seo_Module implements Module_Interface {
         }
 
         if (!empty($conflicts)) {
-            echo '<div class="notice notice-warning"><p>';
-            echo '<strong>Site Essentials SEO:</strong> Detected sitemap conflict with: ' . implode(', ', $conflicts) . '. ';
-            echo 'Please disable their sitemap feature to avoid duplicate sitemaps.';
-            echo '</p></div>';
+            $plugin_names = implode(', ', $conflicts);
+            $dismiss_url = add_query_arg([
+                'se_dismiss_seo_notice' => '1',
+                'nonce' => wp_create_nonce('se_dismiss_seo_notice')
+            ]);
+            
+            echo '<div class="notice notice-info is-dismissible" data-se-notice="seo-plugin">';
+            echo '<p>';
+            echo '<strong>Site Essentials SEO:</strong> Detected ' . esc_html($plugin_names) . ' installed. ';
+            echo 'Ensure only one system is managing each feature (like sitemaps or schema) to avoid duplicate/competing settings.';
+            echo '</p>';
+            echo '<p><a href="' . esc_url($dismiss_url) . '" class="button button-small">Dismiss</a></p>';
+            echo '</div>';
+            
+            // Add JavaScript to handle AJAX dismiss
+            ?>
+            <script>
+            jQuery(document).ready(function($) {
+                $('[data-se-notice="seo-plugin"] .notice-dismiss').on('click', function() {
+                    $.post(ajaxurl, {
+                        action: 'se_dismiss_seo_notice',
+                        nonce: '<?php echo wp_create_nonce('se_dismiss_seo_notice'); ?>'
+                    });
+                });
+            });
+            </script>
+            <?php
         }
+    }
+
+    /**
+     * Handle dismiss notice via URL
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function handle_dismiss_notice() {
+        if (!isset($_GET['se_dismiss_seo_notice'])) {
+            return;
+        }
+
+        if (!isset($_GET['nonce']) || !wp_verify_nonce($_GET['nonce'], 'se_dismiss_seo_notice')) {
+            return;
+        }
+
+        update_user_meta(get_current_user_id(), 'se_seo_plugin_notice_dismissed', true);
+        
+        // Redirect to remove query args
+        wp_safe_redirect(remove_query_arg(['se_dismiss_seo_notice', 'nonce']));
+        exit;
+    }
+
+    /**
+     * Handle AJAX dismiss notice
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function ajax_dismiss_notice() {
+        check_ajax_referer('se_dismiss_seo_notice', 'nonce');
+        
+        update_user_meta(get_current_user_id(), 'se_seo_plugin_notice_dismissed', true);
+        
+        wp_send_json_success();
     }
 
     /**
@@ -1077,7 +1166,7 @@ class Seo_Module implements Module_Interface {
             }
             .site-essentials-html-sitemap .archive-link {
                 font-size: 0.8em;
-                color: #0073aa;
+                color: var(--bde-brand-primary-color);
                 text-decoration: none;
                 padding: 4px 8px;
                 background: #e5f2ff;
@@ -1085,7 +1174,7 @@ class Seo_Module implements Module_Interface {
                 transition: all 0.2s;
             }
             .site-essentials-html-sitemap .archive-link:hover {
-                background: #0073aa;
+                background:var(--bde-brand-primary-color-hover);
                 color: white;
             }
             .site-essentials-html-sitemap .sitemap-list {
@@ -1096,7 +1185,7 @@ class Seo_Module implements Module_Interface {
                 margin-bottom: 10px;
                 padding: 8px;
                 background: #f9f9f9;
-                border-left: 3px solid #0073aa;
+                border-left: 3px solid var(--bde-brand-primary-color-hover);
             }
             .site-essentials-html-sitemap .sitemap-dates {
                 display: block;

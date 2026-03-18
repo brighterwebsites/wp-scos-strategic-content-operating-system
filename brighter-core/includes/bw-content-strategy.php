@@ -54,14 +54,6 @@ add_action('init', function() {
         'auth_callback'     => function() { return current_user_can('edit_posts'); },
     ]);
     
-    // Optimization status (DEPRECATED - kept for backwards compatibility)
-    register_post_meta('', '_brt_opt_status', [
-        'type'          => 'string',
-        'single'        => true,
-        'show_in_rest'  => false,
-        'auth_callback' => function() { return current_user_can('edit_posts'); },
-    ]);
-
     // Index status
     register_post_meta('', 'bw_index_status', [
         'type'          => 'string',
@@ -106,7 +98,20 @@ function bw_cs_post_types() {
     ], 'names');
     
     // Exclude post types that shouldn't have content strategy
-    $exclude = ['attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation'];
+    $exclude = [
+        'attachment', 
+        'nav_menu_item', 
+        'wp_block', 
+        'wp_template', 
+        'wp_template_part', 
+        'wp_navigation',
+        // WooCommerce post types
+        'product',
+        'product_variation',
+        'shop_order',
+        'shop_coupon',
+        'shop_webhook',
+    ];
     
     return array_values(array_diff($post_types, $exclude));
 }
@@ -228,32 +233,6 @@ function bw_cs_content_plan_options() {
     ];
 }
 //this is ready to be depreciated fully please also search for other instances and uses of this and remove it, flag if we need to rework any other sections. 
-function bw_cs_opt_status_options() {
-    return [
-        ''              => ['label' => '� No status �', 'color' => '#6b7280', 'bg' => '#f3f4f6'],  // Grey: Default / Unassigned
-
-        // --- Workflow Stages (In Progress) ---
-        'idea'          => ['label' => 'ℹ️ Idea', 'color' => '#4338ca', 'bg' => '#e0e7ff'],  // Indigo-700: Early planning / concept
-        'draft'         => ['label' => '🆕 Drafted', 'color' => '#4f46e5', 'bg' => '#eef2ff'],  // Indigo-600: In progress content, not yet ready for publishing
-
-        // --- Testing & Strategic Action ---
-        'cont'          => ['label' => '🧾 Content Only', 'color' => '#be185d', 'bg' => '#fce7f3'],  // Rose-700: Content done is published
-        'seo_basic'     => ['label' => '🚀 SEO Basic', 'color' => '#b45309', 'bg' => '#fef3c7'],  // Amber-700: Basic Onpage SEO is done
-        'cro'           => ['label' => '📲 Conversion', 'color' => '#1d4ed8', 'bg' => '#dbeafe'],  // Blue-700: Analytics/UX optimisation is done
-
-        // --- SEO Optimised Status (Green Zone) ---
-        'op60'          => ['label' => '⭐ Optimised 60+', 'color' => '#15803d', 'bg' => '#dcfce7'],  // Green-700: At or Above target NeuronWriter keyword optimised
-        'op70'          => ['label' => '🎯 Optimised 70+', 'color' => '#065f46', 'bg' => '#a7f3d0'],  // Emerald-800: Tech SEO Implemented
-        'op80'          => ['label' => '💎 Optimised 80+', 'color' => '#7e22ce', 'bg' => '#f3e8ff'],  // Purple-700: Tech SEO + Conversion
-
-        // --- Content Inventory Decisions (Archival) ---
-        'attention'     => ['label' => '📉 Low Perf', 'color' => '#9d174d', 'bg' => '#fbcfe8'],  // Rose-800: Low Performing + Needs investigation
-        'urgent'        => ['label' => '📌 Urgent Attention', 'color' => '#b91c1c', 'bg' => '#fee2e2'],  // Red-700: High Pri Low Performing any status
-        'ctr'           => ['label' => '🚩 Visibility', 'color' => '#0f766e', 'bg' => '#ccfbf1'],  // Teal-700: Pri for Meta and or Tech SEO Needs improvement + is planned
-        'repurpose'     => ['label' => '🔄 Repurpose', 'color' => '#b45309', 'bg' => '#fcefd5'],  // Pri for Content improvement + is planned
-    ];
-}
-
 // ==========================
 // Admin Columns
 // ==========================
@@ -269,7 +248,6 @@ add_action('admin_init', function() {
                     $new['bw_intent']          = 'Intent';
                     $new['bw_purpose']         = 'Purpose';
                     $new['bw_index']           = 'Index Status';
-                    $new['bw_opt']             = 'Optimization';
                     $new['bw_progress']        = 'Progress';
                     $new['bw_next_step']       = 'Next Step';
                     $new['bw_altc_notes']      = 'Primary Intent';
@@ -304,21 +282,6 @@ add_action('admin_init', function() {
                          . esc_html($opts[$val] ?? 'NA') . '</span>';
                     break;
                     
-                case 'bw_opt':
-                    $val = get_post_meta($post_id, '_brt_opt_status', true);
-                    $opts = bw_cs_opt_status_options();
-                    if (!isset($opts[$val])) $val = '';
-                    $cfg = $opts[$val];
-                    printf(
-                        '<span class="bw-opt-badge" data-post="%d" data-value="%s" title="Click to edit" style="display:inline-block;border-radius:999px;padding:.2em .6em;font-size:12px;font-weight:600;color:%s;background:%s;cursor:pointer;">%s</span>',
-                        $post_id,
-                        esc_attr($val),
-                        esc_attr($cfg['color']),
-                        esc_attr($cfg['bg']),
-                        esc_html($cfg['label'])
-                    );
-                    break;
-
                 case 'bw_index':
                     $val = get_post_meta($post_id, 'bw_index_status', true);
                     $opts = bw_cs_index_status_options();
@@ -377,7 +340,8 @@ add_action('admin_init', function() {
                     $values = get_post_meta($post_id, 'workflow_progress', true);
                     $opts = bw_cs_workflow_progress_options();
                     if (!empty($values) && is_array($values)) {
-                        echo '<span class="bw-cs-progress" data-post="' . esc_attr($post_id) . '" style="cursor:pointer;">';
+                        // Store values as JSON in data attribute for inline edit
+                        echo '<span class="bw-cs-progress" data-post="' . esc_attr($post_id) . '" data-progress-values="' . esc_attr(wp_json_encode($values)) . '" style="cursor:pointer;">';
                         $tags = [];
                         foreach ($values as $val) {
                             if (isset($opts[$val])) {
@@ -458,7 +422,6 @@ foreach (['post', 'page'] as $pt) {
         // DEPRECATED: bw_topic removed - use ALTC Topic taxonomy instead
         $cols['bw_intent']          = 'bw_intent';
         $cols['bw_purpose']         = 'bw_purpose';
-        $cols['bw_opt']             = '_brt_opt_status';
         $cols['bw_index']           = 'bw_index_status';
         $cols['bw_pillar']          = 'bw_pillar_page_id';
         $cols['bw_service_pathway'] = 'bw_service_pathway_id';
@@ -473,13 +436,45 @@ foreach (['post', 'page'] as $pt) {
     });
 }
 
+// ==========================
+// Hidden Columns by Default
+// ==========================
+// Make specified columns unchecked by default for ALL users
+foreach (bw_cs_post_types() as $pt) {
+    add_filter("default_hidden_columns", function($hidden, $screen) use ($pt) {
+        // Only apply to our post types' edit screens
+        if ($screen->id !== "edit-{$pt}") {
+            return $hidden;
+        }
+        
+        // Columns to hide by default
+        $hide_by_default = [
+            'bw_pillar',          // Pillar
+            'bw_service_pathway', // Service Pathway
+            'bw_intent',          // Intent
+            'bw_purpose',         // Purpose
+            'bw_index',           // Index Status
+            'bw_progress',        // Progress
+            'bw_next_step',       // Next Step
+            'bw_altc_notes',      // Primary Intent
+            'taxonomy-bw_topic',  // ALTC Topic
+            'taxonomy-bw_role',   // Role
+            'taxonomy-bw_maturity', // Maturity
+            'taxonomy-bw_social', // Social
+        ];
+        
+        // Merge with existing hidden columns (don't override user preferences)
+        return array_unique(array_merge($hidden, $hide_by_default));
+    }, 10, 2);
+}
+
 add_action('pre_get_posts', function($q) {
     if (!is_admin() || !$q->is_main_query()) return;
     $orderby = $q->get('orderby');
 
     // Text-based meta fields
     // DEPRECATED: bw_page_topic removed - use ALTC Topic taxonomy instead
-    if (in_array($orderby, ['bw_intent', 'bw_purpose', '_brt_opt_status', 'bw_index_status', 'bw_pillar_page_id', 'bw_service_pathway_id', 'content_plan'], true)) {
+    if (in_array($orderby, ['bw_intent', 'bw_purpose', 'bw_index_status', 'bw_pillar_page_id', 'bw_service_pathway_id', 'content_plan'], true)) {
         $q->set('meta_key', $orderby);
         $q->set('orderby', 'meta_value');
     }
@@ -584,7 +579,6 @@ add_action('admin_enqueue_scripts', function($hook) {
         const nonce = "' . esc_js(wp_create_nonce('bw_cs_inline')) . '";
         const intentOpts = ' . wp_json_encode(bw_cs_intent_options()) . ';
         const purposeOpts = ' . wp_json_encode(bw_cs_purpose_options()) . ';
-        const optOpts = ' . wp_json_encode(bw_cs_opt_status_options()) . ';
         const indexOpts = ' . wp_json_encode(bw_cs_index_status_options()) . ';
         const pillarOpts = ' . wp_json_encode($pillar_opts) . ';
         const servicePathwayOpts = ' . wp_json_encode($service_pathway_opts) . ';
@@ -723,65 +717,6 @@ add_action('admin_enqueue_scripts', function($hook) {
                         "data-field": field,
                         text: opts[value] || "NA",
                         css: spanStyle
-                    });
-                    $select.replaceWith($span);
-                } else {
-                    alert("Save failed");
-                    $select.prop("disabled", false).focus();
-                }
-            });
-        });
-        
-        // Optimization status
-        $(document).on("click", ".bw-opt-badge", function(e) {
-            e.preventDefault();
-            const $span = $(this);
-            const postId = $span.data("post");
-            const current = $span.data("value") || "";
-            
-            const $select = $("<select>", {
-                class: "bw-opt-dropdown",
-                "data-post": postId,
-                css: { fontSize: "12px" }
-            });
-            
-            $.each(optOpts, function(key, cfg) {
-                $select.append($("<option>", {
-                    value: key,
-                    text: cfg.label,
-                    selected: key === current
-                }));
-            });
-            
-            $span.replaceWith($select);
-            $select.focus();
-        });
-        
-        $(document).on("change blur", ".bw-opt-dropdown", function(e) {
-            const $select = $(this);
-            const postId = $select.data("post");
-            const value = $select.val();
-            const cfg = optOpts[value] || optOpts[""];
-            
-            $select.prop("disabled", true);
-            saveField(postId, "_brt_opt_status", value).done(function(resp) {
-                if (resp && resp.success) {
-                    const $span = $("<span>", {
-                        class: "bw-opt-badge",
-                        "data-post": postId,
-                        "data-value": value,
-                        title: "Click to edit",
-                        text: cfg.label,
-                        css: {
-                            display: "inline-block",
-                            borderRadius: "999px",
-                            padding: ".2em .6em",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            color: cfg.color,
-                            background: cfg.bg,
-                            cursor: "pointer"
-                        }
                     });
                     $select.replaceWith($span);
                 } else {
@@ -1053,7 +988,7 @@ add_action('wp_ajax_bw_cs_save_field', function() {
     }
     
     // Allowed fields for inline editing
-    $allowed = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', 'bw_service_pathway_id', '_brt_opt_status', 'bw_index_status', 'workflow_progress', 'content_plan'];
+    $allowed = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar_page_id', 'bw_service_pathway_id', 'bw_index_status', 'workflow_progress', 'content_plan'];
     if (!in_array($field, $allowed, true)) {
         wp_send_json_error('Invalid field');
     }
@@ -1225,17 +1160,6 @@ function bw_cs_quick_bulk_box($col, $post_type) {
                         <?php endforeach; ?>
                     </select>
                 </label>
-            <?php elseif ($col === 'bw_opt'): ?>
-                <label><span class="title">Optimization</span>
-                    <select name="_brt_opt_status">
-                        <?php if ($is_bulk): ?>
-                            <option value="">-- No Change --</option>
-                        <?php endif; ?>
-                        <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
-                            <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($cfg['label']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
             <?php elseif ($col === 'bw_index'): ?>
                 <label><span class="title">Index Status</span>
                     <select name="bw_index_status">
@@ -1260,37 +1184,45 @@ add_action('admin_footer-edit.php', function() {
     ?>
     <script>
     jQuery(function($) {
-        var $qe = inlineEditPost.edit;
-        inlineEditPost.edit = function(id) {
-            $qe.apply(this, arguments);
-            var postId = (typeof id === 'object') ? this.getId(id) : id;
-            var $row = $('#post-' + postId);
-
-            // Primary Intent (bw_altc_notes)
-            $('textarea[name="bw_altc_notes"]', '.inline-edit-row').val($row.find('.bw-cs-text[data-field="bw_altc_notes"]').text().trim());
-            
-            var intent = $row.find('.bw-cs-select[data-field="bw_intent"]').text().trim();
-            $('select[name="bw_intent"] option', '.inline-edit-row').filter(function() {
-                return $(this).text() === intent;
-            }).prop('selected', true);
-            
-            var purpose = $row.find('.bw-cs-select[data-field="bw_purpose"]').text().trim();
-            $('select[name="bw_purpose"] option', '.inline-edit-row').filter(function() {
-                return $(this).text() === purpose;
-            }).prop('selected', true);
-            
-            var optVal = $row.find('.bw-opt-badge').data('value') || '';
-            $('select[name="_brt_opt_status"]', '.inline-edit-row').val(optVal);
-
-            var indexStatus = $row.find('.bw-cs-select[data-field="bw_index_status"]').text().trim();
-            $('select[name="bw_index_status"] option', '.inline-edit-row').filter(function() {
-                return $(this).text() === indexStatus;
-            }).prop('selected', true);
-            
-            // Next Step
-            var nextStepVal = $row.find('.bw-cs-next-step').data('value') || '';
-            $('select[name="content_plan"]', '.inline-edit-row').val(nextStepVal);
-        };
+        // Hook into WordPress's inlineEditPost.edit function (the official way)
+        if (typeof inlineEditPost !== 'undefined') {
+            var $wp_inline_edit = inlineEditPost.edit;
+            inlineEditPost.edit = function(id) {
+                // Call original function
+                $wp_inline_edit.apply(this, arguments);
+                
+                // Get post ID
+                var postId = 0;
+                if (typeof(id) === 'object') {
+                    postId = parseInt(this.getId(id));
+                }
+                
+                if (postId > 0) {
+                    // Get saved progress values from the table row
+                    var $row = $('#post-' + postId);
+                    var progressData = $row.find('.bw-cs-progress').attr('data-progress-values');
+                    
+                    if (progressData) {
+                        try {
+                            var progressValues = JSON.parse(progressData);
+                            
+                            // Wait a moment for inline edit form to render
+                            setTimeout(function() {
+                                $('.bw-progress-checkboxes-edit input[type="checkbox"]').prop('checked', false);
+                                
+                                if (Array.isArray(progressValues) && progressValues.length > 0) {
+                                    progressValues.forEach(function(val) {
+                                        $('.bw-progress-checkboxes-edit input[value="' + val + '"]').prop('checked', true);
+                                    });
+                                }
+                            }, 50);
+                        } catch(e) {
+                            // Silent fail
+                        }
+                    }
+                }
+            };
+        }
     });
     </script>
     <?php
@@ -1319,9 +1251,6 @@ add_action('save_post', function($post_id) {
         'bw_altc_notes'         => 'sanitize_textarea_field',
         'bw_intent'             => 'sanitize_text_field',
         'bw_purpose'            => 'sanitize_text_field',
-        'bw_pillar_page_id'     => 'absint',
-        'bw_service_pathway_id' => 'absint',
-        '_brt_opt_status'       => 'sanitize_text_field',
         'bw_index_status'       => 'sanitize_text_field',
         'content_plan'          => 'sanitize_text_field',
     ];
@@ -1339,6 +1268,32 @@ add_action('save_post', function($post_id) {
         }
     }
     
+    // FIX: Pillar Page ID and Service Pathway ID - Handle separately to prevent clearing on bulk edit
+    // These are integer fields, so we need special handling for empty strings
+    if (isset($_REQUEST['bw_pillar_page_id'])) {
+        $value = $_REQUEST['bw_pillar_page_id'];
+        // For bulk edit: empty string means "No Change", don't update
+        if ($is_bulk_edit && $value === '') {
+            // Skip - don't clear existing value
+        } else {
+            // For quick edit or bulk edit with actual value
+            $value = absint($value);
+            update_post_meta($post_id, 'bw_pillar_page_id', $value);
+        }
+    }
+    
+    if (isset($_REQUEST['bw_service_pathway_id'])) {
+        $value = $_REQUEST['bw_service_pathway_id'];
+        // For bulk edit: empty string means "No Change", don't update
+        if ($is_bulk_edit && $value === '') {
+            // Skip - don't clear existing value
+        } else {
+            // For quick edit or bulk edit with actual value
+            $value = absint($value);
+            update_post_meta($post_id, 'bw_service_pathway_id', $value);
+        }
+    }
+    
     // Handle workflow_progress (multi-select checkboxes)
     // Only update if the progress field was actually rendered in the form (marker field present)
     if (isset($_REQUEST['workflow_progress'])) {
@@ -1349,6 +1304,7 @@ add_action('save_post', function($post_id) {
         }
     } elseif (!$is_bulk_edit && isset($_REQUEST['workflow_progress_touched'])) {
         // Only clear if the progress section was rendered but no boxes checked
+        // AND this is NOT a bulk edit
         update_post_meta($post_id, 'workflow_progress', []);
     }
     // If neither condition met, leave existing workflow_progress unchanged
@@ -1377,7 +1333,6 @@ function bw_cs_render_metabox($post) {
     $intent = get_post_meta($post->ID, 'bw_intent', true);
     $purpose = get_post_meta($post->ID, 'bw_purpose', true);
     $pillar = get_post_meta($post->ID, 'bw_pillar_page_id', true);
-    $opt = get_post_meta($post->ID, '_brt_opt_status', true);
     $index_status = get_post_meta($post->ID, 'bw_index_status', true);
     $workflow_progress = get_post_meta($post->ID, 'workflow_progress', true);
     $content_plan = get_post_meta($post->ID, 'content_plan', true);
@@ -1482,18 +1437,6 @@ function bw_cs_render_metabox($post) {
     </div>
     
     <div class="bw-cs-field">
-        <label for="_brt_opt_status">Optimization Status <em style="font-weight:normal;color:#999;">(Legacy)</em></label>
-        <select id="_brt_opt_status" name="_brt_opt_status" style="width:100%;">
-            <?php foreach (bw_cs_opt_status_options() as $key => $cfg): ?>
-                <option value="<?php echo esc_attr($key); ?>" <?php selected($opt, $key); ?>>
-                    <?php echo esc_html($cfg['label']); ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <p class="bw-cs-help">Legacy field - to be deprecated</p>
-    </div>
-    
-    <div class="bw-cs-field">
         <label>Progress</label>
         <div class="bw-progress-tags">
             <?php foreach (bw_cs_workflow_progress_options() as $key => $cfg): 
@@ -1571,7 +1514,6 @@ add_action('save_post', function($post_id) {
         'bw_intent'             => 'sanitize_text_field',
         'bw_purpose'            => 'sanitize_text_field',
         'bw_pillar_page_id'     => 'absint',
-        '_brt_opt_status'       => 'sanitize_text_field',
         'bw_index_status'       => 'sanitize_text_field',
         'content_plan'          => 'sanitize_text_field',
     ];
@@ -1602,7 +1544,6 @@ add_action('save_post', function($post_id) {
  * bw_page_topic       → content_topic         → "SEO Services" [DEPRECATED - kept for GA4 legacy data]
  * bw_intent           → content_intent        → "informational"
  * bw_purpose          → content_purpose       → "pillar"
- * _brt_opt_status     → optimization_status   → "cro"
  * bw_pillar_page_id   → pillar_page           → "About Us"
  *
  * These dimensions are automatically included in ALL GA4 events:

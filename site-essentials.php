@@ -134,18 +134,20 @@ add_action('init', function() {
             \SiteEssentials\Modules\Seo\Seo_Module::class
         );
 
-        // CRITICAL: Disable WordPress core sitemaps if SEO module is enabled
-        // WordPress core registers sitemaps with: add_action('init', 'wp_sitemaps_get_server', 5)
-        // We remove this action BEFORE it runs, then add our filter as backup
-        if ($settings->is_module_enabled('seo')) {
-            add_action('init', function() {
-                // Remove WP core sitemap initialization (runs at priority 5)
-                remove_action('init', 'wp_sitemaps_get_server', 5);
-            }, 1); // Priority 1 = runs BEFORE WP core
+        \SiteEssentials\Core\Module_Loader::register(
+            'cpt',
+            \SiteEssentials\Modules\CustomPosts\Cpt_Module::class
+        );
 
-            // Backup: Also add filter in case WP core changes their implementation
-            add_filter('wp_sitemaps_enabled', '__return_false', 1);
-        }
+        // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used.
+        // WP core registers at init priority 5; we must run earlier. Use priority 0 so we run first.
+        add_action('init', function() {
+            $removed = remove_action('init', 'wp_sitemaps_get_server', 5);
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('[Site Essentials] wp_sitemaps disable: remove_action(init, wp_sitemaps_get_server, 5) = ' . ($removed ? 'true' : 'false'));
+            }
+        }, 0);
+        add_filter('wp_sitemaps_enabled', '__return_false', 1);
 
         // Load all enabled modules
         \SiteEssentials\Core\Module_Loader::load_modules();

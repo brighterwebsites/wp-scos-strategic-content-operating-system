@@ -17,11 +17,44 @@ class BW_Social_Webhook_Manual {
     /**
      * Post types that support social posts (all content-strategy post types)
      */
+    /**
+     * Get post types for social amplification
+     * Returns all public post types that should have social amplification
+     */
     private function get_post_types() {
+        // Use Content Strategy post types if available
         if (function_exists('bw_cs_post_types')) {
-            return bw_cs_post_types();
+            $cs_types = bw_cs_post_types();
+        } else {
+            // Fallback: get all public post types
+            $cs_types = get_post_types([
+                'public' => true,
+                'show_ui' => true
+            ], 'names');
         }
-        return array('post', 'page', 'folio', 'projects', 'kb', 'news');
+        
+        // Also explicitly include these post types (in case they register late)
+        $explicit_types = array('post', 'page', 'folio', 'projects', 'kb', 'news');
+        
+        // Merge and dedupe
+        $all_types = array_unique(array_merge($cs_types, $explicit_types));
+        
+        // Exclude unwanted types
+        $exclude = array(
+            'attachment', 
+            'nav_menu_item', 
+            'wp_block', 
+            'wp_template', 
+            'wp_template_part', 
+            'wp_navigation',
+            'product',
+            'product_variation',
+            'shop_order',
+            'shop_coupon',
+            'shop_webhook'
+        );
+        
+        return array_values(array_diff($all_types, $exclude));
     }
 
     /**
@@ -31,8 +64,9 @@ class BW_Social_Webhook_Manual {
         // Add meta box to post editor
         add_action('add_meta_boxes', array($this, 'add_meta_box'));
         
-        // Add admin column for all post types (deferred to init:20 so CPTs like faq, projects are registered)
-        add_action('init', array($this, 'register_admin_columns'), 20);
+        // Add admin column for all post types
+        // Hook very late (priority 99) to ensure all CPTs (projects, folio, etc.) are registered
+        add_action('init', array($this, 'register_admin_columns'), 99);
         
         // AJAX handler for manual trigger
         add_action('wp_ajax_bw_trigger_social_webhook', array($this, 'ajax_trigger_webhook'));

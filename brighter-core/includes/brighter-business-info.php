@@ -2,21 +2,27 @@
 /**
  * Brighter Tools: Business Info
  *
- * File: brighter-buinessinfo.php
+ * File: brighter-business-info.php
  * Version: 4.2.0
  *
+ * IN USE (do not remove):
+ * - Caching: Brighter_Business_Cache (get_all, clear). brighter_update_option() clears cache on save.
+ * - Options: bw_* (BRIGHTER_OPTION_PREFIX = 'bw_') for privacy policy, schema, contact.
+ * - Shortcodes: [business_info setting="..."], [site_copyright].
+ * - Admin form: brighterweb_render_business_info_form() (used on Site Essentials > Business Info).
+ * - SEOPress schema mapping: sp_schemas_mapping_select (bw_* keys).
+ *
  * Changelog:
- * 4.2.0 - SECURITY: Input sanitization, SQL injection prevention, XSS protection, capability checks
- * 4.1.0 - Performance optimization: Added caching, batch option loading, reduced queries
- * 4.0.0 - Added proper option prefixing, fixed encoding issues, optimized queries
+ * 4.2.0 - SECURITY: Input sanitization, XSS protection, capability checks. Option prefix bw_.
  */
 
 if (!defined('ABSPATH')) exit;
 
 /**
- * Option prefix to prevent conflicts with other plugins
+ * Option prefix for business info options (e.g. bw_business_name, bw_phone_number, bw_email).
+ * Used for privacy policy and schema; only a small number of sites use this.
  */
-define('BRIGHTER_OPTION_PREFIX', 'brighter_');
+define('BRIGHTER_OPTION_PREFIX', 'bw_');
 
 /**
  * Cache group for business info
@@ -153,17 +159,27 @@ function brighter_get_business_info_fields() {
     
     if ($fields === null) {
         $fields = [
-            // Info
-            'business_name', 'contact_name', 'abn', 'organisation_type', 'service_description',
-            // Contact
-            'phone_number', 'email', 'address', 'city', 'state', 'postcode', 'country', 'lat', 'long',
-            // Hours
-            'business_hours',
-            // Social
+            // Entity Identity
+            'organisation_type', 'business_name', 'business_category', 'service_description', 'abn', 'founding_date', 'founder_contact_name',
+            
+            // Key Media
+            'site_icon', 'business_logo', 'publisher_logo', 'business_image', 'mobile_theme_color',
+            
+            // Contact Information
+            'phone_number', 'email', 'contact_name', 'contact_type', 'contact_option',
+            'address', 'city', 'state', 'postcode', 'country', 'country_code',
+            'lat', 'long', 'place_id',
+            
+            // Social Media & Web Presence
             'social_link_facebook', 'social_link_twitter', 'social_link_instagram',
-            'social_link_youtube', 'social_link_linkedin', 'social_link_google_review',
-            // Service
-            'area_served', 'provider_mobility', 'price_tier'
+            'social_link_youtube', 'social_link_linkedin', 'social_link_pinterest',
+            'google_maps_share', 'knowledge_panel_share', 'additional_account_urls',
+            
+            // Operational Details
+            'business_hours', 'price_tier', 'provider_mobility', 'service_area',
+            
+            // Legacy/deprecated (keep for backwards compatibility)
+            'social_link_google_review', 'area_served'
         ];
     }
     
@@ -224,13 +240,25 @@ function brighter_sanitize_business_field($key, $value) {
         return sanitize_email($value);
     }
     
-    // URL fields
-    if (strpos($key, 'social_link_') === 0) {
+    // URL/image fields
+    if (strpos($key, 'social_link_') === 0 || 
+        in_array($key, ['site_icon', 'business_logo', 'publisher_logo', 'business_image', 
+                        'google_maps_share', 'knowledge_panel_share'], true)) {
         return esc_url_raw($value);
     }
     
+    // Color fields (hex)
+    if ($key === 'mobile_theme_color') {
+        $value = sanitize_text_field($value);
+        // Ensure it's a valid hex color
+        if (preg_match('/^#?[0-9a-fA-F]{3,6}$/', $value)) {
+            return $value;
+        }
+        return '';
+    }
+    
     // Textarea fields
-    if (in_array($key, ['service_description', 'business_hours'], true)) {
+    if (in_array($key, ['service_description', 'business_hours', 'service_area', 'additional_account_urls'], true)) {
         return sanitize_textarea_field($value);
     }
     
@@ -261,100 +289,465 @@ function brighterweb_register_business_info_settings() {
         ]);
     }
 
-    // Add UI sections
+    // ========================================
+    // ENTITY IDENTITY SECTION
+    // ========================================
     add_settings_section(
-        'brighterweb_info_section',
-        'Business Information',
-        'brighterweb_info_section_callback',
-        'brighterweb_business_info_page'
-    );
-    
-    add_settings_section(
-        'brighterweb_contact_section',
-        'Business Contact Info',
-        'brighterweb_contact_section_callback',
-        'brighterweb_business_info_page'
-    );
-    
-    add_settings_section(
-        'brighterweb_social_section',
-        'Social Media Links',
+        'brighterweb_entity_section',
+        'Entity Identity',
         function() {
-            echo '<p class="business-info-p">Paste full URLs to your social profiles.</p>';
+            echo '<p class="business-info-p">Define your organization type, business name, category, and core description for schema markup.</p>';
         },
         'brighterweb_business_info_page'
     );
     
-    add_settings_section(
-        'brighterweb_service_section',
-        'Service Details',
-        function() {
-            echo '<p class="business-info-p">Define your service area, mobility and pricing tier.</p>';
-        },
-        'brighterweb_business_info_page'
-    );
-
-    // Info fields
-    $info_fields = ['business_name', 'contact_name', 'abn', 'business_hours'];
-    foreach ($info_fields as $field) {
-        add_settings_field(
-            $field, 
-            ucwords(str_replace('_', ' ', $field)), 
-            'brighterweb_field_callback', 
-            'brighterweb_business_info_page', 
-            'brighterweb_info_section', 
-            ['id' => BRIGHTER_OPTION_PREFIX . $field, 'type' => 'text']
-        );
-    }
-
-    // Contact fields
-    $contact_fields = ['phone_number', 'email', 'address', 'city', 'state', 'postcode', 'country', 'lat', 'long'];
-    foreach ($contact_fields as $field) {
-        $type = ($field === 'email') ? 'email' : 'text';
-        add_settings_field(
-            $field, 
-            ucwords(str_replace('_', ' ', $field)), 
-            'brighterweb_field_callback', 
-            'brighterweb_business_info_page', 
-            'brighterweb_contact_section', 
-            ['id' => BRIGHTER_OPTION_PREFIX . $field, 'type' => $type]
-        );
-    }
-
-    // Social fields
-    $social_fields = ['facebook', 'twitter', 'instagram', 'youtube', 'linkedin', 'google_review'];
-    foreach ($social_fields as $social) {
-        $id = BRIGHTER_OPTION_PREFIX . "social_link_{$social}";
-        add_settings_field(
-            $id, 
-            ucfirst($social), 
-            'brighterweb_field_callback', 
-            'brighterweb_business_info_page', 
-            'brighterweb_social_section', 
-            ['id' => $id, 'type' => 'url']
-        );
-    }
-
-    // Dropdown/textarea fields
     add_settings_field(
         'organisation_type', 
         'Organisation Type', 
         'brighterweb_select_field_callback', 
         'brighterweb_business_info_page', 
-        'brighterweb_info_section', 
+        'brighterweb_entity_section', 
         [
             'id' => BRIGHTER_OPTION_PREFIX . 'organisation_type',
-            'options' => ['Local Business', 'Organization', 'Person']
+            'options' => ['Local Business', 'Organization', 'Person'],
+            'note' => 'Person vs. Organization / Local Business'
+        ]
+    );
+    
+    add_settings_field(
+        'business_name', 
+        'Business Name', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'business_name', 'type' => 'text']
+    );
+    
+    add_settings_field(
+        'business_category', 
+        'Business Category', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'business_category', 
+            'type' => 'text',
+            'note' => 'Same as Primary Category on your Google Business Profile'
         ]
     );
     
     add_settings_field(
         'service_description', 
-        'Service Description', 
+        'Description', 
         'brighterweb_textarea_callback', 
         'brighterweb_business_info_page', 
-        'brighterweb_info_section', 
-        ['id' => BRIGHTER_OPTION_PREFIX . 'service_description']
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'service_description',
+            'note' => 'Service Description or Organization Bio'
+        ]
+    );
+    
+    add_settings_field(
+        'abn', 
+        'Business Identification', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'abn', 
+            'type' => 'text',
+            'note' => 'VAT ID or ABN. Search: https://abr.business.gov.au/ABN/'
+        ]
+    );
+    
+    add_settings_field(
+        'founding_date', 
+        'Founding Date', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'founding_date', 
+            'type' => 'text',
+            'note' => 'ISO 8601 format: YYYY (e.g. 2020) or YYYY-MM or YYYY-MM-DD'
+        ]
+    );
+    
+    add_settings_field(
+        'founder_contact_name', 
+        'Founder Contact Name', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_entity_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'founder_contact_name', 
+            'type' => 'text',
+            'note' => 'Full name (first and last) of the founder or primary contact'
+        ]
+    );
+
+    // ========================================
+    // KEY MEDIA SECTION
+    // ========================================
+    add_settings_section(
+        'brighterweb_media_section',
+        'Key Media',
+        function() {
+            echo '<p class="business-info-p">Upload or link to your business logos and images for schema, social sharing, and search results.</p>';
+            echo '<p class="business-info-p"><strong>Note:</strong> Site Icon syncs with WordPress Customizer (Appearance → Customize → Site Identity). You can set it here and in the Customizer.</p>';
+        },
+        'brighterweb_business_info_page'
+    );
+    
+    add_settings_field(
+        'site_icon', 
+        'Site Icon (Favicon)', 
+        'brighterweb_image_upload_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_media_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'site_icon',
+            'note' => 'Browser tabs & Google Mobile Search. 512×512px min (1:1 square). Symbol only, bold, simple.'
+        ]
+    );
+    
+    add_settings_field(
+        'business_logo', 
+        'Business / Org Logo', 
+        'brighterweb_image_upload_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_media_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'business_logo',
+            'note' => 'Google Knowledge Panel & Maps. 1200×1200px min (1:1). Full logo, centered with 20% padding.'
+        ]
+    );
+    
+    add_settings_field(
+        'publisher_logo', 
+        'Publisher Logo (Optional)', 
+        'brighterweb_image_upload_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_media_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'publisher_logo',
+            'note' => 'Google News & Article thumbnails. 600×60px (wide) or 600×600px. Use if main logo is too complex.'
+        ]
+    );
+    
+    add_settings_field(
+        'business_image', 
+        'Business Image', 
+        'brighterweb_image_upload_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_media_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'business_image',
+            'note' => 'Local Business verification. 1200×675px min (16:9 or 4:3). Shop front, interior, or team photo.'
+        ]
+    );
+    
+    add_settings_field(
+        'mobile_theme_color', 
+        'Mobile Theme Colour', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_media_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'mobile_theme_color', 
+            'type' => 'text',
+            'note' => 'Hex color (e.g. #193b2d) for mobile browser theme'
+        ]
+    );
+
+    // ========================================
+    // CONTACT INFORMATION SECTION
+    // ========================================
+    add_settings_section(
+        'brighterweb_contact_section',
+        'Contact Information',
+        function() {
+            echo '<p class="business-info-p">Enter your contact and location information below.</p>';
+        },
+        'brighterweb_business_info_page'
+    );
+    
+    add_settings_field(
+        'phone_number', 
+        'Primary Phone Number', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'phone_number', 'type' => 'tel']
+    );
+    
+    add_settings_field(
+        'email', 
+        'Email Address', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'email', 'type' => 'email']
+    );
+    
+    add_settings_field(
+        'contact_name', 
+        'DPO / Privacy Contact Name', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'contact_name', 
+            'type' => 'text',
+            'note' => 'Data Protection Officer or Privacy Contact (if different from founder)'
+        ]
+    );
+    
+    add_settings_field(
+        'contact_type', 
+        'Contact Type', 
+        'brighterweb_select_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'contact_type',
+            'options' => [
+                '' => '-- Select --',
+                'customer support' => 'Customer Support',
+                'technical support' => 'Technical Support',
+                'billing support' => 'Billing Support',
+                'sales' => 'Sales',
+                'emergency' => 'Emergency'
+            ],
+            'note' => 'Only for Organizations'
+        ]
+    );
+    
+    add_settings_field(
+        'contact_option', 
+        'Contact Option', 
+        'brighterweb_select_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'contact_option',
+            'options' => [
+                '' => 'None',
+                'TollFree' => 'Toll Free',
+                'HearingImpairedSupported' => 'Hearing Impaired Supported'
+            ],
+            'note' => 'Only for Organizations'
+        ]
+    );
+    
+    add_settings_field(
+        'address', 
+        'Address', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'address', 'type' => 'text']
+    );
+    
+    add_settings_field(
+        'city', 
+        'City', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'city', 'type' => 'text']
+    );
+    
+    add_settings_field(
+        'state', 
+        'State', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'state', 'type' => 'text']
+    );
+    
+    add_settings_field(
+        'postcode', 
+        'Postcode', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'postcode', 'type' => 'text']
+    );
+    
+    add_settings_field(
+        'country', 
+        'Country', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'country', 'type' => 'text']
+    );
+    
+    add_settings_field(
+        'country_code', 
+        'Country Code', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'country_code', 
+            'type' => 'text',
+            'note' => 'e.g. AU'
+        ]
+    );
+    
+    add_settings_field(
+        'lat', 
+        'Latitude', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'lat', 
+            'type' => 'text',
+            'note' => 'Use numerical coordinate like -37.00000. Find: https://latitude.to/'
+        ]
+    );
+    
+    add_settings_field(
+        'long', 
+        'Longitude', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'long', 
+            'type' => 'text',
+            'note' => 'Use numerical coordinate like 145.00000'
+        ]
+    );
+    
+    add_settings_field(
+        'place_id', 
+        'Google Place ID', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_contact_section', 
+        [
+            'id'   => BRIGHTER_OPTION_PREFIX . 'place_id', 
+            'type' => 'text',
+            // Update the note line below:
+            'note' => '<a href="https://developers.google.com/places/web-service/place-id" target="_blank">Find your Local Verified Location Business</a> (no place ID for service area businesses)'
+        ]
+    );
+
+    // ========================================
+    // SOCIAL MEDIA & WEB PRESENCE SECTION
+    // ========================================
+    add_settings_section(
+        'brighterweb_social_section',
+        'Social Media & Web Presence',
+        function() {
+            echo '<p class="business-info-p">Paste full URLs to your social profiles and sharing links.</p>';
+        },
+        'brighterweb_business_info_page'
+    );
+    
+    $social_fields = [
+        'facebook' => 'Facebook',
+        'twitter' => 'X / Twitter',
+        'instagram' => 'Instagram',
+        'youtube' => 'YouTube',
+        'linkedin' => 'LinkedIn',
+        'pinterest' => 'Pinterest'
+    ];
+    
+    foreach ($social_fields as $key => $label) {
+        $note = '';
+        if ($key === 'twitter') {
+            $note = 'X needs to be Username not full URL';
+        }
+        add_settings_field(
+            "social_link_{$key}", 
+            $label, 
+            'brighterweb_field_callback', 
+            'brighterweb_business_info_page', 
+            'brighterweb_social_section', 
+            [
+                'id' => BRIGHTER_OPTION_PREFIX . "social_link_{$key}", 
+                'type' => 'url',
+                'note' => $note
+            ]
+        );
+    }
+    
+    add_settings_field(
+        'google_maps_share', 
+        'Google Maps Share', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_social_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'google_maps_share', 
+            'type' => 'url',
+            'note' => 'Search your business, click "Share" next to Save under your business name, copy link'
+        ]
+    );
+    
+    add_settings_field(
+        'knowledge_panel_share', 
+        'Knowledge Panel Share', 
+        'brighterweb_field_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_social_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'knowledge_panel_share', 
+            'type' => 'url',
+            'note' => 'If you have a knowledge panel, get the share link and add it here'
+        ]
+    );
+    
+    add_settings_field(
+        'additional_account_urls', 
+        'Additional Account URLs', 
+        'brighterweb_textarea_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_social_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'additional_account_urls',
+            'note' => 'One URL per line'
+        ]
+    );
+
+    // ========================================
+    // OPERATIONAL DETAILS SECTION
+    // ========================================
+    add_settings_section(
+        'brighterweb_service_section',
+        'Operational Details',
+        function() {
+            echo '<p class="business-info-p">Define your service area, mobility, hours and pricing tier.</p>';
+        },
+        'brighterweb_business_info_page'
+    );
+    
+    add_settings_field(
+        'business_hours', 
+        'Business Hours', 
+        'brighterweb_textarea_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_service_section', 
+        ['id' => BRIGHTER_OPTION_PREFIX . 'business_hours']
+    );
+    
+    add_settings_field(
+        'price_tier', 
+        'Price Tier', 
+        'brighterweb_dropdown_callback', 
+        'brighterweb_business_info_page', 
+        'brighterweb_service_section', 
+        [
+            'id' => BRIGHTER_OPTION_PREFIX . 'price_tier',
+            'options' => ['$', '$$', '$$$', '$$$$']
+        ]
     );
     
     add_settings_field(
@@ -370,16 +763,12 @@ function brighterweb_register_business_info_settings() {
     );
     
     add_settings_field(
-        'price_tier', 
-        'Price Tier', 
-        'brighterweb_dropdown_callback', 
+        'service_area', 
+        'Service Area / Details', 
+        'brighterweb_textarea_callback', 
         'brighterweb_business_info_page', 
         'brighterweb_service_section', 
-        [
-            'id' => BRIGHTER_OPTION_PREFIX . 'price_tier',
-            'options' => ['$', '$$', '$$$', '$$$$']
- 
-]
+        ['id' => BRIGHTER_OPTION_PREFIX . 'service_area']
     );
 }
 add_action('admin_init', 'brighterweb_register_business_info_settings');
@@ -394,12 +783,12 @@ add_action('update_option', function($option_name) {
 }, 10, 1);
 
 /**
- * Section callbacks
+ * Section callbacks (legacy - kept for backwards compatibility if referenced elsewhere)
  * 
  * SECURITY: All output properly escaped
  */
 function brighterweb_info_section_callback() {
-    echo '<p class="business-info-p">Please enter your general business information below. This information is used to populate your website\'s privacy policy and to generate <a href="https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data" target="_blank" rel="noopener noreferrer">schema markup</a> to help search engines understand and display your business more effectively in search results.</p>';
+    echo '<p class="business-info-p">Please enter your general business information below.</p>';
 }
 
 function brighterweb_contact_section_callback() {
@@ -424,7 +813,8 @@ function brighterweb_field_callback($args) {
     echo '<input type="' . esc_attr($type) . '" name="' . esc_attr($args['id']) . '" value="' . esc_attr($value) . '" class="regular-text" />';
     
     if (!empty($args['note'])) {
-        echo '<p class="description">' . esc_html($args['note']) . '</p>';
+        // Allow safe HTML (links, em, strong) in notes
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
     }
 }
 
@@ -442,6 +832,10 @@ function brighterweb_dropdown_callback($args) {
         echo '<option value="' . esc_attr($key) . '" ' . $selected . '>' . esc_html($label) . '</option>';
     }
     echo '</select>';
+    
+    if (!empty($args['note'])) {
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
+    }
 }
 
 /**
@@ -461,6 +855,10 @@ function brighterweb_select_field_callback($args) {
         echo '<option value="' . esc_attr($val) . '"' . $selected . '>' . esc_html($label) . '</option>';
     }
     echo '</select>';
+    
+    if (!empty($args['note'])) {
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
+    }
 }
 
 /**
@@ -472,6 +870,76 @@ function brighterweb_textarea_callback($args) {
     $id = $args['id'];
     $value = get_option($id, '');
     echo '<textarea name="' . esc_attr($id) . '" id="' . esc_attr($id) . '" rows="4" cols="50" class="large-text">' . esc_textarea($value) . '</textarea>';
+    if (!empty($args['note'])) {
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
+    }
+}
+
+/**
+ * Image upload callback (uses WordPress Media Library)
+ * 
+ * SECURITY: Proper URL escaping and validation
+ */
+function brighterweb_image_upload_callback($args) {
+    $id = $args['id'];
+    $value = get_option($id, '');
+    $button_id = $id . '_button';
+    $preview_id = $id . '_preview';
+    
+    echo '<div class="brighter-image-upload-wrapper">';
+    echo '<input type="url" name="' . esc_attr($id) . '" id="' . esc_attr($id) . '" value="' . esc_url($value) . '" class="regular-text brighter-image-url" />';
+    echo '<button type="button" class="button brighter-image-upload-btn" id="' . esc_attr($button_id) . '">Select Image</button>';
+    
+    if ($value) {
+        echo '<div id="' . esc_attr($preview_id) . '" class="brighter-image-preview" style="margin-top:10px;">';
+        echo '<img src="' . esc_url($value) . '" style="max-width:200px;height:auto;display:block;" />';
+        echo '</div>';
+    } else {
+        echo '<div id="' . esc_attr($preview_id) . '" class="brighter-image-preview" style="margin-top:10px;display:none;"></div>';
+    }
+    
+    if (!empty($args['note'])) {
+        echo '<p class="description">' . wp_kses_post($args['note']) . '</p>';
+    }
+    
+    // Special note for site icon
+    if ($id === BRIGHTER_OPTION_PREFIX . 'site_icon') {
+        echo '<p class="description"><em>To sync with WordPress Customizer site icon, go to Appearance → Customize → Site Identity.</em></p>';
+    }
+    
+    echo '</div>';
+    
+    // Inline script for media uploader (only output once)
+    static $script_output = false;
+    if (!$script_output) {
+        $script_output = true;
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            $('.brighter-image-upload-btn').on('click', function(e) {
+                e.preventDefault();
+                var button = $(this);
+                var inputField = button.prev('.brighter-image-url');
+                var previewDiv = button.next('.brighter-image-preview');
+                
+                var frame = wp.media({
+                    title: 'Select or Upload Image',
+                    button: { text: 'Use this image' },
+                    multiple: false
+                });
+                
+                frame.on('select', function() {
+                    var attachment = frame.state().get('selection').first().toJSON();
+                    inputField.val(attachment.url);
+                    previewDiv.html('<img src="' + attachment.url + '" style="max-width:200px;height:auto;display:block;" />').show();
+                });
+                
+                frame.open();
+            });
+        });
+        </script>
+        <?php
+    }
 }
 
 /**
@@ -484,6 +952,9 @@ function brighterweb_render_business_info_form() {
     if (!current_user_can('manage_options')) {
         wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
     }
+    
+    // Enqueue media uploader scripts
+    wp_enqueue_media();
     
     echo '<form method="post" action="options.php" class="business_info_style">';
     settings_fields('brighterweb_business_info_group');
@@ -565,36 +1036,38 @@ function sp_schemas_mapping_select($mapping) {
     $mapping['brighter_fields'] = [
         'label' => __('Brighter Business Info', 'brighterwebsites'),
         'values' => [
-            // Basic Info
-            'brighter_business_name' => __('Business Name', 'brighterwebsites'),
-            'brighter_contact_name' => __('Contact Name', 'brighterwebsites'),
-            'brighter_abn' => __('ABN', 'brighterwebsites'),
-            'brighter_business_hours' => __('Business Hours', 'brighterwebsites'),
-            'brighter_organisation_type' => __('Organisation Type', 'brighterwebsites'),
-            'brighter_service_description' => __('Service Description', 'brighterwebsites'),
+            // Basic Info (option prefix bw_)
+            'bw_business_name' => __('Business Name', 'brighterwebsites'),
+            'bw_contact_name' => __('DPO / Privacy Contact Name', 'brighterwebsites'),
+            'bw_founder_contact_name' => __('Founder Contact Name', 'brighterwebsites'),
+            'bw_founding_date' => __('Founding Date', 'brighterwebsites'),
+            'bw_abn' => __('ABN', 'brighterwebsites'),
+            'bw_business_hours' => __('Business Hours', 'brighterwebsites'),
+            'bw_organisation_type' => __('Organisation Type', 'brighterwebsites'),
+            'bw_service_description' => __('Service Description', 'brighterwebsites'),
 
             // Contact Details
-            'brighter_phone_number' => __('Phone Number', 'brighterwebsites'),
-            'brighter_email' => __('Email', 'brighterwebsites'),
-            'brighter_address' => __('Address', 'brighterwebsites'),
-            'brighter_city' => __('City', 'brighterwebsites'),
-            'brighter_state' => __('State', 'brighterwebsites'),
-            'brighter_postcode' => __('Postcode', 'brighterwebsites'),
-            'brighter_country' => __('Country', 'brighterwebsites'),
-            'brighter_lat' => __('Latitude', 'brighterwebsites'),
-            'brighter_long' => __('Longitude', 'brighterwebsites'),
+            'bw_phone_number' => __('Phone Number', 'brighterwebsites'),
+            'bw_email' => __('Email', 'brighterwebsites'),
+            'bw_address' => __('Address', 'brighterwebsites'),
+            'bw_city' => __('City', 'brighterwebsites'),
+            'bw_state' => __('State', 'brighterwebsites'),
+            'bw_postcode' => __('Postcode', 'brighterwebsites'),
+            'bw_country' => __('Country', 'brighterwebsites'),
+            'bw_lat' => __('Latitude', 'brighterwebsites'),
+            'bw_long' => __('Longitude', 'brighterwebsites'),
 
             // Social Links
-            'brighter_social_link_facebook' => __('Facebook URL', 'brighterwebsites'),
-            'brighter_social_link_twitter' => __('Twitter URL', 'brighterwebsites'),
-            'brighter_social_link_instagram' => __('Instagram URL', 'brighterwebsites'),
-            'brighter_social_link_youtube' => __('YouTube URL', 'brighterwebsites'),
-            'brighter_social_link_linkedin' => __('LinkedIn URL', 'brighterwebsites'),
-            'brighter_social_link_google_review' => __('Google Review URL', 'brighterwebsites'),
+            'bw_social_link_facebook' => __('Facebook URL', 'brighterwebsites'),
+            'bw_social_link_twitter' => __('Twitter URL', 'brighterwebsites'),
+            'bw_social_link_instagram' => __('Instagram URL', 'brighterwebsites'),
+            'bw_social_link_youtube' => __('YouTube URL', 'brighterwebsites'),
+            'bw_social_link_linkedin' => __('LinkedIn URL', 'brighterwebsites'),
+            'bw_social_link_google_review' => __('Google Review URL', 'brighterwebsites'),
 
             // Service Details
-            'brighter_provider_mobility' => __('Provider Mobility', 'brighterwebsites'),
-            'brighter_price_tier' => __('Price Tier', 'brighterwebsites'),
+            'bw_provider_mobility' => __('Provider Mobility', 'brighterwebsites'),
+            'bw_price_tier' => __('Price Tier', 'brighterwebsites'),
         ]
     ];
 

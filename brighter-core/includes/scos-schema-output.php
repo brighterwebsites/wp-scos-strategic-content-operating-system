@@ -81,6 +81,237 @@ function bw_output_schema_graph() {
 }
 
 /**
+ * Get current singular post/page ID when rendering schema (for Product/Service blocks).
+ * Tries get_queried_object_id() then get_the_ID() so it works in wp_head.
+ *
+ * @return int 0 if not singular or invalid
+ */
+function bw_schema_get_singular_id() {
+    if (!is_singular()) {
+        return 0;
+    }
+    $id = get_queried_object_id();
+    if (!$id && function_exists('get_the_ID')) {
+        $id = get_the_ID();
+    }
+    $id = (int) $id;
+    if (!$id || !get_post_status($id)) {
+        return 0;
+    }
+    $type = get_post_type($id);
+    if (!in_array($type, ['post', 'page'], true)) {
+        return 0;
+    }
+    return $id;
+}
+
+/**
+ * Normalize schema JSON string so unquoted %%variable%% values become quoted.
+ * Allows "aggregateRating": %%_rating_json%% (invalid JSON) to decode; at output
+ * the quoted "%%_rating_json%%" is then replaced by the resolved array/object.
+ *
+ * @param string $json Raw schema JSON (may contain unquoted %%...%%)
+ * @return string JSON string safe for json_decode
+ */
+function bw_schema_normalize_json_placeholders($json) {
+    if (!is_string($json) || strpos($json, '%%') === false) {
+        return $json;
+    }
+    return preg_replace('/:\s*%%([^%]+)%%/', ': "%%$1%%"', $json);
+}
+
+/**
+ * Parse comma/space-separated post IDs from option string.
+ *
+ * @param string $value Option value
+ * @return int[] Array of positive integers
+ */
+function bw_schema_parse_post_id_list($value) {
+    $value = trim((string) $value);
+    if ($value === '') {
+        return [];
+    }
+    $parts = preg_split('/[\s,]+/', $value, -1, PREG_SPLIT_NO_EMPTY);
+    $ids = array_values(array_filter(array_map('absint', $parts)));
+    return $ids;
+}
+
+/**
+ * Get featured image URL for a post (tries full, large, then attachment permalink).
+ * Works in wp_head / outside the loop.
+ *
+ * @param int $post_id Post ID
+ * @return string URL or empty
+ */
+function bw_schema_get_post_thumbnail_url($post_id) {
+    $post_id = (int) $post_id;
+    if (!$post_id) {
+        return '';
+    }
+    $thumb_id = (int) get_post_thumbnail_id($post_id);
+    if (!$thumb_id) {
+        return '';
+    }
+    foreach (['full', 'large', 'medium_large'] as $size) {
+        $url = wp_get_attachment_image_url($thumb_id, $size);
+        if ($url) {
+            return $url;
+        }
+    }
+    $url = get_the_post_thumbnail_url($post_id, 'full');
+    if ($url) {
+        return $url;
+    }
+    return (string) get_permalink($thumb_id);
+}
+
+/**
+ * Resolve a single schema variable for a given post/context.
+ * Used by bw_schema_replace_variables. Variable names are case-sensitive.
+ *
+ * @param string $name   Variable name without %%, e.g. post_title, _cmeta_my_key, _acf_my_field
+ * @param int    $post_id Post ID (0 for site-only context, e.g. Local Business)
+ * @return string|int|float|array|null Resolved value; arrays allowed for ACF (Stage 3 repeaters)
+ */
+function bw_schema_resolve_variable($name, $post_id) {
+    $name = trim($name);
+    if ($name === '') {
+        return '';
+    }
+
+    // Site-level (work with or without post)
+    if ($name === 'site_name') {
+        return get_bloginfo('name');
+    }
+    if ($name === 'site_url') {
+        return home_url('/');
+    }
+
+    // Post-level (require valid post)
+    if (!$post_id || !get_post_status($post_id)) {
+        return '';
+    }
+
+    // Standard WP post fields
+    $post = get_post($post_id);
+    if (!$post) {
+        return '';
+    }
+    $map = [
+        'post_title'     => $post->post_title,
+        'post_excerpt'   => get_the_excerpt($post_id),
+        'post_date'      => get_the_date('c', $post_id),
+        'post_modified'  => get_the_modified_date('c', $post_id),
+        'post_url'       => get_permalink($post_id),
+        'post_id'        => $post_id,
+        'post_name'      => $post->post_name,
+        'post_author'    => get_the_author_meta('display_name', $post->post_author),
+    ];
+    if (array_key_exists($name, $map)) {
+        return $map[$name];
+    }
+
+    // Featured image: URL string or ImageObject for schema (post-centric, size fallbacks)
+    if ($name === 'post_thumbnail_url') {
+        $url = bw_schema_get_post_thumbnail_url($post_id);
+        $url = apply_filters('bw_schema_post_thumbnail_url', $url, $post_id);
+        return is_string($url) && $url !== '' ? $url : '';
+    }
+    if ($name === 'post_thumbnail') {
+        $url = bw_schema_get_post_thumbnail_url($post_id);
+        if (!$url) {
+            return '';
+        }
+        $thumb_id = (int) get_post_thumbnail_id($post_id);
+        $w = 0;
+        $h = 0;
+        if ($thumb_id) {
+            $meta = wp_get_attachment_metadata($thumb_id, true);
+            $w = isset($meta['width']) ? (int) $meta['width'] : 0;
+            $h = isset($meta['height']) ? (int) $meta['height'] : 0;
+        }
+        $img = [
+            '@type' => 'ImageObject',
+            'url'   => $url,
+        ];
+        if ($w && $h) {
+            $img['width'] = $w;
+            $img['height'] = $h;
+        }
+        return $img;
+    }
+
+    // Custom meta: %%_cmeta_meta_key%% → get_post_meta($post_id, 'meta_key', true)
+    if (strpos($name, '_cmeta_') === 0) {
+        $meta_key = substr($name, 7);
+        $val = get_post_meta($post_id, $meta_key, true);
+        if (is_array($val) || is_object($val)) {
+            return $val;
+        }
+        return $val === '' || $val === null ? '' : (string) $val;
+    }
+
+    // ACF: %%_acf_field_name%% → get_field('field_name', $post_id)
+    if (strpos($name, '_acf_') === 0 && function_exists('get_field')) {
+        $field_key = substr($name, 5);
+        $val = get_field($field_key, $post_id);
+        if (is_array($val) || is_object($val)) {
+            return $val;
+        }
+        return $val === '' || $val === null ? '' : (string) $val;
+    }
+
+    return apply_filters('bw_schema_resolve_variable', '', $name, $post_id);
+}
+
+/**
+ * Recursively replace %%variable%% placeholders in schema array (string values).
+ * When a string value is exactly "%%var%%", it may be replaced with an array (e.g. ACF).
+ *
+ * @param array|string $data    Decoded schema (array or subtree)
+ * @param int          $post_id Post ID for context (0 for site-only)
+ * @return array|string Same structure with placeholders replaced
+ */
+function bw_schema_replace_variables($data, $post_id) {
+    if (is_array($data)) {
+        $out = [];
+        foreach ($data as $key => $val) {
+            $out[$key] = bw_schema_replace_variables($val, $post_id);
+        }
+        return $out;
+    }
+    if (!is_string($data)) {
+        return $data;
+    }
+    $str = $data;
+
+    // Whole value is a single variable → can replace with array/object
+    if (preg_match('/^%%([^%]+)%%$/', $str, $m)) {
+        $resolved = bw_schema_resolve_variable($m[1], $post_id);
+        if (is_array($resolved) || is_object($resolved)) {
+            return (array) $resolved;
+        }
+        if ($resolved !== '' && $resolved !== null) {
+            return (string) $resolved;
+        }
+        return '';
+    }
+
+    // Mixed or multiple variables: replace in place, always string
+    if (strpos($str, '%%') === false) {
+        return $str;
+    }
+    $replaced = preg_replace_callback('/%%([^%]+)%%/', function ($matches) use ($post_id) {
+        $resolved = bw_schema_resolve_variable($matches[1], $post_id);
+        if (is_array($resolved) || is_object($resolved)) {
+            return wp_json_encode($resolved);
+        }
+        return (string) $resolved;
+    }, $str);
+    return $replaced;
+}
+
+/**
  * Get author schema @id from user data
  * 
  * @param int|null $user_id User ID (defaults to post author)
@@ -157,9 +388,9 @@ function bw_render_schema_graph() {
     // LocalBusiness - Loaded from admin options (Site Essentials > SEO > Schema)
     $local_business_schema = get_option('bw_local_business_schema', '');
     if (!empty($local_business_schema)) {
-        $decoded = json_decode($local_business_schema, true);
+        $decoded = json_decode(bw_schema_normalize_json_placeholders($local_business_schema), true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            // Ensure @id is set for organization reference
+            $decoded = bw_schema_replace_variables($decoded, 0);
             if (!isset($decoded['@id'])) {
                 $decoded['@id'] = home_url('/#organization');
             }
@@ -243,7 +474,11 @@ function bw_render_schema_graph() {
     // ============================================
     
     $current_url = home_url($_SERVER['REQUEST_URI']);
-    $post_id = is_singular() ? get_the_ID() : 0;
+    // Use get_queried_object_id() for reliable singular ID in wp_head context
+    $post_id = is_singular() ? get_queried_object_id() : 0;
+    if ($post_id && !get_post_status($post_id)) {
+        $post_id = 0;
+    }
     
     // WebPage - always add
     $webpage = [
@@ -608,22 +843,64 @@ function bw_render_schema_graph() {
     }
     
     // ============================================
-    // PROJECTS - CreativeWork
+    // ADMIN TEMPLATES: Success Stories | Product | Service
     // ============================================
     
-    if (is_singular('project')) {
-        $graph[] = [
-            "@type" => "CreativeWork",
-            "@id" => get_permalink() . '#creative-work',
-            "name" => get_the_title(),
-            "description" => get_the_excerpt(),
-            "url" => get_permalink(),
-            "creator" => [
-                "@id" => home_url('/#organization')
-            ],
-            "dateCreated" => get_the_date('c'),
-            "image" => has_post_thumbnail() ? get_the_post_thumbnail_url($post_id, 'large') : null
-        ];
+    // Success Stories — on single project (CPT) only (CreativeWork removed; use Success Stories tab)
+    if (is_singular('projects') && $post_id) {
+        $success_stories_schema = get_option('bw_success_stories_schema', '');
+        if (!empty($success_stories_schema)) {
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($success_stories_schema), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $decoded = bw_schema_replace_variables($decoded, $post_id);
+                if (isset($decoded[0])) {
+                    $graph = array_merge($graph, $decoded);
+                } else {
+                    $graph[] = $decoded;
+                }
+            }
+        }
+    }
+    
+    // Product — on single post or page when its ID is in the list
+    $singular_id = bw_schema_get_singular_id();
+    if ($singular_id) {
+        $product_post_ids = get_option('bw_product_post_ids', '');
+        $product_schema = get_option('bw_product_schema', '');
+        $ids = bw_schema_parse_post_id_list($product_post_ids);
+        $ids = apply_filters('bw_schema_product_post_ids', $ids, $singular_id);
+        $include_product = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_product', false, $singular_id);
+        if ($include_product && $product_schema !== '') {
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($product_schema), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $decoded = bw_schema_replace_variables($decoded, $singular_id);
+                if (isset($decoded[0]) && is_array($decoded[0])) {
+                    $graph = array_merge($graph, $decoded);
+                } else {
+                    $graph[] = $decoded;
+                }
+            }
+        }
+    }
+    
+    // Service — on single post or page when its ID is in the list
+    if ($singular_id) {
+        $service_post_ids = get_option('bw_service_post_ids', '');
+        $service_schema = get_option('bw_service_schema', '');
+        $ids = bw_schema_parse_post_id_list($service_post_ids);
+        $ids = apply_filters('bw_schema_service_post_ids', $ids, $singular_id);
+        $include_service = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_service', false, $singular_id);
+        if ($include_service && $service_schema !== '') {
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($service_schema), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $decoded = bw_schema_replace_variables($decoded, $singular_id);
+                if (isset($decoded[0]) && is_array($decoded[0])) {
+                    $graph = array_merge($graph, $decoded);
+                } else {
+                    $graph[] = $decoded;
+                }
+            }
+        }
     }
     
     // ============================================
@@ -739,10 +1016,10 @@ function bw_render_schema_graph() {
         $custom_schema = get_post_meta($post_id, 'bw_custom_schema', true);
         
         if (!empty($custom_schema)) {
-            $decoded = json_decode($custom_schema, true);
+            $decoded = json_decode(bw_schema_normalize_json_placeholders($custom_schema), true);
             
             if (json_last_error() === JSON_ERROR_NONE) {
-                // If array of blocks, merge them
+                $decoded = bw_schema_replace_variables($decoded, $post_id);
                 if (isset($decoded[0])) {
                     $graph = array_merge($graph, $decoded);
                 } else {
@@ -756,10 +1033,10 @@ function bw_render_schema_graph() {
     // OUTPUT
     // ============================================
     
-    // Filter out any null values from image fields etc.
+    // Filter out null and empty string so we don't output "image": "" etc.
     $graph = array_map(function($block) {
         return array_filter($block, function($value) {
-            return $value !== null;
+            return $value !== null && $value !== '';
         });
     }, $graph);
     

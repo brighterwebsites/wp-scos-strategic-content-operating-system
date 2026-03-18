@@ -44,10 +44,28 @@ if (file_exists(SITE_ESSENTIALS_PATH . '../.git/HEAD')) {
 
         <div class="se-welcome-card">
             <div class="dashicons dashicons-performance"></div>
-            <h2><?php esc_html_e('WordPress Tweaks', 'site-essentials'); ?></h2>
-            <p><?php esc_html_e('Performance and security tweaks for WordPress. Disable unnecessary features.', 'site-essentials'); ?></p>
+            <h2><?php esc_html_e('Performance', 'site-essentials'); ?></h2>
+            <p><?php esc_html_e('WordPress Tweaks, Image Optimization, and Asset Preloading.', 'site-essentials'); ?></p>
             <a href="<?php echo esc_url(admin_url('admin.php?page=site-essentials-essentials')); ?>" class="button button-primary">
-                <?php esc_html_e('Configure Tweaks', 'site-essentials'); ?>
+                <?php esc_html_e('Performance', 'site-essentials'); ?>
+            </a>
+        </div>
+
+        <div class="se-welcome-card">
+            <div class="dashicons dashicons-portfolio"></div>
+            <h2><?php esc_html_e('Custom Posts & Fields', 'site-essentials'); ?></h2>
+            <p><?php esc_html_e('Manage recommended custom post types (FAQ, Projects/Success Stories) and extended field sets (Author Extension).', 'site-essentials'); ?></p>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=site-essentials-cpt')); ?>" class="button button-primary">
+                <?php esc_html_e('Manage Custom Posts & Fields', 'site-essentials'); ?>
+            </a>
+        </div>
+
+        <div class="se-welcome-card">
+            <div class="dashicons dashicons-building"></div>
+            <h2><?php esc_html_e('Business Info', 'site-essentials'); ?></h2>
+            <p><?php esc_html_e('Contact name, phone, email and business details for privacy policy and schema.', 'site-essentials'); ?></p>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=site-essentials-business-info')); ?>" class="button button-primary">
+                <?php esc_html_e('Business Info', 'site-essentials'); ?>
             </a>
         </div>
 

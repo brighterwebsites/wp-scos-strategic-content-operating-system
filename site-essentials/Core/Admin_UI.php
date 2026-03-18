@@ -43,6 +43,8 @@ class Admin_UI {
     const PAGE_SLUG = 'site-essentials';
     const SEO_PAGE_SLUG = 'site-essentials-seo';
     const ESSENTIALS_PAGE_SLUG = 'site-essentials-essentials';
+    const CPT_PAGE_SLUG = 'site-essentials-cpt';
+    const BUSINESS_INFO_PAGE_SLUG = 'site-essentials-business-info';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
 
     /**
@@ -67,6 +69,9 @@ class Admin_UI {
         add_action('wp_ajax_site_essentials_clear_sitemap_cache', [$this, 'ajax_clear_sitemap_cache']);
         add_action('admin_post_site_essentials_save_tweaks', [$this, 'save_tweaks_settings']);
         add_action('admin_post_site_essentials_save_seo', [$this, 'save_seo_settings']);
+        add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
+        // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
+        add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
     }
 
     /**
@@ -99,14 +104,34 @@ class Admin_UI {
             [$this, 'render_seo_page']                          // Callback
         );
 
-        // Essentials submenu (always visible, shows notice if disabled)
+        // Performance submenu (WordPress Tweaks, Image Optimization, Asset Preloading)
         add_submenu_page(
             self::PAGE_SLUG,                                     // Parent slug
-            __('Essentials', 'site-essentials'),                // Page title
-            __('Essentials', 'site-essentials'),                // Menu title
+            __('Performance', 'site-essentials'),                // Page title
+            __('Performance', 'site-essentials'),                // Menu title
             'manage_options',                                    // Capability
-            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug
-            [$this, 'render_essentials_page']                   // Callback
+            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug (unchanged: site-essentials-essentials)
+            [$this, 'render_performance_page']                  // Callback
+        );
+
+        // Custom Posts (Recommended CPT) submenu
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Recommended Custom Posts & Fields', 'site-essentials'),  // Page title
+            __('Custom Posts', 'site-essentials'),               // Menu title
+            'manage_options',                                    // Capability
+            self::CPT_PAGE_SLUG,                                // Menu slug
+            [$this, 'render_cpt_page']                          // Callback
+        );
+
+        // Business Info submenu (standalone page; used for privacy policy, contact details)
+        add_submenu_page(
+            self::PAGE_SLUG,                                     // Parent slug
+            __('Business Info', 'site-essentials'),              // Page title
+            __('Business Info', 'site-essentials'),              // Menu title
+            'manage_options',                                    // Capability
+            self::BUSINESS_INFO_PAGE_SLUG,                      // Menu slug
+            [$this, 'render_business_info_page']                 // Callback
         );
 
         // Settings submenu (always visible)
@@ -119,8 +144,7 @@ class Admin_UI {
             [$this, 'render_settings_page']                     // Callback
         );
 
-        // Remove duplicate first submenu item (WordPress auto-adds parent as first submenu)
-        remove_submenu_page(self::PAGE_SLUG, self::PAGE_SLUG);
+        // Keep first submenu item (Site Essentials -> welcome page) so top-level menu links to welcome, not SEO
     }
 
     /**
@@ -162,9 +186,12 @@ class Admin_UI {
     public function enqueue_assets($hook) {
         // Only load on Site Essentials pages
         $allowed_hooks = [
+            'toplevel_page_' . self::PAGE_SLUG,
             'toplevel_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
         ];
 
@@ -255,29 +282,89 @@ class Admin_UI {
     }
 
     /**
-     * Render Essentials page
+     * Render Performance page (WordPress Tweaks, Image Optimization, Asset Preloading)
      *
      * @since 1.0.0
      * @return void
      */
-    public function render_essentials_page() {
-        // Check user capabilities
+    public function render_performance_page() {
         if (!current_user_can('manage_options')) {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
 
-        // Check if Tweaks module is enabled
-        if (!$this->settings->is_module_enabled('tweaks')) {
-            $this->render_module_disabled_notice('Essentials', 'tweaks');
+        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'tweaks';
+        $tweaks_module = Module_Loader::get_module('tweaks');
+
+        // Image Optimization tab: brighter-support-image-settings must be loaded (brighter-core)
+        $image_settings_available = function_exists('brighter_get_image_sizes_config');
+
+        include SITE_ESSENTIALS_PATH . 'Views/performance-page.php';
+    }
+
+    /**
+     * Render Custom Posts (Recommended CPT) page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_cpt_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        if (!$this->settings->is_module_enabled('cpt')) {
+            $this->render_module_disabled_notice(__('Custom Posts', 'site-essentials'), 'cpt');
             return;
         }
 
-        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'tweaks';
+        $cpt_module = Module_Loader::get_module('cpt');
 
-        // Get WordPress Tweaks module if loaded
-        $tweaks_module = Module_Loader::get_module('tweaks');
+        if (!$cpt_module || !is_object($cpt_module)) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            esc_html_e('Custom Posts module is not loaded.', 'site-essentials');
+            echo '</p></div></div>';
+            return;
+        }
 
-        include SITE_ESSENTIALS_PATH . 'Views/essentials-page.php';
+        if (isset($_GET['updated']) && $_GET['updated'] === 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved.', 'site-essentials') . '</p></div>';
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__('Recommended Custom Posts & Fields', 'site-essentials') . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card" data-module-id="cpt">';
+        $cpt_module->render_settings();
+        echo '</div></div></div>';
+    }
+
+    /**
+     * Render Business Info page
+     *
+     * Uses the existing Business Info form from brighter-core (privacy policy, contact details).
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_business_info_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__('Business Info', 'site-essentials') . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card">';
+
+        if (function_exists('brighterweb_render_business_info_form')) {
+            brighterweb_render_business_info_form();
+        } else {
+            echo '<div class="notice notice-warning"><p>';
+            echo esc_html__('Business Info module is not loaded. Ensure brighter-core is active.', 'site-essentials');
+            echo '</p></div>';
+        }
+
+        echo '</div></div></div>';
     }
 
     /**
@@ -418,6 +505,10 @@ class Admin_UI {
             if ($module_id === 'seo') {
                 flush_rewrite_rules();
             }
+            // Flush rewrite rules when enabling CPT module (projects archive)
+            if ($module_id === 'cpt') {
+                flush_rewrite_rules();
+            }
         } else {
             error_log("[Admin_UI] Calling disable_module({$module_id})");
             $result = $this->settings->disable_module($module_id);
@@ -435,6 +526,9 @@ class Admin_UI {
                 }
                 // Clear standard WordPress cache
                 wp_cache_flush();
+            }
+            if ($module_id === 'cpt') {
+                flush_rewrite_rules();
             }
         }
 
@@ -563,6 +657,43 @@ class Admin_UI {
     }
 
     /**
+     * Handle Asset Preload form when POSTed to Performance > Asset Preloading (same-page submit).
+     * Does not use admin-post.php so it works regardless of brighter-core load order.
+     *
+     * @since 1.0.0
+     */
+    public function maybe_save_asset_preload() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            return;
+        }
+        if (!isset($_GET['page']) || $_GET['page'] !== self::ESSENTIALS_PAGE_SLUG) {
+            return;
+        }
+        if (!isset($_GET['tab']) || $_GET['tab'] !== 'asset-preloading') {
+            return;
+        }
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        if (empty($_POST['bw_tweaks_nonce']) || !wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
+            return;
+        }
+        if (!class_exists('Brighter_Tweaks')) {
+            return;
+        }
+        if (!\Brighter_Tweaks::process_save()) {
+            return;
+        }
+        $redirect = add_query_arg([
+            'page'           => self::ESSENTIALS_PAGE_SLUG,
+            'tab'            => 'asset-preloading',
+            'tweaks_saved'    => '1',
+        ], admin_url('admin.php'));
+        wp_safe_redirect($redirect);
+        exit;
+    }
+
+    /**
      * Save tweaks settings
      *
      * @since 1.0.0
@@ -675,6 +806,54 @@ class Admin_UI {
         $redirect_url = add_query_arg([
             'page'    => self::SEO_PAGE_SLUG,
             'tab'     => 'sitemaps',
+            'updated' => 'true',
+        ], admin_url('admin.php'));
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    /**
+     * Save Custom Posts (CPT) settings
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function save_cpt_settings() {
+        if (!isset($_POST['site_essentials_cpt_nonce']) ||
+            !wp_verify_nonce($_POST['site_essentials_cpt_nonce'], 'site_essentials_cpt')) {
+            wp_die(__('Security check failed', 'site-essentials'));
+        }
+
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'site-essentials'));
+        }
+
+        $cpt_options = isset($_POST['cpt_options']) && is_array($_POST['cpt_options']) ? $_POST['cpt_options'] : [];
+
+        $opts = [
+            'customer_success_stories'  => !empty($cpt_options['customer_success_stories']),
+            'include_categories'        => !empty($cpt_options['include_categories']),
+            'include_tags'              => !empty($cpt_options['include_tags']),
+            'archive_slug'              => isset($cpt_options['archive_slug']) ? sanitize_title($cpt_options['archive_slug']) : 'projects',
+            'enable_faq'                => !empty($cpt_options['enable_faq']),
+            'enable_author_extension'   => !empty($cpt_options['enable_author_extension']),
+            'enable_reviews'            => !empty($cpt_options['enable_reviews']),
+        ];
+
+        $this->settings->update_module_settings('cpt', $opts);
+        
+        // Module 15: Sync Author Extension enabled state
+        if (!empty($opts['enable_author_extension'])) {
+            update_option('bw_author_extension_enabled', true);
+        } else {
+            update_option('bw_author_extension_enabled', false);
+        }
+
+        flush_rewrite_rules();
+
+        $redirect_url = add_query_arg([
+            'page'    => self::CPT_PAGE_SLUG,
             'updated' => 'true',
         ], admin_url('admin.php'));
 

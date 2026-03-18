@@ -24,14 +24,17 @@ class Brighter_Tweaks {
     const OPT = 'bw_preloads_map';
     const OPT_THEME = 'theme_colour';
     const OPT_POST_TYPES = 'brighter_preload_post_types';
+    const OPT_GOOGLE_FONTS = 'bw_google_fonts_preload';
 
     public static function boot() {
         // Admin
         add_action('admin_init', [__CLASS__, 'register_settings']);
+        add_action('admin_post_brighter_tweaks_save', [__CLASS__, 'handle_save_redirect']);
         
         // Frontend output - priority 1 for early loading
         add_action('wp_head', [__CLASS__, 'output_preloads'], 1);
         add_action('wp_head', [__CLASS__, 'output_featured_image_preload'], 1);
+        add_action('wp_head', [__CLASS__, 'output_theme_color_meta'], 1);
         
         // Google Fonts removal - CRITICAL
         add_action('wp_loaded', [__CLASS__, 'remove_google_fonts']);
@@ -74,13 +77,37 @@ class Brighter_Tweaks {
             },
             'default' => []
         ]);
+        
+        // WebP conversion options for preloads
+        register_setting('brighter_tweaks', 'brighter_preload_webp_append', [
+            'type' => 'integer',
+            'default' => 0
+        ]);
+        
+        register_setting('brighter_tweaks', 'brighter_preload_webp_replace', [
+            'type' => 'integer',
+            'default' => 0
+        ]);
+        
+        // OG image size option for preloads
+        register_setting('brighter_tweaks', 'brighter_preload_use_og_image', [
+            'type' => 'integer',
+            'default' => 1 // Default to ON
+        ]);
+        
+        // Google Fonts preload
+        register_setting('brighter_tweaks', self::OPT_GOOGLE_FONTS, [
+            'type' => 'string',
+            'sanitize_callback' => 'wp_kses_post',
+            'default' => ''
+        ]);
 
         // Settings section for post types
         add_settings_section(
             'preload_on_singles',
-            '??? Preload Featured Images on Singles',
+            'Preload Featured Images on Singles',
             function () { 
-                echo '<p>' . esc_html__('Select the post types where featured images should be preloaded on single pages.', 'brighterwebsites') . '</p>'; 
+                echo '<p>' . esc_html__('Select the post types to Preload the OG 1200×630 Image version of Featured Images on Singles. *Requires OG image to be selected in Image Optimization.', 'brighterwebsites') . '</p>'; 
             },
             'brighter_tweaks'
         );
@@ -97,6 +124,77 @@ class Brighter_Tweaks {
                 echo '</label>';
             }
         }, 'brighter_tweaks', 'preload_on_singles');
+        
+        // WebP options for featured image preloads
+        add_settings_field('brighter_preload_webp_options', 'WebP Auto-Conversion', function () {
+            $append = get_option('brighter_preload_webp_append', 0);
+            $replace = get_option('brighter_preload_webp_replace', 0);
+            
+            echo '<label style="display:block;margin-bottom:8px">';
+            echo '<input type="checkbox" name="brighter_preload_webp_append" value="1" ' . checked(1, $append, false) . '> ';
+            echo 'Append .webp for auto preload (LiteSpeed e.g., image.jpg.webp)';
+            echo '</label>';
+            
+            echo '<label style="display:block;margin-bottom:4px">';
+            echo '<input type="checkbox" name="brighter_preload_webp_replace" value="1" ' . checked(1, $replace, false) . '> ';
+            echo 'Replace with .webp for auto preloads (ShortPixel e.g., image.webp)';
+            echo '</label>';
+            
+            echo '<p class="description">*Replace will take preference if both options selected.</p>';
+        }, 'brighter_tweaks', 'preload_on_singles');
+        
+        // Option to use OG image for preload
+        add_settings_field('brighter_preload_use_og_image', 'Preload Image Size', function () {
+            $use_og = get_option('brighter_preload_use_og_image', 1); // Default to ON
+            
+            echo '<label style="display:block;margin-bottom:8px">';
+            echo '<input type="checkbox" name="brighter_preload_use_og_image" value="1" ' . checked(1, $use_og, false) . '> ';
+            echo 'Preload Featured OG 1200×630 image type for all selected singles';
+            echo '</label>';
+            
+            echo '<p class="description">If checked: Uses og-image (1200×630) size for preload. If unchecked: Uses original image size. <br><strong>Recommended:</strong> Keep enabled to match OG meta tags and improve consistency.</p>';
+        }, 'brighter_tweaks', 'preload_on_singles');
+        
+        // Google Fonts Preload section
+        add_settings_section(
+            'google_fonts_preload',
+            'Google Fonts Preload',
+            function () { 
+                echo '<p>' . esc_html__('Add Google Fonts preload link tags to improve performance. Enter the full <link rel="preload"> tags.', 'brighterwebsites') . '</p>'; 
+            },
+            'brighter_tweaks'
+        );
+        
+        add_settings_field('bw_google_fonts_preload', 'Google Fonts Preload Tags', function () {
+            wp_cache_delete('bw_google_fonts_preload', 'options');
+            $value = get_option(self::OPT_GOOGLE_FONTS, '');
+            echo '<style>
+                .bw-google-fonts-wrap { max-width: 800px; }
+                .bw-google-fonts-wrap textarea { 
+                    font-family: Consolas, Monaco, monospace; 
+                    font-size: 12px;
+                    width: 100%;
+                    display: block;
+                }
+                .bw-google-fonts-wrap .description {
+                    max-width: 800px;
+                }
+                .bw-google-fonts-wrap code {
+                    display: block;
+                    padding: 10px;
+                    background: #f6f7f7;
+                    border: 1px solid #dcdcde;
+                    margin-top: 8px;
+                    word-wrap: break-word;
+                    white-space: pre-wrap;
+                }
+            </style>';
+            echo '<div class="bw-google-fonts-wrap">';
+            echo '<textarea name="' . esc_attr(self::OPT_GOOGLE_FONTS) . '" rows="8" placeholder="' . esc_attr('<link rel="preload" href="https://fonts.gstatic.com/..." as="font" type="font/woff2" crossorigin>') . '">' . esc_textarea($value) . '</textarea>';
+            echo '<p class="description">' . esc_html__('Paste the full <link> tags, one per line. Example:', 'brighterwebsites') . '</p>';
+            echo '<code>&lt;link rel="preload" href="https://fonts.gstatic.com/s/lato/v25/S6uyw4BMUTPHjx4wXg.woff2"<br>&nbsp;&nbsp;as="font" type="font/woff2" crossorigin&gt;</code>';
+            echo '</div>';
+        }, 'brighter_tweaks', 'google_fonts_preload');
 
         // Register post meta for per-page preloads
         register_post_meta('page', '_bw_preloads', [
@@ -114,55 +212,141 @@ class Brighter_Tweaks {
         ]);
     }
 
-    /**
-     * Admin page render
-     * SECURITY: Nonce verification, capability checks, output escaping
-     */
-    public static function render_page() {
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
-        }
+    /** @var bool Set to true to log Asset Preload save/redirect to error_log (WP_DEBUG_LOG) */
+    const DEBUG_SAVE = true;
 
-        // Handle form submission
-        if (!empty($_POST['bw_tweaks_nonce']) && wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
-            // Theme colour
-            if (isset($_POST[self::OPT_THEME])) {
-                update_option(self::OPT_THEME, self::sanitise_hex(wp_unslash($_POST[self::OPT_THEME])));
+    /**
+     * Process form save (nonce check + option updates). Returns true if saved.
+     */
+    public static function process_save() {
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] process_save() called');
+            error_log('[Brighter_Tweaks] POST keys: ' . print_r(array_keys($_POST), true));
+        }
+        if (!current_user_can('manage_options')) {
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] process_save FAIL: current_user_can(manage_options)=false');
             }
-            
-            // Post types for featured image preload
-            if (isset($_POST[self::OPT_POST_TYPES]) && is_array($_POST[self::OPT_POST_TYPES])) {
-                $types = array_map('sanitize_text_field', $_POST[self::OPT_POST_TYPES]);
-                update_option(self::OPT_POST_TYPES, $types);
-            } else {
-                update_option(self::OPT_POST_TYPES, []);
+            return false;
+        }
+        if (empty($_POST['bw_tweaks_nonce']) || !wp_verify_nonce($_POST['bw_tweaks_nonce'], 'bw_tweaks_save')) {
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] process_save FAIL: nonce missing or invalid. POST keys: ' . implode(', ', array_keys($_POST)));
             }
-            
-            // Preloads map
-            $map = [];
-            if (!empty($_POST[self::OPT]) && is_array($_POST[self::OPT])) {
-                foreach ($_POST[self::OPT] as $pid => $raw) {
-                    $pid = (int)$pid;
-                    $lines = array_filter(array_map('trim', explode("\n", wp_unslash($raw))));
-                    if ($pid > 0 && $lines) {
-                        $map[$pid] = array_values(array_unique(array_map([__CLASS__, 'sanitise_url'], $lines)));
-                    }
+            return false;
+        }
+        
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] Nonce valid, proceeding with save...');
+        }
+        
+        if (isset($_POST[self::OPT_THEME])) {
+            update_option(self::OPT_THEME, self::sanitise_hex(wp_unslash($_POST[self::OPT_THEME])));
+        }
+        if (isset($_POST[self::OPT_POST_TYPES]) && is_array($_POST[self::OPT_POST_TYPES])) {
+            $types = array_map('sanitize_text_field', $_POST[self::OPT_POST_TYPES]);
+            update_option(self::OPT_POST_TYPES, $types);
+        } else {
+            update_option(self::OPT_POST_TYPES, []);
+        }
+        
+        // Save WebP options
+        update_option('brighter_preload_webp_append', isset($_POST['brighter_preload_webp_append']) ? 1 : 0);
+        update_option('brighter_preload_webp_replace', isset($_POST['brighter_preload_webp_replace']) ? 1 : 0);
+        update_option('brighter_preload_use_og_image', isset($_POST['brighter_preload_use_og_image']) ? 1 : 0);
+        
+        // Save Google Fonts Preload
+        if (isset($_POST[self::OPT_GOOGLE_FONTS])) {
+            $value = wp_unslash($_POST[self::OPT_GOOGLE_FONTS]);
+            $allowed_tags = [
+                'link' => [
+                    'rel' => true,
+                    'href' => true,
+                    'as' => true,
+                    'type' => true,
+                    'crossorigin' => true,
+                ]
+            ];
+            $sanitized = wp_kses($value, $allowed_tags);
+            update_option(self::OPT_GOOGLE_FONTS, $sanitized);
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] Google Fonts - Raw length: ' . strlen($value) . ', Sanitized length: ' . strlen($sanitized));
+            }
+        }
+        
+        // Merge per-page preloads with existing map so saving one pagination page
+        // doesn't wipe URLs for pages that weren't visible on this screen.
+        $existing = get_option(self::OPT, []);
+        if (!is_array($existing)) {
+            $existing = [];
+        }
+        $map = $existing;
+        if (!empty($_POST[self::OPT]) && is_array($_POST[self::OPT])) {
+            foreach ($_POST[self::OPT] as $pid => $raw) {
+                $pid = (int) $pid;
+                $lines = array_filter(array_map('trim', explode("\n", wp_unslash($raw))));
+                if ($pid > 0 && $lines) {
+                    $map[$pid] = array_values(array_unique(array_map([__CLASS__, 'sanitise_url'], $lines)));
+                } elseif ($pid > 0 && isset($map[$pid])) {
+                    // Explicitly cleared textarea on this page: remove entry.
+                    unset($map[$pid]);
                 }
             }
-            update_option(self::OPT, $map);
-            
-            echo '<div class="updated"><p>' . esc_html__('Brighter Tweaks saved.', 'brighterwebsites') . '</p></div>';
         }
+        update_option(self::OPT, $map);
+        return true;
+    }
 
-        // Load data
+    /**
+     * Redirect after save when form is submitted via admin-post (e.g. from Site Essentials).
+     * Uses redirect_to from POST when present and valid, else referer, else Support Hub tweaks.
+     */
+    public static function handle_save_redirect() {
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] handle_save_redirect() called. POST[action]=' . (isset($_POST['action']) ? $_POST['action'] : ''));
+        }
+        if (self::process_save()) {
+            $redirect = '';
+            if (!empty($_POST['redirect_to'])) {
+                $to = esc_url_raw(wp_unslash($_POST['redirect_to']));
+                if (wp_validate_redirect($to, admin_url())) {
+                    $redirect = $to;
+                }
+            }
+            if (!$redirect) {
+                $redirect = wp_get_referer();
+            }
+            if (!$redirect || !wp_validate_redirect($redirect)) {
+                $redirect = admin_url('admin.php?page=brighter_support&tab=tweaks');
+            }
+            $redirect = add_query_arg('tweaks_saved', '1', $redirect);
+            if (self::DEBUG_SAVE) {
+                error_log('[Brighter_Tweaks] redirect (success): ' . $redirect);
+            }
+            wp_safe_redirect($redirect);
+            exit;
+        }
+        if (self::DEBUG_SAVE) {
+            error_log('[Brighter_Tweaks] redirect (save failed): admin.php');
+        }
+        wp_safe_redirect(admin_url('admin.php'));
+        exit;
+    }
+
+    /**
+     * Render only the preload/tweaks form (for embedding in Site Essentials > Performance).
+     * When $embed is true, form posts to admin-post.php so save works from the embedded page.
+     * $redirect_to: optional URL to redirect to after save (e.g. Performance asset-preloading tab).
+     */
+    public static function render_preload_form($embed = false, $redirect_to = '') {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
         $theme = get_option(self::OPT_THEME, '');
         $map = get_option(self::OPT, []);
-
-        // Pagination
         $paged = max(1, isset($_GET['paged']) ? absint($_GET['paged']) : 1);
         $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
         $per_page = 20;
-
         $q = new WP_Query([
             'post_type' => 'page',
             'posts_per_page' => $per_page,
@@ -174,108 +358,155 @@ class Brighter_Tweaks {
             'fields' => 'ids',
         ]);
 
+        if ($embed && $redirect_to !== '') {
+            // POST to the Performance > Asset Preloading page; Site Essentials handles save (no admin-post.php)
+            $form_action = wp_validate_redirect($redirect_to, '') ? $redirect_to : '';
+            $form_method = 'post';
+        } else {
+            $form_action = '';
+            $form_method = 'post';
+        }
+        ?>
+        <form method="<?php echo esc_attr($form_method); ?>" action="<?php echo esc_url($form_action); ?>" style="margin-top:20px;">
+            <?php wp_nonce_field('bw_tweaks_save', 'bw_tweaks_nonce'); ?>
+
+            <?php do_settings_sections('brighter_tweaks'); ?>
+
+            <hr>
+
+            <h2 class="title"><?php esc_html_e('Per-Page Preloads', 'brighterwebsites'); ?></h2>
+            <p><?php esc_html_e('Enter one asset URL per line. These will be preloaded only on that page. Supports images, fonts, CSS and JS.', 'brighterwebsites'); ?></p>
+
+            <style>
+                .bw-preload-row {
+                    background: #fff;
+                    border: 1px solid #c3c4c7;
+                    padding: 15px;
+                    margin-bottom: 12px;
+                    border-radius: 4px;
+                }
+                .bw-preload-row:nth-of-type(even) {
+                    background: #f6f7f7;
+                }
+                .bw-preload-page-info {
+                    margin-bottom: 10px;
+                }
+                .bw-preload-page-info strong {
+                    font-size: 14px;
+                    color: #1d2327;
+                }
+                .bw-preload-page-info a {
+                    text-decoration: none;
+                    color: #2271b1;
+                    font-size: 12px;
+                }
+                .bw-preload-page-info a:hover {
+                    text-decoration: underline;
+                }
+                .bw-preload-page-info small {
+                    color: #646970;
+                    font-size: 11px;
+                }
+                .bw-preload-textarea {
+                    width: 100%;
+                    font-family: Consolas, Monaco, monospace;
+                    font-size: 12px;
+                    padding: 8px;
+                    border: 1px solid #8c8f94;
+                    border-radius: 3px;
+                    box-sizing: border-box;
+                }
+            </style>
+
+            <div style="margin-top:12px;">
+                <?php
+                if ($q->have_posts()):
+                    foreach ($q->posts as $pid):
+                        $title = get_the_title($pid) ?: '(no title)';
+                        $url = get_permalink($pid);
+                        $val = isset($map[$pid]) ? implode("\n", $map[$pid]) : '';
+                        ?>
+                        <div class="bw-preload-row">
+                            <div class="bw-preload-page-info">
+                                <strong><?php echo esc_html($title); ?></strong><br>
+                                <a href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($url); ?></a><br>
+                                <small><?php echo esc_html(sprintf('ID: %d | Status: %s', $pid, get_post_status($pid))); ?></small>
+                            </div>
+                            <textarea name="<?php echo esc_attr(self::OPT); ?>[<?php echo (int)$pid; ?>]"
+                                      rows="4" class="bw-preload-textarea" placeholder="<?php esc_attr_e('Enter asset URLs (one per line)', 'brighterwebsites'); ?>"><?php echo esc_textarea($val); ?></textarea>
+                        </div>
+                        <?php
+                    endforeach;
+                else:
+                    echo '<p>' . esc_html__('No pages found.', 'brighterwebsites') . '</p>';
+                endif;
+                ?>
+            </div>
+
+            <?php
+            $total_pages = $q->max_num_pages ?: 1;
+            if ($total_pages > 1) {
+                echo '<p>';
+                for ($i = 1; $i <= $total_pages; $i++) {
+                    $link = add_query_arg([
+                        'page' => $embed ? 'site-essentials-essentials' : 'brighter_support',
+                        'tab' => $embed ? 'asset-preloading' : 'tweaks',
+                        's' => $search,
+                        'paged' => $i,
+                    ], admin_url('admin.php'));
+                    if ($i === $paged) {
+                        echo '<span class="button button-primary" style="margin-right:6px;">' . esc_html($i) . '</span>';
+                    } else {
+                        echo '<a class="button" style="margin-right:6px;" href="' . esc_url($link) . '">' . esc_html($i) . '</a>';
+                    }
+                }
+                echo '</p>';
+            }
+            ?>
+
+            <p><button class="button button-primary"><?php esc_html_e('Save Tweaks', 'brighterwebsites'); ?></button></p>
+        </form>
+        <?php
+        wp_reset_postdata();
+    }
+
+    /**
+     * Admin page render
+     * SECURITY: Nonce verification, capability checks, output escaping
+     */
+    public static function render_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'brighterwebsites'));
+        }
+        if (self::process_save()) {
+            echo '<div class="updated"><p>' . esc_html__('Brighter Tweaks saved.', 'brighterwebsites') . '</p></div>';
+        }
+
+        $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Brighter Tweaks', 'brighterwebsites'); ?></h1>
-
             <form method="get" style="margin-top:10px;">
                 <input type="hidden" name="page" value="brighter_support">
                 <input type="hidden" name="tab" value="tweaks">
-                <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search pages�', 'brighterwebsites'); ?>">
+                <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search pages?', 'brighterwebsites'); ?>">
                 <button class="button"><?php esc_html_e('Search', 'brighterwebsites'); ?></button>
             </form>
-
-            <form method="post" style="margin-top:20px;">
-                <?php wp_nonce_field('bw_tweaks_save', 'bw_tweaks_nonce'); ?>
-
-                <h2 class="title"><?php esc_html_e('Theme Colour', 'brighterwebsites'); ?></h2>
-                <p><?php esc_html_e('Used across Brighter tools where a brand colour is needed.', 'brighterwebsites'); ?></p>
-                <input type="text" name="<?php echo esc_attr(self::OPT_THEME); ?>"
-                       value="<?php echo esc_attr($theme); ?>" class="regular-text" placeholder="#193b2d"
-                       pattern="^#?[0-9a-fA-F]{3,6}$" />
-                <p class="description"><?php esc_html_e('Accepts 3 or 6-digit hex. The hash is optional.', 'brighterwebsites'); ?></p>
-
-                <hr>
-
-                <?php 
-                // Output the featured image preload settings
-                do_settings_sections('brighter_tweaks');
-                ?>
-
-                <hr>
-
-                <h2 class="title"><?php esc_html_e('Per-Page Preloads', 'brighterwebsites'); ?></h2>
-                <p><?php esc_html_e('Enter one asset URL per line. These will be preloaded only on that page. Supports images, fonts, CSS and JS.', 'brighterwebsites'); ?></p>
-
-                <table class="widefat striped">
-                    <thead>
-                        <tr>
-                            <th style="width:35%"><?php esc_html_e('Page', 'brighterwebsites'); ?></th>
-                            <th><?php esc_html_e('Assets to Preload (one per line)', 'brighterwebsites'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php
-                    if ($q->have_posts()):
-                        foreach ($q->posts as $pid):
-                            $title = get_the_title($pid) ?: '(no title)';
-                            $url = get_permalink($pid);
-                            $val = isset($map[$pid]) ? implode("\n", $map[$pid]) : '';
-                            ?>
-                            <tr>
-                                <td>
-                                    <strong><?php echo esc_html($title); ?></strong><br>
-                                    <code><?php echo esc_html($url); ?></code><br>
-                                    <small><?php echo esc_html(sprintf('ID: %d | Status: %s', $pid, get_post_status($pid))); ?></small>
-                                </td>
-                                <td>
-                                    <textarea name="<?php echo esc_attr(self::OPT); ?>[<?php echo (int)$pid; ?>]"
-                                              rows="4" style="width:100%;font-family:monospace;"><?php echo esc_textarea($val); ?></textarea>
-                                </td>
-                            </tr>
-                            <?php
-                        endforeach;
-                    else:
-                        echo '<tr><td colspan="2">' . esc_html__('No pages found.', 'brighterwebsites') . '</td></tr>';
-                    endif;
-                    ?>
-                    </tbody>
-                </table>
-
-                <?php
-                // Pagination with correct tab parameter
-                $total_pages = $q->max_num_pages ?: 1;
-                if ($total_pages > 1) {
-                    echo '<p>';
-                    for ($i = 1; $i <= $total_pages; $i++) {
-                        $link = add_query_arg([
-                            'page' => 'brighter_support',
-                            'tab' => 'tweaks',
-                            's' => $search,
-                            'paged' => $i,
-                        ], admin_url('admin.php'));
-
-                        if ($i === $paged) {
-                            echo '<span class="button button-primary" style="margin-right:6px;">' . esc_html($i) . '</span>';
-                        } else {
-                            echo '<a class="button" style="margin-right:6px;" href="' . esc_url($link) . '">' . esc_html($i) . '</a>';
-                        }
-                    }
-                    echo '</p>';
-                }
-                ?>
-
-                <p><button class="button button-primary"><?php esc_html_e('Save Tweaks', 'brighterwebsites'); ?></button></p>
-            </form>
+            <?php self::render_preload_form(false); ?>
         </div>
         <?php
-        wp_reset_postdata();
     }
 
     /**
      * Output preloads for current page
      */
     public static function output_preloads() {
+        // Output Google Fonts preloads (site-wide) - already sanitized on save
+        $google_fonts = get_option(self::OPT_GOOGLE_FONTS, '');
+        if (!empty($google_fonts)) {
+           echo $google_fonts . "\n";
+        }
+        
         // Work on any singular page/post
         if (!is_singular()) return;
         
@@ -303,7 +534,6 @@ class Brighter_Tweaks {
         if (empty($urls)) return;
         
         // Output preloads
-        echo "\n<!-- Brighter Tweaks: Preloads -->\n";
         foreach ($urls as $u) {
             $u = self::normalise_url($u);
             if (empty($u)) continue;
@@ -319,7 +549,6 @@ class Brighter_Tweaks {
                 !empty($attr['crossorigin']) ? ' crossorigin' : ''
             );
         }
-        echo "<!-- /Brighter Tweaks: Preloads -->\n";
     }
 
     /**
@@ -337,18 +566,46 @@ class Brighter_Tweaks {
         
         $id = get_post_thumbnail_id();
         
-        // Try to use 'og-image' size first (1200x630), fallback to 'full'
-        $size = 'og-image';
-        $src = wp_get_attachment_image_url($id, $size);
+        // Check if we should use og-image or original
+        $use_og_image = get_option('brighter_preload_use_og_image', 1);
         
-        // If og-image doesn't exist, use full
-        if (!$src) {
+        if ($use_og_image) {
+            // Try to use 'og-image' size first (1200x630), fallback to 'full'
+            $size = 'og-image';
+            $src = wp_get_attachment_image_url($id, $size);
+            
+            // If og-image doesn't exist, use full
+            if (!$src) {
+                $size = 'full';
+                $src = wp_get_attachment_image_url($id, $size);
+            }
+        } else {
+            // Use original/full size
             $size = 'full';
             $src = wp_get_attachment_image_url($id, $size);
         }
         
+        // Apply WebP conversion if enabled
+        $webp_replace = get_option('brighter_preload_webp_replace', 0);
+        $webp_append = get_option('brighter_preload_webp_append', 0);
+        
+        if ($webp_replace) {
+            // ShortPixel style: replace extension (image.jpg → image.webp)
+            $src = preg_replace('/\.(jpe?g|png)$/i', '.webp', $src);
+        } elseif ($webp_append) {
+            // LiteSpeed style: append .webp (image.jpg → image.jpg.webp)
+            if (preg_match('/\.(jpe?g|png)$/i', $src)) {
+                $src .= '.webp';
+            }
+        }
+        
         $srcset = wp_get_attachment_image_srcset($id, $size);
         $mime = get_post_mime_type($id) ?: 'image/*';
+        
+        // Update mime type if using WebP
+        if ($webp_replace || $webp_append) {
+            $mime = 'image/webp';
+        }
         
         if ($src) {
             $src = self::normalise_url($src);
@@ -359,6 +616,26 @@ class Brighter_Tweaks {
                 esc_attr($mime)
             );
         }
+    }
+
+    /**
+     * Output theme-color meta tag from Business Info
+     */
+    public static function output_theme_color_meta() {
+        // Get theme color from Business Info
+        $theme_color = get_option('bw_mobile_theme_color', '');
+        
+        if (empty($theme_color)) {
+            return;
+        }
+        
+        // Ensure it has a hash
+        if ($theme_color[0] !== '#') {
+            $theme_color = '#' . $theme_color;
+        }
+        
+        echo "\n<!-- Brighter Tweaks: Theme Color -->\n";
+        echo '<meta name="theme-color" content="' . esc_attr($theme_color) . '">' . "\n";
     }
 
     /**
@@ -615,3 +892,9 @@ class Brighter_Tweaks {
 }
 
 Brighter_Tweaks::boot();
+
+/**
+ * Disable SEOPress Content Analysis meta box
+ * TEMPORARY: Can be removed once SEOPress is configured properly
+ */
+add_filter('seopress_metabox_content_analysis', '__return_false');

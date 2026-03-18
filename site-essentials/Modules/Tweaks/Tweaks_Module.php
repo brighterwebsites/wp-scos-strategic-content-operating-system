@@ -329,14 +329,34 @@ class Tweaks_Module implements Module_Interface {
      */
     private function disable_rest_api() {
         add_filter('rest_authentication_errors', function($result) {
-            if (!is_user_logged_in()) {
-                return new \WP_Error(
-                    'rest_not_logged_in',
-                    __('You are not currently logged in.', 'site-essentials'),
-                    ['status' => 401]
-                );
+            // Allow if user is logged in
+            if (is_user_logged_in()) {
+                return $result;
             }
-            return $result;
+            
+            // CRITICAL: Whitelist specific REST API endpoints that need unauthenticated access
+            $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+            
+            // Whitelist patterns:
+            $whitelist_patterns = [
+                '/wp-json/wc/',           // WooCommerce endpoints
+                '/wp-json/brighter/',     // Brighter custom endpoints (GPT, Make, etc.)
+                '/wp-json/brighter-core/', // Brighter Core endpoints (social amplification, etc.)
+                '/wp-json/brighter-x/',   // Brighter-X endpoints
+            ];
+            
+            foreach ($whitelist_patterns as $pattern) {
+                if (strpos($request_uri, $pattern) !== false) {
+                    return $result; // Allow this endpoint
+                }
+            }
+            
+            // Block all other unauthenticated REST requests
+            return new \WP_Error(
+                'rest_not_logged_in',
+                __('You are not currently logged in.', 'site-essentials'),
+                ['status' => 401]
+            );
         });
     }
 

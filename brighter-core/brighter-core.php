@@ -44,6 +44,7 @@ function brighter_get_whitelisted_modules() {
             'brighter-business-info',
             'brighter-support',
             'brighter-frontend',
+            'brighter-og-meta',             // Open Graph & Meta Tags
             'brighter-admin-branding',
             'brighter-support-image-settings',
             'bw-admin-tweaks',
@@ -78,12 +79,13 @@ function brighter_get_whitelisted_modules() {
             'class-content-stats-page',
             'class-column-toggles',
             'class-field-tooltips',
-            'migrate-reading-time-fields', // One-time migration
             'migrate-tldr-field', // One-time migration (ACF → bw_tldr)
             'class-tldr-meta-box', // TLDR field meta box (admin only)
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
             'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
+            'class-author-extension', // Module 15: Author Extension (E-E-A-T fields)
+            'post-type-enhancements', // Add author support to custom post types
         ];
     }
 
@@ -167,8 +169,10 @@ function brighter_load_modules() {
     $modules = [
         'brighter-business-info',
         'brighter-frontend',
+        'brighter-og-meta',             // Open Graph & Meta Tags
         'brighter-support',
         'brighter-admin-branding',
+        'login-styling',
         'brighter-support-image-settings',
         'bw-admin-tweaks',
         'image-optimisation',
@@ -184,6 +188,9 @@ function brighter_load_modules() {
  	'bw-support-cache-dashbrd',
         'bw-faq',
         'privacy-policy-style',
+        'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
+        'post-type-enhancements',       // Add author support to custom post types
+        
         // ALTC modules
         'class-altc-taxonomies',
         'class-altc-meta-boxes',
@@ -195,7 +202,6 @@ function brighter_load_modules() {
         'class-content-analysis',
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-reading-time-fields', // One-time migration (admin only)
         'migrate-tldr-field', // One-time migration (admin only)
         'class-tldr-meta-box', // TLDR field meta box (admin only)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
@@ -219,7 +225,6 @@ function brighter_load_modules() {
         // Content Analysis (admin-only)
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-reading-time-fields', // One-time migration (admin only)
         'migrate-tldr-field', // One-time migration (admin only)
         'class-tldr-meta-box', // TLDR field meta box (admin only)
        // 'brighter-tweaks',
@@ -239,6 +244,16 @@ brighter_load_modules();
 // Load API system (separate from modules due to subdirectory structure)
 if (file_exists(BRIGHTER_CORE_PATH . 'includes/api/class-brighter-api.php')) {
     require_once BRIGHTER_CORE_PATH . 'includes/api/class-brighter-api.php';
+}
+
+// Load ntfy notification system
+if (file_exists(BRIGHTER_CORE_PATH . 'includes/class-ntfy-notifications.php')) {
+    require_once BRIGHTER_CORE_PATH . 'includes/class-ntfy-notifications.php';
+}
+
+// Load ntfy test helper (temporary - for testing ntfy connection)
+if (file_exists(BRIGHTER_CORE_PATH . 'includes/ntfy/test-ntfy.php')) {
+    require_once BRIGHTER_CORE_PATH . 'includes/ntfy/test-ntfy.php';
 }
 
 /**

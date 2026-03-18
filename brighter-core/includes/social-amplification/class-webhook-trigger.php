@@ -87,6 +87,9 @@ class BW_Social_Webhook_Trigger {
         $breadcrumb = BW_Breadcrumbs_Meta::get_breadcrumb($post_id);
         $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
 
+        // Get image optimization data
+        $image_data = $this->get_image_optimization_data($post_id);
+
         // Prepare payload
         $payload = array(
             'post_id' => $post_id,
@@ -100,6 +103,7 @@ class BW_Social_Webhook_Trigger {
             'content_type' => $content_type,
             'site_url' => get_site_url(),
             'trigger_time' => current_time('mysql'),
+            'image_optimization' => $image_data, // Added for bulk image optimization
         );
 
         // Send webhook
@@ -223,5 +227,137 @@ class BW_Social_Webhook_Trigger {
         ));
         
         return true;
+    }
+
+    /**
+     * Get image optimization data for webhook payload
+     *
+     * @param int $post_id Post ID
+     * @return array Image data including featured and attached images
+     */
+    private function get_image_optimization_data($post_id) {
+        // Get post content
+        $post = get_post($post_id);
+        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_the_excerpt($post_id) ?: '';
+        }
+
+        // Get aggregated content (post + ACF + Breakdance)
+        $raw_content = class_exists('BW_Content_Analysis') 
+            ? BW_Content_Analysis::get_aggregated_content($post_id) 
+            : $post->post_content;
+        
+        // Plain text version (fully stripped)
+        $content_plain = wp_strip_all_tags($raw_content);
+        
+        // Source material version (with H2 as markdown for AI context)
+        $source_material = $this->sanitize_content_for_prompt($raw_content);
+
+        // Get featured image data
+        $featured_image = null;
+        $featured_image_id = get_post_thumbnail_id($post_id);
+        if ($featured_image_id) {
+            $featured_image = $this->get_single_image_data($featured_image_id);
+        }
+
+        // Get all attached images
+        $attached_images = array();
+        $attachments = get_attached_media('image', $post_id);
+        foreach ($attachments as $attachment) {
+            // Skip featured image (already included)
+            if ($attachment->ID === $featured_image_id) {
+                continue;
+            }
+            $attached_images[] = $this->get_single_image_data($attachment->ID);
+        }
+
+        return array(
+            'content' => $content_plain,
+            'source_material' => $source_material, // Formatted with H2 as markdown
+            'tldr' => $tldr,
+            'featured_image' => $featured_image,
+            'attached_images' => $attached_images,
+            'image_count' => array(
+                'featured' => $featured_image ? 1 : 0,
+                'attached' => count($attached_images),
+                'total' => ($featured_image ? 1 : 0) + count($attached_images)
+            )
+        );
+    }
+
+    /**
+     * Sanitize post content for prompt data (with H2 as markdown)
+     *
+     * @param string $content Raw post content (HTML)
+     * @return string Cleaned content with H2 as markdown
+     */
+    private function sanitize_content_for_prompt($content) {
+        if (empty($content) || !is_string($content)) {
+            return '';
+        }
+
+        // Convert H2 headings to markdown format (## Heading)
+        $content = preg_replace('/<h2[^>]*>(.*?)<\/h2>/is', '## $1', $content);
+
+        // Convert paragraph tags to single newlines
+        $content = preg_replace('/<p[^>]*>(.*?)<\/p>/is', "$1\n", $content);
+
+        // Convert other block-level elements to newlines
+        $content = preg_replace('/<br\s*\/?>/i', "\n", $content);
+        $content = preg_replace('/<\/?(div|section|article|header|footer|aside|nav)[^>]*>/i', "\n", $content);
+
+        // Strip all remaining HTML tags
+        $content = wp_strip_all_tags($content);
+
+        // Decode HTML entities
+        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Normalize whitespace
+        $content = preg_replace('/[ \t]+/', ' ', $content);
+        $content = preg_replace('/\n{3,}/', "\n\n", $content);
+        
+        // Remove leading/trailing whitespace from each line and blank lines
+        $lines = explode("\n", $content);
+        $lines = array_map('trim', $lines);
+        $cleaned_lines = array();
+        foreach ($lines as $line) {
+            if ($line !== '') {
+                $cleaned_lines[] = $line;
+            }
+        }
+
+        $content = implode("\n", $cleaned_lines);
+        return trim($content);
+    }
+
+    /**
+     * Get single image data
+     *
+     * @param int $attachment_id Image attachment ID
+     * @return array Image metadata
+     */
+    private function get_single_image_data($attachment_id) {
+        $attachment = get_post($attachment_id);
+        if (!$attachment) {
+            return null;
+        }
+
+        $image_meta = wp_get_attachment_metadata($attachment_id);
+        
+        return array(
+            'id' => (int) $attachment_id,
+            'url' => wp_get_attachment_url($attachment_id),
+            'title' => $attachment->post_title,
+            'alt' => get_post_meta($attachment_id, '_wp_attachment_image_alt', true),
+            'caption' => $attachment->post_excerpt,
+            'description' => $attachment->post_content,
+            'filename' => basename(get_attached_file($attachment_id)),
+            'mime_type' => $attachment->post_mime_type,
+            'dimensions' => array(
+                'width' => isset($image_meta['width']) ? (int) $image_meta['width'] : null,
+                'height' => isset($image_meta['height']) ? (int) $image_meta['height'] : null
+            )
+        );
     }
 }

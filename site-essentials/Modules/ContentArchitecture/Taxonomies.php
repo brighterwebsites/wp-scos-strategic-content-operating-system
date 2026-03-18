@@ -32,6 +32,13 @@ class Taxonomies {
 
 		// Associate with all supported public post types after they're registered.
 		add_action( 'init', [ __CLASS__, 'associate_post_types' ], 20 );
+
+		// Topic term meta — sameAs URL field on edit-tags.php
+		add_action( 'init',                        [ __CLASS__, 'register_term_meta' ] );
+		add_action( 'scos_topic_add_form_fields',  [ __CLASS__, 'topic_add_fields' ] );
+		add_action( 'scos_topic_edit_form_fields', [ __CLASS__, 'topic_edit_fields' ] );
+		add_action( 'created_scos_topic',          [ __CLASS__, 'save_topic_meta' ] );
+		add_action( 'edited_scos_topic',           [ __CLASS__, 'save_topic_meta' ] );
 	}
 
 	/**
@@ -190,5 +197,76 @@ class Taxonomies {
 		$types = array_values( array_diff( $all, $exclude ) );
 
 		return $types;
+	}
+
+	// =========================================================================
+	// Topic term meta — sameAs URL
+	// =========================================================================
+
+	/**
+	 * Register scos_topic_same_as as proper term meta so it's available
+	 * via REST, WP All Export, and get_term_meta().
+	 */
+	public static function register_term_meta() {
+		register_term_meta( 'scos_topic', 'scos_topic_same_as', [
+			'type'              => 'string',
+			'description'       => __( 'External authoritative URL for this topic (used in schema sameAs).', 'site-essentials' ),
+			'single'            => true,
+			'sanitize_callback' => 'esc_url_raw',
+			'show_in_rest'      => false,
+		] );
+	}
+
+	/**
+	 * Render the sameAs field on the Add New Topic form.
+	 */
+	public static function topic_add_fields() {
+		?>
+		<div class="form-field">
+			<label for="scos_topic_same_as"><?php esc_html_e( 'sameAs URL', 'site-essentials' ); ?></label>
+			<input type="url" id="scos_topic_same_as" name="scos_topic_same_as" value="" placeholder="https://www.wikidata.org/wiki/Q12345" />
+			<p><?php esc_html_e( 'External authoritative URL for this topic (used in schema sameAs). Example: https://www.wikidata.org/wiki/Q12345', 'site-essentials' ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render the sameAs field on the Edit Topic form.
+	 *
+	 * @param \WP_Term $term Current term object.
+	 */
+	public static function topic_edit_fields( $term ) {
+		$value = get_term_meta( $term->term_id, 'scos_topic_same_as', true );
+		?>
+		<tr class="form-field">
+			<th scope="row">
+				<label for="scos_topic_same_as"><?php esc_html_e( 'sameAs URL', 'site-essentials' ); ?></label>
+			</th>
+			<td>
+				<input type="url" id="scos_topic_same_as" name="scos_topic_same_as"
+					value="<?php echo esc_attr( $value ); ?>"
+					placeholder="https://www.wikidata.org/wiki/Q12345"
+					style="width:100%;max-width:500px" />
+				<p class="description"><?php esc_html_e( 'External authoritative URL for this topic (used in schema sameAs). Example: https://www.wikidata.org/wiki/Q12345', 'site-essentials' ); ?></p>
+			</td>
+		</tr>
+		<?php
+	}
+
+	/**
+	 * Save scos_topic_same_as when a topic is created or updated.
+	 *
+	 * @param int $term_id Term ID being saved.
+	 */
+	public static function save_topic_meta( $term_id ) {
+		if ( ! isset( $_POST['scos_topic_same_as'] ) ) {
+			return;
+		}
+		$url = esc_url_raw( wp_unslash( $_POST['scos_topic_same_as'] ) );
+		if ( $url ) {
+			update_term_meta( $term_id, 'scos_topic_same_as', $url );
+		} else {
+			delete_term_meta( $term_id, 'scos_topic_same_as' );
+		}
 	}
 }

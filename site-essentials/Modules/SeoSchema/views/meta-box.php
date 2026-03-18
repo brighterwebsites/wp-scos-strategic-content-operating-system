@@ -43,13 +43,10 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 		><?php echo esc_textarea( $custom_schema ); ?></textarea>
 
 		<p class="scos-schema-help">
-			<?php
-			printf(
-				/* translators: %s = schema.org link */
-				esc_html__( 'Enter valid JSON-LD schema markup. The %s @context and @type are required. This is output as-is in a <script type="application/ld+json"> tag.', 'site-essentials' ),
-				'<code>schema.org</code> '
-			);
-			?>
+			<?php esc_html_e( 'Enter valid JSON-LD schema markup. The schema.org @context and @type are required. This is output as-is in a', 'site-essentials' ); ?>
+			<code>&lt;script type="application/ld+json"&gt;</code>
+			<?php esc_html_e( 'tag. Multiple blocks can be added as an array:', 'site-essentials' ); ?>
+			<code>[{"@type": "FAQPage", ...}, {"@type": "HowTo", ...}]</code>
 		</p>
 	</div>
 

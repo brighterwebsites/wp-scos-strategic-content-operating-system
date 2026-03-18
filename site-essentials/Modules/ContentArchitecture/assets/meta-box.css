@@ -263,6 +263,9 @@
 }
 
 /* ---- Quick-add panel ---- */
+.scos-ca-quick-add[hidden] {
+	display: none;
+}
 .scos-ca-quick-add {
 	display: flex;
 	flex-direction: column;

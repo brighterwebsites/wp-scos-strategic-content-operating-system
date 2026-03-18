@@ -49,7 +49,7 @@ defined( 'ABSPATH' ) || exit;
 				id="scos_seo_breadcrumb_title"
 				value="<?php echo esc_attr( $breadcrumb_title ); ?>"
 				placeholder="<?php esc_attr_e( 'e.g. SEO Signals', 'site-essentials' ); ?>">
-			<p class="scos-seo-help"><?php esc_html_e( 'Short label for breadcrumb navigation. Plain text — can include spaces. (YOURLS shortlink slug is set separately in the Social Amplification metabox.)', 'site-essentials' ); ?></p>
+			<p class="scos-seo-help"><?php esc_html_e( 'Short label for breadcrumb navigation. Plain text, can include spaces — e.g. "SEO Signals". (YOURLS shortlink slug is separate, set in the Social Amplification metabox.)', 'site-essentials' ); ?></p>
 		</div>
 
 		<!-- TLDR Summary -->
@@ -59,7 +59,7 @@ defined( 'ABSPATH' ) || exit;
 			</label>
 			<textarea name="scos_seo_tldr" id="scos_seo_tldr" rows="3"
 				placeholder="<?php esc_attr_e( 'Brief 1–3 sentence summary used for voice search, social sharing, and the [tldr] shortcode…', 'site-essentials' ); ?>"><?php echo esc_textarea( $tldr ); ?></textarea>
-			<p class="scos-seo-help"><?php esc_html_e( 'Shown via [tldr] shortcode. Also used for Google Speakable and Airtable sync.', 'site-essentials' ); ?></p>
+			<p class="scos-seo-help"><?php esc_html_e( 'Shown via [tldr] shortcode. Also used for Google Speakable.', 'site-essentials' ); ?></p>
 		</div>
 
 		<!-- Meta Title -->

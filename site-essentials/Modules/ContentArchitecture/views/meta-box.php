@@ -57,7 +57,7 @@ $purpose_type_labels = [
 
 				<!-- Content Cluster -->
 				<div class="scos-ca-field">
-					<label for="scos_ca_cluster"><?php esc_html_e( 'Content Cluster', 'site-essentials' ); ?></label>
+					<label for="scos_ca_cluster"><?php esc_html_e( 'Cluster', 'site-essentials' ); ?></label>
 					<select name="scos_ca_cluster" id="scos_ca_cluster">
 						<option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
 						<?php foreach ( $clusters as $term ) : ?>
@@ -67,12 +67,8 @@ $purpose_type_labels = [
 							</option>
 						<?php endforeach; ?>
 					</select>
-					<button type="button" class="scos-ca-add-term button-link"
-						data-taxonomy="scos_content_cluster"
-						data-target="scos_ca_cluster"
-						data-label="<?php esc_attr_e( 'New Content Cluster', 'site-essentials' ); ?>">
-						+ <?php esc_html_e( 'Add Cluster', 'site-essentials' ); ?>
-					</button>
+					<?php /* Add Cluster button intentionally omitted — new clusters should be created via Content Architecture > Clusters menu, not per-post */ ?>
+					<p class="scos-ca-help"><?php esc_html_e( 'Select the Strategic Content Cluster this content belongs to.', 'site-essentials' ); ?></p>
 				</div>
 
 				<!-- Primary Topic -->
@@ -93,6 +89,7 @@ $purpose_type_labels = [
 						data-label="<?php esc_attr_e( 'New Topic', 'site-essentials' ); ?>">
 						+ <?php esc_html_e( 'Add Topic', 'site-essentials' ); ?>
 					</button>
+					<p class="scos-ca-help"><?php esc_html_e( 'Select or create the Primary Topic for this content.', 'site-essentials' ); ?></p>
 				</div>
 
 			</div>
@@ -116,6 +113,7 @@ $purpose_type_labels = [
 							</option>
 						<?php endforeach; ?>
 					</select>
+					<p class="scos-ca-help"><?php esc_html_e( 'Link to the parent Pillar page this content supports.', 'site-essentials' ); ?></p>
 				</div>
 
 				<!-- Service Pathway -->
@@ -134,6 +132,7 @@ $purpose_type_labels = [
 							</option>
 						<?php endforeach; ?>
 					</select>
+					<p class="scos-ca-help"><?php esc_html_e( 'Link to the related Service, Product, or Conversion Hub this content drives towards.', 'site-essentials' ); ?></p>
 				</div>
 
 			</div>
@@ -156,6 +155,7 @@ $purpose_type_labels = [
 							</option>
 						<?php endforeach; ?>
 					</select>
+					<p class="scos-ca-help"><?php esc_html_e( 'User search intent for this content.', 'site-essentials' ); ?></p>
 				</div>
 
 				<!-- Purpose -->
@@ -169,6 +169,7 @@ $purpose_type_labels = [
 							</option>
 						<?php endforeach; ?>
 					</select>
+					<p class="scos-ca-help"><?php esc_html_e( 'Content purpose in strategy.', 'site-essentials' ); ?></p>
 				</div>
 
 				<!-- Content Maturity -->
@@ -190,8 +191,8 @@ $purpose_type_labels = [
 			<div class="scos-ca-field">
 				<label for="scos_ca_intent_goal"><?php esc_html_e( 'Search Intent Goal', 'site-essentials' ); ?></label>
 				<textarea name="scos_ca_intent_goal" id="scos_ca_intent_goal" rows="2"
-					placeholder="<?php esc_attr_e( 'What is the primary search intent this content satisfies?', 'site-essentials' ); ?>"><?php echo esc_textarea( $fields['intent_goal'] ); ?></textarea>
-				<p class="scos-ca-help"><?php esc_html_e( 'e.g. "How to choose a stable builder"', 'site-essentials' ); ?></p>
+					placeholder="<?php esc_attr_e( 'e.g. "How to choose a stable builder"', 'site-essentials' ); ?>"><?php echo esc_textarea( $fields['intent_goal'] ); ?></textarea>
+				<p class="scos-ca-help"><?php esc_html_e( 'What is the primary search intent satisfied by this content?', 'site-essentials' ); ?></p>
 			</div>
 
 		</div>
@@ -320,6 +321,7 @@ $purpose_type_labels = [
 						</option>
 					<?php endforeach; ?>
 				</select>
+				<p class="scos-ca-help"><?php esc_html_e( 'Actual Google Search Console index status for this page.', 'site-essentials' ); ?></p>
 			</div>
 		</div>
 

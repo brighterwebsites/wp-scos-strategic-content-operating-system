@@ -781,14 +781,14 @@ class Admin_Columns {
 			'scos-ca-admin-columns',
 			SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/admin-columns.css',
 			[],
-			'1.0.0'
+			'1.0.4'
 		);
 
 		wp_enqueue_script(
 			'scos-ca-admin-columns',
 			SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/admin-columns.js',
 			[ 'jquery', 'inline-edit-post' ],
-			'1.0.0',
+			'1.0.4',
 			true
 		);
 

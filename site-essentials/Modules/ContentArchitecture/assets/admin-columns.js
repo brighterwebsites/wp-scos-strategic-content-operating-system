@@ -2,6 +2,8 @@
 ( function ( $ ) {
 	'use strict';
 
+	console.log( '[SCOS] admin-columns.js v1.0.4 loaded' );
+
 	// -------------------------------------------------------------------------
 	// Quick Edit — pre-populate from per-row data container
 	// -------------------------------------------------------------------------

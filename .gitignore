@@ -14,8 +14,9 @@
 !GIT_SETUP_GUIDE.md
 !DEPLOYMENT.md
 
-# Documentation directories
+# Documentation and example/template directories (local reference only)
 /docs/
+/Examples_templates/
 /high level strategy/
 /docs/history/
 

@@ -234,13 +234,9 @@ add_action('wp_head', function() {
     // Used by: GA4 tracking scripts, content strategy tools, AI agents
     // ============================================
     ?>
-    <!-- SCOS CAR - Full data for singular pages -->
     <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
     // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
     window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT); ?>;
-    
-    // Note: window.brighterGA4 is created by brighter-ga4-tracking.php (runs on ALL pages)
-    // We don't create it here to avoid conflicts and ensure skipTracking property is preserved
     </script>
     <?php
 }, 5); // Priority 5 = loads before GA4 tracking (priority 99)

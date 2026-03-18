@@ -235,10 +235,8 @@ ul.bw-breadcrumbs {
 .bw-breadcrumbs li,
 .bw-breadcrumbs li a {
     color: var(--bde-body-text-color);
-    font-size: 18px;
     text-decoration-line: none;
     text-transform: uppercase;
-    font-weight: 900;
     line-height: 1;
     letter-spacing: 1px;
     margin-bottom: 5px;
@@ -262,6 +260,22 @@ ul.bw-breadcrumbs {
         transparent 0%,
         rgba(255, 255, 255, 0.15) 50%,
         rgba(255, 255, 255, 0.35) 100%
+    );
+}
+/* Overflow fade indicator */
+.bw-breadcrumbs-wrap.is-overflowing::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0, 0, 0, 0.15) 50%,
+        rgba(0, 0, 0, 0.35) 100%
     );
 }
 

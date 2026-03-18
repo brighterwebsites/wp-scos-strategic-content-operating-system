@@ -52,8 +52,7 @@ function brighter_output_og_meta_tags() {
     // =========================================
     // OG: URL, Site Name, Locale
     // =========================================
-    echo "\n<!-- Open Graph Meta Tags -->\n";
-    echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
+     echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
     echo '<meta property="og:site_name" content="' . esc_attr($business_name) . '">' . "\n";
     echo '<meta property="og:locale" content="' . esc_attr($og_locale) . '">' . "\n";
     
@@ -125,9 +124,7 @@ function brighter_output_og_meta_tags() {
     // =========================================
     // Twitter Card
     // =========================================
-    echo "\n<!-- Twitter Card Meta Tags -->\n";
-    echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
-    echo "<!-- /Open Graph Meta Tags -->\n\n";
+     echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
 }
 
 /**

@@ -25,7 +25,7 @@ add_action('wp_head', function() {
     
     // Pass GA4 ID to JavaScript for consent-based loading
     ?>
-    <!-- Google Analytics 4 - Brighter Core -->
+    <!-- Google Analytics 4 -->
     <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
         (function() {
             'use strict';
@@ -48,12 +48,19 @@ add_action('wp_head', function() {
 }, 5); // Priority 5 = loads early
 
 /** PART 1: Inline Core Script - GA4 loader (no consent check) */
+//Removed comments for cleaner output
+// Wait for brighterGA4 to be created (PART 0 runs at priority 5, this runs at 99)
+// Only log error after all attempts failed
+// Skip tracking if admin/editor is logged in
+// Set consent mode to granted (no consent check required)
+// Grant analytics storage by default
+// Load GA4 script
+// Start initialization check
 add_action('wp_head', function() {
     ?>
     <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
     (function(){'use strict';
-    // Wait for brighterGA4 to be created (PART 0 runs at priority 5, this runs at 99)
-    var attempts = 0;
+       var attempts = 0;
     var maxAttempts = 50; // Wait up to 5 seconds (50 * 100ms)
     
     function checkAndInit(){
@@ -63,14 +70,13 @@ add_action('wp_head', function() {
                 setTimeout(checkAndInit, 100);
                 return;
             }
-            // Only log error after all attempts failed
             if(window.console&&window.console.error){
                 console.error('[Brighter GA4] ERROR: window.brighterGA4 not found after ' + (maxAttempts * 100) + 'ms! Check if brighter-ga4-tracking.php is loading.');
             }
             return;
         }
         
-        // Skip tracking if admin/editor is logged in
+        
         if(window.brighterGA4.skipTracking===true){
             if(window.console&&window.console.log){
                 console.log('[Brighter GA4] Skipping tracking (admin/editor logged in)');
@@ -79,17 +85,14 @@ add_action('wp_head', function() {
         }
         
         if(!window.brighterGA4.loaded){
-            // Set consent mode to granted (no consent check required)
             window.dataLayer=window.dataLayer||[];
             function gtag(){dataLayer.push(arguments);}
             window.gtag=gtag;
             gtag('js',new Date());
-            // Grant analytics storage by default
             gtag('consent','default',{
                 'analytics_storage':'granted',
                 'ad_storage':'denied'
             });
-            // Load GA4 script
             var s=document.createElement('script');
             s.async=true;
             s.src='https://www.googletagmanager.com/gtag/js?id='+window.brighterGA4.measurementId;
@@ -122,7 +125,6 @@ add_action('wp_head', function() {
             },{passive:true});
         })();
     }
-    // Start initialization check
     checkAndInit();
     })();
     </script>

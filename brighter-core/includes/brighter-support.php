@@ -121,7 +121,7 @@ add_action('wp_head', function() {
     // Ahrefs Analytics - data is already sanitized on save, just output it
     $ahrefs = get_option('ahrefs_analytics_script', '');
     if (!empty($ahrefs)) {
-        echo "\n<!-- Ahrefs Analytics -->\n" . $ahrefs . "\n";
+        echo "\n" . $ahrefs . "\n";
     }
 }, 10);
 

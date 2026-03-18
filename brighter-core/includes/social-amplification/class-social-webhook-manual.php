@@ -234,8 +234,8 @@ class BW_Social_Webhook_Manual {
         ?>
         <script type="text/javascript">
         jQuery(document).ready(function($) {
-            console.log('BW Social: JavaScript loaded');
-            console.log('BW Social: Button exists?', $('#bw-trigger-social-webhook').length > 0);
+           //  console.log('BW Social: JavaScript loaded');
+          //  console.log('BW Social: Button exists?', $('#bw-trigger-social-webhook').length > 0);
             
             // Handle meta box button click
             $(document).on('click', '#bw-trigger-social-webhook', function(e) {

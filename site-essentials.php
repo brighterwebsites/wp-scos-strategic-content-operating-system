@@ -159,6 +159,11 @@ add_action('init', function() {
             \SiteEssentials\Modules\SeoSchema\SeoSchema_Module::class
         );
 
+        \SiteEssentials\Core\Module_Loader::register(
+            'analytics',
+            \SiteEssentials\Modules\Analytics\Analytics_Module::class
+        );
+
         // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used.
         // WP core registers at init priority 5; we must run earlier. Use priority 0 so we run first.
         add_action('init', function() {

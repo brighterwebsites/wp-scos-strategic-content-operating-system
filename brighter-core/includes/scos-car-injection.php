@@ -25,6 +25,10 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
  */
 add_action( 'wp_head', function () {
 
+	// Only output CAR when Content Architecture module is active.
+	// This constant is defined at init priority 5 by ContentArchitecture_Module.
+	if ( ! defined( 'SCOS_CA_ACTIVE' ) ) { return; }
+
 	// ── Resolve post ID ──────────────────────────────────────────────────────
 	$post_id = null;
 	if ( is_singular() ) {
@@ -189,7 +193,7 @@ if ( ! function_exists( 'scos_output_car' ) ) :
 function scos_output_car( array $scos ) {
 	echo "\n" . '<script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">' . "\n";
 	echo '// SCOS Content Architecture Record — semantic intent and topical authority mapping.' . "\n";
-	echo 'window.brighterSCOS = ' . wp_json_encode( $scos, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT ) . ';' . "\n";
+	echo 'window.scosCAR = ' . wp_json_encode( $scos, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT ) . ';' . "\n";
 	echo '</script>' . "\n";
 }
 endif;

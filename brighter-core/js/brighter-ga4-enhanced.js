@@ -15,11 +15,11 @@
     enhancedInitialized = true;
   
   // Use SCOS CAR directly (single source of truth)
-  const scos = window.brighterSCOS || {};
+  const scos = window.scosCAR || {};
   const car = scos.car || {};
   const meta = scos.meta || {};
-  const pillar = scos.pillar || null;
-  const servicePathway = scos.service_pathway || null;
+  const pillar = car.pillar || null;
+  const servicePathway = car.service_pathway || null;
   
   function getBaseParams() {
     // Use breadcrumb schema as short title if available, fallback to document.title

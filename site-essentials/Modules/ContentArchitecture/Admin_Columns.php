@@ -604,6 +604,25 @@ class Admin_Columns {
 	// =========================================================================
 
 	public static function handle_edit_save( $post_id, $post ) {
+		// Log EVERYTHING at the top — before any early returns — so we can see what's happening
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$scos_keys = implode( ',', array_filter( array_keys( (array) $_REQUEST ), function( $k ) {
+				return strpos( $k, 'scos_' ) === 0;
+			} ) );
+			error_log( sprintf(
+				'[SCOS BE:entry] post_id=%d  post_type=%s  autosave=%s  revision=%s  can_edit=%s  in_types=%s  _inline=%s  bulk_edit=%s  scos_keys=[%s]',
+				$post_id,
+				$post->post_type ?? '?',
+				( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) ? 'yes' : 'no',
+				wp_is_post_revision( $post_id ) ? 'yes' : 'no',
+				current_user_can( 'edit_post', $post_id ) ? 'yes' : 'no',
+				in_array( $post->post_type, Taxonomies::get_post_types(), true ) ? 'yes' : 'no',
+				isset( $_REQUEST['_inline_edit'] ) ? 'yes' : 'no',
+				isset( $_REQUEST['bulk_edit'] ) ? esc_attr( wp_unslash( $_REQUEST['bulk_edit'] ) ) : 'no',
+				$scos_keys
+			) );
+		}
+
 		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
 		if ( wp_is_post_revision( $post_id ) ) { return; }
 		if ( ! current_user_can( 'edit_post', $post_id ) ) { return; }
@@ -612,18 +631,10 @@ class Admin_Columns {
 		$is_inline = isset( $_REQUEST['_inline_edit'] );
 		$is_bulk   = isset( $_REQUEST['bulk_edit'] );
 
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( sprintf(
-				'[SCOS Admin_Columns] handle_edit_save post_id=%d  action=%s  is_inline=%s  is_bulk=%s  REQUEST keys=%s',
-				$post_id,
-				isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : '(none)',
-				$is_inline ? 'yes' : 'no',
-				$is_bulk   ? 'yes' : 'no',
-				implode( ',', array_filter( array_keys( $_REQUEST ), function( $k ) { return strpos( $k, 'scos_ca_' ) === 0; } ) )
-			) );
-		}
-
 		if ( ! $is_inline && ! $is_bulk ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( '[SCOS BE:skip] neither inline nor bulk — bailing' );
+			}
 			return;
 		}
 
@@ -680,11 +691,12 @@ class Admin_Columns {
 	private static function save_bulk_edit_fields( $post_id ) {
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			error_log( sprintf(
-				'[SCOS Admin_Columns] save_bulk_edit_fields post_id=%d  be_intent=%s  be_purpose=%s  be_cluster=%s',
+				'[SCOS BE:bulk] post_id=%d  intent=%s  purpose=%s  cluster=%s  maturity=%s',
 				$post_id,
-				isset( $_POST['scos_ca_be_intent'] )  ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_intent'] ) )  : '(not set)',
-				isset( $_POST['scos_ca_be_purpose'] ) ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_purpose'] ) ) : '(not set)',
-				isset( $_POST['scos_ca_be_cluster'] ) ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_cluster'] ) ) : '(not set)'
+				isset( $_POST['scos_ca_be_intent'] )   ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_intent'] ) )   : '(not set)',
+				isset( $_POST['scos_ca_be_purpose'] )  ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_purpose'] ) )  : '(not set)',
+				isset( $_POST['scos_ca_be_cluster'] )  ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_cluster'] ) )  : '(not set)',
+				isset( $_POST['scos_ca_be_maturity'] ) ? sanitize_text_field( wp_unslash( $_POST['scos_ca_be_maturity'] ) ) : '(not set)'
 			) );
 		}
 

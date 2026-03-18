@@ -237,6 +237,22 @@ class Meta_Fields {
 	}
 
 	/**
+	 * Content maturity colour map for admin column badges.
+	 *
+	 * @return array<string, array{color: string, bg: string}>
+	 */
+	public static function maturity_colors() {
+		return [
+			'entry'              => [ 'color' => '#92400e', 'bg' => '#fef3c7' ],
+			'learner'            => [ 'color' => '#78350f', 'bg' => '#fde68a' ],
+			'practitioner'       => [ 'color' => '#1e40af', 'bg' => '#dbeafe' ],
+			'professional'       => [ 'color' => '#1e3a8a', 'bg' => '#bfdbfe' ],
+			'expert'             => [ 'color' => '#5b21b6', 'bg' => '#ddd6fe' ],
+			'industry_authority' => [ 'color' => '#065f46', 'bg' => '#d1fae5' ],
+		];
+	}
+
+	/**
 	 * Intent colour map for admin column badges.
 	 *
 	 * @return array<string, array{color: string, bg: string}>

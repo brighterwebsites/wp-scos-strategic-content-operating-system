@@ -20,6 +20,9 @@ class BW_ALTC_Admin_Columns {
      * Initialize admin columns and filters
      */
     public static function init() {
+        // Suppressed when new Content Architecture module is active (scos_* columns replace these)
+        if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
+
         add_action('admin_init', [__CLASS__, 'register_columns']);
         add_action('restrict_manage_posts', [__CLASS__, 'add_filter_dropdowns'], 10, 1);
         add_filter('parse_query', [__CLASS__, 'filter_posts_by_altc']);

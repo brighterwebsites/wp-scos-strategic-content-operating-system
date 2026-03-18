@@ -211,6 +211,26 @@
 	background: var(--tag-bg);
 }
 
+/* Linked page title columns */
+.scos-col-link {
+	font-size: 11px;
+	color: #2271b1;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.scos-col-link:hover { text-decoration: underline; }
+
+/* Truncated text column (intent goal) */
+.scos-col-text {
+	font-size: 11px;
+	color: #374151;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	cursor: help;
+}
+
 /* Tighten column widths for our narrow columns */
 .column-scos_ca_index,
 .column-scos_sa_social {

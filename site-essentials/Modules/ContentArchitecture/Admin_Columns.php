@@ -28,9 +28,13 @@ class Admin_Columns {
 		'scos_ca_topic',
 		'scos_ca_intent',
 		'scos_ca_purpose',
+		'scos_ca_maturity',
 		'scos_ca_progress',
 		'scos_ca_next_step',
 		'scos_ca_index',
+		'scos_ca_pillar',
+		'scos_ca_pathway',
+		'scos_ca_intent_goal',
 		'scos_sa_social',
 	];
 
@@ -66,13 +70,17 @@ class Admin_Columns {
 		foreach ( $columns as $key => $label ) {
 			$new[ $key ] = $label;
 			if ( 'title' === $key ) {
-				$new['scos_ca_cluster']   = __( 'Cluster', 'site-essentials' );
-				$new['scos_ca_topic']     = __( 'Topic', 'site-essentials' );
-				$new['scos_ca_intent']    = __( 'Intent', 'site-essentials' );
-				$new['scos_ca_purpose']   = __( 'Purpose', 'site-essentials' );
-				$new['scos_ca_progress']  = __( 'Progress', 'site-essentials' );
-				$new['scos_ca_next_step'] = __( 'Next Step', 'site-essentials' );
-				$new['scos_ca_index']     = __( 'Index', 'site-essentials' );
+				$new['scos_ca_cluster']     = __( 'Cluster', 'site-essentials' );
+				$new['scos_ca_topic']       = __( 'Topic', 'site-essentials' );
+				$new['scos_ca_intent']      = __( 'Intent', 'site-essentials' );
+				$new['scos_ca_purpose']     = __( 'Purpose', 'site-essentials' );
+				$new['scos_ca_maturity']    = __( 'Maturity', 'site-essentials' );
+				$new['scos_ca_progress']    = __( 'Progress', 'site-essentials' );
+				$new['scos_ca_next_step']   = __( 'Next Step', 'site-essentials' );
+				$new['scos_ca_index']       = __( 'Index', 'site-essentials' );
+				$new['scos_ca_pillar']      = __( 'Pillar', 'site-essentials' );
+				$new['scos_ca_pathway']     = __( 'Pathway', 'site-essentials' );
+				$new['scos_ca_intent_goal'] = __( 'Primary Intent', 'site-essentials' );
 				if ( defined( 'SCOS_SA_ACTIVE' ) ) {
 					$new['scos_sa_social'] = __( 'Social', 'site-essentials' );
 				}
@@ -121,8 +129,11 @@ class Admin_Columns {
 					'topic'        => $t_term ? (int) $t_term->term_id  : 0,
 					'intent'       => (string) get_post_meta( $post_id, 'scos_ca_intent', true ),
 					'purpose'      => (string) get_post_meta( $post_id, 'scos_ca_purpose', true ),
+					'maturity'     => (string) get_post_meta( $post_id, 'scos_ca_maturity', true ),
 					'index-status' => (string) get_post_meta( $post_id, 'scos_ca_index_status', true ),
 					'next-step'    => (string) get_post_meta( $post_id, 'scos_ca_next_step', true ),
+					'pillar'       => (int) get_post_meta( $post_id, 'scos_ca_pillar_page_id', true ),
+					'pathway'      => (int) get_post_meta( $post_id, 'scos_ca_service_pathway_id', true ),
 					'progress'     => $progress,
 				];
 				printf(
@@ -171,6 +182,64 @@ class Admin_Columns {
 					printf(
 						'<span class="scos-col-badge" style="color:%s;background:%s">%s</span>',
 						esc_attr( $c['color'] ), esc_attr( $c['bg'] ), esc_html( $opts[ $val ] )
+					);
+				} else {
+					echo '<span class="scos-col-empty">—</span>';
+				}
+				break;
+
+			case 'scos_ca_maturity':
+				$val    = get_post_meta( $post_id, 'scos_ca_maturity', true );
+				$opts   = Meta_Fields::maturity_options();
+				$colors = Meta_Fields::maturity_colors();
+				if ( $val && isset( $opts[ $val ] ) ) {
+					$c = $colors[ $val ] ?? [ 'color' => '#374151', 'bg' => '#e5e7eb' ];
+					printf(
+						'<span class="scos-col-badge" style="color:%s;background:%s">%s</span>',
+						esc_attr( $c['color'] ), esc_attr( $c['bg'] ), esc_html( $opts[ $val ] )
+					);
+				} else {
+					echo '<span class="scos-col-empty">—</span>';
+				}
+				break;
+
+			case 'scos_ca_pillar':
+				$pillar_id = (int) get_post_meta( $post_id, 'scos_ca_pillar_page_id', true );
+				if ( $pillar_id > 0 ) {
+					$title = get_the_title( $pillar_id );
+					printf(
+						'<a href="%s" class="scos-col-link" title="%s">%s</a>',
+						esc_url( get_edit_post_link( $pillar_id ) ),
+						esc_attr( $title ),
+						esc_html( wp_trim_words( $title, 5, '…' ) )
+					);
+				} else {
+					echo '<span class="scos-col-empty">—</span>';
+				}
+				break;
+
+			case 'scos_ca_pathway':
+				$pathway_id = (int) get_post_meta( $post_id, 'scos_ca_service_pathway_id', true );
+				if ( $pathway_id > 0 ) {
+					$title = get_the_title( $pathway_id );
+					printf(
+						'<a href="%s" class="scos-col-link" title="%s">%s</a>',
+						esc_url( get_edit_post_link( $pathway_id ) ),
+						esc_attr( $title ),
+						esc_html( wp_trim_words( $title, 5, '…' ) )
+					);
+				} else {
+					echo '<span class="scos-col-empty">—</span>';
+				}
+				break;
+
+			case 'scos_ca_intent_goal':
+				$goal = get_post_meta( $post_id, 'scos_ca_intent_goal', true );
+				if ( $goal ) {
+					printf(
+						'<span class="scos-col-text" title="%s">%s</span>',
+						esc_attr( $goal ),
+						esc_html( wp_trim_words( $goal, 8, '…' ) )
 					);
 				} else {
 					echo '<span class="scos-col-empty">—</span>';
@@ -324,6 +393,54 @@ class Admin_Columns {
 						</select>
 					</label>
 
+					<label class="scos-qe-label">
+						<span class="title"><?php esc_html_e( 'Maturity', 'site-essentials' ); ?></span>
+						<select name="scos_ca_qe_maturity" data-scos-field="maturity">
+							<?php foreach ( Meta_Fields::maturity_options() as $v => $l ) : ?>
+								<option value="<?php echo esc_attr( $v ); ?>"><?php echo esc_html( $l ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+
+					<?php
+					$qe_pillar_pages = get_posts( [
+						'post_type'   => get_post_types( [ 'public' => true ], 'names' ),
+						'numberposts' => -1,
+						'orderby'     => 'title',
+						'order'       => 'ASC',
+						'meta_query'  => [ [ 'key' => 'scos_ca_purpose', 'value' => 'pillar' ] ],
+						'fields'      => 'ids',
+					] );
+					$qe_pathway_pages = get_posts( [
+						'post_type'   => get_post_types( [ 'public' => true ], 'names' ),
+						'numberposts' => -1,
+						'orderby'     => 'title',
+						'order'       => 'ASC',
+						'meta_query'  => [ [ 'key' => 'scos_ca_purpose', 'value' => [ 'service-page', 'product-page', 'conversion-hub' ], 'compare' => 'IN' ] ],
+						'fields'      => 'ids',
+					] );
+					?>
+
+					<label class="scos-qe-label">
+						<span class="title"><?php esc_html_e( 'Pillar Page', 'site-essentials' ); ?></span>
+						<select name="scos_ca_qe_pillar_page_id" data-scos-field="pillar">
+							<option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
+							<?php foreach ( $qe_pillar_pages as $pid ) : ?>
+								<option value="<?php echo esc_attr( $pid ); ?>"><?php echo esc_html( get_the_title( $pid ) ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+
+					<label class="scos-qe-label">
+						<span class="title"><?php esc_html_e( 'Service Pathway', 'site-essentials' ); ?></span>
+						<select name="scos_ca_qe_service_pathway_id" data-scos-field="pathway">
+							<option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
+							<?php foreach ( $qe_pathway_pages as $pid ) : ?>
+								<option value="<?php echo esc_attr( $pid ); ?>"><?php echo esc_html( get_the_title( $pid ) ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+
 				</div><!-- .scos-qe-grid -->
 
 				<div class="scos-qe-progress-wrap">
@@ -431,6 +548,17 @@ class Admin_Columns {
 						</select>
 					</label>
 
+					<label class="scos-qe-label">
+						<span class="title"><?php esc_html_e( 'Maturity', 'site-essentials' ); ?></span>
+						<select name="scos_ca_be_maturity">
+							<option value=""><?php esc_html_e( '— No Change —', 'site-essentials' ); ?></option>
+							<?php foreach ( Meta_Fields::maturity_options() as $v => $l ) : ?>
+								<?php if ( '' === $v ) { continue; } ?>
+								<option value="<?php echo esc_attr( $v ); ?>"><?php echo esc_html( $l ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</label>
+
 				</div><!-- .scos-qe-grid -->
 
 				<div class="scos-qe-progress-wrap">
@@ -490,10 +618,11 @@ class Admin_Columns {
 			wp_set_post_terms( $post_id, $id > 0 ? [ $id ] : [], 'scos_topic' );
 		}
 
-		// Simple meta
+		// Simple string meta
 		$meta_map = [
 			'scos_ca_qe_intent'       => 'scos_ca_intent',
 			'scos_ca_qe_purpose'      => 'scos_ca_purpose',
+			'scos_ca_qe_maturity'     => 'scos_ca_maturity',
 			'scos_ca_qe_index_status' => 'scos_ca_index_status',
 			'scos_ca_qe_next_step'    => 'scos_ca_next_step',
 		];
@@ -501,6 +630,14 @@ class Admin_Columns {
 			if ( isset( $_POST[ $post_key ] ) ) {
 				update_post_meta( $post_id, $meta_key, sanitize_text_field( wp_unslash( $_POST[ $post_key ] ) ) );
 			}
+		}
+
+		// Int meta (page links)
+		if ( isset( $_POST['scos_ca_qe_pillar_page_id'] ) ) {
+			update_post_meta( $post_id, 'scos_ca_pillar_page_id', absint( $_POST['scos_ca_qe_pillar_page_id'] ) );
+		}
+		if ( isset( $_POST['scos_ca_qe_service_pathway_id'] ) ) {
+			update_post_meta( $post_id, 'scos_ca_service_pathway_id', absint( $_POST['scos_ca_qe_service_pathway_id'] ) );
 		}
 
 		// Progress — replace with exactly what was selected (pre-populated in panel, so state is explicit)
@@ -525,6 +662,7 @@ class Admin_Columns {
 		$meta_map = [
 			'scos_ca_be_intent'       => 'scos_ca_intent',
 			'scos_ca_be_purpose'      => 'scos_ca_purpose',
+			'scos_ca_be_maturity'     => 'scos_ca_maturity',
 			'scos_ca_be_index_status' => 'scos_ca_index_status',
 			'scos_ca_be_next_step'    => 'scos_ca_next_step',
 		];

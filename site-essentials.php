@@ -139,6 +139,11 @@ add_action('init', function() {
             \SiteEssentials\Modules\CustomPosts\Cpt_Module::class
         );
 
+        \SiteEssentials\Core\Module_Loader::register(
+            'content_architecture',
+            \SiteEssentials\Modules\ContentArchitecture\ContentArchitecture_Module::class
+        );
+
         // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used.
         // WP core registers at init priority 5; we must run earlier. Use priority 0 so we run first.
         add_action('init', function() {

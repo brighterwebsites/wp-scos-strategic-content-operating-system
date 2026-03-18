@@ -66,6 +66,11 @@ class BW_ALTC_Taxonomies {
     public static function register_taxonomies() {
         $post_types = self::get_supported_post_types();
 
+        // When the new Content Architecture module is active, keep the legacy
+        // taxonomies registered (so existing term relationships remain queryable)
+        // but hide all admin UI for them — the new module provides the UI.
+        $ui_active = ! defined( 'SCOS_CA_ACTIVE' );
+
         // Register ALTC Strategic Lens taxonomy
         register_taxonomy('altc_strategic_lens', $post_types, [
             'labels' => [
@@ -83,12 +88,12 @@ class BW_ALTC_Taxonomies {
             ],
             'hierarchical'      => true,
             'public'            => false,
-            'show_ui'           => true,
+            'show_ui'           => $ui_active,
             'show_admin_column' => false,
-            'show_in_nav_menus' => true,
-            'show_in_rest'      => true,
+            'show_in_nav_menus' => $ui_active,
+            'show_in_rest'      => $ui_active,
             'show_tagcloud'     => false,
-            'meta_box_cb'       => false, // Hide default meta box, use custom one
+            'meta_box_cb'       => false, // Managed by custom meta box, not default WP box.
             'capabilities'      => [
                 'manage_terms' => 'manage_categories',
                 'edit_terms'   => 'manage_categories',
@@ -114,12 +119,12 @@ class BW_ALTC_Taxonomies {
             ],
             'hierarchical'      => true,
             'public'            => false,
-            'show_ui'           => true,
+            'show_ui'           => $ui_active,
             'show_admin_column' => false,
             'show_in_nav_menus' => false,
-            'show_in_rest'      => true,
+            'show_in_rest'      => $ui_active,
             'show_tagcloud'     => false,
-            'meta_box_cb'       => false, // Hide default meta box, use custom one
+            'meta_box_cb'       => false, // Managed by custom meta box, not default WP box.
             'capabilities'      => [
                 'manage_terms' => 'manage_categories',
                 'edit_terms'   => 'manage_categories',

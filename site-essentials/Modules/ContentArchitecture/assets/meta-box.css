@@ -1,0 +1,300 @@
+/* =====================================================
+   Content Architecture Meta Box Styles
+   ===================================================== */
+
+/* ---- Wrapper ---- */
+.scos-ca-wrap {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+/* ---- Tab Nav ---- */
+.scos-ca-tabs {
+	display: flex;
+	gap: 2px;
+	border-bottom: 2px solid #dcdcde;
+	margin-bottom: 16px;
+}
+
+.scos-ca-tab-btn {
+	position: relative;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -2px;
+	padding: 8px 16px;
+	font-size: 13px;
+	font-weight: 500;
+	color: #646970;
+	cursor: pointer;
+	transition: color 0.15s, border-color 0.15s;
+}
+
+.scos-ca-tab-btn:hover {
+	color: #1d2327;
+}
+
+.scos-ca-tab-btn.is-active {
+	color: #1d2327;
+	border-bottom-color: #2271b1;
+}
+
+/* Analysis dot (indicates data available) */
+.scos-ca-tab-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	background: #00a32a;
+	border-radius: 50%;
+	margin-left: 5px;
+	vertical-align: middle;
+}
+
+/* ---- Tab Panels ---- */
+.scos-ca-tab-panel {
+	display: none;
+}
+.scos-ca-tab-panel.is-active {
+	display: block;
+}
+
+/* ---- Sections ---- */
+.scos-ca-section {
+	margin-bottom: 18px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid #f0f0f1;
+}
+.scos-ca-section:last-child {
+	border-bottom: none;
+	margin-bottom: 0;
+}
+
+.scos-ca-section-title {
+	margin: 0 0 10px;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #646970;
+}
+
+/* ---- Field rows ---- */
+.scos-ca-field-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+.scos-ca-field-row--3 {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* ---- Individual fields ---- */
+.scos-ca-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.scos-ca-field label {
+	font-weight: 500;
+	font-size: 12px;
+	color: #3c434a;
+}
+.scos-ca-field select,
+.scos-ca-field textarea {
+	width: 100%;
+	max-width: 100%;
+}
+.scos-ca-field textarea {
+	min-height: 54px;
+	resize: vertical;
+}
+.scos-ca-field--inline {
+	flex-direction: row;
+	align-items: center;
+	gap: 10px;
+}
+.scos-ca-field--inline label {
+	flex-shrink: 0;
+	min-width: 110px;
+}
+.scos-ca-help {
+	font-size: 11px;
+	color: #8c8f94;
+	margin: 2px 0 0;
+}
+
+/* Add Term button */
+.scos-ca-add-term {
+	font-size: 11px;
+	color: #2271b1;
+	text-decoration: none;
+	cursor: pointer;
+	background: none;
+	border: none;
+	padding: 0;
+	text-align: left;
+}
+.scos-ca-add-term:hover {
+	color: #135e96;
+	text-decoration: underline;
+}
+
+/* ---- Analysis stats grid ---- */
+.scos-ca-stats-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 8px;
+	margin-bottom: 12px;
+}
+.scos-ca-stats-grid--2 {
+	grid-template-columns: repeat(2, 1fr);
+}
+
+.scos-ca-stat {
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 10px 8px;
+	text-align: center;
+}
+.scos-ca-stat-value {
+	display: block;
+	font-size: 22px;
+	font-weight: 600;
+	color: #1d2327;
+	line-height: 1.2;
+}
+.scos-ca-stat-value small {
+	font-size: 12px;
+	font-weight: 400;
+	color: #646970;
+}
+.scos-ca-stat-label {
+	display: block;
+	font-size: 11px;
+	color: #8c8f94;
+	margin-top: 2px;
+}
+
+/* Link detail lists */
+.scos-ca-link-list {
+	margin-top: 8px;
+}
+.scos-ca-link-list summary {
+	cursor: pointer;
+	font-size: 12px;
+	color: #2271b1;
+	user-select: none;
+}
+.scos-ca-link-list ul {
+	margin: 6px 0 0 12px;
+	padding: 0;
+	font-size: 12px;
+}
+.scos-ca-link-list li {
+	margin-bottom: 2px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 100%;
+}
+.scos-ca-link-list a {
+	text-decoration: none;
+}
+.scos-ca-link-list a:hover {
+	text-decoration: underline;
+}
+
+.scos-ca-last-analyzed {
+	font-size: 11px;
+	color: #8c8f94;
+	margin: 8px 0 0;
+	font-style: italic;
+}
+
+.scos-ca-empty-state {
+	padding: 20px;
+	text-align: center;
+	color: #646970;
+	background: #f6f7f7;
+	border: 1px dashed #dcdcde;
+	border-radius: 4px;
+}
+
+/* ---- Workflow: Progress Tags ---- */
+.scos-ca-progress-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.scos-ca-progress-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	border-radius: 20px;
+	border: 1.5px solid var(--tag-color, #6b7280);
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--tag-color, #374151);
+	background: #f3f4f6;
+	cursor: pointer;
+	transition: background 0.1s, color 0.1s;
+	user-select: none;
+}
+.scos-ca-progress-tag:hover {
+	background: var(--tag-bg, #e5e7eb);
+}
+.scos-ca-progress-tag.is-selected {
+	background: var(--tag-bg, #e5e7eb);
+	color: var(--tag-color, #374151);
+}
+.scos-ca-progress-tag input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+	width: 0;
+	height: 0;
+}
+
+/* ---- Workflow: Next Step select ---- */
+.scos-ca-next-step-select {
+	min-width: 160px;
+}
+
+/* ---- Quick-add panel ---- */
+.scos-ca-quick-add {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 4px;
+	padding: 8px 10px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+}
+.scos-ca-quick-add__label {
+	font-size: 12px;
+	font-weight: 500;
+	color: #3c434a;
+	margin-bottom: 2px;
+}
+.scos-ca-quick-add__row {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+.scos-ca-quick-add__row input[type="text"] {
+	flex: 1;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 782px) {
+	.scos-ca-field-row,
+	.scos-ca-field-row--3 {
+		grid-template-columns: 1fr;
+	}
+	.scos-ca-stats-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}

@@ -30,6 +30,11 @@ class BW_ALTC_Meta_Boxes {
      * Register meta boxes
      */
     public static function register_meta_boxes() {
+        // Suppressed when the new Content Architecture module is active.
+        if ( defined( 'SCOS_CA_ACTIVE' ) ) {
+            return;
+        }
+
         $post_types = BW_ALTC_Taxonomies::get_supported_post_types();
 
         foreach ($post_types as $post_type) {
@@ -304,6 +309,11 @@ class BW_ALTC_Meta_Boxes {
      * Save ALTC meta box data
      */
     public static function save_altc_meta($post_id) {
+        // Suppressed when the new Content Architecture module is active.
+        if ( defined( 'SCOS_CA_ACTIVE' ) ) {
+            return;
+        }
+
         // Check nonce
         if (!isset($_POST['bw_altc_nonce']) || !wp_verify_nonce($_POST['bw_altc_nonce'], 'bw_altc_metabox')) {
             return;

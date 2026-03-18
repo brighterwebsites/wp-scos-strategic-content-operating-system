@@ -46,6 +46,7 @@ class Admin_UI {
     const CPT_PAGE_SLUG = 'site-essentials-cpt';
     const BUSINESS_INFO_PAGE_SLUG = 'site-essentials-business-info';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
+    const ANALYTICS_PAGE_SLUG = 'site-essentials-analytics';
 
     /**
      * Constructor
@@ -133,6 +134,18 @@ class Admin_UI {
             self::BUSINESS_INFO_PAGE_SLUG,                      // Menu slug
             [$this, 'render_business_info_page']                 // Callback
         );
+
+        // Analytics submenu (only when Analytics module is active)
+        if ( defined( 'SCOS_ANALYTICS_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Analytics', 'site-essentials' ),
+                __( 'Analytics', 'site-essentials' ),
+                'manage_options',
+                self::ANALYTICS_PAGE_SLUG,
+                [ $this, 'render_analytics_page' ]
+            );
+        }
 
         // Settings submenu (always visible)
         add_submenu_page(
@@ -335,6 +348,38 @@ class Admin_UI {
         echo '<div class="site-essentials-content">';
         echo '<div class="card se-module-settings-card" data-module-id="cpt">';
         $cpt_module->render_settings();
+        echo '</div></div></div>';
+    }
+
+    /**
+     * Render Analytics page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_analytics_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $analytics_module = Module_Loader::get_module( 'analytics' );
+
+        if ( ! $analytics_module ) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            esc_html_e( 'Analytics module is not loaded.', 'site-essentials' );
+            echo '</p></div></div>';
+            return;
+        }
+
+        if ( isset( $_GET['scos_analytics_saved'] ) ) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'site-essentials' ) . '</p></div>';
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__( 'Analytics', 'site-essentials' ) . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card" data-module-id="analytics">';
+        $analytics_module->render_settings();
         echo '</div></div></div>';
     }
 

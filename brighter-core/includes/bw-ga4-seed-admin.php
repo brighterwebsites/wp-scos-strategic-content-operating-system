@@ -453,8 +453,9 @@ function brighter_analytics_render_page() {
     <?php
 }
 
-// Handle reset flag
+// Legacy reset flag handler (only runs when old page is active)
 add_action('admin_init', function() {
+    if ( defined( 'SCOS_ANALYTICS_ACTIVE' ) ) { return; }
     if (isset($_GET['page']) && $_GET['page'] === 'brighter-analytics' &&
         isset($_GET['tab']) && $_GET['tab'] === 'seeding' &&
         isset($_GET['reset']) && current_user_can('manage_options')) {
@@ -467,8 +468,9 @@ add_action('admin_init', function() {
     }
 });
 
-// AJAX handler to mark seeding as complete
+// Legacy AJAX handler — only active when site-essentials Analytics module is not loaded
 add_action('wp_ajax_brighter_ga4_seed_complete', function() {
+    if ( defined( 'SCOS_ANALYTICS_ACTIVE' ) ) { return; }
     if (!current_user_can('manage_options')) {
         wp_die('Unauthorized');
     }

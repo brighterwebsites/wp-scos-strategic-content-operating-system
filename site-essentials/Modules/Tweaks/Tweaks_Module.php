@@ -283,13 +283,17 @@ class Tweaks_Module implements Module_Interface {
     }
 
     /**
-     * Remove query string from URL
+     * Remove query string from URL — frontend only, never admin.
      *
      * @since  1.0.0
      * @param  string $src URL
      * @return string URL without query string
      */
     public function remove_query_string($src) {
+        // Never strip ?ver= on admin pages — it's required for cache-busting after deploys.
+        if ( is_admin() ) {
+            return $src;
+        }
         if (strpos($src, '?ver=')) {
             $src = remove_query_arg('ver', $src);
         }

@@ -121,6 +121,10 @@ class Tweaks_Module implements Module_Interface {
      * @return void
      */
     public function init() {
+        if ( ! defined( 'SCOS_TWEAKS_ACTIVE' ) ) {
+            define( 'SCOS_TWEAKS_ACTIVE', true );
+        }
+
         // Get enabled tweaks
         $tweaks = $this->settings->get_module_setting('tweaks', 'enabled_tweaks', $this->get_default_tweaks());
 
@@ -131,9 +135,59 @@ class Tweaks_Module implements Module_Interface {
             }
         }
 
+        // Restore WordPress defaults for any tweaks brighter-core removed unconditionally.
+        // brighter-core runs its removals at init priority 1; we run at priority 10.
+        $this->restore_defaults($tweaks);
+
         // Register admin settings if in admin
         if (is_admin()) {
             add_action('admin_init', [$this, 'register_settings']);
+        }
+    }
+
+    /**
+     * Restore WordPress default hooks that brighter-core removes unconditionally.
+     * Called after apply_tweak loop so we only restore what the user hasn't opted into removing.
+     *
+     * @since 1.0.0
+     * @param array $tweaks Current tweak settings.
+     * @return void
+     */
+    private function restore_defaults( $tweaks ) {
+        // ── Emoji ───────────────────────────────────────────────────────────────
+        if ( empty( $tweaks['disable_emojis'] ) ) {
+            add_action( 'wp_head', 'print_emoji_detection_script', 7 );
+            add_action( 'wp_print_styles', 'print_emoji_styles' );
+            add_action( 'admin_print_scripts', 'print_emoji_detection_script' );
+            add_action( 'admin_print_styles', 'print_emoji_styles' );
+        }
+
+        // ── RSD / WLW / WP version ──────────────────────────────────────────────
+        if ( empty( $tweaks['remove_rsd_link'] ) ) {
+            add_action( 'wp_head', 'rsd_link' );
+        }
+        if ( empty( $tweaks['remove_wlw_link'] ) ) {
+            add_action( 'wp_head', 'wlwmanifest_link' );
+        }
+        if ( empty( $tweaks['remove_wp_version'] ) ) {
+            add_action( 'wp_head', 'wp_generator' );
+        }
+
+        // ── Heartbeat ───────────────────────────────────────────────────────────
+        // brighter-core always sets interval to 60s via an anonymous closure.
+        // We override at higher priority to restore the WP default (15s).
+        if ( empty( $tweaks['optimize_heartbeat'] ) ) {
+            add_filter( 'heartbeat_settings', static function ( $settings ) {
+                $settings['interval'] = 15;
+                return $settings;
+            }, 20 );
+        }
+
+        // ── Google Fonts ────────────────────────────────────────────────────────
+        // brighter-tweaks::boot() always schedules remove_google_fonts on wp_loaded.
+        // If our option is off, unhook it now (wp_loaded hasn't fired yet).
+        if ( empty( $tweaks['remove_google_fonts'] ) && class_exists( 'Brighter_Tweaks' ) ) {
+            remove_action( 'wp_loaded', [ 'Brighter_Tweaks', 'remove_google_fonts' ] );
         }
     }
 
@@ -179,7 +233,16 @@ class Tweaks_Module implements Module_Interface {
                 break;
 
             case 'disable_embeds':
-                $this->disable_embeds();
+            case 'disable_embeds_outbound':
+                $this->disable_embeds_outbound();
+                break;
+
+            case 'disable_embeds_inbound':
+                $this->disable_embeds_inbound();
+                break;
+
+            case 'remove_google_fonts':
+                $this->remove_google_fonts();
                 break;
 
             case 'disable_rest_api':
@@ -301,28 +364,57 @@ class Tweaks_Module implements Module_Interface {
     }
 
     /**
-     * Disable WordPress embeds
+     * Disable outbound embeds — stops WordPress auto-converting pasted URLs into iframes.
      *
      * @since 1.0.0
      * @return void
      */
-    private function disable_embeds() {
-        add_action('init', function() {
-            // Remove the REST API endpoint
-            remove_action('rest_api_init', 'wp_oembed_register_route');
-
-            // Turn off oEmbed auto discovery
+    private function disable_embeds_outbound() {
+        add_action('init', static function() {
+            // Prevent WordPress turning pasted URLs into embedded players
             add_filter('embed_oembed_discover', '__return_false');
-
-            // Don't filter oEmbed results
             remove_filter('oembed_dataparse', 'wp_filter_oembed_result', 10);
+        }, 9999);
+    }
 
-            // Remove oEmbed discovery links
+    /**
+     * Disable inbound embeds — stops other sites from embedding this site's content.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function disable_embeds_inbound() {
+        add_action('init', static function() {
+            // Remove REST API endpoint for oEmbed
+            remove_action('rest_api_init', 'wp_oembed_register_route');
+            // Remove discovery <link> tags and embed.js from <head>
             remove_action('wp_head', 'wp_oembed_add_discovery_links');
-
-            // Remove oEmbed-specific JavaScript
             remove_action('wp_head', 'wp_oembed_add_host_js');
         }, 9999);
+    }
+
+    /**
+     * Remove Google Fonts — delegates to Brighter_Tweaks if available, else own implementation.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function remove_google_fonts() {
+        if ( class_exists( 'Brighter_Tweaks' ) ) {
+            // brighter-tweaks already has the logic; just call it directly
+            // (it was unhooking from wp_loaded; we call it now at init time)
+            \Brighter_Tweaks::remove_google_fonts();
+        } else {
+            // Standalone: strip Google Fonts via style_loader_tag + output buffer
+            add_filter( 'style_loader_tag', static function ( $html ) {
+                return strpos( $html, 'fonts.googleapis.com' ) !== false ? '' : $html;
+            }, 10, 2 );
+            add_action( 'wp_loaded', static function () {
+                ob_start( static function ( $html ) {
+                    return preg_replace( '/<link[^>]*fonts\.googleapis\.com[^>]*>/i', '', $html );
+                } );
+            } );
+        }
     }
 
     /**
@@ -372,16 +464,23 @@ class Tweaks_Module implements Module_Interface {
      */
     private function get_default_tweaks() {
         return [
-            'disable_emojis'        => false,
-            'remove_jquery_migrate' => false,
-            'disable_xmlrpc'        => false,
-            'remove_rsd_link'       => false,
-            'remove_wlw_link'       => false,
-            'remove_wp_version'     => false,
-            'optimize_heartbeat'    => false,
-            'remove_query_strings'  => false,
-            'disable_embeds'        => false,
-            'disable_rest_api'      => false,
+            // Performance & Speed
+            'disable_emojis'           => false,
+            'remove_jquery_migrate'    => false,
+            'optimize_heartbeat'       => false,
+            'remove_query_strings'     => false,
+            'disable_embeds_outbound'  => false,
+            'remove_google_fonts'      => false,
+            // Security & Hardening
+            'disable_xmlrpc'           => false,
+            'disable_rest_api'         => false,
+            // SEO & Metadata Code Cleanup
+            'remove_rsd_link'          => false,
+            'remove_wlw_link'          => false,
+            'remove_wp_version'        => false,
+            'disable_embeds_inbound'   => false,
+            // Legacy key — preserved for backwards compat but hidden from UI
+            'disable_embeds'           => false,
         ];
     }
 

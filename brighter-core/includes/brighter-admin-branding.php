@@ -138,11 +138,11 @@ function _brighter_fallback_login_logo_url() {
             return esc_url($url);
         }
     }
-    $url = get_option('bw_business_logo');
+    $url = function_exists( 'brighter_get_option' ) ? brighter_get_option( 'business_logo' ) : get_option( 'bw_business_logo' );
     if ($url && is_string($url)) {
         return esc_url($url);
     }
-    $url = get_option('bw_site_icon');
+    $url = function_exists( 'brighter_get_option' ) ? brighter_get_option( 'site_icon' ) : get_option( 'bw_site_icon' );
     if ($url && is_string($url)) {
         return esc_url($url);
     }

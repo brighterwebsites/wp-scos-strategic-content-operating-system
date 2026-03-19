@@ -24,6 +24,80 @@
 if (!defined('ABSPATH')) exit;
 
 /**
+ * Auto-build a LocalBusiness schema array from scos_biz_* Business Info fields.
+ * Called when scos_site_schema_local_business is empty and business_name is set.
+ *
+ * @return array|null Schema array or null if insufficient data.
+ */
+if ( ! function_exists( 'scos_schema_build_local_business' ) ) {
+function scos_schema_build_local_business() {
+    if ( ! function_exists( 'brighter_get_option' ) ) { return null; }
+
+    $name = brighter_get_option( 'business_name' );
+    if ( ! $name ) { return null; }
+
+    $org_type = brighter_get_option( 'organisation_type' ) ?: 'LocalBusiness';
+    if ( $org_type === 'Local Business' ) $org_type = 'LocalBusiness';
+
+    $schema = [
+        '@context' => 'https://schema.org',
+        '@type'    => $org_type,
+        '@id'      => home_url( '/#' . strtolower( $org_type ) ),
+        'name'     => $name,
+        'url'      => home_url( '/' ),
+    ];
+
+    $desc  = brighter_get_option( 'service_description' );
+    $phone = brighter_get_option( 'phone_number' );
+    $email = brighter_get_option( 'email' );
+    $price = brighter_get_option( 'price_tier' );
+    $img   = brighter_get_option( 'business_image' );
+    $logo  = brighter_get_option( 'business_logo' );
+    $found = brighter_get_option( 'founding_date' );
+
+    if ( $desc )  $schema['description']  = $desc;
+    if ( $phone ) $schema['telephone']    = $phone;
+    if ( $email ) $schema['email']        = $email;
+    if ( $price ) $schema['priceRange']   = $price;
+    if ( $img )   $schema['image']        = $img;
+    if ( $logo )  $schema['logo']         = $logo;
+    if ( $found ) $schema['foundingDate'] = $found;
+
+    // Address
+    $addr_parts = array_filter( [
+        'streetAddress'   => brighter_get_option( 'address' ),
+        'addressLocality' => brighter_get_option( 'city' ),
+        'addressRegion'   => brighter_get_option( 'state' ),
+        'postalCode'      => brighter_get_option( 'postcode' ),
+        'addressCountry'  => brighter_get_option( 'country' ),
+    ] );
+    if ( $addr_parts ) {
+        $schema['address'] = array_merge( [ '@type' => 'PostalAddress' ], $addr_parts );
+    }
+
+    // Geo
+    $lat  = brighter_get_option( 'lat' );
+    $long = brighter_get_option( 'long' );
+    if ( $lat && $long ) {
+        $schema['geo'] = [ '@type' => 'GeoCoordinates', 'latitude' => $lat, 'longitude' => $long ];
+    }
+
+    // sameAs
+    $same_as_keys = [
+        'social_link_facebook', 'social_link_twitter', 'social_link_instagram',
+        'social_link_youtube', 'social_link_linkedin', 'social_link_pinterest',
+        'knowledge_panel_share',
+    ];
+    $same_as = array_filter( array_map( 'brighter_get_option', $same_as_keys ) );
+    if ( $same_as ) {
+        $schema['sameAs'] = array_values( $same_as );
+    }
+
+    return $schema;
+}
+}
+
+/**
  * Output schema on template_redirect (after WP knows what page we're on)
  */
 add_action('template_redirect', 'bw_output_schema_graph', 1);
@@ -385,8 +459,18 @@ function bw_render_schema_graph() {
         ]
     ];
     
-    // LocalBusiness - Loaded from admin options (Site Essentials > SEO > Schema)
-    $local_business_schema = get_option('bw_local_business_schema', '');
+    // LocalBusiness — read from scos_site_schema_* (new) with bw_* fallback (legacy)
+    // Auto-generate from Business Info fields when both stores are empty
+    $local_business_schema = get_option( 'scos_site_schema_local_business', '' );
+    if ( $local_business_schema === '' ) {
+        $local_business_schema = get_option( 'bw_local_business_schema', '' );
+    }
+    if ( $local_business_schema === '' && function_exists( 'brighter_get_option' ) && brighter_get_option( 'business_name' ) ) {
+        $biz_auto = scos_schema_build_local_business();
+        if ( $biz_auto ) {
+            $local_business_schema = wp_json_encode( $biz_auto );
+        }
+    }
     if (!empty($local_business_schema)) {
         $decoded = json_decode(bw_schema_normalize_json_placeholders($local_business_schema), true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
@@ -848,7 +932,7 @@ function bw_render_schema_graph() {
     
     // Success Stories — on single project (CPT) only (CreativeWork removed; use Success Stories tab)
     if (is_singular('projects') && $post_id) {
-        $success_stories_schema = get_option('bw_success_stories_schema', '');
+        $success_stories_schema = get_option( 'scos_site_schema_success_stories', '' ) ?: get_option( 'bw_success_stories_schema', '' );
         if (!empty($success_stories_schema)) {
             $decoded = json_decode(bw_schema_normalize_json_placeholders($success_stories_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
@@ -865,8 +949,8 @@ function bw_render_schema_graph() {
     // Product — on single post or page when its ID is in the list
     $singular_id = bw_schema_get_singular_id();
     if ($singular_id) {
-        $product_post_ids = get_option('bw_product_post_ids', '');
-        $product_schema = get_option('bw_product_schema', '');
+        $product_post_ids = get_option( 'scos_site_schema_product_ids', '' ) ?: get_option( 'bw_product_post_ids', '' );
+        $product_schema   = get_option( 'scos_site_schema_product', '' ) ?: get_option( 'bw_product_schema', '' );
         $ids = bw_schema_parse_post_id_list($product_post_ids);
         $ids = apply_filters('bw_schema_product_post_ids', $ids, $singular_id);
         $include_product = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_product', false, $singular_id);
@@ -885,8 +969,8 @@ function bw_render_schema_graph() {
     
     // Service — on single post or page when its ID is in the list
     if ($singular_id) {
-        $service_post_ids = get_option('bw_service_post_ids', '');
-        $service_schema = get_option('bw_service_schema', '');
+        $service_post_ids = get_option( 'scos_site_schema_service_ids', '' ) ?: get_option( 'bw_service_post_ids', '' );
+        $service_schema   = get_option( 'scos_site_schema_service', '' ) ?: get_option( 'bw_service_schema', '' );
         $ids = bw_schema_parse_post_id_list($service_post_ids);
         $ids = apply_filters('bw_schema_service_post_ids', $ids, $singular_id);
         $include_service = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_service', false, $singular_id);

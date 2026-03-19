@@ -36,7 +36,7 @@ function brighter_output_og_meta_tags() {
     }
 
     // Get business info
-    $business_name = get_option('bw_business_name', get_bloginfo('name'));
+    $business_name = function_exists( 'brighter_get_option' ) ? ( brighter_get_option( 'business_name' ) ?: get_bloginfo( 'name' ) ) : get_option( 'bw_business_name', get_bloginfo( 'name' ) );
     $site_name = get_bloginfo('name');
     
     // Determine locale (default to en_AU, can be extended)

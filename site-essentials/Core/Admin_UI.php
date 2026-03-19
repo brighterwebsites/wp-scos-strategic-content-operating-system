@@ -47,6 +47,7 @@ class Admin_UI {
     const BUSINESS_INFO_PAGE_SLUG = 'site-essentials-business-info';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
     const ANALYTICS_PAGE_SLUG = 'site-essentials-analytics';
+    const SITE_SCHEMA_PAGE_SLUG = 'site-essentials-schema';
 
     /**
      * Constructor
@@ -144,6 +145,18 @@ class Admin_UI {
                 'manage_options',
                 self::ANALYTICS_PAGE_SLUG,
                 [ $this, 'render_analytics_page' ]
+            );
+        }
+
+        // Site Schema submenu (only when SiteSchema module is active)
+        if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Site Schema', 'site-essentials' ),
+                __( 'Site Schema', 'site-essentials' ),
+                'manage_options',
+                self::SITE_SCHEMA_PAGE_SLUG,
+                [ $this, 'render_site_schema_page' ]
             );
         }
 
@@ -386,29 +399,61 @@ class Admin_UI {
     /**
      * Render Business Info page
      *
-     * Uses the existing Business Info form from brighter-core (privacy policy, contact details).
+     * When BusinessInfo module is active, delegates to the module's render_settings().
+     * Falls back to the legacy brighter-core form if the module is not loaded.
      *
      * @since 1.0.0
      * @return void
      */
     public function render_business_info_page() {
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.'));
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
         }
 
         echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__('Business Info', 'site-essentials') . '</h1>';
+        echo '<h1>' . esc_html__( 'Business Info', 'site-essentials' ) . '</h1>';
         echo '<div class="site-essentials-content">';
-        echo '<div class="card se-module-settings-card">';
+        echo '<div class="card se-module-settings-card" data-module-id="business_info">';
 
-        if (function_exists('brighterweb_render_business_info_form')) {
+        $biz_module = Module_Loader::get_module( 'business_info' );
+        if ( $biz_module ) {
+            $biz_module->render_settings();
+        } elseif ( function_exists( 'brighterweb_render_business_info_form' ) ) {
             brighterweb_render_business_info_form();
         } else {
             echo '<div class="notice notice-warning"><p>';
-            echo esc_html__('Business Info module is not loaded. Ensure brighter-core is active.', 'site-essentials');
+            esc_html_e( 'Business Info module is not loaded. Ensure brighter-core is active.', 'site-essentials' );
             echo '</p></div>';
         }
 
+        echo '</div></div></div>';
+    }
+
+    /**
+     * Render Site Schema page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_site_schema_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $schema_module = Module_Loader::get_module( 'site_schema' );
+
+        if ( ! $schema_module ) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            esc_html_e( 'Site Schema module is not loaded.', 'site-essentials' );
+            echo '</p></div></div>';
+            return;
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__( 'Site Schema', 'site-essentials' ) . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card" data-module-id="site_schema">';
+        $schema_module->render_settings();
         echo '</div></div></div>';
     }
 

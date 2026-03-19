@@ -126,7 +126,7 @@ add_action('template_redirect', function() {
         header('Content-Type: text/plain; charset=utf-8');
         
         // Get business info
-        $business_name = get_option('bw_business_name', get_bloginfo('name'));
+        $business_name = function_exists( 'brighter_get_option' ) ? ( brighter_get_option( 'business_name' ) ?: get_bloginfo( 'name' ) ) : get_option( 'bw_business_name', get_bloginfo( 'name' ) );
         $last_update = date('F j, Y');
         
         // Query all published reviews
@@ -265,7 +265,7 @@ add_action('template_redirect', function() {
         $output .= "**Note:** This file is auto-generated from {$business_name}'s verified client reviews.\n";
         
         // Use Google Maps Share URL if available, otherwise use home URL
-        $google_maps_url = get_option('bw_google_maps_share', '');
+        $google_maps_url = function_exists( 'brighter_get_option' ) ? brighter_get_option( 'google_maps_share' ) : get_option( 'bw_google_maps_share', '' );
         $review_link = !empty($google_maps_url) ? $google_maps_url : home_url('/');
         $output .= "For the latest reviews, visit: " . $review_link . "\n";
         

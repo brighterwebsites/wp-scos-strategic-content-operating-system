@@ -36,8 +36,14 @@ class Head_Output {
 		// Robots — WordPress 5.7+ filter; priority 99 overrides SEOPress.
 		add_filter( 'wp_robots', [ __CLASS__, 'filter_robots' ], 99 );
 
-		// Description + Canonical — priority 0 outputs before SEOPress priority 1.
-		add_action( 'wp_head', [ __CLASS__, 'output_meta' ], 0 );
+		// Description + Canonical — priority 2, AFTER WordPress outputs title + robots
+		// at priority 1 (_wp_render_title_tag, wp_robots), giving the natural order:
+		// <title> → <meta robots> → <meta description> → <link canonical>
+		add_action( 'wp_head', [ __CLASS__, 'output_meta' ], 2 );
+
+		// Remove WordPress core's own rel_canonical() hook (priority 10) — it would
+		// produce a second <link rel="canonical"> alongside ours.
+		remove_action( 'wp_head', 'rel_canonical' );
 
 		// Try to suppress SEOPress head output on singulars to avoid duplicates.
 		add_action( 'template_redirect', [ __CLASS__, 'suppress_seopress_head' ], 1 );

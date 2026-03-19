@@ -43,7 +43,7 @@ class SeoMeta_Module implements Module_Interface {
 	}
 
 	public static function get_tier() {
-		return 'pro';
+		return 'basic';
 	}
 
 	public static function get_dependencies() {
@@ -64,9 +64,11 @@ class SeoMeta_Module implements Module_Interface {
 
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Meta_Box.php';
+		require_once __DIR__ . '/Head_Output.php';
 
 		Meta_Fields::init();
 		Meta_Box::init();
+		Head_Output::init();
 	}
 
 	public function render_settings() {

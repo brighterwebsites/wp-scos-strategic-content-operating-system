@@ -31,11 +31,11 @@ class SiteSchema_Module implements Module_Interface {
 	}
 
 	public static function get_name() {
-		return __( 'Site Schema', 'site-essentials' );
+		return __( 'Schema', 'site-essentials' );
 	}
 
 	public static function get_description() {
-		return __( 'Site-wide JSON-LD schema templates: Local Business, Success Stories, Product, and Service.', 'site-essentials' );
+		return __( 'Per-post JSON-LD schema input + site-wide schema templates (Local Business, Success Stories, Product, Service).', 'site-essentials' );
 	}
 
 	public static function get_tier() {
@@ -53,6 +53,17 @@ class SiteSchema_Module implements Module_Interface {
 	public function init() {
 		if ( ! defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
 			define( 'SCOS_SITE_SCHEMA_ACTIVE', true );
+		}
+		// Also covers per-post schema (previously SeoSchema_Module)
+		if ( ! defined( 'SCOS_SCHEMA_ACTIVE' ) ) {
+			define( 'SCOS_SCHEMA_ACTIVE', true );
+		}
+
+		// Boot per-post schema meta box
+		$meta_box_file = dirname( __DIR__ ) . '/SeoSchema/Meta_Box.php';
+		if ( file_exists( $meta_box_file ) ) {
+			require_once $meta_box_file;
+			\SiteEssentials\Modules\SeoSchema\Meta_Box::init();
 		}
 
 		add_action( 'admin_init', [ __CLASS__, 'run_migration' ], 5 );

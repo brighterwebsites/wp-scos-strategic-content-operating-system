@@ -54,6 +54,11 @@ class SeoSchema_Module implements Module_Interface {
 	}
 
 	public function init() {
+		// If SiteSchema module is active, it already handles SCOS_SCHEMA_ACTIVE and Meta_Box
+		if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
+			return;
+		}
+
 		if ( ! defined( 'SCOS_SCHEMA_ACTIVE' ) ) {
 			define( 'SCOS_SCHEMA_ACTIVE', true );
 		}

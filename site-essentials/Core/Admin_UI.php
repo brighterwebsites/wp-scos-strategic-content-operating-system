@@ -126,15 +126,17 @@ class Admin_UI {
             [$this, 'render_cpt_page']                          // Callback
         );
 
-        // Business Info submenu (standalone page; used for privacy policy, contact details)
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Business Info', 'site-essentials'),              // Page title
-            __('Business Info', 'site-essentials'),              // Menu title
-            'manage_options',                                    // Capability
-            self::BUSINESS_INFO_PAGE_SLUG,                      // Menu slug
-            [$this, 'render_business_info_page']                 // Callback
-        );
+        // Business Info submenu — only when BusinessInfo module is active
+        if ( defined( 'SCOS_BIZ_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Business Info', 'site-essentials' ),
+                __( 'Business Info', 'site-essentials' ),
+                'manage_options',
+                self::BUSINESS_INFO_PAGE_SLUG,
+                [ $this, 'render_business_info_page' ]
+            );
+        }
 
         // Analytics submenu (only when Analytics module is active)
         if ( defined( 'SCOS_ANALYTICS_ACTIVE' ) ) {

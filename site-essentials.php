@@ -154,10 +154,7 @@ add_action('init', function() {
             \SiteEssentials\Modules\SocialAmplification\SocialAmplification_Module::class
         );
 
-        \SiteEssentials\Core\Module_Loader::register(
-            'seo_schema',
-            \SiteEssentials\Modules\SeoSchema\SeoSchema_Module::class
-        );
+        // seo_schema is now absorbed into site_schema (one toggle for both per-post + site-wide schema)
 
         \SiteEssentials\Core\Module_Loader::register(
             'analytics',

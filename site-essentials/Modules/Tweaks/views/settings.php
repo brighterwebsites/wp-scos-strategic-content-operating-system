@@ -49,7 +49,7 @@ $groups = [
         'tweaks' => [
             'disable_xmlrpc' => [
                 'label'       => __( 'Disable XML-RPC', 'site-essentials' ),
-                'description' => __( 'Disables the XML-RPC endpoint and strips the <code>X-Pingback</code> header. Blocks a common brute-force vector. Enable unless you use the WordPress mobile app, Jetpack, or another service that requires XML-RPC.', 'site-essentials' ),
+                'description' => __( 'Rejects all XML-RPC POST requests and strips the <code>X-Pingback</code> header. Blocks a common brute-force vector. Enable unless you use the WordPress mobile app, Jetpack, or a service that requires XML-RPC. <em>Note: visiting <code>/xmlrpc.php</code> directly in a browser always shows "accepts POST requests only" — this is WordPress core behavior and is normal whether XML-RPC is enabled or disabled.</em>', 'site-essentials' ),
             ],
             'disable_rest_api' => [
                 'label'       => __( 'Restrict REST API to Logged-In Users', 'site-essentials' ),

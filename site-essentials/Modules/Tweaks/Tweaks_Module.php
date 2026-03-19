@@ -306,12 +306,23 @@ class Tweaks_Module implements Module_Interface {
      * @return void
      */
     private function disable_xmlrpc() {
-        add_filter('xmlrpc_enabled', '__return_false');
+        // Prevent authentication
+        add_filter( 'xmlrpc_enabled', '__return_false' );
 
-        add_filter('wp_headers', function($headers) {
-            unset($headers['X-Pingback']);
+        // Strip X-Pingback header
+        add_filter( 'wp_headers', static function ( $headers ) {
+            unset( $headers['X-Pingback'] );
             return $headers;
-        });
+        } );
+
+        // Block POST requests too — returns 403 before any XML-RPC call is processed
+        add_action( 'xmlrpc_call', static function () {
+            wp_die(
+                __( 'XML-RPC is disabled on this site.', 'site-essentials' ),
+                __( 'XML-RPC Disabled', 'site-essentials' ),
+                [ 'response' => 403 ]
+            );
+        }, 1 );
     }
 
     /**

@@ -810,16 +810,23 @@ class Admin_UI {
 
         // Build full tweaks array (all false by default, enabled ones true)
         $all_tweaks = [
-            'disable_emojis'        => isset($enabled_tweaks['disable_emojis']),
-            'remove_jquery_migrate' => isset($enabled_tweaks['remove_jquery_migrate']),
-            'disable_xmlrpc'        => isset($enabled_tweaks['disable_xmlrpc']),
-            'remove_rsd_link'       => isset($enabled_tweaks['remove_rsd_link']),
-            'remove_wlw_link'       => isset($enabled_tweaks['remove_wlw_link']),
-            'remove_wp_version'     => isset($enabled_tweaks['remove_wp_version']),
-            'optimize_heartbeat'    => isset($enabled_tweaks['optimize_heartbeat']),
-            'remove_query_strings'  => isset($enabled_tweaks['remove_query_strings']),
-            'disable_embeds'        => isset($enabled_tweaks['disable_embeds']),
-            'disable_rest_api'      => isset($enabled_tweaks['disable_rest_api']),
+            // Performance & Speed
+            'disable_emojis'          => isset( $enabled_tweaks['disable_emojis'] ),
+            'remove_jquery_migrate'   => isset( $enabled_tweaks['remove_jquery_migrate'] ),
+            'optimize_heartbeat'      => isset( $enabled_tweaks['optimize_heartbeat'] ),
+            'remove_query_strings'    => isset( $enabled_tweaks['remove_query_strings'] ),
+            'disable_embeds_outbound' => isset( $enabled_tweaks['disable_embeds_outbound'] ),
+            'remove_google_fonts'     => isset( $enabled_tweaks['remove_google_fonts'] ),
+            // Security & Hardening
+            'disable_xmlrpc'          => isset( $enabled_tweaks['disable_xmlrpc'] ),
+            'disable_rest_api'        => isset( $enabled_tweaks['disable_rest_api'] ),
+            // SEO & Metadata Code Cleanup
+            'remove_rsd_link'         => isset( $enabled_tweaks['remove_rsd_link'] ),
+            'remove_wlw_link'         => isset( $enabled_tweaks['remove_wlw_link'] ),
+            'remove_wp_version'       => isset( $enabled_tweaks['remove_wp_version'] ),
+            'disable_embeds_inbound'  => isset( $enabled_tweaks['disable_embeds_inbound'] ),
+            // Legacy key — kept so previously saved data isn't lost
+            'disable_embeds'          => isset( $enabled_tweaks['disable_embeds'] ),
         ];
 
         // Save settings

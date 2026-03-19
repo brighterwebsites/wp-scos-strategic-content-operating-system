@@ -825,6 +825,7 @@ class Admin_UI {
             'remove_wlw_link'         => isset( $enabled_tweaks['remove_wlw_link'] ),
             'remove_wp_version'       => isset( $enabled_tweaks['remove_wp_version'] ),
             'remove_shortlink'        => isset( $enabled_tweaks['remove_shortlink'] ),
+            'remove_rest_api_links'   => isset( $enabled_tweaks['remove_rest_api_links'] ),
             'disable_embeds_inbound'  => isset( $enabled_tweaks['disable_embeds_inbound'] ),
             // Legacy key — kept so previously saved data isn't lost
             'disable_embeds'          => isset( $enabled_tweaks['disable_embeds'] ),

@@ -76,6 +76,10 @@ $groups = [
                 'label'       => __( 'Remove Shortlink Tag', 'site-essentials' ),
                 'description' => __( 'Removes <code>&lt;link rel="shortlink" href="/?p=123"&gt;</code> from the page <code>&lt;head&gt;</code> and the <code>Link:</code> HTTP header. No SEO value; just cleans up head clutter.', 'site-essentials' ),
             ],
+            'remove_rest_api_links' => [
+                'label'       => __( 'Remove REST API Discovery Links', 'site-essentials' ),
+                'description' => __( 'Removes <code>&lt;link rel="https://api.w.org/"&gt;</code> and the per-page <code>&lt;link rel="alternate" type="application/json"&gt;</code> from <code>&lt;head&gt;</code>. These advertise your REST API URL and internal post IDs to crawlers. Pair with <strong>Restrict REST API to Logged-In Users</strong> for full cleanup — if the API is locked anyway, the discovery links serve no purpose.', 'site-essentials' ),
+            ],
             'disable_embeds_inbound' => [
                 'label'       => __( 'Disable Inbound Embeds', 'site-essentials' ),
                 'description' => __( 'Stops other sites from discovering and embedding <em>your</em> content. Removes the oEmbed discovery <code>&lt;link&gt;</code> tags and the REST API endpoint. Zero impact on outbound embeds (YouTube, etc. still work on your pages).', 'site-essentials' ),

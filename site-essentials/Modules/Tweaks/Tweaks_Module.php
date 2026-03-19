@@ -249,6 +249,10 @@ class Tweaks_Module implements Module_Interface {
                 $this->remove_shortlink();
                 break;
 
+            case 'remove_rest_api_links':
+                $this->remove_rest_api_links();
+                break;
+
             case 'disable_rest_api':
                 $this->disable_rest_api();
                 break;
@@ -455,6 +459,21 @@ class Tweaks_Module implements Module_Interface {
     }
 
     /**
+     * Remove REST API discovery <link> tags from <head>.
+     *
+     * Removes:
+     *   <link rel="https://api.w.org/" href="…/wp-json/" />
+     *   <link rel="alternate" type="application/json" href="…/wp-json/wp/v2/pages/N" />
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function remove_rest_api_links() {
+        remove_action( 'wp_head', 'rest_output_link_wp_head', 10 );
+        remove_action( 'template_redirect', 'rest_output_link_header', 11 );
+    }
+
+    /**
      * Disable REST API for non-logged users
      *
      * @since 1.0.0
@@ -516,6 +535,7 @@ class Tweaks_Module implements Module_Interface {
             'remove_wlw_link'          => false,
             'remove_wp_version'        => false,
             'remove_shortlink'         => false,
+            'remove_rest_api_links'    => false,
             'disable_embeds_inbound'   => false,
             // Legacy key — preserved for backwards compat but hidden from UI
             'disable_embeds'           => false,

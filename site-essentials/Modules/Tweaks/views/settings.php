@@ -36,7 +36,7 @@ $groups = [
             ],
             'disable_embeds_outbound' => [
                 'label'       => __( 'Disable Outbound Embeds', 'site-essentials' ),
-                'description' => __( 'Prevents WordPress auto-converting raw pasted URLs (YouTube, Twitter, etc.) into embedded players. Saves the oEmbed HTTP fetch on page load. Use when your page builder (e.g. Breakdance) handles embeds, or you want URLs to stay as plain links.', 'site-essentials' ),
+                'description' => __( 'Stops WordPress auto-converting plain pasted URLs (YouTube, Vimeo, Twitter, etc.) into embedded players in your content. Use when your page builder handles embeds, or you want URLs to stay as links. The <code>[embed]</code> shortcode still works if you need explicit embeds.', 'site-essentials' ),
             ],
             'remove_google_fonts' => [
                 'label'       => __( 'Remove Google Fonts', 'site-essentials' ),
@@ -72,9 +72,13 @@ $groups = [
                 'label'       => __( 'Remove WordPress Version Tag', 'site-essentials' ),
                 'description' => __( 'Strips <code>&lt;meta name="generator" content="WordPress X.X.X"&gt;</code> from the page. Minor security hardening — removes an easy version-fingerprint. Does not affect RSS feeds or API responses.', 'site-essentials' ),
             ],
+            'remove_shortlink' => [
+                'label'       => __( 'Remove Shortlink Tag', 'site-essentials' ),
+                'description' => __( 'Removes <code>&lt;link rel="shortlink" href="/?p=123"&gt;</code> from the page <code>&lt;head&gt;</code> and the <code>Link:</code> HTTP header. No SEO value; just cleans up head clutter.', 'site-essentials' ),
+            ],
             'disable_embeds_inbound' => [
                 'label'       => __( 'Disable Inbound Embeds', 'site-essentials' ),
-                'description' => __( 'Stops other sites from easily embedding <em>your</em> content. Removes the oEmbed discovery <code>&lt;link&gt;</code> tags, <code>embed.js</code>, and the REST API endpoint from your <code>&lt;head&gt;</code>. Zero impact on what you can embed from external sites.', 'site-essentials' ),
+                'description' => __( 'Stops other sites from discovering and embedding <em>your</em> content. Removes the oEmbed discovery <code>&lt;link&gt;</code> tags and the REST API endpoint. Zero impact on outbound embeds (YouTube, etc. still work on your pages).', 'site-essentials' ),
             ],
         ],
     ],

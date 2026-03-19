@@ -245,6 +245,10 @@ class Tweaks_Module implements Module_Interface {
                 $this->remove_google_fonts();
                 break;
 
+            case 'remove_shortlink':
+                $this->remove_shortlink();
+                break;
+
             case 'disable_rest_api':
                 $this->disable_rest_api();
                 break;
@@ -381,27 +385,37 @@ class Tweaks_Module implements Module_Interface {
      * @return void
      */
     private function disable_embeds_outbound() {
-        add_action('init', static function() {
-            // Prevent WordPress turning pasted URLs into embedded players
-            add_filter('embed_oembed_discover', '__return_false');
-            remove_filter('oembed_dataparse', 'wp_filter_oembed_result', 10);
-        }, 9999);
+        // Must run after WP_Embed is instantiated (it hooks itself at wp-settings load time).
+        // Priority 9999 on init fires after our own init-10 bootstrap; $wp_embed is already set.
+        add_action( 'init', static function () {
+            global $wp_embed;
+            if ( ! empty( $wp_embed ) ) {
+                // This is the key hook: WordPress scans content for plain URLs and
+                // auto-converts them to [embed] shortcodes then to iframes.
+                remove_filter( 'the_content', [ $wp_embed, 'autoembed' ], 8 );
+            }
+            // Also block discovery of new oEmbed providers from unknown URLs
+            add_filter( 'embed_oembed_discover', '__return_false' );
+        }, 9999 );
     }
 
     /**
      * Disable inbound embeds — stops other sites from embedding this site's content.
      *
+     * wp_oembed_add_host_js is intentionally NOT removed: the wp-embed.js script it
+     * enqueues is also used by WordPress to render outbound embed players on your own
+     * pages — removing it would break YouTube/Vimeo iframes on your own site.
+     *
      * @since 1.0.0
      * @return void
      */
     private function disable_embeds_inbound() {
-        add_action('init', static function() {
-            // Remove REST API endpoint for oEmbed
-            remove_action('rest_api_init', 'wp_oembed_register_route');
-            // Remove discovery <link> tags and embed.js from <head>
-            remove_action('wp_head', 'wp_oembed_add_discovery_links');
-            remove_action('wp_head', 'wp_oembed_add_host_js');
-        }, 9999);
+        add_action( 'init', static function () {
+            // Remove the REST API endpoint that oEmbed clients call to get your embed HTML
+            remove_action( 'rest_api_init', 'wp_oembed_register_route' );
+            // Remove the <link rel="alternate" type="application/json+oembed"> discovery tags
+            remove_action( 'wp_head', 'wp_oembed_add_discovery_links' );
+        }, 9999 );
     }
 
     /**
@@ -426,6 +440,18 @@ class Tweaks_Module implements Module_Interface {
                 } );
             } );
         }
+    }
+
+    /**
+     * Remove shortlink <link> tag from <head>
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    private function remove_shortlink() {
+        remove_action( 'wp_head', 'wp_shortlink_wp_head', 10 );
+        // Also suppress the Link: header sent via wp_shortlink_header
+        remove_action( 'send_headers', 'wp_shortlink_header', 10 );
     }
 
     /**
@@ -489,6 +515,7 @@ class Tweaks_Module implements Module_Interface {
             'remove_rsd_link'          => false,
             'remove_wlw_link'          => false,
             'remove_wp_version'        => false,
+            'remove_shortlink'         => false,
             'disable_embeds_inbound'   => false,
             // Legacy key — preserved for backwards compat but hidden from UI
             'disable_embeds'           => false,

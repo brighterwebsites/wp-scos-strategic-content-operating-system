@@ -72,6 +72,20 @@ function scos_migration_handle_post(): void {
 			delete_option( 'scos_migration_seo_done' );
 			delete_transient( 'scos_migration_seo_result' );
 			break;
+
+		case 'dry_run_stats':
+			set_transient( 'scos_dry_run_stats', scos_migration_dry_run( 'stats' ), 120 );
+			break;
+
+		case 'run_stats':
+			set_transient( 'scos_migration_stats_result', scos_migration_run_stats(), 120 );
+			update_option( 'scos_migration_stats_done', current_time( 'mysql' ) );
+			break;
+
+		case 'reset_stats':
+			delete_option( 'scos_migration_stats_done' );
+			delete_transient( 'scos_migration_stats_result' );
+			break;
 	}
 
 	wp_safe_redirect( add_query_arg( 'page', 'scos-migration', admin_url( 'tools.php' ) ) );
@@ -84,11 +98,22 @@ function scos_migration_handle_post(): void {
 
 /**
  * Return all post types that participate in content architecture.
+ * Uses SiteEssentials\Taxonomies::get_post_types() when available;
+ * falls back to all public post types minus WP internals.
  *
  * @return string[]
  */
 function scos_migration_post_types(): array {
-	return [ 'page', 'post', 'service', 'resource', 'case_study', 'faq_item' ];
+	if ( class_exists( 'SiteEssentials\\Modules\\ContentArchitecture\\Taxonomies' ) ) {
+		return \SiteEssentials\Modules\ContentArchitecture\Taxonomies::get_post_types();
+	}
+	$exclude = [
+		'attachment', 'revision', 'nav_menu_item', 'custom_css',
+		'customize_changeset', 'oembed_cache', 'user_request',
+		'wp_block', 'wp_template', 'wp_template_part',
+		'wp_global_styles', 'wp_navigation',
+	];
+	return array_values( array_diff( get_post_types( [ 'public' => true ], 'names' ), $exclude ) );
 }
 
 /**
@@ -125,17 +150,14 @@ function scos_migration_remap_maturity( string $old ): string {
  * @return int|WP_Error  Term ID on success.
  */
 function scos_migration_find_or_create_term( string $name, string $slug, string $taxonomy ) {
-	// Try slug first (most reliable match).
 	$existing = get_term_by( 'slug', $slug, $taxonomy );
 	if ( $existing && ! is_wp_error( $existing ) ) {
 		return (int) $existing->term_id;
 	}
-	// Fall back to name.
 	$existing = get_term_by( 'name', $name, $taxonomy );
 	if ( $existing && ! is_wp_error( $existing ) ) {
 		return (int) $existing->term_id;
 	}
-	// Create.
 	$result = wp_insert_term( $name, $taxonomy, [ 'slug' => $slug ] );
 	if ( is_wp_error( $result ) ) {
 		return $result;
@@ -157,19 +179,33 @@ function scos_migration_dry_run( string $type ): array {
 			'Topic (altc_topic → scos_topic)'                       => [ 'old' => 'bw_primary_topic_id',   'new_tax' => 'scos_topic' ],
 			'Maturity (bw_cont_maturity)'                           => [ 'old' => 'bw_cont_maturity',      'new_meta' => 'scos_ca_maturity' ],
 			'Purpose (bw_purpose)'                                  => [ 'old' => 'bw_purpose',            'new_meta' => 'scos_ca_purpose' ],
+			'Intent (bw_intent)'                                    => [ 'old' => 'bw_intent',             'new_meta' => 'scos_ca_intent' ],
+			'Pillar Page (bw_pillar_page_id)'                       => [ 'old' => 'bw_pillar_page_id',     'new_meta' => 'scos_ca_pillar_page_id' ],
 			'Service Pathway (bw_service_pathway_id)'               => [ 'old' => 'bw_service_pathway_id', 'new_meta' => 'scos_ca_service_pathway_id' ],
+			'Index Status (bw_index_status)'                        => [ 'old' => 'bw_index_status',       'new_meta' => 'scos_ca_index_status' ],
+			'Optimization Progress (workflow_progress)'             => [ 'old' => 'workflow_progress',     'new_meta' => 'scos_ca_optimization_progress' ],
+			'Next Step (content_plan)'                              => [ 'old' => 'content_plan',          'new_meta' => 'scos_ca_next_step' ],
 			'Intent Goal / Notes (bw_altc_notes)'                   => [ 'old' => 'bw_altc_notes',         'new_meta' => 'scos_ca_intent_goal' ],
 		];
-	} else {
+	} elseif ( 'seo' === $type ) {
 		$fields = [
-			'Breadcrumb Title – primary (bw_custom_schema)'         => [ 'old' => 'bw_custom_schema',              'new_meta' => 'scos_seo_breadcrumb_title' ],
-			'Breadcrumb Title – fallback (_seopress_robots_breadcrumbs)' => [ 'old' => '_seopress_robots_breadcrumbs', 'new_meta' => 'scos_seo_breadcrumb_title' ],
-			'Per-page Schema JSON-LD (bw_breadcrumb_schema)'        => [ 'old' => 'bw_breadcrumb_schema',           'new_meta' => 'scos_schema_custom' ],
-			'Shortlink Slug (_bw_breadcrumb)'                       => [ 'old' => '_bw_breadcrumb',                 'new_meta' => 'scos_sa_shortlink_slug' ],
-			'SEO Title (_seopress_titles_title)'                    => [ 'old' => '_seopress_titles_title',          'new_meta' => 'scos_seo_title' ],
-			'SEO Description (_seopress_titles_desc)'               => [ 'old' => '_seopress_titles_desc',           'new_meta' => 'scos_seo_description' ],
-			'Robots – noindex (_seopress_robots_index)'             => [ 'old' => '_seopress_robots_index',          'new_meta' => 'scos_seo_robots' ],
-			'Canonical URL (_seopress_robots_canonical)'            => [ 'old' => '_seopress_robots_canonical',      'new_meta' => 'scos_seo_canonical' ],
+			'Breadcrumb Title – primary (bw_custom_schema)'               => [ 'old' => 'bw_custom_schema',              'new_meta' => 'scos_seo_breadcrumb_title' ],
+			'Breadcrumb Title – fallback (_seopress_robots_breadcrumbs)'  => [ 'old' => '_seopress_robots_breadcrumbs',   'new_meta' => 'scos_seo_breadcrumb_title' ],
+			'Per-page Schema JSON-LD (bw_breadcrumb_schema)'              => [ 'old' => 'bw_breadcrumb_schema',           'new_meta' => 'scos_schema_custom' ],
+			'Shortlink Slug (_bw_breadcrumb)'                             => [ 'old' => '_bw_breadcrumb',                 'new_meta' => 'scos_sa_shortlink_slug' ],
+			'SEO Title (_seopress_titles_title)'                          => [ 'old' => '_seopress_titles_title',          'new_meta' => 'scos_seo_title' ],
+			'SEO Description (_seopress_titles_desc)'                     => [ 'old' => '_seopress_titles_desc',           'new_meta' => 'scos_seo_description' ],
+			'Robots – noindex (_seopress_robots_index)'                   => [ 'old' => '_seopress_robots_index',          'new_meta' => 'scos_seo_robots' ],
+			'Canonical URL (_seopress_robots_canonical)'                  => [ 'old' => '_seopress_robots_canonical',      'new_meta' => 'scos_seo_canonical' ],
+		];
+	} else {
+		// stats
+		$fields = [
+			'Word Count (bw_word_count)'                => [ 'old' => 'bw_word_count',          'new_meta' => 'scos_ca_word_count' ],
+			'Image Count (bw_image_count)'              => [ 'old' => 'bw_image_count',         'new_meta' => 'scos_ca_image_count' ],
+			'H2 Count (bw_h2_count)'                    => [ 'old' => 'bw_h2_count',            'new_meta' => 'scos_ca_h2_count' ],
+			'Internal Link Count (bw_internal_link_count)' => [ 'old' => 'bw_internal_link_count', 'new_meta' => 'scos_ca_links_to_internal' ],
+			'Last Analysed (_bw_last_analyzed)'         => [ 'old' => '_bw_last_analyzed',      'new_meta' => 'scos_ca_last_analyzed' ],
 		];
 	}
 
@@ -180,14 +216,14 @@ function scos_migration_dry_run( string $type ): array {
 
 		foreach ( $ids as $post_id ) {
 			$old_val = get_post_meta( $post_id, $cfg['old'], true );
-			if ( empty( $old_val ) ) {
+			if ( $old_val === '' || $old_val === false || $old_val === null ) {
 				continue;
 			}
 			$with_source++;
 
 			if ( isset( $cfg['new_meta'] ) ) {
 				$new_val = get_post_meta( $post_id, $cfg['new_meta'], true );
-				if ( ! empty( $new_val ) ) {
+				if ( $new_val !== '' && $new_val !== false && $new_val !== null ) {
 					$already_done++;
 				} else {
 					$would_migrate++;
@@ -203,9 +239,9 @@ function scos_migration_dry_run( string $type ): array {
 		}
 
 		$counts[ $label ] = [
-			'source'   => $with_source,
-			'done'     => $already_done,
-			'migrate'  => $would_migrate,
+			'source'  => $with_source,
+			'done'    => $already_done,
+			'migrate' => $would_migrate,
 		];
 	}
 
@@ -223,24 +259,32 @@ function scos_migration_run_ca(): array {
 		'topic'     => [ 'migrated' => 0, 'skipped' => 0, 'error' => [] ],
 		'maturity'  => [ 'migrated' => 0, 'skipped' => 0, 'remapped' => 0 ],
 		'purpose'   => [ 'migrated' => 0, 'skipped' => 0 ],
+		'intent'    => [ 'migrated' => 0, 'skipped' => 0 ],
+		'pillar'    => [ 'migrated' => 0, 'skipped' => 0 ],
 		'pathway'   => [ 'migrated' => 0, 'skipped' => 0 ],
+		'index'     => [ 'migrated' => 0, 'skipped' => 0 ],
+		'progress'  => [ 'migrated' => 0, 'skipped' => 0 ],
+		'next_step' => [ 'migrated' => 0, 'skipped' => 0 ],
 		'notes'     => [ 'migrated' => 0, 'skipped' => 0 ],
+	];
+
+	// Old intent option slugs were identical to new — no remap needed.
+	// Old index_status slugs differ slightly; map known divergences.
+	$index_remap = [
+		'not_indexed' => 'no_index',
+		'pending'     => 'requested',
 	];
 
 	foreach ( $ids as $post_id ) {
 
-		// ── Cluster (bw_primary_altc_id → altc_strategic_lens → scos_content_cluster) ──
+		// ── Cluster ──
 		$old_altc_id = (int) get_post_meta( $post_id, 'bw_primary_altc_id', true );
 		if ( $old_altc_id ) {
 			$existing = wp_get_post_terms( $post_id, 'scos_content_cluster' );
 			if ( is_wp_error( $existing ) || empty( $existing ) ) {
 				$old_term = get_term( $old_altc_id, 'altc_strategic_lens' );
 				if ( $old_term && ! is_wp_error( $old_term ) ) {
-					$new_id = scos_migration_find_or_create_term(
-						$old_term->name,
-						$old_term->slug,
-						'scos_content_cluster'
-					);
+					$new_id = scos_migration_find_or_create_term( $old_term->name, $old_term->slug, 'scos_content_cluster' );
 					if ( is_wp_error( $new_id ) ) {
 						$result['cluster']['error'][] = "Post {$post_id}: " . $new_id->get_error_message();
 					} else {
@@ -253,18 +297,14 @@ function scos_migration_run_ca(): array {
 			}
 		}
 
-		// ── Topic (bw_primary_topic_id → altc_topic → scos_topic) ──
+		// ── Topic ──
 		$old_topic_id = (int) get_post_meta( $post_id, 'bw_primary_topic_id', true );
 		if ( $old_topic_id ) {
 			$existing = wp_get_post_terms( $post_id, 'scos_topic' );
 			if ( is_wp_error( $existing ) || empty( $existing ) ) {
 				$old_term = get_term( $old_topic_id, 'altc_topic' );
 				if ( $old_term && ! is_wp_error( $old_term ) ) {
-					$new_id = scos_migration_find_or_create_term(
-						$old_term->name,
-						$old_term->slug,
-						'scos_topic'
-					);
+					$new_id = scos_migration_find_or_create_term( $old_term->name, $old_term->slug, 'scos_topic' );
 					if ( is_wp_error( $new_id ) ) {
 						$result['topic']['error'][] = "Post {$post_id}: " . $new_id->get_error_message();
 					} else {
@@ -277,7 +317,7 @@ function scos_migration_run_ca(): array {
 			}
 		}
 
-		// ── Maturity (bw_cont_maturity → scos_ca_maturity) ──
+		// ── Maturity ──
 		$old_mat = get_post_meta( $post_id, 'bw_cont_maturity', true );
 		if ( $old_mat !== '' && $old_mat !== false ) {
 			$new_mat = get_post_meta( $post_id, 'scos_ca_maturity', true );
@@ -293,44 +333,71 @@ function scos_migration_run_ca(): array {
 			}
 		}
 
-		// ── Purpose (bw_purpose → scos_ca_purpose) ──
-		$old_purpose = get_post_meta( $post_id, 'bw_purpose', true );
-		if ( ! empty( $old_purpose ) ) {
-			$new_purpose = get_post_meta( $post_id, 'scos_ca_purpose', true );
-			if ( empty( $new_purpose ) ) {
-				update_post_meta( $post_id, 'scos_ca_purpose', $old_purpose );
-				$result['purpose']['migrated']++;
+		// ── Purpose ──
+		scos_migration_copy_meta( $post_id, 'bw_purpose', 'scos_ca_purpose', $result['purpose'] );
+
+		// ── Intent ──
+		scos_migration_copy_meta( $post_id, 'bw_intent', 'scos_ca_intent', $result['intent'] );
+
+		// ── Pillar Page ──
+		scos_migration_copy_meta( $post_id, 'bw_pillar_page_id', 'scos_ca_pillar_page_id', $result['pillar'] );
+
+		// ── Service Pathway ──
+		scos_migration_copy_meta( $post_id, 'bw_service_pathway_id', 'scos_ca_service_pathway_id', $result['pathway'] );
+
+		// ── Index Status ──
+		$old_index = get_post_meta( $post_id, 'bw_index_status', true );
+		if ( ! empty( $old_index ) ) {
+			$new_index = get_post_meta( $post_id, 'scos_ca_index_status', true );
+			if ( empty( $new_index ) ) {
+				$mapped = $index_remap[ $old_index ] ?? $old_index;
+				update_post_meta( $post_id, 'scos_ca_index_status', $mapped );
+				$result['index']['migrated']++;
 			} else {
-				$result['purpose']['skipped']++;
+				$result['index']['skipped']++;
 			}
 		}
 
-		// ── Service Pathway (bw_service_pathway_id → scos_ca_service_pathway_id) ──
-		$old_pathway = get_post_meta( $post_id, 'bw_service_pathway_id', true );
-		if ( ! empty( $old_pathway ) ) {
-			$new_pathway = get_post_meta( $post_id, 'scos_ca_service_pathway_id', true );
-			if ( empty( $new_pathway ) ) {
-				update_post_meta( $post_id, 'scos_ca_service_pathway_id', $old_pathway );
-				$result['pathway']['migrated']++;
+		// ── Optimization Progress (workflow_progress → scos_ca_optimization_progress) ──
+		// Old values were stored as a serialised array.
+		$old_progress = get_post_meta( $post_id, 'workflow_progress', true );
+		if ( ! empty( $old_progress ) ) {
+			$new_progress = get_post_meta( $post_id, 'scos_ca_optimization_progress', true );
+			if ( empty( $new_progress ) ) {
+				$progress_arr = is_array( $old_progress ) ? $old_progress : [ $old_progress ];
+				update_post_meta( $post_id, 'scos_ca_optimization_progress', array_map( 'sanitize_text_field', $progress_arr ) );
+				$result['progress']['migrated']++;
 			} else {
-				$result['pathway']['skipped']++;
+				$result['progress']['skipped']++;
 			}
 		}
 
-		// ── Intent Goal / Notes (bw_altc_notes → scos_ca_intent_goal) ──
-		$old_notes = get_post_meta( $post_id, 'bw_altc_notes', true );
-		if ( ! empty( $old_notes ) ) {
-			$new_notes = get_post_meta( $post_id, 'scos_ca_intent_goal', true );
-			if ( empty( $new_notes ) ) {
-				update_post_meta( $post_id, 'scos_ca_intent_goal', $old_notes );
-				$result['notes']['migrated']++;
-			} else {
-				$result['notes']['skipped']++;
-			}
-		}
+		// ── Next Step (content_plan → scos_ca_next_step) ──
+		scos_migration_copy_meta( $post_id, 'content_plan', 'scos_ca_next_step', $result['next_step'] );
+
+		// ── Intent Goal / Notes ──
+		scos_migration_copy_meta( $post_id, 'bw_altc_notes', 'scos_ca_intent_goal', $result['notes'] );
 	}
 
 	return $result;
+}
+
+/**
+ * Copy a scalar meta value if the destination is empty.
+ * Mutates $stat array by reference.
+ */
+function scos_migration_copy_meta( int $post_id, string $old_key, string $new_key, array &$stat ): void {
+	$old = get_post_meta( $post_id, $old_key, true );
+	if ( $old === '' || $old === false || $old === null ) {
+		return;
+	}
+	$new = get_post_meta( $post_id, $new_key, true );
+	if ( $new === '' || $new === false || $new === null ) {
+		update_post_meta( $post_id, $new_key, $old );
+		$stat['migrated']++;
+	} else {
+		$stat['skipped']++;
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -351,38 +418,25 @@ function scos_migration_run_seo(): array {
 
 	foreach ( $ids as $post_id ) {
 
-		// ── Breadcrumb Title: bw_custom_schema (primary) → scos_seo_breadcrumb_title ──
-		// Fallback: _seopress_robots_breadcrumbs if primary is empty
+		// ── Breadcrumb Title ──
 		$new_bc = get_post_meta( $post_id, 'scos_seo_breadcrumb_title', true );
 		if ( empty( $new_bc ) ) {
 			$bc_primary  = get_post_meta( $post_id, 'bw_custom_schema', true );
 			$bc_fallback = get_post_meta( $post_id, '_seopress_robots_breadcrumbs', true );
 			$bc_value    = ! empty( $bc_primary ) ? $bc_primary : $bc_fallback;
-
-			// Only set if the value looks like a title (not JSON-LD / large block of text).
+			// Only copy if value looks like a short title (not JSON-LD).
 			if ( ! empty( $bc_value ) && strlen( $bc_value ) < 200 && strpos( $bc_value, '{' ) === false ) {
 				update_post_meta( $post_id, 'scos_seo_breadcrumb_title', sanitize_text_field( $bc_value ) );
 				$result['breadcrumb_title']['migrated']++;
 			}
-		} else {
-			if ( get_post_meta( $post_id, 'bw_custom_schema', true ) || get_post_meta( $post_id, '_seopress_robots_breadcrumbs', true ) ) {
-				$result['breadcrumb_title']['skipped']++;
-			}
+		} elseif ( get_post_meta( $post_id, 'bw_custom_schema', true ) || get_post_meta( $post_id, '_seopress_robots_breadcrumbs', true ) ) {
+			$result['breadcrumb_title']['skipped']++;
 		}
 
-		// ── Per-page Schema JSON-LD: bw_breadcrumb_schema → scos_schema_custom ──
-		$old_schema = get_post_meta( $post_id, 'bw_breadcrumb_schema', true );
-		if ( ! empty( $old_schema ) ) {
-			$new_schema = get_post_meta( $post_id, 'scos_schema_custom', true );
-			if ( empty( $new_schema ) ) {
-				update_post_meta( $post_id, 'scos_schema_custom', $old_schema );
-				$result['schema_json']['migrated']++;
-			} else {
-				$result['schema_json']['skipped']++;
-			}
-		}
+		// ── Per-page Schema JSON-LD ──
+		scos_migration_copy_meta( $post_id, 'bw_breadcrumb_schema', 'scos_schema_custom', $result['schema_json'] );
 
-		// ── Shortlink Slug: _bw_breadcrumb → scos_sa_shortlink_slug ──
+		// ── Shortlink Slug ──
 		$old_slug = get_post_meta( $post_id, '_bw_breadcrumb', true );
 		if ( ! empty( $old_slug ) ) {
 			$new_slug = get_post_meta( $post_id, 'scos_sa_shortlink_slug', true );
@@ -394,7 +448,7 @@ function scos_migration_run_seo(): array {
 			}
 		}
 
-		// ── SEO Title: _seopress_titles_title → scos_seo_title ──
+		// ── SEO Title ──
 		$old_title = get_post_meta( $post_id, '_seopress_titles_title', true );
 		if ( ! empty( $old_title ) ) {
 			$new_title = get_post_meta( $post_id, 'scos_seo_title', true );
@@ -406,7 +460,7 @@ function scos_migration_run_seo(): array {
 			}
 		}
 
-		// ── SEO Description: _seopress_titles_desc → scos_seo_description ──
+		// ── SEO Description ──
 		$old_desc = get_post_meta( $post_id, '_seopress_titles_desc', true );
 		if ( ! empty( $old_desc ) ) {
 			$new_desc = get_post_meta( $post_id, 'scos_seo_description', true );
@@ -418,15 +472,12 @@ function scos_migration_run_seo(): array {
 			}
 		}
 
-		// ── Robots – noindex: _seopress_robots_index → scos_seo_robots (array) ──
-		// SEOPress stores "yes" = noindex, blank = index.
+		// ── Robots ──
 		$old_noindex = get_post_meta( $post_id, '_seopress_robots_index', true );
 		if ( ! empty( $old_noindex ) ) {
 			$new_robots = get_post_meta( $post_id, 'scos_seo_robots', true );
 			if ( empty( $new_robots ) ) {
-				// scos_seo_robots is stored as a serialised array of directives.
-				$directives = ( $old_noindex === 'yes' || $old_noindex === '1' ) ? [ 'noindex' ] : [];
-				// Also check _seopress_robots_follow for nofollow.
+				$directives   = ( $old_noindex === 'yes' || $old_noindex === '1' ) ? [ 'noindex' ] : [];
 				$old_nofollow = get_post_meta( $post_id, '_seopress_robots_follow', true );
 				if ( $old_nofollow === 'yes' || $old_nofollow === '1' ) {
 					$directives[] = 'nofollow';
@@ -440,7 +491,7 @@ function scos_migration_run_seo(): array {
 			}
 		}
 
-		// ── Canonical: _seopress_robots_canonical → scos_seo_canonical ──
+		// ── Canonical ──
 		$old_canonical = get_post_meta( $post_id, '_seopress_robots_canonical', true );
 		if ( ! empty( $old_canonical ) ) {
 			$new_canonical = get_post_meta( $post_id, 'scos_seo_canonical', true );
@@ -457,66 +508,125 @@ function scos_migration_run_seo(): array {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Run: Content Analysis Stats migration
+// ──────────────────────────────────────────────────────────────────────────────
+
+function scos_migration_run_stats(): array {
+	$ids    = scos_migration_get_all_post_ids();
+	$result = [
+		'word_count'    => [ 'migrated' => 0, 'skipped' => 0 ],
+		'image_count'   => [ 'migrated' => 0, 'skipped' => 0 ],
+		'h2_count'      => [ 'migrated' => 0, 'skipped' => 0 ],
+		'int_links'     => [ 'migrated' => 0, 'skipped' => 0 ],
+		'last_analyzed' => [ 'migrated' => 0, 'skipped' => 0 ],
+	];
+
+	foreach ( $ids as $post_id ) {
+		scos_migration_copy_meta( $post_id, 'bw_word_count',          'scos_ca_word_count',       $result['word_count'] );
+		scos_migration_copy_meta( $post_id, 'bw_image_count',         'scos_ca_image_count',      $result['image_count'] );
+		scos_migration_copy_meta( $post_id, 'bw_h2_count',            'scos_ca_h2_count',         $result['h2_count'] );
+		scos_migration_copy_meta( $post_id, 'bw_internal_link_count', 'scos_ca_links_to_internal', $result['int_links'] );
+		scos_migration_copy_meta( $post_id, '_bw_last_analyzed',      'scos_ca_last_analyzed',    $result['last_analyzed'] );
+	}
+
+	return $result;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Render
 // ──────────────────────────────────────────────────────────────────────────────
 
 function scos_migration_render_page(): void {
-	$ca_done  = get_option( 'scos_migration_ca_done' );
-	$seo_done = get_option( 'scos_migration_seo_done' );
+	$ca_done    = get_option( 'scos_migration_ca_done' );
+	$seo_done   = get_option( 'scos_migration_seo_done' );
+	$stats_done = get_option( 'scos_migration_stats_done' );
 
-	$dry_ca  = get_transient( 'scos_dry_run_ca' );
-	$dry_seo = get_transient( 'scos_dry_run_seo' );
-	$res_ca  = get_transient( 'scos_migration_ca_result' );
-	$res_seo = get_transient( 'scos_migration_seo_result' );
+	$dry_ca    = get_transient( 'scos_dry_run_ca' );
+	$dry_seo   = get_transient( 'scos_dry_run_seo' );
+	$dry_stats = get_transient( 'scos_dry_run_stats' );
+	$res_ca    = get_transient( 'scos_migration_ca_result' );
+	$res_seo   = get_transient( 'scos_migration_seo_result' );
+	$res_stats = get_transient( 'scos_migration_stats_result' );
 
-	// Delete transients so results show once.
 	delete_transient( 'scos_dry_run_ca' );
 	delete_transient( 'scos_dry_run_seo' );
+	delete_transient( 'scos_dry_run_stats' );
 	delete_transient( 'scos_migration_ca_result' );
 	delete_transient( 'scos_migration_seo_result' );
+	delete_transient( 'scos_migration_stats_result' );
+
+	$post_types = scos_migration_post_types();
 	?>
 	<div class="wrap">
 		<h1>⚠ SCOS Field Migration Tool</h1>
 
 		<div style="background:#fff3cd;border:1px solid #f0ad4e;padding:12px 16px;border-radius:4px;margin:16px 0">
-			<strong>Remember to take a full database backup before running any migration.</strong>
-			Fields are only written if the destination is empty (existing scos_* values are never overwritten).
-			<br>Remove <code>scos-migration.php</code> from mu-plugins once migration is complete.
+			<strong>Take a full database backup before running any migration.</strong>
+			Fields are only written if the destination is empty — existing <code>scos_*</code> values are never overwritten.
+			Remove <code>scos-migration.php</code> from mu-plugins once complete.
+		</div>
+
+		<div style="background:#f0f7ff;border:1px solid #c8e0f7;padding:10px 16px;border-radius:4px;margin-bottom:16px;font-size:13px">
+			<strong>Active post types (<?php echo count( $post_types ); ?>):</strong>
+			<?php echo esc_html( implode( ', ', $post_types ) ); ?>
 		</div>
 
 		<?php scos_migration_render_section(
 			'Content Architecture',
-			'Maps bw_* / altc_* meta keys and ALTC taxonomies to the new scos_ca_* keys and scos_content_cluster / scos_topic taxonomies.<br>
+			'Maps bw_* / altc_* meta keys and ALTC taxonomies to scos_ca_* keys and scos_content_cluster / scos_topic taxonomies.<br>
 			<strong>Maturity remap:</strong> <code>learner → entry</code>, <code>practitioner → professional</code>.',
 			'ca',
 			$ca_done,
 			$dry_ca,
 			$res_ca,
 			[
-				'Cluster'        => 'bw_primary_altc_id → <code>scos_content_cluster</code> taxonomy (term lookup / create)',
-				'Topic'          => 'bw_primary_topic_id → <code>scos_topic</code> taxonomy (term lookup / create)',
-				'Maturity'       => 'bw_cont_maturity → <code>scos_ca_maturity</code> (with value remapping)',
-				'Purpose'        => 'bw_purpose → <code>scos_ca_purpose</code>',
-				'Service Pathway'=> 'bw_service_pathway_id → <code>scos_ca_service_pathway_id</code>',
-				'Intent Goal'    => 'bw_altc_notes → <code>scos_ca_intent_goal</code>',
+				'Cluster'              => 'bw_primary_altc_id → <code>scos_content_cluster</code> taxonomy',
+				'Topic'                => 'bw_primary_topic_id → <code>scos_topic</code> taxonomy',
+				'Maturity'             => 'bw_cont_maturity → <code>scos_ca_maturity</code> (with value remapping)',
+				'Purpose'              => 'bw_purpose → <code>scos_ca_purpose</code>',
+				'Intent'               => 'bw_intent → <code>scos_ca_intent</code>',
+				'Pillar Page'          => 'bw_pillar_page_id → <code>scos_ca_pillar_page_id</code>',
+				'Service Pathway'      => 'bw_service_pathway_id → <code>scos_ca_service_pathway_id</code>',
+				'Index Status'         => 'bw_index_status → <code>scos_ca_index_status</code>',
+				'Optimization Progress'=> 'workflow_progress → <code>scos_ca_optimization_progress</code>',
+				'Next Step'            => 'content_plan → <code>scos_ca_next_step</code>',
+				'Intent Goal'          => 'bw_altc_notes → <code>scos_ca_intent_goal</code>',
 			]
 		); ?>
 
 		<?php scos_migration_render_section(
 			'SEO &amp; Schema',
-			'Maps _seopress_* and legacy bw_* SEO/schema keys to the new scos_seo_* and scos_schema_* keys.',
+			'Maps _seopress_* and legacy bw_* SEO/schema keys to scos_seo_* and scos_schema_* keys.',
 			'seo',
 			$seo_done,
 			$dry_seo,
 			$res_seo,
 			[
-				'Breadcrumb Title' => 'bw_custom_schema (primary) + _seopress_robots_breadcrumbs (fallback) → <code>scos_seo_breadcrumb_title</code>',
-				'Schema JSON-LD'   => 'bw_breadcrumb_schema → <code>scos_schema_custom</code>',
-				'Shortlink Slug'   => '_bw_breadcrumb → <code>scos_sa_shortlink_slug</code>',
-				'SEO Title'        => '_seopress_titles_title → <code>scos_seo_title</code>',
-				'SEO Description'  => '_seopress_titles_desc → <code>scos_seo_description</code>',
-				'Robots Directives'=> '_seopress_robots_index + _seopress_robots_follow → <code>scos_seo_robots</code> array',
-				'Canonical URL'    => '_seopress_robots_canonical → <code>scos_seo_canonical</code>',
+				'Breadcrumb Title'  => 'bw_custom_schema (primary) + _seopress_robots_breadcrumbs (fallback) → <code>scos_seo_breadcrumb_title</code>',
+				'Schema JSON-LD'    => 'bw_breadcrumb_schema → <code>scos_schema_custom</code>',
+				'Shortlink Slug'    => '_bw_breadcrumb → <code>scos_sa_shortlink_slug</code>',
+				'SEO Title'         => '_seopress_titles_title → <code>scos_seo_title</code>',
+				'SEO Description'   => '_seopress_titles_desc → <code>scos_seo_description</code>',
+				'Robots Directives' => '_seopress_robots_index + _seopress_robots_follow → <code>scos_seo_robots</code> array',
+				'Canonical URL'     => '_seopress_robots_canonical → <code>scos_seo_canonical</code>',
+			]
+		); ?>
+
+		<?php scos_migration_render_section(
+			'Content Analysis Stats',
+			'Copies previously-computed analysis stats from the legacy bw_* keys. For a full fresh re-analysis, use the
+			<a href="' . esc_url( admin_url( 'admin.php?page=scos-content-architecture' ) ) . '">Run Analysis</a>
+			button on the Content Architecture overview page instead.',
+			'stats',
+			$stats_done,
+			$dry_stats,
+			$res_stats,
+			[
+				'Word Count'          => 'bw_word_count → <code>scos_ca_word_count</code>',
+				'Image Count'         => 'bw_image_count → <code>scos_ca_image_count</code>',
+				'H2 Count'            => 'bw_h2_count → <code>scos_ca_h2_count</code>',
+				'Internal Link Count' => 'bw_internal_link_count → <code>scos_ca_links_to_internal</code>',
+				'Last Analysed Date'  => '_bw_last_analyzed → <code>scos_ca_last_analyzed</code>',
 			]
 		); ?>
 	</div>
@@ -545,10 +655,7 @@ function scos_migration_render_section(
 
 		<table class="widefat striped" style="margin-bottom:16px">
 			<thead>
-				<tr>
-					<th>Field</th>
-					<th>Mapping</th>
-				</tr>
+				<tr><th>Field</th><th>Mapping</th></tr>
 			</thead>
 			<tbody>
 				<?php foreach ( $field_map as $label => $mapping ) : ?>
@@ -602,7 +709,7 @@ function scos_migration_render_section(
 							<em>(<?php echo (int) $counts['remapped']; ?> values remapped)</em>
 						<?php endif; ?>
 						<?php if ( ! empty( $counts['error'] ) ) : ?>
-							<span style="color:#dc2626"><?php echo count( $counts['error'] ); ?> errors:
+							<span style="color:#dc2626"> — <?php echo count( $counts['error'] ); ?> errors:
 								<?php echo esc_html( implode( '; ', array_slice( $counts['error'], 0, 5 ) ) ); ?>
 							</span>
 						<?php endif; ?>
@@ -623,7 +730,7 @@ function scos_migration_render_section(
 
 			<button type="submit" name="scos_migration_action" value="run_<?php echo esc_attr( $type ); ?>"
 				class="button button-primary"
-				onclick="return confirm('Run the <?php echo esc_js( $title ); ?> migration? Empty destination fields will be populated. This cannot be undone.')">
+				onclick="return confirm('Run the <?php echo esc_js( $title ); ?> migration?\n\nEmpty destination fields will be populated. Existing scos_* values are never overwritten.\n\nThis cannot be undone — ensure you have a backup.')">
 				▶ Run Migration
 			</button>
 
@@ -631,7 +738,7 @@ function scos_migration_render_section(
 			<button type="submit" name="scos_migration_action" value="reset_<?php echo esc_attr( $type ); ?>"
 				class="button button-link-delete"
 				style="margin-left:auto"
-				onclick="return confirm('Reset the completed status? This does not undo any data changes.')">
+				onclick="return confirm('Reset completed status? This does NOT undo any data changes.')">
 				Reset status
 			</button>
 			<?php endif; ?>

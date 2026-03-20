@@ -30,6 +30,110 @@ class Content_Analysis {
 
 	public static function init() {
 		add_action( 'save_post', [ __CLASS__, 'analyze' ], 25, 3 );
+		add_action( 'wp_ajax_scos_run_analysis_batch', [ __CLASS__, 'ajax_run_batch' ] );
+		add_action( 'wp_ajax_scos_analysis_status',    [ __CLASS__, 'ajax_status' ] );
+	}
+
+	// ──────────────────────────────────────────────────────────────────────
+	// AJAX: batch analysis for the CA overview page
+	// ──────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Return per-post-type analysis status (total / analyzed / unanalyzed).
+	 */
+	public static function ajax_status(): void {
+		check_ajax_referer( 'scos_analysis', 'nonce' );
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		$types  = Taxonomies::get_post_types();
+		$rows   = [];
+		$totals = [ 'total' => 0, 'analyzed' => 0 ];
+
+		foreach ( $types as $type ) {
+			$obj = get_post_type_object( $type );
+			if ( ! $obj ) continue;
+
+			$all = (int) wp_count_posts( $type )->publish;
+			$analyzed = (int) ( new \WP_Query( [
+				'post_type'      => $type,
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => false,
+				'meta_query'     => [ [ 'key' => 'scos_ca_last_analyzed', 'compare' => 'EXISTS' ] ],
+			] ) )->found_posts;
+
+			$rows[] = [
+				'type'       => $type,
+				'label'      => $obj->labels->name,
+				'total'      => $all,
+				'analyzed'   => $analyzed,
+				'unanalyzed' => max( 0, $all - $analyzed ),
+			];
+			$totals['total']    += $all;
+			$totals['analyzed'] += $analyzed;
+		}
+
+		wp_send_json_success( [ 'rows' => $rows, 'totals' => $totals ] );
+	}
+
+	/**
+	 * Analyze a batch of posts that haven't been analyzed yet.
+	 * Accepts optional $_POST['post_type'] to limit to one type.
+	 * Processes 10 posts per call.
+	 */
+	public static function ajax_run_batch(): void {
+		check_ajax_referer( 'scos_analysis', 'nonce' );
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		$type_filter = isset( $_POST['post_type'] ) ? sanitize_key( $_POST['post_type'] ) : '';
+		$post_types  = $type_filter ? [ $type_filter ] : Taxonomies::get_post_types();
+		$batch_size  = 10;
+
+		$ids = get_posts( [
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => $batch_size,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			'meta_query'     => [
+				'relation' => 'OR',
+				[ 'key' => 'scos_ca_last_analyzed', 'compare' => 'NOT EXISTS' ],
+				[ 'key' => 'scos_ca_last_analyzed', 'value' => '', 'compare' => '=' ],
+			],
+		] );
+
+		$processed = 0;
+		foreach ( $ids as $post_id ) {
+			$post = get_post( $post_id );
+			if ( $post ) {
+				self::analyze( $post_id, $post, true );
+				$processed++;
+			}
+		}
+
+		// Count remaining unanalyzed across all requested post types.
+		$remaining = (int) ( new \WP_Query( [
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'no_found_rows'  => false,
+			'meta_query'     => [
+				'relation' => 'OR',
+				[ 'key' => 'scos_ca_last_analyzed', 'compare' => 'NOT EXISTS' ],
+				[ 'key' => 'scos_ca_last_analyzed', 'value' => '', 'compare' => '=' ],
+			],
+		] ) )->found_posts;
+
+		wp_send_json_success( [
+			'processed' => $processed,
+			'remaining' => $remaining,
+		] );
 	}
 
 	/**

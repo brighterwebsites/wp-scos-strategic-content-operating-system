@@ -112,7 +112,7 @@ $purpose_type_labels = [
 					<?php endforeach; ?>
 				</select>
 				<p class="scos-ca-help">
-					<?php esc_html_e( 'Select secondary or supporting topics. Ctrl/Cmd+click to select multiple.', 'site-essentials' ); ?>
+					<?php esc_html_e( 'Internal use only — not sent to CAR or GA4. Used for topical coverage reporting and internal link suggestions. Ctrl/Cmd+click to select multiple.', 'site-essentials' ); ?>
 					<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_topic&post_type=page' ) ); ?>"
 					   target="_blank" rel="noopener" style="margin-left:6px">
 						<?php esc_html_e( 'Manage topics ↗', 'site-essentials' ); ?>

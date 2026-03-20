@@ -175,12 +175,11 @@ class Meta_Fields {
 	 */
 	public static function maturity_options() {
 		return [
-			''                  => '— Not Set —',
-			'entry'             => 'Entry',
-			'learner'           => 'Learner',
-			'practitioner'      => 'Practitioner',
-			'professional'      => 'Professional',
-			'expert'            => 'Expert',
+			''                   => '— Not Set —',
+			'entry'              => 'Entry',
+			'professional'       => 'Professional',
+			'expert'             => 'Expert',
+			'thought_leader'     => 'Thought Leader',
 			'industry_authority' => 'Industry Authority',
 		];
 	}
@@ -244,10 +243,9 @@ class Meta_Fields {
 	public static function maturity_colors() {
 		return [
 			'entry'              => [ 'color' => '#92400e', 'bg' => '#fef3c7' ],
-			'learner'            => [ 'color' => '#78350f', 'bg' => '#fde68a' ],
-			'practitioner'       => [ 'color' => '#1e40af', 'bg' => '#dbeafe' ],
 			'professional'       => [ 'color' => '#1e3a8a', 'bg' => '#bfdbfe' ],
 			'expert'             => [ 'color' => '#5b21b6', 'bg' => '#ddd6fe' ],
+			'thought_leader'     => [ 'color' => '#0f766e', 'bg' => '#ccfbf1' ],
 			'industry_authority' => [ 'color' => '#065f46', 'bg' => '#d1fae5' ],
 		];
 	}

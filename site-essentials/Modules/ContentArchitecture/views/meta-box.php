@@ -93,6 +93,33 @@ $purpose_type_labels = [
 				</div>
 
 			</div>
+
+			<!-- Supporting Topics (full-width, below cluster + primary row) -->
+			<div class="scos-ca-field scos-ca-field--full" style="margin-top:10px">
+				<label><?php esc_html_e( 'Supporting Topics', 'site-essentials' ); ?></label>
+				<select name="scos_ca_supporting_topics[]"
+				        id="scos_ca_supporting_topics"
+				        multiple
+				        size="<?php echo esc_attr( min( 6, max( 3, count( $topics ) ) ) ); ?>"
+				        class="scos-ca-multi-select">
+					<?php foreach ( $topics as $term ) :
+						$indent = $term->parent ? '&nbsp;&nbsp;&nbsp;' : '';
+					?>
+						<option value="<?php echo esc_attr( $term->term_id ); ?>"
+							<?php echo in_array( (int) $term->term_id, $current_supporting_topics, true ) ? 'selected' : ''; ?>>
+							<?php echo $indent . esc_html( $term->name ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<p class="scos-ca-help">
+					<?php esc_html_e( 'Select secondary or supporting topics. Ctrl/Cmd+click to select multiple.', 'site-essentials' ); ?>
+					<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_topic&post_type=page' ) ); ?>"
+					   target="_blank" rel="noopener" style="margin-left:6px">
+						<?php esc_html_e( 'Manage topics ↗', 'site-essentials' ); ?>
+					</a>
+				</p>
+			</div>
+
 		</div>
 
 		<!-- Structural Context -->

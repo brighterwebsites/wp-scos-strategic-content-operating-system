@@ -68,6 +68,10 @@ class Meta_Box {
 		$current_topic = ( ! is_wp_error( $topic_terms ) && ! empty( $topic_terms ) )
 			? $topic_terms[0]->term_id : 0;
 
+		// Supporting topics — stored as post meta (not taxonomy) to keep primary separate
+		$raw_supporting         = get_post_meta( $post->ID, 'scos_ca_supporting_topics', true );
+		$current_supporting_topics = is_array( $raw_supporting ) ? array_map( 'intval', $raw_supporting ) : [];
+
 		// ---- Strategy + Workflow post meta ----
 		$fields = [
 			'pillar_page_id'         => (int) get_post_meta( $post->ID, 'scos_ca_pillar_page_id', true ),
@@ -169,6 +173,21 @@ class Meta_Box {
 		if ( isset( $_POST['scos_ca_topic'] ) ) {
 			$topic_id = absint( $_POST['scos_ca_topic'] );
 			wp_set_post_terms( $post_id, $topic_id > 0 ? [ $topic_id ] : [], 'scos_topic' );
+		}
+
+		// Supporting topics — stored as post meta array of term IDs
+		if ( isset( $_POST['scos_ca_supporting_topics'] ) ) {
+			$raw        = (array) $_POST['scos_ca_supporting_topics'];
+			$valid_ids  = array_map( 'absint', $raw );
+			$valid_ids  = array_values( array_filter( $valid_ids ) ); // drop zeroes
+			// Exclude the primary topic to avoid duplication
+			$primary_id = absint( $_POST['scos_ca_topic'] ?? 0 );
+			if ( $primary_id ) {
+				$valid_ids = array_values( array_diff( $valid_ids, [ $primary_id ] ) );
+			}
+			update_post_meta( $post_id, 'scos_ca_supporting_topics', $valid_ids );
+		} else {
+			update_post_meta( $post_id, 'scos_ca_supporting_topics', [] );
 		}
 
 		// ---- String / dropdown fields ----

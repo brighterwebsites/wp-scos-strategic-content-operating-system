@@ -108,6 +108,31 @@
 	min-height: 54px;
 	resize: vertical;
 }
+/* Full-width field spanning both columns */
+.scos-ca-field--full {
+	grid-column: 1 / -1;
+}
+
+/* Multi-select — supporting topics */
+.scos-ca-multi-select {
+	width: 100%;
+	min-height: 90px;
+	padding: 4px 0;
+	border: 1px solid #8c8f94;
+	border-radius: 3px;
+	background: #fff;
+	font-size: 13px;
+	cursor: pointer;
+}
+.scos-ca-multi-select option {
+	padding: 3px 8px;
+	line-height: 1.5;
+}
+.scos-ca-multi-select option:checked {
+	background: #2271b1 linear-gradient(0deg, #2271b1 0%, #2271b1 100%);
+	color: #fff;
+}
+
 .scos-ca-field--inline {
 	flex-direction: row;
 	align-items: center;

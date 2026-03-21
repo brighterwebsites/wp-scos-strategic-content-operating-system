@@ -25,15 +25,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Admin_Menu {
 
-	const MENU_SLUG       = 'scos-content-architecture';
-	const OVERVIEW_SLUG   = 'scos-content-architecture';
+	const MENU_SLUG         = 'scos-content-architecture';
+	const OVERVIEW_SLUG     = 'scos-content-architecture';
+	const INTEGRATIONS_SLUG = 'scos-ca-integrations';
 
 	public static function init() {
 		add_action( 'admin_menu',             [ __CLASS__, 'register' ] );
+		add_action( 'admin_menu',             [ __CLASS__, 'suppress_legacy_integrations' ], 99 );
 		add_action( 'admin_enqueue_scripts',  [ __CLASS__, 'enqueue_assets' ] );
+		add_action( 'admin_post_scos_save_ca_integrations', [ __CLASS__, 'save_integrations' ] );
 		// Fix submenu highlight for taxonomy management pages.
 		add_filter( 'parent_file',  [ __CLASS__, 'fix_parent_file' ] );
 		add_filter( 'submenu_file', [ __CLASS__, 'fix_submenu_file' ] );
+	}
+
+	/**
+	 * Remove legacy bw-integration-car submenu from brighter_support once CA is active.
+	 */
+	public static function suppress_legacy_integrations(): void {
+		remove_submenu_page( 'brighter_support', 'bw-integration-car' );
 	}
 
 	public static function enqueue_assets( string $hook ): void {
@@ -98,6 +108,16 @@ class Admin_Menu {
 			__( 'Topics', 'site-essentials' ),
 			'manage_categories',
 			'edit-tags.php?taxonomy=scos_topic'
+		);
+
+		// Integrations — Airtable CAR sync configuration (scos_car_* keys).
+		add_submenu_page(
+			self::MENU_SLUG,
+			__( 'Integrations', 'site-essentials' ),
+			__( 'Integrations', 'site-essentials' ),
+			'manage_options',
+			self::INTEGRATIONS_SLUG,
+			[ __CLASS__, 'render_integrations' ]
 		);
 	}
 
@@ -250,5 +270,198 @@ class Admin_Menu {
 			</div>
 		</div>
 		<?php
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Integrations page
+	// ─────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Helper: read scos_car_* option with bw_airtable_* fallback.
+	 */
+	private static function get_car_option( string $scos_key, string $legacy_key, string $default = '' ): string {
+		$val = get_option( $scos_key, '' );
+		if ( '' !== $val ) {
+			return $val;
+		}
+		return (string) get_option( $legacy_key, $default );
+	}
+
+	/**
+	 * Render the Integrations page (Airtable CAR Sync configuration).
+	 */
+	public static function render_integrations(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
+		}
+
+		$saved = isset( $_GET['scos_ca_int_saved'] );
+
+		$token     = self::get_car_option( 'scos_car_airtable_token',    'bw_airtable_api_token' );
+		$base_id   = self::get_car_option( 'scos_car_airtable_base_id',  'bw_airtable_base_id' );
+		$table_id  = self::get_car_option( 'scos_car_airtable_table_id', 'bw_airtable_table_id' );
+		$altc_id   = self::get_car_option( 'scos_car_airtable_altc_id',  'bw_airtable_altc_table_id' );
+		$topics_id = self::get_car_option( 'scos_car_airtable_topics_id','bw_airtable_topics_table_id' );
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Content Architecture — Integrations', 'site-essentials' ); ?></h1>
+
+			<?php if ( $saved ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'site-essentials' ); ?></p></div>
+			<?php endif; ?>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'scos_ca_integrations_save', 'scos_ca_int_nonce' ); ?>
+				<input type="hidden" name="action" value="scos_save_ca_integrations">
+
+				<h2><?php esc_html_e( 'Airtable CAR Sync', 'site-essentials' ); ?></h2>
+				<p class="description" style="margin-bottom:18px;max-width:700px;">
+					<?php esc_html_e( 'Sync Content Architecture Records (Clusters, Topics, Content) to Airtable. Settings are stored under scos_car_* option keys. Recommended sync order: 1) ALTC Clusters → 2) Topics → 3) Content.', 'site-essentials' ); ?>
+				</p>
+
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<label for="scos_car_airtable_token"><?php esc_html_e( 'API Token', 'site-essentials' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="scos_car_airtable_token" name="scos_car_airtable_token"
+								value="<?php echo esc_attr( $token ); ?>"
+								class="regular-text code" style="width:100%;max-width:560px;"
+								placeholder="Bearer pat..." autocomplete="off" />
+							<p class="description">
+								<?php esc_html_e( 'Your Airtable Personal Access Token.', 'site-essentials' ); ?>
+								<a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">
+									<?php esc_html_e( 'Airtable → Developer → Personal Access Tokens', 'site-essentials' ); ?>
+								</a>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos_car_airtable_base_id"><?php esc_html_e( 'Base ID', 'site-essentials' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="scos_car_airtable_base_id" name="scos_car_airtable_base_id"
+								value="<?php echo esc_attr( $base_id ); ?>"
+								class="regular-text code" style="width:100%;max-width:560px;"
+								placeholder="appOqcQR79umbJJGP" />
+							<p class="description">
+								<?php esc_html_e( 'Found in the Airtable API docs URL (appXXXXXXXXXXXXXX).', 'site-essentials' ); ?>
+								<a href="https://airtable.com/api" target="_blank" rel="noopener"><?php esc_html_e( 'Open API docs →', 'site-essentials' ); ?></a>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos_car_airtable_table_id"><?php esc_html_e( 'Content Table ID', 'site-essentials' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="scos_car_airtable_table_id" name="scos_car_airtable_table_id"
+								value="<?php echo esc_attr( $table_id ); ?>"
+								class="regular-text code" style="width:100%;max-width:560px;"
+								placeholder="tblXXXXXXXXXXXXXX" />
+							<p class="description"><?php esc_html_e( 'Main content/posts table. Use Table ID from API docs (more stable than name).', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos_car_airtable_altc_id"><?php esc_html_e( 'ALTC Clusters Table ID', 'site-essentials' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="scos_car_airtable_altc_id" name="scos_car_airtable_altc_id"
+								value="<?php echo esc_attr( $altc_id ); ?>"
+								class="regular-text code" style="width:100%;max-width:560px;"
+								placeholder="tblXXXXXXXXXXXXXX" />
+							<p class="description"><?php esc_html_e( 'Strategic Lens / ALTC clusters table. Terms sync on save; stores Airtable record ID in term meta for linked records.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos_car_airtable_topics_id"><?php esc_html_e( 'Topics Table ID', 'site-essentials' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="scos_car_airtable_topics_id" name="scos_car_airtable_topics_id"
+								value="<?php echo esc_attr( $topics_id ); ?>"
+								class="regular-text code" style="width:100%;max-width:560px;"
+								placeholder="tblXXXXXXXXXXXXXX" />
+							<p class="description"><?php esc_html_e( 'Topics table. Terms sync on save; stores Airtable record ID in term meta for linked records in Content.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Bulk Sync', 'site-essentials' ); ?></th>
+						<td>
+							<p class="description" style="margin-bottom:8px;"><?php esc_html_e( 'Sync all data to Airtable in the correct order: ALTC Clusters → Topics → Content (phase 1: static) → Content (phase 2: links).', 'site-essentials' ); ?></p>
+							<button type="button" id="scos-airtable-seed-bulk" class="button button-secondary">
+								<?php esc_html_e( 'Seed Airtable — Sync All', 'site-essentials' ); ?>
+							</button>
+							<span id="scos-airtable-seed-status" style="margin-left:12px;font-family:monospace;font-size:12px;color:#555;"></span>
+							<?php wp_nonce_field( 'bw_airtable_seed_bulk', 'bw_airtable_seed_nonce', false ); ?>
+						</td>
+					</tr>
+				</table>
+
+				<?php submit_button( __( 'Save Settings', 'site-essentials' ) ); ?>
+			</form>
+		</div>
+		<script>
+		jQuery(document).ready(function($){
+			$('#scos-airtable-seed-bulk').on('click', function(){
+				var $btn = $(this), $status = $('#scos-airtable-seed-status');
+				$btn.prop('disabled', true);
+				$status.text('<?php esc_html_e( 'Syncing…', 'site-essentials' ); ?>');
+				$.post(ajaxurl, {
+					action: 'bw_airtable_seed_bulk',
+					nonce: $('#bw_airtable_seed_nonce').val()
+				}).done(function(r){
+					if (r.success) {
+						var d = r.data, lines = [];
+						lines.push('ALTC: '       + (d.altc          ? d.altc.synced          : 0) + ' synced, ' + (d.altc          ? d.altc.errors          : 0) + ' errors');
+						lines.push('Topics: '     + (d.topics        ? d.topics.synced        : 0) + ' synced, ' + (d.topics        ? d.topics.errors        : 0) + ' errors');
+						lines.push('Content P1: ' + (d.content_phase1? d.content_phase1.synced: 0) + ' synced, ' + (d.content_phase1? d.content_phase1.errors : 0) + ' errors');
+						lines.push('Content P2: ' + (d.content_phase2? d.content_phase2.synced: 0) + ' synced, ' + (d.content_phase2? d.content_phase2.errors : 0) + ' errors');
+						$status.text(lines.join(' | '));
+					} else {
+						$status.text('Error: ' + (r.data && r.data.message ? r.data.message : 'Unknown'));
+					}
+				}).fail(function(){ $status.text('Request failed.'); })
+				  .always(function(){ $btn.prop('disabled', false); });
+			});
+		});
+		</script>
+		<?php
+	}
+
+	/**
+	 * Handle Integrations form POST — saves scos_car_* keys, dual-writes to bw_airtable_* for compat.
+	 */
+	public static function save_integrations(): void {
+		if ( ! isset( $_POST['scos_ca_int_nonce'] )
+			|| ! wp_verify_nonce( $_POST['scos_ca_int_nonce'], 'scos_ca_integrations_save' ) ) {
+			wp_die( __( 'Security check failed.', 'site-essentials' ) );
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
+		}
+
+		$fields = [
+			'scos_car_airtable_token'    => 'bw_airtable_api_token',
+			'scos_car_airtable_base_id'  => 'bw_airtable_base_id',
+			'scos_car_airtable_table_id' => 'bw_airtable_table_id',
+			'scos_car_airtable_altc_id'  => 'bw_airtable_altc_table_id',
+			'scos_car_airtable_topics_id'=> 'bw_airtable_topics_table_id',
+		];
+
+		foreach ( $fields as $new_key => $legacy_key ) {
+			$val = isset( $_POST[ $new_key ] ) ? sanitize_text_field( $_POST[ $new_key ] ) : '';
+			update_option( $new_key,    $val );
+			update_option( $legacy_key, $val ); // Dual-write: BW_Airtable_Helper reads bw_* keys
+		}
+
+		wp_redirect( add_query_arg(
+			[ 'page' => self::INTEGRATIONS_SLUG, 'scos_ca_int_saved' => '1' ],
+			admin_url( 'admin.php' )
+		) );
+		exit;
 	}
 }

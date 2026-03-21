@@ -98,37 +98,39 @@ class Admin_UI {
             30                                                   // Position
         );
 
-        // SEO submenu (always visible, shows notice if disabled)
+        // 1. SEO
         add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('SEO Basics', 'site-essentials'),                // Page title
-            __('SEO', 'site-essentials'),                        // Menu title
-            'manage_options',                                    // Capability
-            self::SEO_PAGE_SLUG,                                // Menu slug
-            [$this, 'render_seo_page']                          // Callback
+            self::PAGE_SLUG,
+            __( 'SEO Basics', 'site-essentials' ),
+            __( 'SEO', 'site-essentials' ),
+            'manage_options',
+            self::SEO_PAGE_SLUG,
+            [ $this, 'render_seo_page' ]
         );
 
-        // Performance submenu (WordPress Tweaks, Image Optimization, Asset Preloading)
+        // 2. Schema (only when SiteSchema module is active)
+        if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Site Schema', 'site-essentials' ),
+                __( 'Schema', 'site-essentials' ),
+                'manage_options',
+                self::SITE_SCHEMA_PAGE_SLUG,
+                [ $this, 'render_site_schema_page' ]
+            );
+        }
+
+        // 3. Custom Posts
         add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Performance', 'site-essentials'),                // Page title
-            __('Performance', 'site-essentials'),                // Menu title
-            'manage_options',                                    // Capability
-            self::ESSENTIALS_PAGE_SLUG,                         // Menu slug (unchanged: site-essentials-essentials)
-            [$this, 'render_performance_page']                  // Callback
+            self::PAGE_SLUG,
+            __( 'Recommended Custom Posts & Fields', 'site-essentials' ),
+            __( 'Custom Posts', 'site-essentials' ),
+            'manage_options',
+            self::CPT_PAGE_SLUG,
+            [ $this, 'render_cpt_page' ]
         );
 
-        // Custom Posts (Recommended CPT) submenu
-        add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Recommended Custom Posts & Fields', 'site-essentials'),  // Page title
-            __('Custom Posts', 'site-essentials'),               // Menu title
-            'manage_options',                                    // Capability
-            self::CPT_PAGE_SLUG,                                // Menu slug
-            [$this, 'render_cpt_page']                          // Callback
-        );
-
-        // Business Info submenu — only when BusinessInfo module is active
+        // 4. Business Info (only when BusinessInfo module is active)
         if ( defined( 'SCOS_BIZ_ACTIVE' ) ) {
             add_submenu_page(
                 self::PAGE_SLUG,
@@ -140,7 +142,7 @@ class Admin_UI {
             );
         }
 
-        // Analytics submenu (only when Analytics module is active)
+        // 5. Analytics (only when Analytics module is active)
         if ( defined( 'SCOS_ANALYTICS_ACTIVE' ) ) {
             add_submenu_page(
                 self::PAGE_SLUG,
@@ -152,7 +154,8 @@ class Admin_UI {
             );
         }
 
-        // Social Amplification submenu (only when Social Amplification module is active)
+        // 6. Social Amplification (only when Social Amplification module is active)
+        // Post Framing is linked from within the Social Amplification page, not as a separate menu item.
         if ( defined( 'SCOS_SA_ACTIVE' ) ) {
             add_submenu_page(
                 self::PAGE_SLUG,
@@ -162,36 +165,26 @@ class Admin_UI {
                 self::SMA_PAGE_SLUG,
                 [ $this, 'render_social_amplification_page' ]
             );
-            // Post Framing list (the bw_talking_point CPT) hangs under Site Essentials
-            add_submenu_page(
-                self::PAGE_SLUG,
-                __( 'Post Framing', 'site-essentials' ),
-                __( 'Post Framing', 'site-essentials' ),
-                'edit_posts',
-                'edit.php?post_type=bw_talking_point'
-            );
         }
 
-        // Site Schema submenu (only when SiteSchema module is active)
-        if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
-            add_submenu_page(
-                self::PAGE_SLUG,
-                __( 'Site Schema', 'site-essentials' ),
-                __( 'Site Schema', 'site-essentials' ),
-                'manage_options',
-                self::SITE_SCHEMA_PAGE_SLUG,
-                [ $this, 'render_site_schema_page' ]
-            );
-        }
-
-        // Settings submenu (always visible)
+        // 7. Performance
         add_submenu_page(
-            self::PAGE_SLUG,                                     // Parent slug
-            __('Plugin Settings', 'site-essentials'),           // Page title
-            __('Settings', 'site-essentials'),                   // Menu title
-            'manage_options',                                    // Capability
-            self::SETTINGS_PAGE_SLUG,                           // Menu slug
-            [$this, 'render_settings_page']                     // Callback
+            self::PAGE_SLUG,
+            __( 'Performance', 'site-essentials' ),
+            __( 'Performance', 'site-essentials' ),
+            'manage_options',
+            self::ESSENTIALS_PAGE_SLUG,
+            [ $this, 'render_performance_page' ]
+        );
+
+        // 8. Settings (always visible)
+        add_submenu_page(
+            self::PAGE_SLUG,
+            __( 'Plugin Settings', 'site-essentials' ),
+            __( 'Settings', 'site-essentials' ),
+            'manage_options',
+            self::SETTINGS_PAGE_SLUG,
+            [ $this, 'render_settings_page' ]
         );
 
         // Keep first submenu item (Site Essentials -> welcome page) so top-level menu links to welcome, not SEO

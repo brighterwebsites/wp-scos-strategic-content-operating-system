@@ -26,6 +26,20 @@ $page_url   = admin_url( 'admin.php?page=site-essentials-social-amplification' )
 $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_types();
 ?>
 
+<!-- ── Quick links ── -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+	<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=bw_talking_point' ) ); ?>"
+	   class="button button-secondary" style="display:inline-flex;align-items:center;gap:6px;">
+		<span class="dashicons dashicons-edit" style="margin-top:3px;font-size:16px;"></span>
+		<?php esc_html_e( 'Post Framing', 'site-essentials' ); ?>
+	</a>
+	<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=bw_talking_point' ) ); ?>"
+	   class="button" style="display:inline-flex;align-items:center;gap:6px;">
+		<span class="dashicons dashicons-plus-alt2" style="margin-top:3px;font-size:16px;"></span>
+		<?php esc_html_e( 'Add Post Frame', 'site-essentials' ); ?>
+	</a>
+</div>
+
 <!-- ── Status bar ── -->
 <div class="scos-sma-status-bar" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
 	<span style="color:#16a34a;font-size:18px;">&#10003;</span>

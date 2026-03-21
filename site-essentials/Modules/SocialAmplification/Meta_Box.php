@@ -57,9 +57,9 @@ class Meta_Box {
 		}
 
 		$last_trigger   = get_post_meta( $post->ID, '_bw_social_last_trigger', true );
-		$webhook_url    = get_option( 'bw_social_webhook_url', '' );
+		$webhook_url    = SocialAmplification_Module::get_option( 'scos_sma_webhook_url', 'bw_social_webhook_url' );
 		$is_published   = ( 'publish' === $post->post_status );
-		$yourls_api_url = rtrim( get_option( 'bw_yourls_api_url', '' ), '/' );
+		$yourls_api_url = rtrim( SocialAmplification_Module::get_option( 'scos_sma_yourls_url', 'bw_yourls_api_url' ), '/' );
 		$yourls_base    = $yourls_api_url
 			? preg_replace( '#/yourls-api\.php$#', '', $yourls_api_url )
 			: '';

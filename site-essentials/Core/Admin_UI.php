@@ -47,6 +47,7 @@ class Admin_UI {
     const BUSINESS_INFO_PAGE_SLUG = 'site-essentials-business-info';
     const SETTINGS_PAGE_SLUG = 'site-essentials-settings';
     const ANALYTICS_PAGE_SLUG = 'site-essentials-analytics';
+    const SMA_PAGE_SLUG       = 'site-essentials-social-amplification';
     const SITE_SCHEMA_PAGE_SLUG = 'site-essentials-schema';
 
     /**
@@ -72,6 +73,7 @@ class Admin_UI {
         add_action('admin_post_site_essentials_save_tweaks', [$this, 'save_tweaks_settings']);
         add_action('admin_post_site_essentials_save_seo', [$this, 'save_seo_settings']);
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
+        add_action('admin_post_site_essentials_save_sma', [$this, 'save_sma_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
     }
@@ -150,6 +152,26 @@ class Admin_UI {
             );
         }
 
+        // Social Amplification submenu (only when Social Amplification module is active)
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Social Amplification', 'site-essentials' ),
+                __( 'Social Amplification', 'site-essentials' ),
+                'manage_options',
+                self::SMA_PAGE_SLUG,
+                [ $this, 'render_social_amplification_page' ]
+            );
+            // Post Framing list (the bw_talking_point CPT) hangs under Site Essentials
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Post Framing', 'site-essentials' ),
+                __( 'Post Framing', 'site-essentials' ),
+                'edit_posts',
+                'edit.php?post_type=bw_talking_point'
+            );
+        }
+
         // Site Schema submenu (only when SiteSchema module is active)
         if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
             add_submenu_page(
@@ -220,6 +242,9 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::ANALYTICS_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SITE_SCHEMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
         ];
 
@@ -429,6 +454,82 @@ class Admin_UI {
         }
 
         echo '</div></div></div>';
+    }
+
+    /**
+     * Render Social Amplification page
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function render_social_amplification_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $sma_module = Module_Loader::get_module( 'social_amplification' );
+
+        if ( ! $sma_module ) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            esc_html_e( 'Social Amplification module is not loaded.', 'site-essentials' );
+            echo '</p></div></div>';
+            return;
+        }
+
+        if ( isset( $_GET['scos_sma_saved'] ) ) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'site-essentials' ) . '</p></div>';
+        }
+
+        echo '<div class="wrap site-essentials-wrap">';
+        echo '<h1>' . esc_html__( 'Social Amplification', 'site-essentials' ) . '</h1>';
+        echo '<div class="site-essentials-content">';
+        echo '<div class="card se-module-settings-card" data-module-id="social_amplification">';
+        $sma_module->render_settings();
+        echo '</div></div></div>';
+    }
+
+    /**
+     * Save Social Amplification settings (admin-post handler)
+     *
+     * Saves to scos_sma_* keys and dual-writes to legacy bw_* keys so that
+     * BW_Social_Webhook_Trigger and BW_YOURLS_Helper continue to work without changes.
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function save_sma_settings(): void {
+        if ( ! isset( $_POST['scos_sma_nonce'] )
+            || ! wp_verify_nonce( $_POST['scos_sma_nonce'], 'scos_sma_save' ) ) {
+            wp_die( __( 'Security check failed.', 'site-essentials' ) );
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
+        }
+
+        // Make.com webhook
+        $webhook_url     = isset( $_POST['scos_sma_webhook_url'] ) ? esc_url_raw( $_POST['scos_sma_webhook_url'] ) : '';
+        $webhook_enabled = isset( $_POST['scos_sma_webhook_enabled'] ) ? 1 : 0;
+        update_option( 'scos_sma_webhook_url',     $webhook_url );
+        update_option( 'scos_sma_webhook_enabled', $webhook_enabled );
+        // Dual-write legacy keys
+        update_option( 'bw_social_webhook_url',     $webhook_url );
+        update_option( 'bw_social_webhook_enabled', $webhook_enabled );
+
+        // YOURLS
+        $yourls_fields = [
+            'scos_sma_yourls_url'       => [ 'bw_yourls_api_url',  'esc_url_raw' ],
+            'scos_sma_yourls_signature' => [ 'bw_yourls_signature', 'sanitize_text_field' ],
+            'scos_sma_yourls_username'  => [ 'bw_yourls_username',  'sanitize_text_field' ],
+            'scos_sma_yourls_password'  => [ 'bw_yourls_password',  'sanitize_text_field' ],
+        ];
+        foreach ( $yourls_fields as $new_key => [ $legacy_key, $cb ] ) {
+            $val = isset( $_POST[ $new_key ] ) ? $cb( $_POST[ $new_key ] ) : '';
+            update_option( $new_key,    $val );
+            update_option( $legacy_key, $val );
+        }
+
+        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
+        exit;
     }
 
     /**

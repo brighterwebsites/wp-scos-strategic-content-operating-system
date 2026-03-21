@@ -464,6 +464,24 @@ class Tweaks_Module implements Module_Interface {
         add_filter( 'style_loader_tag', static function ( $tag ) {
             return strpos( $tag, 'fonts.googleapis.com' ) !== false ? '' : $tag;
         }, 20, 1 );
+
+        // Step 4 — suppress LiteSpeed Cache's Google Fonts pipeline.
+        // LiteSpeed has two settings that re-inject fonts AFTER our dequeue:
+        //   optm.gfonts_remove  — LiteSpeed's own "Remove Google Fonts" (strips then re-adds async)
+        //   optm.gfonts         — "Load Google Fonts Asynchronously" (injects via WebFont JS)
+        // Forcing both off here means our removal wins regardless of the LiteSpeed settings.
+        add_filter( 'litespeed_conf', static function ( $val, $key ) {
+            if ( 'optm.gfonts_remove' === $key ) {
+                return false;
+            }
+            if ( 'optm.gfonts' === $key ) {
+                return '';
+            }
+            return $val;
+        }, PHP_INT_MAX, 2 );
+
+        // Belt-and-suspenders: LiteSpeed also exposes a direct action for its font output.
+        add_filter( 'litespeed_optm_gfonts', '__return_empty_string', PHP_INT_MAX );
     }
 
     /**

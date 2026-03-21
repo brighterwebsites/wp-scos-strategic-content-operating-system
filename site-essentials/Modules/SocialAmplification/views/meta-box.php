@@ -55,7 +55,7 @@ $can_trigger        = $is_published && $webhook_configured;
 			<div class="scos-sa-status scos-sa-status--warn">
 				<span class="dashicons dashicons-warning"></span>
 				<?php esc_html_e( 'Webhook not configured.', 'site-essentials' ); ?>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=bw-social-amplification' ) ); ?>">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=site-essentials-social-amplification&tab=makecom' ) ); ?>">
 					<?php esc_html_e( 'Open settings', 'site-essentials' ); ?>
 				</a>
 			</div>

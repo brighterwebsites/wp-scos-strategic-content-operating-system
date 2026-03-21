@@ -40,7 +40,7 @@ $groups = [
             ],
             'remove_google_fonts' => [
                 'label'       => __( 'Remove Google Fonts', 'site-essentials' ),
-                'description' => __( 'Dequeues and strips all <code>fonts.googleapis.com</code> stylesheet links from the page — including Breakdance\'s font handle. Use when you self-host fonts or no longer need Google Fonts loaded by your theme or page builder. Add preload tags via the <strong>Asset Preloads</strong> tab if replacing with self-hosted files.<br><strong>Note:</strong> If LiteSpeed Cache has <em>Load Google Fonts Asynchronously</em> turned ON, it may still inject preconnect or font preload tags. Keep that setting off for complete control over font loading.', 'site-essentials' ),
+                'description' => __( 'Dequeues and strips all <code>fonts.googleapis.com</code> stylesheet links from the page — including Breakdance\'s font handle. Use when you self-host fonts or no longer need Google Fonts loaded by your theme or page builder. Add preload tags via the <strong>Asset Preloads</strong> tab if replacing with self-hosted files.<br><strong>LiteSpeed Cache:</strong> Turn off both <em>Remove Google Fonts</em> <strong>and</strong> <em>Load Google Fonts Asynchronously</em> in LiteSpeed ▸ Page Optimisation ▸ CSS Settings. When either is on, LiteSpeed re-injects fonts via its own pipeline after our removal.', 'site-essentials' ),
             ],
         ],
     ],

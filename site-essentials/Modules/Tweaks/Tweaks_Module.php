@@ -185,8 +185,9 @@ class Tweaks_Module implements Module_Interface {
 
         // ── Google Fonts ────────────────────────────────────────────────────────
         // brighter-tweaks::boot() always schedules remove_google_fonts on wp_loaded.
-        // If our option is off, unhook it now (wp_loaded hasn't fired yet).
-        if ( empty( $tweaks['remove_google_fonts'] ) && class_exists( 'Brighter_Tweaks' ) ) {
+        // We always unschedule it — if the option is ON we handle it ourselves
+        // with a cleaner dequeue + filter approach (no output buffering).
+        if ( class_exists( 'Brighter_Tweaks' ) ) {
             remove_action( 'wp_loaded', [ 'Brighter_Tweaks', 'remove_google_fonts' ] );
         }
     }
@@ -429,21 +430,40 @@ class Tweaks_Module implements Module_Interface {
      * @return void
      */
     private function remove_google_fonts() {
-        if ( class_exists( 'Brighter_Tweaks' ) ) {
-            // brighter-tweaks already has the logic; just call it directly
-            // (it was unhooking from wp_loaded; we call it now at init time)
-            \Brighter_Tweaks::remove_google_fonts();
-        } else {
-            // Standalone: strip Google Fonts via style_loader_tag + output buffer
-            add_filter( 'style_loader_tag', static function ( $html ) {
-                return strpos( $html, 'fonts.googleapis.com' ) !== false ? '' : $html;
-            }, 10, 2 );
-            add_action( 'wp_loaded', static function () {
-                ob_start( static function ( $html ) {
-                    return preg_replace( '/<link[^>]*fonts\.googleapis\.com[^>]*>/i', '', $html );
-                } );
-            } );
-        }
+        // Step 1 — dequeue known handles at priority 999 (fires after all plugins enqueue).
+        // Covers: Breakdance ('breakdance-google-fonts'), themes, and common plugin handles.
+        add_action( 'wp_enqueue_scripts', static function () {
+            $handles = [
+                'google-fonts',
+                'breakdance-google-fonts',
+                'breakdance-fonts',
+                'bde-google-fonts',
+            ];
+            foreach ( $handles as $handle ) {
+                wp_dequeue_style( $handle );
+                wp_deregister_style( $handle );
+            }
+        }, 999 );
+
+        // Step 2 — sweep all registered styles; dequeue any whose src is fonts.googleapis.com.
+        // Catches dynamically-named handles we can't predict.
+        add_action( 'wp_print_styles', static function () {
+            global $wp_styles;
+            if ( ! $wp_styles instanceof \WP_Styles ) {
+                return;
+            }
+            foreach ( array_keys( $wp_styles->registered ) as $handle ) {
+                $src = $wp_styles->registered[ $handle ]->src ?? '';
+                if ( $src && strpos( $src, 'fonts.googleapis.com' ) !== false ) {
+                    wp_dequeue_style( $handle );
+                }
+            }
+        }, 1 );
+
+        // Step 3 — final catch-all on the rendered tag (handles any that slipped through).
+        add_filter( 'style_loader_tag', static function ( $tag ) {
+            return strpos( $tag, 'fonts.googleapis.com' ) !== false ? '' : $tag;
+        }, 20, 1 );
     }
 
     /**

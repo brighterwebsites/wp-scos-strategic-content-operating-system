@@ -345,10 +345,10 @@ class BW_Airtable_Helper {
             // ALTC Strategy fields - Linked Record when we have Airtable record IDs
             'ALTC Cluster' => $altc_record_id ? array($altc_record_id) : null,
             'Topics' => $topic_record_id ? array($topic_record_id) : null,
-            'Maturity Level' => get_post_meta($post_id, 'bw_cont_maturity', true),
-            'Content Intent' => get_post_meta($post_id, 'bw_intent', true),
-            'Content Purpose' => get_post_meta($post_id, 'bw_purpose', true),
-            'Intent Goal' => get_post_meta($post_id, 'bw_altc_notes', true),
+            'Maturity Level'  => get_post_meta($post_id, 'scos_ca_maturity',  true) ?: get_post_meta($post_id, 'bw_cont_maturity', true),
+            'Content Intent'  => get_post_meta($post_id, 'scos_ca_intent',    true) ?: get_post_meta($post_id, 'bw_intent',         true),
+            'Content Purpose' => get_post_meta($post_id, 'scos_ca_purpose',   true) ?: get_post_meta($post_id, 'bw_purpose',        true),
+            'Intent Goal'     => get_post_meta($post_id, 'scos_ca_intent_goal', true) ?: get_post_meta($post_id, 'bw_altc_notes',   true),
             
             // Pillar relationship
             'Pillar' => $pillar_title,

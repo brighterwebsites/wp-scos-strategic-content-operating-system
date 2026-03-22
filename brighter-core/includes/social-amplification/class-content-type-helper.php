@@ -41,9 +41,10 @@ class BW_Content_Type_Helper {
             return 'home';
         }
 
-        // Pages: Check for bw_purpose meta (if not empty)
+        // Pages: Check for purpose meta (scos_ca_purpose preferred; bw_purpose as fallback).
         if ($post_type === 'page') {
-            $purpose = get_post_meta($post_id, 'bw_purpose', true);
+            $purpose = get_post_meta($post_id, 'scos_ca_purpose', true)
+                    ?: get_post_meta($post_id, 'bw_purpose', true);
 
             if (!empty($purpose)) {
                 // Standardized purpose to content type mapping

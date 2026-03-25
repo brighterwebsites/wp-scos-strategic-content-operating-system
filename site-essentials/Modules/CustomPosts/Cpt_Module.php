@@ -200,6 +200,12 @@ class Cpt_Module implements Module_Interface {
         } else {
             update_option('bw_author_extension_enabled', false);
         }
+
+        // ─── FAQ System ────────────────────────────────────────────────────────
+        if (!empty($opts['enable_faq'])) {
+            require_once __DIR__ . '/FAQ/FAQ_Module.php';
+            \SiteEssentials\Modules\CustomPosts\FAQ\FAQ_Module::init();
+        }
     }
 
     // =========================================================================

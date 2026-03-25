@@ -130,6 +130,17 @@ class Admin_UI {
             [ $this, 'render_cpt_page' ]
         );
 
+        // 3b. FAQs list (only when FAQ module is active)
+        if ( defined( 'SCOS_FAQ_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'FAQs', 'site-essentials' ),
+                __( 'FAQs', 'site-essentials' ),
+                'edit_posts',
+                'edit.php?post_type=faq'
+            );
+        }
+
         // 4. Business Info (only when BusinessInfo module is active)
         if ( defined( 'SCOS_BIZ_ACTIVE' ) ) {
             add_submenu_page(

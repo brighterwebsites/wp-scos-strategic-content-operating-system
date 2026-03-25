@@ -34,11 +34,11 @@ $modules = [
 		'key'         => 'enable_faq',
 		'name'        => __( 'FAQ System', 'site-essentials' ),
 		'tier'        => 'basic',
-		'description' => __( 'Generate dynamic frequently asked questions schema and layouts for your services and products.', 'site-essentials' ),
+		'description' => __( 'Reusable FAQ entries with parent/child grouping, FAQPage schema, and a Gutenberg selector block. Tag FAQs with your topic vocabulary for topical coverage reporting.', 'site-essentials' ),
 		'enabled'     => $faq_enabled,
-		'disabled'    => true,
-		'coming_soon' => true,
-		'settings_id' => null,
+		'disabled'    => false,
+		'coming_soon' => false,
+		'settings_id' => 'scos-cpt-faq-settings',
 	],
 	'projects' => [
 		'key'         => 'customer_success_stories',
@@ -143,6 +143,77 @@ $modules = [
 			<?php esc_html_e( 'Save Settings', 'site-essentials' ); ?>
 		</button>
 	</p>
+
+	<!-- ── FAQ Settings ── -->
+	<?php if ( $faq_enabled ) :
+		$faq_count = wp_count_posts( 'faq' );
+		$faq_total = isset( $faq_count->publish ) ? (int) $faq_count->publish : 0;
+	?>
+	<div id="scos-cpt-faq-settings" class="scos-cpt-section">
+		<h2><?php esc_html_e( 'FAQ System', 'site-essentials' ); ?></h2>
+		<p class="description" style="margin-bottom:16px;">
+			<?php esc_html_e( 'FAQs are reusable content snippets. Add them to any page or post using the', 'site-essentials' ); ?>
+			<strong><?php esc_html_e( 'FAQ Selector', 'site-essentials' ); ?></strong>
+			<?php esc_html_e( 'Gutenberg block or the', 'site-essentials' ); ?>
+			<code>[faqs ids="1,2,3"]</code>
+			<?php esc_html_e( 'shortcode. FAQPage schema is output automatically.', 'site-essentials' ); ?>
+		</p>
+
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Published FAQs', 'site-essentials' ); ?></th>
+				<td>
+					<strong><?php echo esc_html( $faq_total ); ?></strong>
+					<?php if ( $faq_total > 0 ) : ?>
+						&nbsp;—&nbsp;
+						<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=faq' ) ); ?>">
+							<?php esc_html_e( 'View all FAQs', 'site-essentials' ); ?>
+						</a>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Manage', 'site-essentials' ); ?></th>
+				<td>
+					<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=faq' ) ); ?>" class="button button-secondary">
+						<?php esc_html_e( 'All FAQs', 'site-essentials' ); ?>
+					</a>
+					&nbsp;
+					<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=faq' ) ); ?>" class="button button-secondary">
+						<?php esc_html_e( 'Add New FAQ', 'site-essentials' ); ?>
+					</a>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Parent / Child', 'site-essentials' ); ?></th>
+				<td>
+					<p class="description">
+						<?php esc_html_e( 'FAQs support parent/child nesting. Use the "Parent FAQ" field in the editor to group related questions — e.g. set a category-level FAQ as the parent of specific follow-up FAQs.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Primary Topic', 'site-essentials' ); ?></th>
+				<td>
+					<p class="description">
+						<?php esc_html_e( 'Assign each FAQ a Primary Topic (from your scos_topic vocabulary) to power topical coverage reporting and link suggestions in the Content Architecture module.', 'site-essentials' ); ?>
+					</p>
+					<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_topic&post_type=faq' ) ); ?>" style="font-size:13px;">
+						<?php esc_html_e( 'Manage Topics', 'site-essentials' ); ?>
+					</a>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Gutenberg Block', 'site-essentials' ); ?></th>
+				<td>
+					<p class="description">
+						<?php esc_html_e( 'Search for "FAQ Selector" in the block inserter. Choose display format (accordion or plain), heading level, and whether to inject FAQPage schema.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+		</table>
+	</div>
+	<?php endif; ?>
 
 	<!-- ── Projects Settings ── -->
 	<?php if ( $projects_enabled ) : ?>

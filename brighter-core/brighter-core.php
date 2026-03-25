@@ -65,22 +65,35 @@ function brighter_get_whitelisted_modules() {
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
+            // bw-faq: keep — provides brighter/faq-selector Gutenberg block +
+            //   REST routes (/faqs, /faqs/search, /faqs/export) used by the block.
+            //   FAQ_Module (site-essentials) overrides the CPT, meta boxes, and
+            //   columns but deliberately leaves the block + REST intact.
+            //   Remove this entry only after the block is ported to FAQ_Module.
             'bw-faq',
-            // ALTC modules
+
+            // ── ALTC legacy modules ───────────────────────────────────────────
+            // class-altc-taxonomies: keep — registers legacy altc_strategic_lens
+            //   and altc_topic slugs so existing DB term relationships stay valid
+            //   until data is fully migrated to scos_content_cluster / scos_topic.
             'class-altc-taxonomies',
-            'class-altc-meta-boxes',
-            'class-altc-admin-columns',
-            'class-altc-admin-pages',
-            'class-altc-ga4-integration',
-            'class-altc-migration',
-            // Content Analysis
+            // 'class-altc-meta-boxes',    // REPLACED — SCOS_CA_ACTIVE guard makes this a no-op; CA Meta_Box.php handles editing
+            // 'class-altc-admin-columns', // REPLACED — SCOS_CA_ACTIVE guard makes this a no-op; CA Admin_Columns.php handles list views
+            // 'class-altc-admin-pages',   // REPLACED — CA Admin_Menu.php (scos-content-architecture) provides the new overview and topic pages
+            // 'class-altc-ga4-integration', // STUB — class has no hooks; GA4 integration is via scos-car-injection
+            // 'class-altc-migration',     // DORMANT — admin hooks are commented out inside the file; no active UI
+
+            // ── Content Analysis ─────────────────────────────────────────────
+            // class-content-analysis: keep — BW_Content_Analysis class and save_post
+            //   hooks still write bw_* stats that scos CA module reads via
+            //   BW_Content_Analysis::get_aggregated_content().
             'class-content-analysis',
             'class-content-analysis-seeder',
             'class-content-stats-page',
             'class-column-toggles',
             'class-field-tooltips',
-            'migrate-tldr-field', // One-time migration (ACF → bw_tldr)
-            'class-tldr-meta-box', // TLDR field meta box (admin only)
+            // 'migrate-tldr-field', // ONE-TIME MIGRATION — ACF → bw_tldr already complete; safe to disable
+            // 'class-tldr-meta-box', // REPLACED — SCOS_SEO_ACTIVE guard makes this a no-op; SeoMeta Meta_Box.php provides TLDR field
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
             'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
@@ -186,24 +199,28 @@ function brighter_load_modules() {
 	'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
 	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
+        // bw-faq: keep — Gutenberg block + REST routes (CPT overridden by FAQ_Module)
         'bw-faq',
         'privacy-policy-style',
         'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
         'post-type-enhancements',       // Add author support to custom post types
-        
-        // ALTC modules
+
+        // ── ALTC legacy modules ───────────────────────────────────────────────
+        // Keep: legacy taxonomy slugs needed for DB compat until migration confirmed
         'class-altc-taxonomies',
-        'class-altc-meta-boxes',
-        'class-altc-admin-columns',
-        'class-altc-admin-pages',
-        'class-altc-ga4-integration',
-        'class-altc-migration',
-        // Content Analysis modules
+        // 'class-altc-meta-boxes',    // REPLACED by CA Meta_Box.php (SCOS_CA_ACTIVE guard = no-op)
+        // 'class-altc-admin-columns', // REPLACED by CA Admin_Columns.php (SCOS_CA_ACTIVE guard = no-op)
+        // 'class-altc-admin-pages',   // REPLACED by CA Admin_Menu.php (scos-content-architecture)
+        // 'class-altc-ga4-integration', // STUB — no hooks registered
+        // 'class-altc-migration',     // DORMANT — admin hooks commented out inside file
+
+        // ── Content Analysis ──────────────────────────────────────────────────
+        // Keep: BW_Content_Analysis class still used by site-essentials CA module
         'class-content-analysis',
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-tldr-field', // One-time migration (admin only)
-        'class-tldr-meta-box', // TLDR field meta box (admin only)
+        // 'migrate-tldr-field', // ONE-TIME MIGRATION — already complete
+        // 'class-tldr-meta-box', // REPLACED by SeoMeta Meta_Box.php (SCOS_SEO_ACTIVE guard = no-op)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
         'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
         'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)

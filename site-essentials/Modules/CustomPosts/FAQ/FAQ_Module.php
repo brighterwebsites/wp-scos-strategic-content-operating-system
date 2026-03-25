@@ -50,10 +50,14 @@ class FAQ_Module {
 		// Keep: register_faq_selector_block, rest routes, shortcode (still used)
 		// Keep: faq_dashboard_widget (removed below on wp_dashboard_setup)
 
-		// ── Register enhanced CPT (priority 21 for rewrite tag, 22 for CPT) ──
-		add_action( 'init', [ self::class, 'register_rewrite_tag' ], 21 );
-		add_action( 'init', [ self::class, 'register_cpt' ],         22 );
-		add_action( 'init', [ self::class, 'add_topic_support' ],    30 );
+		// ── Register enhanced CPT ─────────────────────────────────────────────
+		// IMPORTANT: Taxonomies::associate_post_types() fires at init priority 20
+		// and populates a static cache of supported post types used by the CA and
+		// SEO meta boxes. We must register the faq CPT BEFORE priority 20 so it
+		// is included in that cache (and therefore gets the CA + SEO meta boxes).
+		add_action( 'init', [ self::class, 'register_rewrite_tag' ], 15 );
+		add_action( 'init', [ self::class, 'register_cpt' ],         16 );
+		add_action( 'init', [ self::class, 'add_topic_support' ],    25 ); // after associate_post_types (20)
 		add_action( 'init', [ self::class, 'maybe_flush_rewrites' ], 999 );
 
 		// ── Permalink generation ───────────────────────────────────────────────
@@ -175,7 +179,7 @@ class FAQ_Module {
 	 * Runs at init priority 999, after everything is registered.
 	 */
 	public static function maybe_flush_rewrites(): void {
-		$version = '2.1'; // Bump when slug/tag structure changes
+		$version = '2.2'; // Bump when slug/tag structure changes
 		if ( get_option( 'scos_faq_rewrite_version' ) !== $version ) {
 			flush_rewrite_rules( false );
 			update_option( 'scos_faq_rewrite_version', $version );

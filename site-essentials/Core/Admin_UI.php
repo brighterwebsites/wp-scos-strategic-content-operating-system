@@ -1056,6 +1056,14 @@ class Admin_UI {
             update_option('bw_author_extension_enabled', false);
         }
 
+        // FAQ archive / redirect settings
+        $faq_opts = isset($_POST['scos_faq']) && is_array($_POST['scos_faq']) ? $_POST['scos_faq'] : [];
+        update_option('scos_faq_archive_enabled',  !empty($faq_opts['archive_enabled']));
+        update_option('scos_faq_archive_redirect', isset($faq_opts['archive_redirect']) ? esc_url_raw($faq_opts['archive_redirect']) : '');
+        update_option('scos_faq_topic_redirect',   isset($faq_opts['topic_redirect'])   ? esc_url_raw($faq_opts['topic_redirect'])   : '');
+        // Bump rewrite version so FAQ_Module re-flushes on next load
+        delete_option('scos_faq_rewrite_version');
+
         flush_rewrite_rules();
 
         $redirect_url = add_query_arg([

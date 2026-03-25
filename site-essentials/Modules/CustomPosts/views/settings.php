@@ -212,6 +212,49 @@ $modules = [
 				</td>
 			</tr>
 		</table>
+
+		<h3 style="margin-top:20px;"><?php esc_html_e( 'Archive &amp; URL Settings', 'site-essentials' ); ?></h3>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Enable FAQ Archive', 'site-essentials' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="scos_faq[archive_enabled]" value="1"
+							<?php checked( get_option( 'scos_faq_archive_enabled', false ) ); ?>>
+						<?php esc_html_e( 'Enable the /faq/ archive page', 'site-essentials' ); ?>
+					</label>
+					<p class="description">
+						<?php esc_html_e( 'When off, /faq/ redirects to the URL below (or returns 404 if left empty).', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="scos_faq_archive_redirect"><?php esc_html_e( 'Redirect /faq/ to', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="url" id="scos_faq_archive_redirect" name="scos_faq[archive_redirect]"
+						value="<?php echo esc_attr( get_option( 'scos_faq_archive_redirect', '' ) ); ?>"
+						class="regular-text" placeholder="https://example.com/frequently-asked-questions/">
+					<p class="description">
+						<?php esc_html_e( 'Only used when the archive is disabled. Leave empty to return a 404.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="scos_faq_topic_redirect"><?php esc_html_e( 'Redirect /faq/topic/ to', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="url" id="scos_faq_topic_redirect" name="scos_faq[topic_redirect]"
+						value="<?php echo esc_attr( get_option( 'scos_faq_topic_redirect', '' ) ); ?>"
+						class="regular-text" placeholder="<?php echo esc_attr( home_url( '/faq/' ) ); ?>">
+					<p class="description">
+						<?php esc_html_e( 'Where to send visitors who land on a topic-folder URL (e.g. /faq/pricing/). Defaults to /faq/ if empty.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+		</table>
 	</div>
 	<?php endif; ?>
 

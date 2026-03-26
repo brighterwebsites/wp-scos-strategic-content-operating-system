@@ -470,7 +470,7 @@ class Tweaks_Module implements Module_Interface {
         //   optm.gfonts_remove  — LiteSpeed's own "Remove Google Fonts" (strips then re-adds async)
         //   optm.gfonts         — "Load Google Fonts Asynchronously" (injects via WebFont JS)
         // Forcing both off here means our removal wins regardless of the LiteSpeed settings.
-        add_filter( 'litespeed_conf', static function ( $val, $key ) {
+        add_filter( 'litespeed_conf', static function ( $val, $key = '' ) {
             if ( 'optm.gfonts_remove' === $key ) {
                 return false;
             }

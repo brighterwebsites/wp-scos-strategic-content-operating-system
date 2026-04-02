@@ -40,11 +40,6 @@ add_action('wp_body_open', function () {
     echo '<a class="skip-link screen-reader-text" href="#main-content">Skip to main content</a>';
 });
 
-// Inject #main-content target ID into the page
-// This creates the anchor point for the skip link to jump to
-add_action('wp_body_open', function () {
-    echo '<div id="main-content"></div>';
-}, 5);
 
 // Skip link styles are now in frontend.css
 // No inline styles needed - CSS is cached and loaded via brighter-frontend.css

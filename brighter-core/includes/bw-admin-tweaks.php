@@ -86,7 +86,7 @@ function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
 }
 
 /**
- * Display backup reminder notice after login redirect
+ * Display backup reminder notice after login redirect should move this to agency settings
  */
 add_action( 'admin_notices', 'bw_backup_reminder_notice' );
 function bw_backup_reminder_notice() {

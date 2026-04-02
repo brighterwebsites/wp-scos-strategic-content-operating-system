@@ -72,6 +72,7 @@ class Admin_UI {
         add_action('wp_ajax_site_essentials_clear_sitemap_cache', [$this, 'ajax_clear_sitemap_cache']);
         add_action('admin_post_site_essentials_save_tweaks', [$this, 'save_tweaks_settings']);
         add_action('admin_post_site_essentials_save_seo', [$this, 'save_seo_settings']);
+        add_action('admin_post_site_essentials_save_archive_meta', ['\SiteEssentials\Modules\SeoMeta\Archive_Settings', 'handle_save']);
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
         add_action('admin_post_site_essentials_save_sma', [$this, 'save_sma_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here

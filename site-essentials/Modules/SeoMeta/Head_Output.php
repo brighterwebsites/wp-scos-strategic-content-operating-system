@@ -3,12 +3,17 @@
  * SEO Meta — Head Output
  *
  * Outputs <title>, <meta name="description">, <meta name="robots">,
- * and <link rel="canonical"> for singular posts/pages.
+ * <link rel="canonical">, and rel="prev/next" pagination links to the
+ * <head> for both singular posts/pages and archive views.
  *
- * Read priority per field:
+ * Read priority for singulars:
  *   1. scos_seo_*   — set via our SeoMeta metabox
  *   2. _seopress_*  — legacy/migrated data (backward compat)
  *   3. WordPress defaults
+ *
+ * Read priority for archives:
+ *   1. scos_seo_archive_{slug} option — set via SEO > Meta Tags admin tab
+ *   2. WordPress defaults (title only)
  *
  * SEOPress suppression:
  *   When this class is active we try to remove SEOPress's wp_head meta
@@ -41,6 +46,9 @@ class Head_Output {
 		// <title> → <meta robots> → <meta description> → <link canonical>
 		add_action( 'wp_head', [ __CLASS__, 'output_meta' ], 2 );
 
+		// Rel prev/next — priority 3 so they appear immediately after canonical.
+		add_action( 'wp_head', [ __CLASS__, 'output_rel_links' ], 3 );
+
 		// Remove WordPress core's own rel_canonical() hook (priority 10) — it would
 		// produce a second <link rel="canonical"> alongside ours.
 		remove_action( 'wp_head', 'rel_canonical' );
@@ -49,13 +57,48 @@ class Head_Output {
 		add_action( 'template_redirect', [ __CLASS__, 'suppress_seopress_head' ], 1 );
 	}
 
-	// ── Title ────────────────────────────────────────────────────────────────
+	// ── Context helper ────────────────────────────────────────────────────────
+
+	/**
+	 * Return the archive slug for the current request, or null if not an archive
+	 * we manage.
+	 *
+	 * 'post'        → blog / posts index (is_home())
+	 * <cpt_name>    → CPT archive (is_post_type_archive())
+	 * null          → not a managed archive context
+	 *
+	 * @return string|null
+	 */
+	private static function archive_slug(): ?string {
+		if ( is_home() ) {
+			return 'post';
+		}
+		if ( is_post_type_archive() ) {
+			$obj = get_queried_object();
+			return ( $obj instanceof \WP_Post_Type ) ? $obj->name : null;
+		}
+		return null;
+	}
+
+	// ── Title ─────────────────────────────────────────────────────────────────
 
 	/**
 	 * @param  string $title Existing document title.
 	 * @return string
 	 */
 	public static function get_title( $title ) {
+		// ── Archive branch ────────────────────────────────────────────────────
+		$slug = self::archive_slug();
+		if ( null !== $slug ) {
+			$settings = Archive_Settings::get( $slug );
+			if ( ! empty( $settings['title'] ) ) {
+				$paged = max( 0, (int) get_query_var( 'paged' ) );
+				return Archive_Settings::parse_tokens( $settings['title'], $slug, $paged );
+			}
+			return $title; // WP default archive title
+		}
+
+		// ── Singular branch ───────────────────────────────────────────────────
 		if ( ! is_singular() ) {
 			return $title;
 		}
@@ -78,7 +121,7 @@ class Head_Output {
 		return $title; // WordPress default
 	}
 
-	// ── Robots ───────────────────────────────────────────────────────────────
+	// ── Robots ────────────────────────────────────────────────────────────────
 
 	/**
 	 * Merge our robots directives into the WordPress wp_robots array.
@@ -87,6 +130,22 @@ class Head_Output {
 	 * @return array
 	 */
 	public static function filter_robots( $robots ) {
+		// ── Archive branch ────────────────────────────────────────────────────
+		$slug = self::archive_slug();
+		if ( null !== $slug ) {
+			$settings = Archive_Settings::get( $slug );
+			$directives = is_array( $settings['robots'] ) ? $settings['robots'] : [];
+
+			// Paginated noindex override
+			$paged = max( 0, (int) get_query_var( 'paged' ) );
+			if ( $settings['pagination_noindex'] && $paged > 1 ) {
+				$directives[] = 'noindex';
+			}
+
+			return self::apply_robots_array( $robots, array_unique( $directives ) );
+		}
+
+		// ── Singular branch ───────────────────────────────────────────────────
 		if ( ! is_singular() ) {
 			return $robots;
 		}
@@ -111,8 +170,18 @@ class Head_Output {
 			return $robots;
 		}
 
-		// Apply scos_seo_robots array
-		if ( in_array( 'noindex', $scos, true ) ) {
+		return self::apply_robots_array( $robots, $scos );
+	}
+
+	/**
+	 * Apply a list of robots directive strings to the $robots array.
+	 *
+	 * @param  array    $robots     Existing wp_robots array.
+	 * @param  string[] $directives Subset of: noindex, nofollow, noimageindex, nosnippet.
+	 * @return array
+	 */
+	private static function apply_robots_array( array $robots, array $directives ): array {
+		if ( in_array( 'noindex', $directives, true ) ) {
 			$robots['noindex'] = true;
 			unset( $robots['max-image-preview'], $robots['max-snippet'], $robots['max-video-preview'] );
 		} else {
@@ -122,19 +191,19 @@ class Head_Output {
 			$robots['max-video-preview'] = -1;
 		}
 
-		if ( in_array( 'nofollow', $scos, true ) ) {
+		if ( in_array( 'nofollow', $directives, true ) ) {
 			$robots['nofollow'] = true;
 		} else {
 			unset( $robots['nofollow'] );
 		}
 
-		if ( in_array( 'noimageindex', $scos, true ) ) {
+		if ( in_array( 'noimageindex', $directives, true ) ) {
 			$robots['noimageindex'] = true;
 		} else {
 			unset( $robots['noimageindex'] );
 		}
 
-		if ( in_array( 'nosnippet', $scos, true ) ) {
+		if ( in_array( 'nosnippet', $directives, true ) ) {
 			$robots['nosnippet'] = true;
 		} else {
 			unset( $robots['nosnippet'] );
@@ -143,14 +212,26 @@ class Head_Output {
 		return $robots;
 	}
 
-	// ── Description + Canonical ──────────────────────────────────────────────
+	// ── Description + Canonical ───────────────────────────────────────────────
 
 	/**
-	 * Output <meta name="description"> and <link rel="canonical"> at priority 0
-	 * so they appear before SEOPress (priority 1) in the rendered head.
+	 * Output <meta name="description"> and <link rel="canonical"> at priority 2.
+	 * Handles both singulars and managed archives.
 	 */
 	public static function output_meta() {
-		if ( is_admin() || ! is_singular() ) {
+		if ( is_admin() ) {
+			return;
+		}
+
+		// ── Archive branch ────────────────────────────────────────────────────
+		$slug = self::archive_slug();
+		if ( null !== $slug ) {
+			self::output_archive_meta( $slug );
+			return;
+		}
+
+		// ── Singular branch ───────────────────────────────────────────────────
+		if ( ! is_singular() ) {
 			return;
 		}
 		$pid = get_the_ID();
@@ -196,15 +277,98 @@ class Head_Output {
 		echo "<!-- /SCOS SEO Meta -->\n\n";
 	}
 
-	// ── SEOPress suppression ─────────────────────────────────────────────────
+	/**
+	 * Output archive description, canonical, and OG image.
+	 *
+	 * @param string $slug Archive slug.
+	 */
+	private static function output_archive_meta( string $slug ): void {
+		$settings = Archive_Settings::get( $slug );
+		$paged    = max( 0, (int) get_query_var( 'paged' ) );
+
+		echo "\n<!-- SCOS SEO Meta (archive) -->\n";
+
+		// ── Meta description ─────────────────────────────────────────────────
+		if ( ! empty( $settings['description'] ) ) {
+			$desc = Archive_Settings::parse_tokens( $settings['description'], $slug, $paged );
+			if ( '' !== $desc ) {
+				echo '<meta name="description" content="' . esc_attr( $desc ) . '" />' . "\n";
+			}
+		}
+
+		// ── Canonical ────────────────────────────────────────────────────────
+		$base_url = self::archive_base_url( $slug );
+
+		if ( ! empty( $base_url ) ) {
+			$canonical = ( $settings['canonical_paged'] && $paged > 1 )
+				? get_pagenum_link( $paged )
+				: $base_url;
+			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+		}
+
+		// ── OG image ─────────────────────────────────────────────────────────
+		$og_image_id = (int) $settings['og_image_id'];
+		if ( $og_image_id > 0 ) {
+			$img = wp_get_attachment_image_src( $og_image_id, 'full' );
+			if ( $img ) {
+				[ $src, $width, $height ] = $img;
+				$mime = get_post_mime_type( $og_image_id );
+				$alt  = trim( (string) get_post_meta( $og_image_id, '_wp_attachment_image_alt', true ) );
+				echo '<meta property="og:image" content="' . esc_url( $src ) . '" />' . "\n";
+				if ( $width )  { echo '<meta property="og:image:width" content="' . esc_attr( (string) $width ) . '" />' . "\n"; }
+				if ( $height ) { echo '<meta property="og:image:height" content="' . esc_attr( (string) $height ) . '" />' . "\n"; }
+				if ( $mime )   { echo '<meta property="og:image:type" content="' . esc_attr( $mime ) . '" />' . "\n"; }
+				if ( $alt )    { echo '<meta property="og:image:alt" content="' . esc_attr( $alt ) . '" />' . "\n"; }
+			}
+		}
+
+		echo "<!-- /SCOS SEO Meta (archive) -->\n\n";
+	}
+
+	// ── Rel prev / next ───────────────────────────────────────────────────────
 
 	/**
-	 * Attempt to remove SEOPress's wp_head meta output on singulars.
+	 * Output rel="prev" and rel="next" pagination links for archives where the
+	 * setting is enabled.
+	 *
+	 * Hooked to wp_head at priority 3 (after canonical at priority 2).
+	 */
+	public static function output_rel_links(): void {
+		if ( is_admin() ) {
+			return;
+		}
+
+		$slug = self::archive_slug();
+		if ( null === $slug ) {
+			return;
+		}
+
+		$settings = Archive_Settings::get( $slug );
+		if ( empty( $settings['rel_prevnext'] ) ) {
+			return;
+		}
+
+		global $wp_query;
+		$max_pages = (int) $wp_query->max_num_pages;
+		$paged     = max( 1, (int) get_query_var( 'paged' ) );
+
+		if ( $paged > 1 ) {
+			echo '<link rel="prev" href="' . esc_url( get_pagenum_link( $paged - 1 ) ) . '" />' . "\n";
+		}
+		if ( $paged < $max_pages ) {
+			echo '<link rel="next" href="' . esc_url( get_pagenum_link( $paged + 1 ) ) . '" />' . "\n";
+		}
+	}
+
+	// ── SEOPress suppression ──────────────────────────────────────────────────
+
+	/**
+	 * Attempt to remove SEOPress's wp_head meta output on singulars and archives.
 	 * Our wp_robots filter (priority 99) and wp_head priority 0 ensure our
 	 * tags win regardless, but removing SEOPress avoids duplicate tags.
 	 */
 	public static function suppress_seopress_head() {
-		if ( ! is_singular() ) {
+		if ( ! is_singular() && null === self::archive_slug() ) {
 			return;
 		}
 
@@ -226,5 +390,26 @@ class Head_Output {
 				}
 			}
 		}
+	}
+
+	// ── URL helpers ───────────────────────────────────────────────────────────
+
+	/**
+	 * Resolve the canonical base URL for an archive (non-paginated page 1).
+	 *
+	 * @param  string $slug
+	 * @return string
+	 */
+	private static function archive_base_url( string $slug ): string {
+		if ( 'post' === $slug ) {
+			$blog_page_id = (int) get_option( 'page_for_posts' );
+			if ( $blog_page_id ) {
+				return (string) get_permalink( $blog_page_id );
+			}
+			// Blog is the front page
+			return home_url( '/' );
+		}
+
+		return (string) ( get_post_type_archive_link( $slug ) ?: '' );
 	}
 }

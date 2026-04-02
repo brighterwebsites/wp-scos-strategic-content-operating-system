@@ -147,6 +147,36 @@ class Archive_Settings {
 		];
 	}
 
+	/**
+	 * Returns slug → label pairs for all public taxonomies.
+	 *
+	 * Order: Categories first, Tags second, then custom taxonomies sorted by label.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function get_taxonomy_archives(): array {
+		$taxonomies = get_taxonomies( [ 'public' => true ], 'objects' );
+
+		$archives = [];
+
+		// Built-ins first
+		foreach ( [ 'category', 'post_tag' ] as $slug ) {
+			if ( isset( $taxonomies[ $slug ] ) ) {
+				$archives[ $slug ] = $taxonomies[ $slug ]->labels->name;
+				unset( $taxonomies[ $slug ] );
+			}
+		}
+
+		// Custom taxonomies sorted alphabetically
+		$custom = [];
+		foreach ( $taxonomies as $tax ) {
+			$custom[ $tax->name ] = $tax->labels->name;
+		}
+		asort( $custom );
+
+		return $archives + $custom;
+	}
+
 	// ── CRUD helpers ──────────────────────────────────────────────────────────
 
 	/**
@@ -223,8 +253,15 @@ class Archive_Settings {
 				$title = __( 'Page Not Found', 'site-essentials' );
 				break;
 			default:
-				$pt    = get_post_type_object( $slug );
-				$title = $pt ? $pt->labels->name : $slug;
+				// Taxonomy term archive (category / tag / custom tax)
+				if ( taxonomy_exists( $slug ) ) {
+					$term  = get_queried_object();
+					$title = ( $term instanceof \WP_Term ) ? $term->name : $slug;
+				} else {
+					// CPT archive
+					$pt    = get_post_type_object( $slug );
+					$title = $pt ? $pt->labels->name : $slug;
+				}
 		}
 
 		// %sep%
@@ -246,6 +283,20 @@ class Archive_Settings {
 			$author_name = ( $author_obj instanceof \WP_User ) ? $author_obj->display_name : '';
 		}
 
+		// %term% — taxonomy term name (alias for %title% in taxonomy contexts)
+		$term_name = '';
+		if ( taxonomy_exists( $slug ) ) {
+			$term_obj  = get_queried_object();
+			$term_name = ( $term_obj instanceof \WP_Term ) ? $term_obj->name : '';
+		}
+
+		// %taxonomy% — taxonomy plural label
+		$tax_label = '';
+		if ( taxonomy_exists( $slug ) ) {
+			$tax_obj   = get_taxonomy( $slug );
+			$tax_label = $tax_obj ? $tax_obj->labels->name : '';
+		}
+
 		$tokens = [
 			'%title%'    => $title,
 			'%sitename%' => get_bloginfo( 'name' ),
@@ -253,6 +304,8 @@ class Archive_Settings {
 			'%page%'     => $page_str,
 			'%search%'   => $search_q,
 			'%author%'   => $author_name,
+			'%term%'     => $term_name ?: $title, // alias for %title% in tax context
+			'%taxonomy%' => $tax_label,
 		];
 
 		return str_replace( array_keys( $tokens ), array_values( $tokens ), $raw );
@@ -276,7 +329,8 @@ class Archive_Settings {
 
 		$all_slugs = array_merge(
 			array_keys( self::get_archives() ),
-			array_keys( self::get_special_archives() )
+			array_keys( self::get_special_archives() ),
+			array_keys( self::get_taxonomy_archives() )
 		);
 		$posted = ( isset( $_POST['scos_archive'] ) && is_array( $_POST['scos_archive'] ) )
 			? wp_unslash( $_POST['scos_archive'] )

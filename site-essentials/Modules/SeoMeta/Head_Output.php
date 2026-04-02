@@ -85,6 +85,11 @@ class Head_Output {
 		if ( is_date() )    { return 'date'; }
 		if ( is_search() )  { return 'search'; }
 		if ( is_404() )     { return '404'; }
+		// Taxonomy term archives (is_category, is_tag, is_tax all return a WP_Term)
+		if ( is_category() || is_tag() || is_tax() ) {
+			$obj = get_queried_object();
+			return ( $obj instanceof \WP_Term ) ? $obj->taxonomy : null;
+		}
 		return null;
 	}
 
@@ -439,6 +444,16 @@ class Head_Output {
 				return '';
 
 			default:
+				// Taxonomy term archive — canonical is the term's own URL
+				if ( taxonomy_exists( $slug ) ) {
+					$term = get_queried_object();
+					if ( $term instanceof \WP_Term ) {
+						$link = get_term_link( $term );
+						return is_wp_error( $link ) ? '' : (string) $link;
+					}
+					return '';
+				}
+				// CPT archive
 				return (string) ( get_post_type_archive_link( $slug ) ?: '' );
 		}
 	}

@@ -397,6 +397,241 @@ function scos_archive_has_data( array $s ): bool {
 		</details>
 		<?php endforeach; ?>
 
+		<!-- ══════════════════════════════════════════════════════════════
+		     Special Archive Types
+		     ══════════════════════════════════════════════════════════════ -->
+		<h2 style="margin: 32px 0 12px; font-size: 15px; color: #1d2327; border-bottom: 2px solid #dcdcde; padding-bottom: 8px;">
+			<?php esc_html_e( 'Special Archive Types', 'site-essentials' ); ?>
+		</h2>
+		<p style="color: #50575e; margin: 0 0 16px; font-size: 13px;">
+			<?php esc_html_e( 'Control SEO output and optionally disable author, date, and search archives with a 301 redirect to the URL of your choice.', 'site-essentials' ); ?>
+		</p>
+
+		<?php
+		$special_archives = Archive_Settings::get_special_archives();
+		foreach ( $special_archives as $slug => $label ) :
+			$s          = Archive_Settings::get( $slug );
+			$f          = 'scos_archive[' . esc_attr( $slug ) . ']';
+			$has_disable = in_array( $slug, [ 'author', 'date', 'search' ], true );
+			$is_disabled = $has_disable && ! empty( $s['disabled'] );
+			$is_open     = scos_archive_has_data( $s ) || $is_disabled;
+		?>
+		<details class="scos-archive-card"<?php echo $is_open ? ' open' : ''; ?>>
+			<summary>
+				<span class="scos-card-title">
+					<?php echo esc_html( $label ); ?>
+					<span class="scos-card-meta">
+						<?php echo esc_html( 'is_' . ( '404' === $slug ? '404' : $slug ) . '()' ); ?>
+					</span>
+				</span>
+				<?php if ( $is_disabled ) : ?>
+				<span class="scos-card-badge" style="background:#fce8e8;color:#8b1a1a;"><?php esc_html_e( 'disabled – redirecting', 'site-essentials' ); ?></span>
+				<?php elseif ( scos_archive_has_data( $s ) ) : ?>
+				<span class="scos-card-badge"><?php esc_html_e( 'configured', 'site-essentials' ); ?></span>
+				<?php endif; ?>
+				<span class="scos-card-chevron">&#8964;</span>
+			</summary>
+
+			<div class="scos-archive-card-body">
+
+				<?php if ( $has_disable ) : ?>
+				<!-- ── Disable / Redirect ──────────────────────── -->
+				<h3><?php esc_html_e( 'Archive Status', 'site-essentials' ); ?></h3>
+				<?php
+				$disable_labels = [
+					'author' => __( 'Disable author archives — redirect all /author/ URLs', 'site-essentials' ),
+					'date'   => __( 'Disable date archives — redirect all date archive URLs', 'site-essentials' ),
+					'search' => __( 'Disable search results page — redirect all search queries', 'site-essentials' ),
+				];
+				?>
+				<label style="display: block; margin-bottom: 10px;">
+					<input type="checkbox"
+						name="<?php echo esc_attr( $f ); ?>[disabled]"
+						value="1"
+						<?php checked( $is_disabled ); ?>>
+					<?php echo esc_html( $disable_labels[ $slug ] ?? '' ); ?>
+				</label>
+				<table class="form-table" role="presentation" style="margin-top: 0;">
+					<tr>
+						<th scope="row" style="width:180px;">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-redirect">
+								<?php esc_html_e( 'Redirect to URL', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<input type="url"
+								id="scos-<?php echo esc_attr( $slug ); ?>-redirect"
+								name="<?php echo esc_attr( $f ); ?>[redirect_url]"
+								value="<?php echo esc_attr( $s['redirect_url'] ?? '' ); ?>"
+								class="regular-text"
+								placeholder="<?php echo esc_attr( home_url( '/' ) ); ?>">
+							<p class="description"><?php esc_html_e( 'Leave blank to redirect to the homepage. Only used when the archive is disabled above.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php endif; ?>
+
+				<?php if ( 'author' === $slug ) : ?>
+				<!-- ── Author Slug ────────────────────────────── -->
+				<h3><?php esc_html_e( 'Author Archive URL', 'site-essentials' ); ?></h3>
+				<table class="form-table" role="presentation" style="margin-top:0;">
+					<tr>
+						<th scope="row" style="width:180px;">
+							<label for="scos-author-slug">
+								<?php esc_html_e( 'URL prefix', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+							<span style="color:#50575e;"><?php echo esc_html( rtrim( home_url( '/' ), '/' ) . '/' ); ?></span>
+							<input type="text"
+								id="scos-author-slug"
+								name="<?php echo esc_attr( $f ); ?>[author_slug]"
+								value="<?php echo esc_attr( $s['author_slug'] ?? '' ); ?>"
+								class="small-text"
+								placeholder="author"
+								style="width:120px;">
+							<span style="color:#50575e;">/username/</span>
+							<p class="description" style="width:100%; margin-top:4px;"><?php esc_html_e( 'Changes /author/ to a custom prefix (e.g. team). Leave blank to use the WordPress default. Rewrite rules are flushed automatically on save.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php endif; ?>
+
+				<!-- ── Meta & SEO ────────────────────────────── -->
+				<h3><?php esc_html_e( 'Meta & SEO', 'site-essentials' ); ?></h3>
+				<p style="margin:0 0 12px; font-size:12px; color:#787c82;">
+					<?php
+					$token_hints = [
+						'author' => __( 'Available tokens: %title% (author name), %author%, %sitename%, %sep%, %page%', 'site-essentials' ),
+						'date'   => __( 'Available tokens: %title% (date label e.g. "January 2025"), %sitename%, %sep%, %page%', 'site-essentials' ),
+						'search' => __( 'Available tokens: %title% (search query), %search%, %sitename%, %sep%', 'site-essentials' ),
+						'404'    => __( 'Available tokens: %title% ("Page Not Found"), %sitename%, %sep%', 'site-essentials' ),
+					];
+					echo esc_html( $token_hints[ $slug ] ?? '' );
+					?>
+				</p>
+				<table class="form-table" role="presentation" style="margin-top:0;">
+					<tr>
+						<th scope="row" style="width:180px;">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-title">
+								<?php esc_html_e( 'Meta Title', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<input type="text"
+								id="scos-<?php echo esc_attr( $slug ); ?>-title"
+								name="<?php echo esc_attr( $f ); ?>[title]"
+								value="<?php echo esc_attr( $s['title'] ); ?>"
+								class="large-text"
+								placeholder="%title% %sep% %sitename%"
+								maxlength="120">
+							<p class="description"><?php esc_html_e( 'Supports tokens. Leave blank to use the WordPress default.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-description">
+								<?php esc_html_e( 'Meta Description', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<textarea
+								id="scos-<?php echo esc_attr( $slug ); ?>-description"
+								name="<?php echo esc_attr( $f ); ?>[description]"
+								rows="3"
+								class="large-text"
+								maxlength="320"><?php echo esc_textarea( $s['description'] ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'Supports tokens. Leave blank to omit.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-breadcrumb">
+								<?php esc_html_e( 'Breadcrumb Title', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<input type="text"
+								id="scos-<?php echo esc_attr( $slug ); ?>-breadcrumb"
+								name="<?php echo esc_attr( $f ); ?>[breadcrumb_title]"
+								value="<?php echo esc_attr( $s['breadcrumb_title'] ); ?>"
+								class="regular-text">
+							<p class="description"><?php esc_html_e( 'Short label for breadcrumb navigation.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+				</table>
+
+				<!-- ── Meta Robots ───────────────────────────── -->
+				<h3><?php esc_html_e( 'Meta Robots', 'site-essentials' ); ?></h3>
+				<fieldset>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Meta Robots', 'site-essentials' ); ?></legend>
+					<?php
+					$robots_opts = [
+						'noindex'      => __( 'noindex — Exclude from search engine indexes', 'site-essentials' ),
+						'nofollow'     => __( 'nofollow — Do not follow links on this page', 'site-essentials' ),
+						'noimageindex' => __( 'noimageindex — Exclude images from image search', 'site-essentials' ),
+						'nosnippet'    => __( 'nosnippet — Do not show a text snippet in results', 'site-essentials' ),
+					];
+					foreach ( $robots_opts as $val => $rbl ) :
+						$checked = in_array( $val, (array) $s['robots'], true );
+					?>
+					<label style="display: block; margin-bottom: 5px;">
+						<input type="checkbox"
+							name="<?php echo esc_attr( $f ); ?>[robots][]"
+							value="<?php echo esc_attr( $val ); ?>"
+							<?php checked( $checked ); ?>>
+						<?php echo esc_html( $rbl ); ?>
+					</label>
+					<?php endforeach; ?>
+					<?php if ( in_array( $slug, [ 'search', 'date' ], true ) ) : ?>
+					<p class="description" style="margin-top:6px;">
+						<?php esc_html_e( 'Tip: noindex is commonly applied to date and search archives to prevent duplicate-content issues in search results.', 'site-essentials' ); ?>
+					</p>
+					<?php endif; ?>
+				</fieldset>
+
+				<?php if ( 'author' === $slug ) : ?>
+				<!-- ── Author OG Image ───────────────────────── -->
+				<h3><?php esc_html_e( 'Default OG / Social Image', 'site-essentials' ); ?></h3>
+				<?php
+				$og_id    = (int) ( $s['og_image_id'] ?? 0 );
+				$og_src   = $og_id ? wp_get_attachment_image_url( $og_id, [ 240, 126 ] ) : '';
+				$input_id = 'scos-author-og-id';
+				$thumb_id = 'scos-author-og-thumb';
+				?>
+				<div class="scos-og-wrap">
+					<div class="scos-og-thumb-box<?php echo $og_src ? ' has-image' : ''; ?>" id="<?php echo esc_attr( $thumb_id ); ?>">
+						<?php if ( $og_src ) : ?>
+							<img src="<?php echo esc_url( $og_src ); ?>" alt="">
+						<?php else : ?>
+							<?php esc_html_e( 'Select your default thumbnail', 'site-essentials' ); ?>
+						<?php endif; ?>
+					</div>
+					<input type="hidden"
+						id="<?php echo esc_attr( $input_id ); ?>"
+						name="<?php echo esc_attr( $f ); ?>[og_image_id]"
+						value="<?php echo esc_attr( (string) $og_id ); ?>">
+					<div class="scos-og-actions">
+						<button type="button" class="button scos-og-upload"
+							data-input="<?php echo esc_attr( $input_id ); ?>"
+							data-thumb="<?php echo esc_attr( $thumb_id ); ?>">
+							<?php echo $og_id ? esc_html__( 'Change Image', 'site-essentials' ) : esc_html__( 'Upload an Image', 'site-essentials' ); ?>
+						</button>
+						<button type="button" class="button scos-og-remove"
+							data-input="<?php echo esc_attr( $input_id ); ?>"
+							data-thumb="<?php echo esc_attr( $thumb_id ); ?>"
+							style="<?php echo $og_id ? '' : 'display:none;'; ?>">
+							<?php esc_html_e( 'Remove Image', 'site-essentials' ); ?>
+						</button>
+					</div>
+					<p class="description" style="margin-top:4px;"><?php esc_html_e( 'Used as og:image for author archive pages when no user profile image is available.', 'site-essentials' ); ?></p>
+				</div>
+				<?php endif; ?>
+
+			</div><!-- /.scos-archive-card-body -->
+		</details>
+		<?php endforeach; ?>
+
 		<p style="margin-top: 20px;">
 			<?php submit_button( __( 'Save Archive SEO Settings', 'site-essentials' ), 'primary', 'submit', false ); ?>
 		</p>

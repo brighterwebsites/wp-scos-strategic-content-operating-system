@@ -65,6 +65,10 @@ class Head_Output {
 	 *
 	 * 'post'        → blog / posts index (is_home())
 	 * <cpt_name>    → CPT archive (is_post_type_archive())
+	 * 'author'      → author archive (is_author())
+	 * 'date'        → date archive (is_date())
+	 * 'search'      → search results (is_search())
+	 * '404'         → 404 not found (is_404())
 	 * null          → not a managed archive context
 	 *
 	 * @return string|null
@@ -77,6 +81,10 @@ class Head_Output {
 			$obj = get_queried_object();
 			return ( $obj instanceof \WP_Post_Type ) ? $obj->name : null;
 		}
+		if ( is_author() )  { return 'author'; }
+		if ( is_date() )    { return 'date'; }
+		if ( is_search() )  { return 'search'; }
+		if ( is_404() )     { return '404'; }
 		return null;
 	}
 
@@ -396,20 +404,42 @@ class Head_Output {
 
 	/**
 	 * Resolve the canonical base URL for an archive (non-paginated page 1).
+	 * Returns empty string for contexts where a canonical is inappropriate
+	 * (search results, 404).
 	 *
 	 * @param  string $slug
 	 * @return string
 	 */
 	private static function archive_base_url( string $slug ): string {
-		if ( 'post' === $slug ) {
-			$blog_page_id = (int) get_option( 'page_for_posts' );
-			if ( $blog_page_id ) {
-				return (string) get_permalink( $blog_page_id );
-			}
-			// Blog is the front page
-			return home_url( '/' );
-		}
+		switch ( $slug ) {
+			case 'post':
+				$blog_page_id = (int) get_option( 'page_for_posts' );
+				return $blog_page_id
+					? (string) get_permalink( $blog_page_id )
+					: home_url( '/' );
 
-		return (string) ( get_post_type_archive_link( $slug ) ?: '' );
+			case 'author':
+				return (string) get_author_posts_url( get_queried_object_id() );
+
+			case 'date':
+				if ( is_year() ) {
+					return (string) get_year_link( (int) get_query_var( 'year' ) );
+				}
+				if ( is_month() ) {
+					return (string) get_month_link( (int) get_query_var( 'year' ), (int) get_query_var( 'monthnum' ) );
+				}
+				if ( is_day() ) {
+					return (string) get_day_link( (int) get_query_var( 'year' ), (int) get_query_var( 'monthnum' ), (int) get_query_var( 'day' ) );
+				}
+				return '';
+
+			case 'search':
+			case '404':
+				// No canonical — search is query-specific; 404 has no URL to canonicalise to.
+				return '';
+
+			default:
+				return (string) ( get_post_type_archive_link( $slug ) ?: '' );
+		}
 	}
 }

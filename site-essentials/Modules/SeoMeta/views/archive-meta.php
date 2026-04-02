@@ -2,7 +2,7 @@
 /**
  * SEO Meta — Archive Settings view
  *
- * Rendered inside the "Meta Tags" tab of Site Essentials > SEO.
+ * Rendered inside the "Archive SEO" tab of Site Essentials > SEO.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta\Views
@@ -19,262 +19,404 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 	     esc_html__( 'Archive SEO settings saved.', 'site-essentials' ) .
 	     '</p></div>';
 }
+
+/**
+ * Returns true if the settings array has any non-default values saved,
+ * so we open the accordion by default for archives that are already configured.
+ */
+function scos_archive_has_data( array $s ): bool {
+	return ! empty( $s['title'] )
+	    || ! empty( $s['description'] )
+	    || ! empty( $s['breadcrumb_title'] )
+	    || ! empty( $s['tldr'] )
+	    || ! empty( $s['robots'] )
+	    || ! empty( $s['og_image_id'] );
+}
 ?>
+<style>
+/* ── Archive accordion cards ─────────────────────────── */
+.scos-archive-meta-wrap details.scos-archive-card {
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+	margin-bottom: 12px;
+	padding: 0;
+}
+.scos-archive-meta-wrap details.scos-archive-card summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 18px;
+	cursor: pointer;
+	user-select: none;
+	list-style: none;
+	gap: 10px;
+}
+.scos-archive-meta-wrap details.scos-archive-card summary::-webkit-details-marker { display: none; }
+.scos-archive-meta-wrap details.scos-archive-card summary::marker { display: none; }
+.scos-archive-meta-wrap details.scos-archive-card summary .scos-card-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: #1d2327;
+	margin: 0;
+	flex: 1;
+}
+.scos-archive-meta-wrap details.scos-archive-card summary .scos-card-meta {
+	font-size: 12px;
+	font-weight: 400;
+	color: #787c82;
+	margin-left: 8px;
+}
+.scos-archive-meta-wrap details.scos-archive-card summary .scos-card-badge {
+	font-size: 11px;
+	background: #e8f0e8;
+	color: #2d6a2d;
+	border-radius: 10px;
+	padding: 2px 8px;
+	white-space: nowrap;
+}
+.scos-archive-meta-wrap details.scos-archive-card summary .scos-card-chevron {
+	font-size: 18px;
+	color: #787c82;
+	transition: transform 0.15s ease;
+	flex-shrink: 0;
+}
+.scos-archive-meta-wrap details.scos-archive-card[open] summary .scos-card-chevron {
+	transform: rotate(180deg);
+}
+.scos-archive-meta-wrap details.scos-archive-card[open] summary {
+	border-bottom: 1px solid #dcdcde;
+}
+.scos-archive-card-body {
+	padding: 18px 18px 24px;
+}
+.scos-archive-card-body h3 {
+	font-size: 13px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #50575e;
+	margin: 24px 0 10px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid #f0f0f1;
+}
+.scos-archive-card-body h3:first-child { margin-top: 4px; }
+
+/* ── OG image picker ─────────────────────────────────── */
+.scos-og-wrap { display: flex; flex-direction: column; gap: 8px; max-width: 260px; }
+.scos-og-thumb-box {
+	width: 240px;
+	height: 126px;
+	border: 2px dashed #c3c4c7;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background: #f6f7f7;
+	color: #787c82;
+	font-size: 12px;
+	text-align: center;
+	padding: 8px;
+}
+.scos-og-thumb-box img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.scos-og-thumb-box.has-image { border-style: solid; border-color: #c3c4c7; }
+.scos-og-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
 
 <div class="scos-archive-meta-wrap">
 
 	<!-- Token cheat-sheet ──────────────────────────────────────────────── -->
-	<div class="card se-module-settings-card" style="margin-bottom: 20px;">
-		<h2 class="title"><?php esc_html_e( 'Template Tokens', 'site-essentials' ); ?></h2>
-		<p><?php esc_html_e( 'Use these tokens in Meta Title and Meta Description fields. They are replaced with live values at render time.', 'site-essentials' ); ?></p>
-		<table class="widefat striped" style="max-width: 600px;">
-			<thead>
-				<tr>
-					<th><?php esc_html_e( 'Token', 'site-essentials' ); ?></th>
-					<th><?php esc_html_e( 'Resolves to', 'site-essentials' ); ?></th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr><td><code>%title%</code></td><td><?php esc_html_e( 'Archive name — post type plural label or blog page title', 'site-essentials' ); ?></td></tr>
-				<tr><td><code>%sitename%</code></td><td><?php esc_html_e( 'Site name from Settings > General', 'site-essentials' ); ?></td></tr>
-				<tr><td><code>%sep%</code></td><td><?php esc_html_e( 'Separator character (default –, filterable via scos_seo_title_sep)', 'site-essentials' ); ?></td></tr>
-				<tr><td><code>%page%</code></td><td><?php esc_html_e( '"Page 2" on paginated views, blank on page 1', 'site-essentials' ); ?></td></tr>
-			</tbody>
-		</table>
-		<p style="margin-top: 10px; color: #666;">
-			<?php esc_html_e( 'Example title:', 'site-essentials' ); ?>
-			<code>%title% %sep% %sitename%</code>
-			<?php esc_html_e( '→', 'site-essentials' ); ?>
-			<?php echo esc_html( sprintf( '%s – %s', __( 'Posts (Blog)', 'site-essentials' ), get_bloginfo( 'name' ) ) ); ?>
-		</p>
-	</div>
+	<details class="scos-archive-card" style="margin-bottom: 20px;">
+		<summary>
+			<span class="scos-card-title"><?php esc_html_e( 'Template Tokens', 'site-essentials' ); ?></span>
+			<span class="scos-card-meta"><?php esc_html_e( 'Use in Meta Title and Meta Description fields', 'site-essentials' ); ?></span>
+			<span class="scos-card-chevron">&#8964;</span>
+		</summary>
+		<div class="scos-archive-card-body">
+			<table class="widefat striped" style="max-width: 580px;">
+				<thead>
+					<tr>
+						<th style="width:130px;"><?php esc_html_e( 'Token', 'site-essentials' ); ?></th>
+						<th><?php esc_html_e( 'Resolves to', 'site-essentials' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr><td><code>%title%</code></td><td><?php esc_html_e( 'Archive name — post type plural label, or blog page title', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%sitename%</code></td><td><?php esc_html_e( 'Site name from Settings › General', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%sep%</code></td><td><?php esc_html_e( 'Separator (default –, filterable via scos_seo_title_sep)', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%page%</code></td><td><?php esc_html_e( '"Page 2" on paginated views, blank on page 1', 'site-essentials' ); ?></td></tr>
+				</tbody>
+			</table>
+			<p style="margin-top: 10px; color: #50575e; font-size: 13px;">
+				<?php esc_html_e( 'Example:', 'site-essentials' ); ?>
+				<code>%title% %sep% %sitename%</code>
+				&rarr;
+				<em><?php echo esc_html( sprintf( '%s – %s', __( 'Posts (Blog)', 'site-essentials' ), get_bloginfo( 'name' ) ) ); ?></em>
+			</p>
+		</div>
+	</details>
 
 	<!-- Per-archive settings form ─────────────────────────────────────── -->
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="site_essentials_save_archive_meta">
 		<?php wp_nonce_field( 'scos_save_archive_meta', 'scos_archive_meta_nonce' ); ?>
 
-		<?php foreach ( $archives as $slug => $label ) :
-			$s = Archive_Settings::get( $slug );
-			$f = 'scos_archive[' . esc_attr( $slug ) . ']';
+		<?php
+		$first = true;
+		foreach ( $archives as $slug => $label ) :
+			$s        = Archive_Settings::get( $slug );
+			$f        = 'scos_archive[' . esc_attr( $slug ) . ']';
+			$is_open  = $first || scos_archive_has_data( $s );
+			$first    = false;
+
+			$has_archive_url = ( 'post' === $slug )
+				? ( (int) get_option( 'page_for_posts' ) ? get_permalink( get_option( 'page_for_posts' ) ) : home_url( '/' ) )
+				: get_post_type_archive_link( $slug );
 		?>
-		<div class="card se-module-settings-card" style="margin-bottom: 20px;">
+		<details class="scos-archive-card"<?php echo $is_open ? ' open' : ''; ?>>
+			<summary>
+				<span class="scos-card-title">
+					<?php echo esc_html( $label ); ?>
+					<span class="scos-card-meta">
+						<?php echo esc_html( 'post' === $slug ? 'is_home()' : 'is_post_type_archive(\'' . $slug . '\')' ); ?>
+					</span>
+				</span>
+				<?php if ( scos_archive_has_data( $s ) ) : ?>
+				<span class="scos-card-badge"><?php esc_html_e( 'configured', 'site-essentials' ); ?></span>
+				<?php elseif ( $has_archive_url ) : ?>
+				<span class="scos-card-badge" style="background:#f0f0f1;color:#50575e;"><?php esc_html_e( 'has archive', 'site-essentials' ); ?></span>
+				<?php endif; ?>
+				<span class="scos-card-chevron">&#8964;</span>
+			</summary>
 
-			<h2 class="title">
-				<?php echo esc_html( $label ); ?>
-				<small style="font-size: 13px; font-weight: 400; color: #666; margin-left: 8px;">
-					<?php echo esc_html( 'post' === $slug
-						? __( 'is_home()', 'site-essentials' )
-						: 'is_post_type_archive(\'' . $slug . '\')' ); ?>
-				</small>
-			</h2>
+			<div class="scos-archive-card-body">
 
-			<!-- ── Title & Description ──────────────────────────────────── -->
-			<table class="form-table" role="presentation">
+				<?php if ( $has_archive_url ) : ?>
+				<p style="margin: 0 0 16px; font-size: 12px; color: #787c82;">
+					<?php esc_html_e( 'Archive URL:', 'site-essentials' ); ?>
+					<a href="<?php echo esc_url( $has_archive_url ); ?>" target="_blank"><?php echo esc_html( $has_archive_url ); ?></a>
+				</p>
+				<?php else : ?>
+				<p style="margin: 0 0 16px; font-size: 12px; color: #a7aaad;">
+					<?php esc_html_e( 'No archive URL — this post type does not currently have has_archive enabled. Settings will apply when an archive is enabled.', 'site-essentials' ); ?>
+				</p>
+				<?php endif; ?>
 
-				<tr>
-					<th scope="row">
-						<label for="scos-<?php echo esc_attr( $slug ); ?>-title">
-							<?php esc_html_e( 'Meta Title', 'site-essentials' ); ?>
-						</label>
-					</th>
-					<td>
-						<input type="text"
-							id="scos-<?php echo esc_attr( $slug ); ?>-title"
-							name="<?php echo esc_attr( $f ); ?>[title]"
-							value="<?php echo esc_attr( $s['title'] ); ?>"
-							class="regular-text"
-							placeholder="<?php echo esc_attr( '%title% %sep% %sitename%' ); ?>"
-							maxlength="120">
-						<p class="description"><?php esc_html_e( 'Supports tokens. Leave blank to use WordPress default. Aim for 50–60 characters.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
+				<!-- ── Title & Description ──────────────────────── -->
+				<h3><?php esc_html_e( 'Meta & SEO', 'site-essentials' ); ?></h3>
+				<table class="form-table" role="presentation" style="margin-top: 0;">
 
-				<tr>
-					<th scope="row">
-						<label for="scos-<?php echo esc_attr( $slug ); ?>-description">
-							<?php esc_html_e( 'Meta Description', 'site-essentials' ); ?>
-						</label>
-					</th>
-					<td>
-						<textarea
-							id="scos-<?php echo esc_attr( $slug ); ?>-description"
-							name="<?php echo esc_attr( $f ); ?>[description]"
-							rows="3"
-							class="large-text"
-							maxlength="320"><?php echo esc_textarea( $s['description'] ); ?></textarea>
-						<p class="description"><?php esc_html_e( 'Supports tokens. Leave blank to omit the meta description tag. Aim for 140–160 characters.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
+					<tr>
+						<th scope="row" style="width: 180px;">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-title">
+								<?php esc_html_e( 'Meta Title', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<input type="text"
+								id="scos-<?php echo esc_attr( $slug ); ?>-title"
+								name="<?php echo esc_attr( $f ); ?>[title]"
+								value="<?php echo esc_attr( $s['title'] ); ?>"
+								class="large-text"
+								placeholder="%title% %sep% %sitename%"
+								maxlength="120">
+							<p class="description"><?php esc_html_e( 'Supports tokens. Leave blank to use the WordPress default. Aim for 50–60 characters.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
 
-				<tr>
-					<th scope="row">
-						<label for="scos-<?php echo esc_attr( $slug ); ?>-breadcrumb">
-							<?php esc_html_e( 'Breadcrumb Title', 'site-essentials' ); ?>
-						</label>
-					</th>
-					<td>
-						<input type="text"
-							id="scos-<?php echo esc_attr( $slug ); ?>-breadcrumb"
-							name="<?php echo esc_attr( $f ); ?>[breadcrumb_title]"
-							value="<?php echo esc_attr( $s['breadcrumb_title'] ); ?>"
-							class="regular-text">
-						<p class="description"><?php esc_html_e( 'Short label used in breadcrumb navigation for this archive.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-description">
+								<?php esc_html_e( 'Meta Description', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<textarea
+								id="scos-<?php echo esc_attr( $slug ); ?>-description"
+								name="<?php echo esc_attr( $f ); ?>[description]"
+								rows="3"
+								class="large-text"
+								maxlength="320"><?php echo esc_textarea( $s['description'] ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'Supports tokens. Leave blank to omit. Aim for 140–160 characters.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
 
-				<tr>
-					<th scope="row">
-						<label for="scos-<?php echo esc_attr( $slug ); ?>-tldr">
-							<?php esc_html_e( 'TLDR Summary', 'site-essentials' ); ?>
-						</label>
-					</th>
-					<td>
-						<textarea
-							id="scos-<?php echo esc_attr( $slug ); ?>-tldr"
-							name="<?php echo esc_attr( $f ); ?>[tldr]"
-							rows="2"
-							class="large-text"><?php echo esc_textarea( $s['tldr'] ); ?></textarea>
-						<p class="description"><?php esc_html_e( 'One-sentence summary of this archive for internal reference and potential schema use.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
+					<tr>
+						<th scope="row">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-breadcrumb">
+								<?php esc_html_e( 'Breadcrumb Title', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<input type="text"
+								id="scos-<?php echo esc_attr( $slug ); ?>-breadcrumb"
+								name="<?php echo esc_attr( $f ); ?>[breadcrumb_title]"
+								value="<?php echo esc_attr( $s['breadcrumb_title'] ); ?>"
+								class="regular-text">
+							<p class="description"><?php esc_html_e( 'Short label used in breadcrumb navigation.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
 
-			</table>
+					<tr>
+						<th scope="row">
+							<label for="scos-<?php echo esc_attr( $slug ); ?>-tldr">
+								<?php esc_html_e( 'TLDR Summary', 'site-essentials' ); ?>
+							</label>
+						</th>
+						<td>
+							<textarea
+								id="scos-<?php echo esc_attr( $slug ); ?>-tldr"
+								name="<?php echo esc_attr( $f ); ?>[tldr]"
+								rows="2"
+								class="large-text"><?php echo esc_textarea( $s['tldr'] ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'One-sentence summary for internal reference and potential schema use.', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
 
-			<!-- ── Robots ───────────────────────────────────────────────── -->
-			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Meta Robots', 'site-essentials' ); ?></h3>
-			<fieldset>
-				<legend class="screen-reader-text"><?php esc_html_e( 'Meta Robots', 'site-essentials' ); ?></legend>
-				<?php
-				$robots_opts = [
-					'noindex'      => __( 'noindex — Exclude from search engine indexes', 'site-essentials' ),
-					'nofollow'     => __( 'nofollow — Do not follow links on this page', 'site-essentials' ),
-					'noimageindex' => __( 'noimageindex — Exclude images from image search', 'site-essentials' ),
-					'nosnippet'    => __( 'nosnippet — Do not show a text snippet in results', 'site-essentials' ),
-				];
-				foreach ( $robots_opts as $val => $label_text ) :
-					$checked = in_array( $val, (array) $s['robots'], true );
-				?>
-				<label style="display: block; margin-bottom: 4px;">
-					<input type="checkbox"
-						name="<?php echo esc_attr( $f ); ?>[robots][]"
-						value="<?php echo esc_attr( $val ); ?>"
-						<?php checked( $checked ); ?>>
-					<?php echo esc_html( $label_text ); ?>
-				</label>
-				<?php endforeach; ?>
-			</fieldset>
+				</table>
 
-			<!-- ── Sitemap Exclusion ────────────────────────────────────── -->
-			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></h3>
-			<fieldset>
-				<legend class="screen-reader-text"><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></legend>
-				<?php
-				$sitemap_opts = [
-					'xml'  => __( 'Exclude from XML Sitemap', 'site-essentials' ),
-					'html' => __( 'Exclude from HTML Sitemap', 'site-essentials' ),
-					'news' => __( 'Exclude from Google News Sitemap', 'site-essentials' ),
-				];
-				foreach ( $sitemap_opts as $val => $label_text ) :
-					$checked = in_array( $val, (array) $s['sitemap_exclude'], true );
-				?>
-				<label style="display: block; margin-bottom: 4px;">
-					<input type="checkbox"
-						name="<?php echo esc_attr( $f ); ?>[sitemap_exclude][]"
-						value="<?php echo esc_attr( $val ); ?>"
-						<?php checked( $checked ); ?>>
-					<?php echo esc_html( $label_text ); ?>
-				</label>
-				<?php endforeach; ?>
-			</fieldset>
+				<!-- ── Robots ───────────────────────────────────── -->
+				<h3><?php esc_html_e( 'Meta Robots', 'site-essentials' ); ?></h3>
+				<fieldset>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Meta Robots', 'site-essentials' ); ?></legend>
+					<?php
+					$robots_opts = [
+						'noindex'      => __( 'noindex — Exclude from search engine indexes', 'site-essentials' ),
+						'nofollow'     => __( 'nofollow — Do not follow links on this page', 'site-essentials' ),
+						'noimageindex' => __( 'noimageindex — Exclude images from image search', 'site-essentials' ),
+						'nosnippet'    => __( 'nosnippet — Do not show a text snippet in results', 'site-essentials' ),
+					];
+					foreach ( $robots_opts as $val => $label_text ) :
+						$checked = in_array( $val, (array) $s['robots'], true );
+					?>
+					<label style="display: block; margin-bottom: 5px;">
+						<input type="checkbox"
+							name="<?php echo esc_attr( $f ); ?>[robots][]"
+							value="<?php echo esc_attr( $val ); ?>"
+							<?php checked( $checked ); ?>>
+						<?php echo esc_html( $label_text ); ?>
+					</label>
+					<?php endforeach; ?>
+				</fieldset>
 
-			<!-- ── OG Image ─────────────────────────────────────────────── -->
-			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'OG / Social Image', 'site-essentials' ); ?></h3>
-			<div class="scos-og-image-field" style="display: flex; align-items: flex-start; gap: 12px;">
+				<!-- ── Sitemap ──────────────────────────────────── -->
+				<h3><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></h3>
+				<fieldset>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></legend>
+					<?php
+					$sitemap_opts = [
+						'xml'  => __( 'Exclude from XML Sitemap', 'site-essentials' ),
+						'html' => __( 'Exclude from HTML Sitemap', 'site-essentials' ),
+						'news' => __( 'Exclude from Google News Sitemap', 'site-essentials' ),
+					];
+					foreach ( $sitemap_opts as $val => $label_text ) :
+						$checked = in_array( $val, (array) $s['sitemap_exclude'], true );
+					?>
+					<label style="display: block; margin-bottom: 5px;">
+						<input type="checkbox"
+							name="<?php echo esc_attr( $f ); ?>[sitemap_exclude][]"
+							value="<?php echo esc_attr( $val ); ?>"
+							<?php checked( $checked ); ?>>
+						<?php echo esc_html( $label_text ); ?>
+					</label>
+					<?php endforeach; ?>
+				</fieldset>
+
+				<!-- ── OG Image ─────────────────────────────────── -->
+				<h3><?php esc_html_e( 'Social / OG Image', 'site-essentials' ); ?></h3>
 				<?php
 				$og_id  = (int) $s['og_image_id'];
-				$og_src = $og_id ? wp_get_attachment_image_url( $og_id, [ 120, 63 ] ) : '';
+				$og_src = $og_id ? wp_get_attachment_image_url( $og_id, [ 240, 126 ] ) : '';
+				$input_id = 'scos-' . esc_attr( $slug ) . '-og-id';
+				$thumb_id = 'scos-' . esc_attr( $slug ) . '-og-thumb';
 				?>
-				<?php if ( $og_src ) : ?>
-				<div class="scos-og-image-preview">
-					<img src="<?php echo esc_url( $og_src ); ?>" alt="" width="120" height="63"
-						style="width:120px;height:63px;object-fit:cover;border:1px solid #ddd;border-radius:3px;">
-				</div>
-				<?php endif; ?>
-				<div>
+				<div class="scos-og-wrap">
+					<div class="scos-og-thumb-box<?php echo $og_src ? ' has-image' : ''; ?>" id="<?php echo esc_attr( $thumb_id ); ?>">
+						<?php if ( $og_src ) : ?>
+							<img src="<?php echo esc_url( $og_src ); ?>" alt="">
+						<?php else : ?>
+							<?php esc_html_e( 'Select your default thumbnail', 'site-essentials' ); ?>
+						<?php endif; ?>
+					</div>
 					<input type="hidden"
-						id="scos-<?php echo esc_attr( $slug ); ?>-og-image-id"
+						id="<?php echo esc_attr( $input_id ); ?>"
 						name="<?php echo esc_attr( $f ); ?>[og_image_id]"
 						value="<?php echo esc_attr( (string) $og_id ); ?>">
-					<button type="button"
-						class="button scos-og-image-select"
-						data-target="scos-<?php echo esc_attr( $slug ); ?>-og-image-id"
-						data-preview="scos-<?php echo esc_attr( $slug ); ?>-og-image-preview">
-						<?php echo $og_id ? esc_html__( 'Change Image', 'site-essentials' ) : esc_html__( 'Select Image', 'site-essentials' ); ?>
-					</button>
-					<?php if ( $og_id ) : ?>
-					<button type="button"
-						class="button scos-og-image-remove"
-						data-target="scos-<?php echo esc_attr( $slug ); ?>-og-image-id"
-						style="margin-left: 4px;">
-						<?php esc_html_e( 'Remove', 'site-essentials' ); ?>
-					</button>
-					<?php endif; ?>
-					<p class="description"><?php esc_html_e( 'Recommended: 1200×630 px. Used as og:image for this archive on social shares.', 'site-essentials' ); ?></p>
+					<div class="scos-og-actions">
+						<button type="button"
+							class="button scos-og-upload"
+							data-input="<?php echo esc_attr( $input_id ); ?>"
+							data-thumb="<?php echo esc_attr( $thumb_id ); ?>">
+							<?php echo $og_id ? esc_html__( 'Change Image', 'site-essentials' ) : esc_html__( 'Upload an Image', 'site-essentials' ); ?>
+						</button>
+						<button type="button"
+							class="button scos-og-remove"
+							data-input="<?php echo esc_attr( $input_id ); ?>"
+							data-thumb="<?php echo esc_attr( $thumb_id ); ?>"
+							style="<?php echo $og_id ? '' : 'display:none;'; ?>">
+							<?php esc_html_e( 'Remove Image', 'site-essentials' ); ?>
+						</button>
+					</div>
+					<p class="description" style="margin-top: 4px;"><?php esc_html_e( 'Recommended: 1200×630 px. Shown as og:image on social shares for this archive.', 'site-essentials' ); ?></p>
 				</div>
-			</div>
 
-			<!-- ── Pagination settings ──────────────────────────────────── -->
-			<h3 style="margin: 16px 0 8px;"><?php esc_html_e( 'Pagination', 'site-essentials' ); ?></h3>
-			<fieldset>
-				<legend class="screen-reader-text"><?php esc_html_e( 'Pagination settings', 'site-essentials' ); ?></legend>
+				<!-- ── Pagination ───────────────────────────────── -->
+				<h3><?php esc_html_e( 'Pagination', 'site-essentials' ); ?></h3>
+				<fieldset>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Pagination settings', 'site-essentials' ); ?></legend>
+					<label style="display: block; margin-bottom: 8px;">
+						<input type="checkbox"
+							name="<?php echo esc_attr( $f ); ?>[pagination_noindex]"
+							value="1"
+							<?php checked( ! empty( $s['pagination_noindex'] ) ); ?>>
+						<?php esc_html_e( 'noindex on paginated pages (e.g. /page/2/)', 'site-essentials' ); ?>
+					</label>
+					<label style="display: block; margin-bottom: 8px;">
+						<input type="checkbox"
+							name="<?php echo esc_attr( $f ); ?>[canonical_paged]"
+							value="1"
+							<?php checked( ! empty( $s['canonical_paged'] ) ); ?>>
+						<?php esc_html_e( 'Self-canonical on paginated pages (page/2 canonical → page/2, not archive root)', 'site-essentials' ); ?>
+					</label>
+					<label style="display: block; margin-bottom: 4px;">
+						<input type="checkbox"
+							name="<?php echo esc_attr( $f ); ?>[rel_prevnext]"
+							value="1"
+							<?php checked( ! empty( $s['rel_prevnext'] ) ); ?>>
+						<?php esc_html_e( 'Output rel="prev" / rel="next" links in <head> for paginated archives', 'site-essentials' ); ?>
+					</label>
+				</fieldset>
 
-				<label style="display: block; margin-bottom: 8px;">
-					<input type="checkbox"
-						name="<?php echo esc_attr( $f ); ?>[pagination_noindex]"
-						value="1"
-						<?php checked( ! empty( $s['pagination_noindex'] ) ); ?>>
-					<?php esc_html_e( 'noindex on paginated pages (e.g. /page/2/)', 'site-essentials' ); ?>
-				</label>
-
-				<label style="display: block; margin-bottom: 8px;">
-					<input type="checkbox"
-						name="<?php echo esc_attr( $f ); ?>[canonical_paged]"
-						value="1"
-						<?php checked( ! empty( $s['canonical_paged'] ) ); ?>>
-					<?php esc_html_e( 'Self-canonical on paginated pages (page/2 canonical → page/2, not archive root)', 'site-essentials' ); ?>
-				</label>
-
-				<label style="display: block; margin-bottom: 4px;">
-					<input type="checkbox"
-						name="<?php echo esc_attr( $f ); ?>[rel_prevnext]"
-						value="1"
-						<?php checked( ! empty( $s['rel_prevnext'] ) ); ?>>
-					<?php esc_html_e( 'Output rel="prev" / rel="next" links in <head> for paginated archives', 'site-essentials' ); ?>
-				</label>
-			</fieldset>
-
-		</div><!-- /.card -->
+			</div><!-- /.scos-archive-card-body -->
+		</details>
 		<?php endforeach; ?>
 
-		<?php submit_button( __( 'Save Archive SEO Settings', 'site-essentials' ) ); ?>
+		<p style="margin-top: 20px;">
+			<?php submit_button( __( 'Save Archive SEO Settings', 'site-essentials' ), 'primary', 'submit', false ); ?>
+		</p>
 
 	</form>
 </div><!-- /.scos-archive-meta-wrap -->
 
-<?php
-// Enqueue WP media library for the OG image picker
-wp_enqueue_media();
-?>
 <script>
+/* global wp, jQuery */
 (function ($) {
 	'use strict';
-	if (typeof wp === 'undefined' || !wp.media) { return; }
 
-	$(document).on('click', '.scos-og-image-select', function () {
-		var btn      = $(this);
-		var targetId = btn.data('target');
-		var frame    = wp.media({
+	function openMediaFrame(inputId, thumbId) {
+		if (typeof wp === 'undefined' || !wp.media) {
+			// eslint-disable-next-line no-alert
+			alert('<?php echo esc_js( __( 'Media library not available. Try reloading the page.', 'site-essentials' ) ); ?>');
+			return;
+		}
+
+		var frame = wp.media({
 			title:    '<?php echo esc_js( __( 'Select OG Image', 'site-essentials' ) ); ?>',
 			button:   { text: '<?php echo esc_js( __( 'Use this image', 'site-essentials' ) ); ?>' },
 			library:  { type: 'image' },
@@ -282,33 +424,38 @@ wp_enqueue_media();
 		});
 
 		frame.on('select', function () {
-			var att = frame.state().get('selection').first().toJSON();
-			$('#' + targetId).val(att.id);
+			var att    = frame.state().get('selection').first().toJSON();
+			var src    = (att.sizes && att.sizes.medium) ? att.sizes.medium.url : att.url;
 
-			var preview = btn.siblings('.scos-og-image-preview');
-			if (preview.length) {
-				preview.find('img').attr('src', att.sizes && att.sizes.thumbnail ? att.sizes.thumbnail.url : att.url);
-			} else {
-				var img = $('<div class="scos-og-image-preview"><img style="width:120px;height:63px;object-fit:cover;border:1px solid #ddd;border-radius:3px;" /></div>');
-				img.find('img').attr('src', att.sizes && att.sizes.thumbnail ? att.sizes.thumbnail.url : att.url);
-				btn.before(img);
-			}
+			$('#' + inputId).val(att.id);
 
-			btn.text('<?php echo esc_js( __( 'Change Image', 'site-essentials' ) ); ?>');
-			if (!btn.siblings('.scos-og-image-remove').length) {
-				btn.after('<button type="button" class="button scos-og-image-remove" data-target="' + targetId + '" style="margin-left:4px;"><?php echo esc_js( __( 'Remove', 'site-essentials' ) ); ?></button>');
-			}
+			var $thumb = $('#' + thumbId);
+			$thumb.addClass('has-image').html('<img src="' + src + '" alt="">');
+
+			// Update upload button label & show remove
+			$thumb.closest('.scos-og-wrap').find('.scos-og-upload')
+				.text('<?php echo esc_js( __( 'Change Image', 'site-essentials' ) ); ?>');
+			$thumb.closest('.scos-og-wrap').find('.scos-og-remove').show();
 		});
 
 		frame.open();
+	}
+
+	$(document).on('click', '.scos-og-upload', function () {
+		openMediaFrame($(this).data('input'), $(this).data('thumb'));
 	});
 
-	$(document).on('click', '.scos-og-image-remove', function () {
-		var targetId = $(this).data('target');
-		$('#' + targetId).val('');
-		$(this).siblings('.scos-og-image-preview').remove();
-		$(this).siblings('.scos-og-image-select').text('<?php echo esc_js( __( 'Select Image', 'site-essentials' ) ); ?>');
-		$(this).remove();
+	$(document).on('click', '.scos-og-remove', function () {
+		var $wrap  = $(this).closest('.scos-og-wrap');
+		var inputId = $(this).data('input');
+
+		$('#' + inputId).val('');
+
+		var $thumb = $('#' + $(this).data('thumb'));
+		$thumb.removeClass('has-image').text('<?php echo esc_js( __( 'Select your default thumbnail', 'site-essentials' ) ); ?>');
+
+		$wrap.find('.scos-og-upload').text('<?php echo esc_js( __( 'Upload an Image', 'site-essentials' ) ); ?>');
+		$(this).hide();
 	});
 }(jQuery));
 </script>

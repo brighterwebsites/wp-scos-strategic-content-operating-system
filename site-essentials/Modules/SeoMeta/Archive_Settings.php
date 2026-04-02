@@ -62,8 +62,11 @@ class Archive_Settings {
 	/**
 	 * Returns slug → label pairs for all configurable archives.
 	 *
-	 * Order: Posts (blog) first, then CPTs with has_archive sorted alphabetically
-	 * by their plural label.
+	 * Includes the Posts (blog) archive and every public, non-built-in CPT.
+	 * Whether or not a CPT currently has has_archive enabled, storing settings
+	 * now means they are ready when archives are turned on.
+	 *
+	 * Order: Posts (blog) first, then CPTs sorted alphabetically by plural label.
 	 *
 	 * @return array<string, string>
 	 */
@@ -82,9 +85,6 @@ class Archive_Settings {
 
 		$cpt_archives = [];
 		foreach ( $post_types as $pt ) {
-			if ( empty( $pt->has_archive ) ) {
-				continue;
-			}
 			$cpt_archives[ $pt->name ] = $pt->labels->name;
 		}
 
@@ -247,8 +247,18 @@ class Archive_Settings {
 	}
 
 	/**
-	 * Called from SeoMeta_Module::init() — no hooks registered here;
-	 * all hooks live in Admin_UI (save handler) and Head_Output (frontend output).
+	 * Called from SeoMeta_Module::init().
+	 * Registers the admin_enqueue_scripts hook so wp.media is available on the
+	 * Archive SEO tab of Site Essentials > SEO.
 	 */
-	public static function init(): void {}
+	public static function init(): void {
+		if ( is_admin() ) {
+			add_action( 'admin_enqueue_scripts', static function ( string $hook ): void {
+				// Load on any Site Essentials SEO page
+				if ( false !== strpos( $hook, 'site-essentials-seo' ) ) {
+					wp_enqueue_media();
+				}
+			} );
+		}
+	}
 }

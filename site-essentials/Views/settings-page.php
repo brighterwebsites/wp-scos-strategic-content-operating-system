@@ -37,6 +37,10 @@ if (!defined('ABSPATH')) {
            class="nav-tab <?php echo $active_tab === 'import-export' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Import/Export', 'site-essentials'); ?>
         </a>
+        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=api"
+           class="nav-tab <?php echo $active_tab === 'api' ? 'nav-tab-active' : ''; ?>">
+            <?php esc_html_e('API Settings', 'site-essentials'); ?>
+        </a>
         <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=cache"
            class="nav-tab <?php echo $active_tab === 'cache' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Cache', 'site-essentials'); ?>
@@ -82,6 +86,9 @@ if (!defined('ABSPATH')) {
                     </button>
                 </div>
             </div>
+
+        <?php elseif ($active_tab === 'api'): ?>
+            <?php include SITE_ESSENTIALS_PATH . 'Views/settings-api.php'; ?>
 
         <?php elseif ($active_tab === 'cache'): ?>
             <div class="site-essentials-cache">

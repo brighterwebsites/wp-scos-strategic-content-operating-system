@@ -31,6 +31,9 @@ $base_url = admin_url('admin.php?page=' . $performance_slug);
         <a href="<?php echo esc_url($base_url . '&tab=asset-preloading'); ?>" class="nav-tab <?php echo $active_tab === 'asset-preloading' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Asset Preloading', 'site-essentials'); ?>
         </a>
+        <a href="<?php echo esc_url($base_url . '&tab=monitoring'); ?>" class="nav-tab <?php echo $active_tab === 'monitoring' ? 'nav-tab-active' : ''; ?>">
+            <?php esc_html_e('Monitoring', 'site-essentials'); ?>
+        </a>
     </nav>
 
     <div class="site-essentials-content">
@@ -91,6 +94,9 @@ $base_url = admin_url('admin.php?page=' . $performance_slug);
                     ?>
                 </div>
             <?php endif; ?>
+
+        <?php elseif ($active_tab === 'monitoring'): ?>
+            <?php include SITE_ESSENTIALS_PATH . 'Views/performance-monitoring.php'; ?>
 
         <?php endif; ?>
     </div>

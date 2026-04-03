@@ -33,6 +33,7 @@ class Meta_Box {
 		add_action( 'add_meta_boxes',        [ __CLASS__, 'register' ] );
 		add_action( 'save_post',             [ __CLASS__, 'save' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+		add_filter( 'wp_insert_post_data',   [ __CLASS__, 'maybe_freeze_modified_date' ], 10, 2 );
 	}
 
 	// -------------------------------------------------------------------------
@@ -94,6 +95,9 @@ class Meta_Box {
 		}
 
 		$sitemap_exclude = (array) get_post_meta( $post->ID, 'scos_seo_sitemap_exclude', true );
+
+		$freeze_date        = (bool) get_post_meta( $post->ID, 'scos_seo_freeze_og_date', true );
+		$global_freeze_date = (bool) get_option( 'scos_seo_freeze_modified_date', false );
 
 		include __DIR__ . '/views/meta-box.php';
 	}
@@ -169,6 +173,14 @@ class Meta_Box {
 			in_array( 'noindex', $robots, true ) ? 'yes' : 'no'
 		);
 
+		// ---- Freeze modified date (per-post) ----
+		// Always write so unchecking a previously-checked box is captured.
+		update_post_meta(
+			$post_id,
+			'scos_seo_freeze_og_date',
+			! empty( $_POST['scos_seo_freeze_og_date'] ) ? '1' : '0'
+		);
+
 		// ---- Sitemap exclusions (multi-check) ----
 		$valid_sitemap = array_keys( Meta_Fields::sitemap_options() );
 		if ( isset( $_POST['scos_seo_sitemap_exclude'] ) ) {
@@ -180,6 +192,60 @@ class Meta_Box {
 			$exclude = [];
 		}
 		update_post_meta( $post_id, 'scos_seo_sitemap_exclude', $exclude );
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Prevent WP from bumping post_modified when:
+	 *   - The global "freeze all modified dates" option is on, OR
+	 *   - The per-post scos_seo_freeze_og_date flag is checked.
+	 *
+	 * Per-post value '0' can override the global freeze for that one save.
+	 */
+	public static function maybe_freeze_modified_date( array $data, array $postarr ): array {
+		$post_id = (int) ( $postarr['ID'] ?? 0 );
+		if ( ! $post_id ) {
+			return $data;
+		}
+
+		// Skip revisions, auto-drafts, trash
+		$status = $data['post_status'] ?? '';
+		if ( in_array( $status, [ 'auto-draft', 'inherit', 'trash' ], true ) ) {
+			return $data;
+		}
+
+		// Skip during autosave
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return $data;
+		}
+
+		$global_freeze = (bool) get_option( 'scos_seo_freeze_modified_date', false );
+		$per_post      = get_post_meta( $post_id, 'scos_seo_freeze_og_date', true );
+
+		// Resolve freeze intent:
+		// Global ON  → freeze, unless per-post is explicitly '0' (user override)
+		// Global OFF → freeze only if per-post is explicitly '1'
+		if ( $global_freeze ) {
+			$should_freeze = ( '0' !== (string) $per_post );
+		} else {
+			$should_freeze = ( '1' === (string) $per_post );
+		}
+
+		if ( ! $should_freeze ) {
+			return $data;
+		}
+
+		// Preserve current modified date — on brand-new posts (no prior date) skip.
+		$original     = get_post_field( 'post_modified',     $post_id );
+		$original_gmt = get_post_field( 'post_modified_gmt', $post_id );
+
+		if ( $original && '0000-00-00 00:00:00' !== $original ) {
+			$data['post_modified']     = $original;
+			$data['post_modified_gmt'] = $original_gmt;
+		}
+
+		return $data;
 	}
 
 	// -------------------------------------------------------------------------

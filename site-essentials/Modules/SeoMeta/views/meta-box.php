@@ -3,14 +3,16 @@
  * SEO Meta box view — 3-tab UI.
  *
  * Variables available from Meta_Box::render():
- *   $post              WP_Post
- *   $breadcrumb_title  string
- *   $tldr              string
- *   $title             string
- *   $description       string
- *   $canonical         string
- *   $robots            string[]
- *   $sitemap_exclude   string[]
+ *   $post               WP_Post
+ *   $breadcrumb_title   string
+ *   $tldr               string
+ *   $title              string
+ *   $description        string
+ *   $canonical          string
+ *   $robots             string[]
+ *   $sitemap_exclude    string[]
+ *   $freeze_date        bool   — per-post freeze flag
+ *   $global_freeze_date bool   — site-wide freeze option
  *
  * @package SiteEssentials
  */
@@ -130,6 +132,37 @@ defined( 'ABSPATH' ) || exit;
 					</label>
 				<?php endforeach; ?>
 			</div>
+		</div>
+
+		<!-- Freeze Modified Date -->
+		<div class="scos-seo-field">
+			<label><?php esc_html_e( 'Modified Date', 'site-essentials' ); ?></label>
+			<label class="scos-seo-check-label">
+				<input type="checkbox"
+					name="scos_seo_freeze_og_date"
+					value="1"
+					<?php
+					// When global freeze is ON and per-post is not explicitly set to '0' → show as checked.
+					// When global freeze is OFF → show checked only if per-post is explicitly '1'.
+					$per_post_raw = get_post_meta( $post->ID, 'scos_seo_freeze_og_date', true );
+					if ( $global_freeze_date ) {
+						$show_checked = ( '0' !== (string) $per_post_raw );
+					} else {
+						$show_checked = $freeze_date;
+					}
+					checked( $show_checked );
+					?>>
+				<?php esc_html_e( 'Freeze modified date', 'site-essentials' ); ?>
+			</label>
+			<?php if ( $global_freeze_date ) : ?>
+				<p class="scos-seo-help" style="color:#b45309;">
+					<?php esc_html_e( 'Global freeze is active — all posts are frozen by default. Uncheck here to allow this save to update the modified date.', 'site-essentials' ); ?>
+				</p>
+			<?php else : ?>
+				<p class="scos-seo-help">
+					<?php esc_html_e( 'Prevent this post\'s "Last Modified" timestamp from changing on each save. Useful when making minor edits. Uncheck when publishing a major update.', 'site-essentials' ); ?>
+				</p>
+			<?php endif; ?>
 		</div>
 
 		<!-- Sitemap Visibility -->

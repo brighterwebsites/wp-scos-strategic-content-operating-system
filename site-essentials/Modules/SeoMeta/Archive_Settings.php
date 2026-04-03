@@ -297,15 +297,25 @@ class Archive_Settings {
 			$tax_label = $tax_obj ? $tax_obj->labels->name : '';
 		}
 
+		// %description% — term description (stripped of HTML) for taxonomy contexts
+		$description_val = '';
+		if ( taxonomy_exists( $slug ) ) {
+			$term_obj = get_queried_object();
+			if ( $term_obj instanceof \WP_Term && ! empty( $term_obj->description ) ) {
+				$description_val = wp_strip_all_tags( $term_obj->description );
+			}
+		}
+
 		$tokens = [
-			'%title%'    => $title,
-			'%sitename%' => get_bloginfo( 'name' ),
-			'%sep%'      => $sep,
-			'%page%'     => $page_str,
-			'%search%'   => $search_q,
-			'%author%'   => $author_name,
-			'%term%'     => $term_name ?: $title, // alias for %title% in tax context
-			'%taxonomy%' => $tax_label,
+			'%title%'       => $title,
+			'%sitename%'    => get_bloginfo( 'name' ),
+			'%sep%'         => $sep,
+			'%page%'        => $page_str,
+			'%search%'      => $search_q,
+			'%author%'      => $author_name,
+			'%term%'        => $term_name ?: $title,
+			'%taxonomy%'    => $tax_label,
+			'%description%' => $description_val,
 		];
 
 		return str_replace( array_keys( $tokens ), array_values( $tokens ), $raw );
@@ -385,6 +395,16 @@ class Archive_Settings {
 
 		// Flush rewrite rules if author slug changed
 		delete_option( 'scos_seo_author_rewrite_ver' );
+
+		// ── Global SEO defaults ──
+		$scos_global = ( isset( $_POST['scos_global'] ) && is_array( $_POST['scos_global'] ) )
+			? $_POST['scos_global']
+			: [];
+		update_option(
+			'scos_seo_freeze_modified_date',
+			! empty( $scos_global['freeze_modified_date'] ) ? '1' : '',
+			false
+		);
 
 		wp_safe_redirect(
 			add_query_arg(

@@ -171,18 +171,23 @@ function scos_archive_has_data( array $s ): bool {
 			<span class="scos-card-chevron">&#8964;</span>
 		</summary>
 		<div class="scos-archive-card-body">
-			<table class="widefat striped" style="max-width: 580px;">
+			<table class="widefat striped" style="max-width: 640px;">
 				<thead>
 					<tr>
-						<th style="width:130px;"><?php esc_html_e( 'Token', 'site-essentials' ); ?></th>
+						<th style="width:140px;"><?php esc_html_e( 'Token', 'site-essentials' ); ?></th>
 						<th><?php esc_html_e( 'Resolves to', 'site-essentials' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
-					<tr><td><code>%title%</code></td><td><?php esc_html_e( 'Archive name — post type plural label, or blog page title', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%title%</code></td><td><?php esc_html_e( 'Archive name — CPT plural label, term name, author name, or blog page title', 'site-essentials' ); ?></td></tr>
 					<tr><td><code>%sitename%</code></td><td><?php esc_html_e( 'Site name from Settings › General', 'site-essentials' ); ?></td></tr>
 					<tr><td><code>%sep%</code></td><td><?php esc_html_e( 'Separator (default –, filterable via scos_seo_title_sep)', 'site-essentials' ); ?></td></tr>
 					<tr><td><code>%page%</code></td><td><?php esc_html_e( '"Page 2" on paginated views, blank on page 1', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%term%</code></td><td><?php esc_html_e( 'Taxonomy term name (alias for %title% on term archives)', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%taxonomy%</code></td><td><?php esc_html_e( 'Taxonomy plural label (e.g. "Categories", "Tags")', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%description%</code></td><td><?php esc_html_e( 'Term description — the description set on the taxonomy term edit screen', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%author%</code></td><td><?php esc_html_e( 'Author display name (author archives)', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>%search%</code></td><td><?php esc_html_e( 'Search query string (search results archives)', 'site-essentials' ); ?></td></tr>
 				</tbody>
 			</table>
 			<p style="margin-top: 10px; color: #50575e; font-size: 13px;">
@@ -198,6 +203,36 @@ function scos_archive_has_data( array $s ): bool {
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="site_essentials_save_archive_meta">
 		<?php wp_nonce_field( 'scos_save_archive_meta', 'scos_archive_meta_nonce' ); ?>
+
+		<!-- ── Global SEO Defaults ─────────────────────────────────────── -->
+		<h2 class="scos-section-heading"><?php esc_html_e( 'Global SEO Defaults', 'site-essentials' ); ?></h2>
+		<details class="scos-archive-card" <?php echo get_option( 'scos_seo_freeze_modified_date' ) ? 'open' : ''; ?>>
+			<summary>
+				<span class="scos-card-title"><?php esc_html_e( 'Modified Date', 'site-essentials' ); ?></span>
+				<span class="scos-card-meta"><?php esc_html_e( 'Control how post_modified updates site-wide', 'site-essentials' ); ?></span>
+				<?php if ( get_option( 'scos_seo_freeze_modified_date' ) ) : ?>
+					<span class="scos-card-badge"><?php esc_html_e( 'active', 'site-essentials' ); ?></span>
+				<?php endif; ?>
+				<span class="scos-card-chevron">&#8964;</span>
+			</summary>
+			<div class="scos-archive-card-body">
+				<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+					<input type="checkbox"
+						name="scos_global[freeze_modified_date]"
+						value="1"
+						style="margin-top:3px;"
+						<?php checked( get_option( 'scos_seo_freeze_modified_date' ) ); ?>>
+					<span>
+						<strong><?php esc_html_e( 'Freeze modified date globally', 'site-essentials' ); ?></strong><br>
+						<span style="color:#50575e;font-size:13px;">
+							<?php esc_html_e( 'When enabled, saving any post will not update its "Last Modified" timestamp unless the post has the per-post freeze unchecked. Useful for minor edits, copy fixes, or SEO tweaks where you don\'t want the date to change. Individual posts can override this via the SEO metabox → Advanced tab.', 'site-essentials' ); ?>
+						</span>
+					</span>
+				</label>
+			</div>
+		</details>
+
+		<h2 class="scos-section-heading"><?php esc_html_e( 'Post Type Archives', 'site-essentials' ); ?></h2>
 
 		<?php
 		foreach ( $archives as $slug => $label ) :

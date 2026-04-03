@@ -47,6 +47,10 @@ defined( 'ABSPATH' ) || exit;
                style="opacity: 0.5; cursor: not-allowed;">
                 <?php esc_html_e( 'Schema', 'site-essentials' ); ?> <small>(<?php esc_html_e( 'Coming Soon', 'site-essentials' ); ?>)</small>
             </a>
+            <a href="?page=<?php echo esc_attr( \SiteEssentials\Core\Admin_UI::SEO_PAGE_SLUG ); ?>&tab=advanced"
+               class="nav-tab <?php echo 'advanced' === $active_tab ? 'nav-tab-active' : ''; ?>">
+                <?php esc_html_e( 'Advanced', 'site-essentials' ); ?>
+            </a>
         </h2>
 
         <div class="site-essentials-content">
@@ -74,6 +78,9 @@ defined( 'ABSPATH' ) || exit;
                 <div class="card" style="margin-top: 20px; padding: 20px;">
                     <p><?php esc_html_e( 'Schema markup management coming soon.', 'site-essentials' ); ?></p>
                 </div>
+
+            <?php elseif ( 'advanced' === $active_tab ) : ?>
+                <?php include SITE_ESSENTIALS_PATH . 'Modules/SeoMeta/views/advanced.php'; ?>
 
             <?php endif; ?>
 

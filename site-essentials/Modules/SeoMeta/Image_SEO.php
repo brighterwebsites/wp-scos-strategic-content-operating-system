@@ -152,8 +152,11 @@ class Image_SEO {
 			wp_die( esc_html__( 'You do not have sufficient permissions.', 'site-essentials' ) );
 		}
 
-		$posted = ( isset( $_POST['scos_image_seo'] ) && is_array( $_POST['scos_image_seo'] ) )
-			? $_POST['scos_image_seo']
+		$all_post = wp_unslash( $_POST );
+
+		// ── Image SEO ──
+		$posted = ( isset( $all_post['scos_image_seo'] ) && is_array( $all_post['scos_image_seo'] ) )
+			? $all_post['scos_image_seo']
 			: [];
 
 		update_option(
@@ -166,6 +169,9 @@ class Image_SEO {
 			],
 			false
 		);
+
+		// ── Virtual files (robots.txt / llms.txt) ──
+		Virtual_Files::save( $all_post );
 
 		wp_safe_redirect(
 			add_query_arg(

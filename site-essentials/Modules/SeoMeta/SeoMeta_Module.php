@@ -67,12 +67,14 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/Head_Output.php';
 		require_once __DIR__ . '/Archive_Settings.php';
 		require_once __DIR__ . '/Image_SEO.php';
+		require_once __DIR__ . '/Virtual_Files.php';
 
 		Meta_Fields::init();
 		Meta_Box::init();
 		Head_Output::init();
 		Archive_Settings::init();
 		Image_SEO::init();
+		Virtual_Files::init();
 	}
 
 	public function render_settings() {

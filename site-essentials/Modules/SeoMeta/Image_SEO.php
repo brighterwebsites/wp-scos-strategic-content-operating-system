@@ -173,6 +173,9 @@ class Image_SEO {
 		// ── Virtual files (robots.txt / llms.txt) ──
 		Virtual_Files::save( $all_post );
 
+		// ── EXIF / metadata stripping ──
+		Exif_Stripper::save( $all_post );
+
 		wp_safe_redirect(
 			add_query_arg(
 				[

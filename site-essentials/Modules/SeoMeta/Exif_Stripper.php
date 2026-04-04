@@ -178,6 +178,20 @@ class Exif_Stripper {
 				// No ICC — that's fine.
 			}
 
+			// Explicitly remove named profiles BEFORE stripImage().
+			// Imagick's stripImage() can leave a corrupted APP1 EXIF marker in
+			// the JPEG stream if it only zeroes the data without removing the
+			// marker header, causing PHP exif_read_data() to throw an E_WARNING.
+			// Removing them first ensures clean output.
+			foreach ( [ 'exif', 'iptc', 'xmp', '8bim', 'psict', 'iptc-na' ] as $profile ) {
+				try {
+					$img->removeImageProfile( $profile );
+				} catch ( \ImagickException $e ) {
+					// Profile not present — fine.
+				}
+			}
+
+			// Belt-and-suspenders: strip catches anything not named above.
 			$img->stripImage();
 
 			if ( $icc ) {
@@ -273,6 +287,12 @@ class Exif_Stripper {
 				// No ICC.
 			}
 
+			// Explicitly remove named profiles first (prevents corrupted APP1 markers).
+			foreach ( [ 'exif', 'iptc', 'xmp', '8bim', 'psict', 'iptc-na' ] as $profile ) {
+				try {
+					$img->removeImageProfile( $profile );
+				} catch ( \ImagickException $e ) {}
+			}
 			$img->stripImage();
 
 			if ( $icc ) {

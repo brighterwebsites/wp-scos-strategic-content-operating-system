@@ -58,9 +58,17 @@ add_action('wp_footer', function() {
             <a href="https://brighterwebsites.com.au/support" target="_blank" rel="noopener">💬 Support</a>
             <a href="<?php echo esc_url(admin_url('edit.php')); ?>">📊 Dashboard</a>
 
-<a href="#" class="gs-purge-cache">🔄 Purge Cache</a>
-            <?php if ($post && $post->ID): ?>
-                <a href="<?php echo esc_url(get_edit_post_link($post->ID)); ?>">✏️ Edit This Page</a>
+            <?php if ($post && $post->ID):
+                $post_id         = $post->ID;
+                $wp_edit_url     = admin_url( 'post.php?post=' . $post_id . '&action=edit' );
+                $seo_url         = $wp_edit_url . '#scos_seo_meta';
+                $bd_data         = get_post_meta( $post_id, '_breakdance_data', true );
+                $edit_page_url   = ! empty( $bd_data )
+                    ? home_url( '/?breakdance=builder&id=' . $post_id )
+                    : $wp_edit_url;
+            ?>
+                <a href="<?php echo esc_url( $seo_url ); ?>">🔍 Edit SEO</a>
+                <a href="<?php echo esc_url( $edit_page_url ); ?>">✏️ Edit Page</a>
             <?php endif; ?>
         </div>
         <?php

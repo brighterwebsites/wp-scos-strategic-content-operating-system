@@ -61,9 +61,24 @@ class SocialAmplification_Module implements Module_Interface {
 		require_once __DIR__ . '/Meta_Box.php';
 		require_once __DIR__ . '/Post_Framing.php';
 
+		// ── Postly.ai amplification pipeline ──────────────────────────────
+		require_once __DIR__ . '/Amplification/Anthropic_Client.php';
+		require_once __DIR__ . '/Amplification/Postly_Client.php';
+		require_once __DIR__ . '/Amplification/Amplification_Engine.php';
+		require_once __DIR__ . '/Amplification/REST_Endpoint.php';
+		require_once __DIR__ . '/Publish_Hook.php';
+
 		Meta_Fields::init();
 		Meta_Box::init();
 		Post_Framing::init();
+		Amplification\REST_Endpoint::init();
+		Publish_Hook::init();
+
+		// WP-CLI backfill command
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			require_once __DIR__ . '/CLI/Backfill_Command.php';
+			\WP_CLI::add_command( 'bw-social backfill', CLI\Backfill_Command::class );
+		}
 
 		// One-time migration: copy bw_* option values → scos_sma_* on first load
 		add_action( 'admin_init', [ $this, 'maybe_migrate_options' ] );

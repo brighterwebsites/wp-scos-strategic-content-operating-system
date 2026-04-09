@@ -41,6 +41,10 @@ if (!defined('ABSPATH')) {
            class="nav-tab <?php echo $active_tab === 'api' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('API Settings', 'site-essentials'); ?>
         </a>
+        <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=ai-keys"
+           class="nav-tab <?php echo $active_tab === 'ai-keys' ? 'nav-tab-active' : ''; ?>">
+            <?php esc_html_e('AI API Keys', 'site-essentials'); ?>
+        </a>
         <a href="?page=<?php echo esc_attr(\SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG); ?>&tab=cache"
            class="nav-tab <?php echo $active_tab === 'cache' ? 'nav-tab-active' : ''; ?>">
             <?php esc_html_e('Cache', 'site-essentials'); ?>
@@ -89,6 +93,45 @@ if (!defined('ABSPATH')) {
 
         <?php elseif ($active_tab === 'api'): ?>
             <?php include SITE_ESSENTIALS_PATH . 'Views/settings-api.php'; ?>
+
+        <?php elseif ($active_tab === 'ai-keys'): ?>
+            <?php
+            $anthropic_key = get_option( 'bw_anthropic_api_key', '' );
+            ?>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <?php wp_nonce_field( 'scos_save_ai_keys', 'scos_ai_keys_nonce' ); ?>
+                <input type="hidden" name="action" value="scos_save_ai_keys">
+
+                <h2><?php esc_html_e( 'AI API Keys', 'site-essentials' ); ?></h2>
+                <p class="description" style="margin-bottom:20px;">
+                    <?php esc_html_e( 'Third-party AI provider credentials used across Site Essentials modules. These keys are stored as WordPress options and never exposed to the front end.', 'site-essentials' ); ?>
+                </p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_anthropic_api_key"><?php esc_html_e( 'Anthropic API Key', 'site-essentials' ); ?></label>
+                        </th>
+                        <td>
+                            <input type="password" id="bw_anthropic_api_key" name="bw_anthropic_api_key"
+                                value="<?php echo esc_attr( $anthropic_key ); ?>"
+                                class="regular-text code" autocomplete="new-password"
+                                style="width:100%;max-width:560px;" />
+                            <p class="description">
+                                <?php esc_html_e( 'Used by Social Amplification (Postly.ai caption generation via Claude) and future AI integrations. Obtain from ', 'site-essentials' ); ?>
+                                <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>.
+                            </p>
+                            <?php if ( $anthropic_key ) : ?>
+                                <p style="color:#16a34a;font-size:13px;margin-top:6px;">
+                                    &#10003; <?php esc_html_e( 'Key is saved. Enter a new value to replace it.', 'site-essentials' ); ?>
+                                </p>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+
+                <?php submit_button( __( 'Save AI API Keys', 'site-essentials' ) ); ?>
+            </form>
 
         <?php elseif ($active_tab === 'cache'): ?>
             <div class="site-essentials-cache">

@@ -19,6 +19,19 @@ $yourls_sig      = SMA::get_option( 'scos_sma_yourls_signature', 'bw_yourls_sign
 $yourls_user     = SMA::get_option( 'scos_sma_yourls_username',  'bw_yourls_username' );
 $yourls_pass     = SMA::get_option( 'scos_sma_yourls_password',  'bw_yourls_password' );
 
+// Postly / Anthropic fields
+$postly_api_key      = get_option( 'bw_postly_api_key', '' );
+$postly_workspace_id = get_option( 'bw_postly_workspace_id', '' );
+$postly_channel_ids  = get_option( 'bw_postly_channel_ids', '' );
+$acf_gallery_keys    = get_option( 'bw_social_acf_gallery_keys', '' );
+$acf_featured_key    = get_option( 'bw_social_acf_featured_key', '' );
+$webhook_secret      = get_option( 'bw_social_webhook_secret', '' );
+$social_enabled      = get_option( 'bw_social_enabled', '' );
+
+// Last run log entry
+$amplify_log      = get_option( \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::LOG_OPTION, [] );
+$last_log_entries = is_array( $amplify_log ) ? array_slice( array_reverse( $amplify_log, true ), 0, 5, true ) : [];
+
 $active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'yourls';
 $page_url   = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 
@@ -70,6 +83,10 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 	<a href="<?php echo esc_url( add_query_arg( 'tab', 'makecom', $page_url ) ); ?>"
 	   class="nav-tab <?php echo $active_tab === 'makecom' ? 'nav-tab-active' : ''; ?>">
 		<?php esc_html_e( 'Make.com Integration', 'site-essentials' ); ?>
+	</a>
+	<a href="<?php echo esc_url( add_query_arg( 'tab', 'postly', $page_url ) ); ?>"
+	   class="nav-tab <?php echo $active_tab === 'postly'  ? 'nav-tab-active' : ''; ?>">
+		<?php esc_html_e( 'Postly.ai', 'site-essentials' ); ?>
 	</a>
 	<a href="<?php echo esc_url( add_query_arg( 'tab', 'docs', $page_url ) ); ?>"
 	   class="nav-tab <?php echo $active_tab === 'docs'    ? 'nav-tab-active' : ''; ?>">
@@ -147,12 +164,204 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 		</tr>
 	</table>
 
+<?php elseif ( $active_tab === 'postly' ) : ?>
+
+	<!-- ── Postly.ai Settings ── -->
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
+		<input type="hidden" name="action" value="site_essentials_save_sma">
+		<input type="hidden" name="_scos_sma_tab" value="postly">
+
+		<h3 style="margin-top:0;"><?php esc_html_e( 'Postly.ai Social Amplification', 'site-essentials' ); ?></h3>
+		<p class="description" style="margin-bottom:18px;">
+			<?php esc_html_e( 'Automatically generate and schedule 3 social posts when a Projects post is published. Uses Anthropic AI for caption generation and Postly.ai for scheduling. Anthropic API key is managed in Settings → AI API Keys.', 'site-essentials' ); ?>
+		</p>
+
+		<table class="form-table">
+
+			<!-- Enable toggle -->
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Enable Social Amplification', 'site-essentials' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="bw_social_enabled" value="1" <?php checked( $social_enabled, '1' ); ?> />
+						<?php esc_html_e( 'Automatically amplify when a Projects post is published', 'site-essentials' ); ?>
+					</label>
+					<p class="description">
+						<?php esc_html_e( 'Requires Postly API key, Workspace ID, and Anthropic API key (in Settings → AI API Keys) to be configured.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- Postly API Key -->
+			<tr>
+				<th scope="row">
+					<label for="bw_postly_api_key"><?php esc_html_e( 'Postly API Key', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="password" id="bw_postly_api_key" name="bw_postly_api_key"
+						value="<?php echo esc_attr( $postly_api_key ); ?>"
+						class="regular-text code" autocomplete="new-password"
+						style="width:100%;max-width:560px;" />
+					<p class="description">
+						<?php esc_html_e( 'Your Postly.ai API key. Get it from ', 'site-essentials' ); ?>
+						<a href="https://app.postly.ai" target="_blank" rel="noopener">app.postly.ai</a>.
+					</p>
+				</td>
+			</tr>
+
+			<!-- Postly Workspace ID -->
+			<tr>
+				<th scope="row">
+					<label for="bw_postly_workspace_id"><?php esc_html_e( 'Postly Workspace ID', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="bw_postly_workspace_id" name="bw_postly_workspace_id"
+						value="<?php echo esc_attr( $postly_workspace_id ); ?>"
+						class="regular-text code" style="width:100%;max-width:560px;" />
+					<p class="description">
+						<?php esc_html_e( 'The workspace ID from your Postly account (find it in the Workspace settings URL).', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- Channel IDs (optional) -->
+			<tr>
+				<th scope="row">
+					<label for="bw_postly_channel_ids"><?php esc_html_e( 'Target Channel IDs', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="bw_postly_channel_ids" name="bw_postly_channel_ids"
+						value="<?php echo esc_attr( $postly_channel_ids ); ?>"
+						class="regular-text code" style="width:100%;max-width:560px;"
+						placeholder="<?php esc_attr_e( 'id1, id2, id3', 'site-essentials' ); ?>" />
+					<p class="description">
+						<?php esc_html_e( 'Comma-separated Postly social channel IDs to post to. Leave blank to post to all channels connected in the workspace. Find IDs via the Postly API: GET /workspaces/{id}/socials.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- ACF Gallery Keys -->
+			<tr>
+				<th scope="row">
+					<label for="bw_social_acf_gallery_keys"><?php esc_html_e( 'ACF Gallery Field Keys', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="bw_social_acf_gallery_keys" name="bw_social_acf_gallery_keys"
+						value="<?php echo esc_attr( $acf_gallery_keys ); ?>"
+						class="regular-text code" style="width:100%;max-width:560px;"
+						placeholder="<?php esc_attr_e( 'project_gallery, secondary_gallery', 'site-essentials' ); ?>" />
+					<p class="description">
+						<?php esc_html_e( 'Comma-separated ACF field keys that contain gallery images. These are combined with the featured image for post image sets.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- ACF Featured Image Key (optional override) -->
+			<tr>
+				<th scope="row">
+					<label for="bw_social_acf_featured_key"><?php esc_html_e( 'ACF Featured Image Key', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="bw_social_acf_featured_key" name="bw_social_acf_featured_key"
+						value="<?php echo esc_attr( $acf_featured_key ); ?>"
+						class="regular-text code" style="width:100%;max-width:560px;" />
+					<p class="description">
+						<?php esc_html_e( 'Optional. ACF field key for a custom featured/hero image. Overrides the standard WordPress featured image as the first image. Leave blank to use the WP featured image.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- Webhook Secret -->
+			<tr>
+				<th scope="row">
+					<label for="bw_social_webhook_secret"><?php esc_html_e( 'Webhook Secret', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<?php if ( $webhook_secret ) : ?>
+						<div style="display:flex;align-items:center;gap:10px;max-width:560px;">
+							<input type="text" id="bw_social_webhook_secret_display"
+								value="<?php echo esc_attr( $webhook_secret ); ?>"
+								class="regular-text code" readonly style="flex:1;background:#f6f7f7;" />
+							<button type="button" class="button"
+								onclick="navigator.clipboard.writeText('<?php echo esc_js( $webhook_secret ); ?>').then(()=>this.textContent='Copied!').catch(()=>{})">
+								<?php esc_html_e( 'Copy', 'site-essentials' ); ?>
+							</button>
+						</div>
+					<?php else : ?>
+						<p class="description" style="color:#b45309;"><?php esc_html_e( 'Not yet generated — save settings to auto-generate.', 'site-essentials' ); ?></p>
+					<?php endif; ?>
+					<p class="description">
+						<?php esc_html_e( 'Auto-generated. Used to authenticate the internal REST endpoint (POST /wp-json/bw-social/v1/amplify). Keep private.', 'site-essentials' ); ?>
+					</p>
+					<!-- Hidden: preserve secret across saves (will not change if already set) -->
+					<input type="hidden" name="bw_social_webhook_secret" value="<?php echo esc_attr( $webhook_secret ); ?>" />
+				</td>
+			</tr>
+
+		</table>
+
+		<?php submit_button( __( 'Save Postly Settings', 'site-essentials' ) ); ?>
+
+	</form>
+
+	<!-- ── Status / Recent Runs ── -->
+	<hr style="margin:28px 0 20px;">
+	<h3 style="margin-top:0;"><?php esc_html_e( 'Recent Amplification Runs', 'site-essentials' ); ?></h3>
+
+	<?php if ( empty( $last_log_entries ) ) : ?>
+		<p class="description"><?php esc_html_e( 'No posts have been amplified yet.', 'site-essentials' ); ?></p>
+	<?php else : ?>
+		<table class="widefat striped" style="max-width:900px;">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Post', 'site-essentials' ); ?></th>
+					<th><?php esc_html_e( 'Run At', 'site-essentials' ); ?></th>
+					<th><?php esc_html_e( 'Shortlink', 'site-essentials' ); ?></th>
+					<th><?php esc_html_e( 'Posts Scheduled', 'site-essentials' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+			<?php foreach ( $last_log_entries as $pid => $entry ) :
+				$post_title = get_the_title( $pid );
+				$scheduled_count = count( array_filter( $entry['posts'] ?? [], static fn( $p ) => ( $p['status'] ?? '' ) === 'scheduled' ) );
+				$error_count     = count( array_filter( $entry['posts'] ?? [], static fn( $p ) => ( $p['status'] ?? '' ) === 'error' ) );
+			?>
+				<tr>
+					<td>
+						<a href="<?php echo esc_url( get_edit_post_link( $pid ) ); ?>">
+							<?php echo esc_html( $post_title ?: "#$pid" ); ?>
+						</a>
+					</td>
+					<td><?php echo esc_html( $entry['ran_at'] ?? '—' ); ?></td>
+					<td>
+						<?php if ( ! empty( $entry['shortlink'] ) ) : ?>
+							<a href="<?php echo esc_url( $entry['shortlink'] ); ?>" target="_blank" rel="noopener">
+								<?php echo esc_html( $entry['shortlink'] ); ?>
+							</a>
+						<?php else : ?>—<?php endif; ?>
+					</td>
+					<td>
+						<?php if ( $scheduled_count > 0 ) : ?>
+							<span style="color:#16a34a;">&#10003; <?php echo esc_html( $scheduled_count ); ?> scheduled</span>
+						<?php endif; ?>
+						<?php if ( $error_count > 0 ) : ?>
+							<span style="color:#b45309;margin-left:8px;">&#x26A0; <?php echo esc_html( $error_count ); ?> failed</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+	<?php endif; ?>
+
 <?php else : ?>
 
 	<!-- ── Settings form (YOURLS + Make.com tabs share one form) ── -->
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
 		<input type="hidden" name="action" value="site_essentials_save_sma">
+		<input type="hidden" name="_scos_sma_tab" value="<?php echo esc_attr( $active_tab ); ?>">
 
 		<?php if ( $active_tab === 'yourls' ) : ?>
 

@@ -77,6 +77,7 @@ class Admin_UI {
         add_action('admin_post_scos_save_redirections',            ['\SiteEssentials\Modules\SeoMeta\Redirections', 'handle_save']);
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
         add_action('admin_post_site_essentials_save_sma', [$this, 'save_sma_settings']);
+        add_action('admin_post_scos_save_ai_keys',        [$this, 'save_ai_keys']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
     }
@@ -535,7 +536,62 @@ class Admin_UI {
             update_option( $legacy_key, $val );
         }
 
-        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
+        // ── Postly.ai / Anthropic pipeline settings ──────────────────────────
+        $postly_fields = [
+            'bw_postly_api_key'          => 'sanitize_text_field',
+            'bw_postly_workspace_id'     => 'sanitize_text_field',
+            'bw_postly_channel_ids'      => 'sanitize_text_field',
+            'bw_social_acf_gallery_keys' => 'sanitize_text_field',
+            'bw_social_acf_featured_key' => 'sanitize_text_field',
+        ];
+        foreach ( $postly_fields as $key => $sanitizer ) {
+            if ( isset( $_POST[ $key ] ) ) {
+                update_option( $key, $sanitizer( $_POST[ $key ] ) );
+            }
+        }
+
+        // Enable toggle (absent from POST when unchecked)
+        update_option( 'bw_social_enabled', isset( $_POST['bw_social_enabled'] ) ? '1' : '' );
+
+        // Webhook secret: auto-generate if not already set; allow manual value if posted
+        $posted_secret  = isset( $_POST['bw_social_webhook_secret'] )
+            ? sanitize_text_field( $_POST['bw_social_webhook_secret'] )
+            : '';
+        $current_secret = get_option( 'bw_social_webhook_secret', '' );
+        if ( ! $current_secret ) {
+            // Generate a fresh secret when none exists yet
+            update_option( 'bw_social_webhook_secret', wp_generate_password( 32, false ) );
+        } elseif ( $posted_secret && $posted_secret !== $current_secret ) {
+            // Only update if the form explicitly sends a different value
+            update_option( 'bw_social_webhook_secret', $posted_secret );
+        }
+
+        $active_tab = isset( $_POST['_scos_sma_tab'] ) ? sanitize_key( $_POST['_scos_sma_tab'] ) : 'yourls';
+
+        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'tab' => $active_tab, 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
+        exit;
+    }
+
+    /**
+     * Save AI API Keys (Anthropic, etc.) from Settings → AI API Keys tab.
+     *
+     * @since 1.4.0
+     * @return void
+     */
+    public function save_ai_keys(): void {
+        if ( ! isset( $_POST['scos_ai_keys_nonce'] )
+            || ! wp_verify_nonce( $_POST['scos_ai_keys_nonce'], 'scos_save_ai_keys' ) ) {
+            wp_die( __( 'Security check failed.', 'site-essentials' ) );
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
+        }
+
+        if ( isset( $_POST['bw_anthropic_api_key'] ) ) {
+            update_option( 'bw_anthropic_api_key', sanitize_text_field( $_POST['bw_anthropic_api_key'] ) );
+        }
+
+        wp_redirect( add_query_arg( [ 'page' => self::SETTINGS_PAGE_SLUG, 'tab' => 'ai-keys', 'updated' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
     }
 

@@ -96,7 +96,8 @@ if (!defined('ABSPATH')) {
 
         <?php elseif ($active_tab === 'ai-keys'): ?>
             <?php
-            $anthropic_key = get_option( 'bw_anthropic_api_key', '' );
+            $anthropic_key   = get_option( 'bw_anthropic_api_key', '' );
+            $anthropic_model = get_option( 'bw_anthropic_model', '' );
             ?>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                 <?php wp_nonce_field( 'scos_save_ai_keys', 'scos_ai_keys_nonce' ); ?>
@@ -126,6 +127,24 @@ if (!defined('ABSPATH')) {
                                     &#10003; <?php esc_html_e( 'Key is saved. Enter a new value to replace it.', 'site-essentials' ); ?>
                                 </p>
                             <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="bw_anthropic_model"><?php esc_html_e( 'Claude Model', 'site-essentials' ); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="bw_anthropic_model" name="bw_anthropic_model"
+                                value="<?php echo esc_attr( $anthropic_model ); ?>"
+                                class="regular-text code"
+                                style="width:100%;max-width:560px;"
+                                placeholder="claude-3-5-sonnet-latest" />
+                            <p class="description">
+                                <?php esc_html_e( 'Leave blank to use the default (claude-3-5-sonnet-latest). Override if your account has access to a specific model version, e.g. ', 'site-essentials' ); ?>
+                                <code>claude-3-7-sonnet-20250219</code>.
+                                <?php esc_html_e( 'Check available models at ', 'site-essentials' ); ?>
+                                <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener">docs.anthropic.com/models</a>.
+                            </p>
                         </td>
                     </tr>
                 </table>

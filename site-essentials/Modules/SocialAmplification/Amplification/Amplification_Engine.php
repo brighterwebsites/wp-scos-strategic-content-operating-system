@@ -25,14 +25,10 @@ defined( 'ABSPATH' ) || exit;
 
 class Amplification_Engine {
 
-	// Days between each scheduled post
 	const POST_INTERVAL_DAYS = 42;
-
-	// Max images per Postly post
-	const IMAGES_PER_POST = 4;
-
-	// Option key for the run log (keyed by post_id)
-	const LOG_OPTION = 'scos_sa_amplify_log';
+	const IMAGES_PER_POST    = 4;
+	const LOG_OPTION         = 'scos_sa_amplify_log';
+	const LOG_PREFIX         = '[SCOS SMA Engine]';
 
 	// ──────────────────────────────────────────────────────────────────────────
 	// Entry point
@@ -47,27 +43,36 @@ class Amplification_Engine {
 	 * @throws \RuntimeException on unrecoverable error.
 	 */
 	public static function run( int $post_id, array $options = [] ): array {
+		error_log( self::LOG_PREFIX . " ── Starting amplification run for post #{$post_id} ──" );
+
 		$post = get_post( $post_id );
 		if ( ! $post || $post->post_status !== 'publish' ) {
-			throw new \RuntimeException( "Post {$post_id} is not published or does not exist." );
+			$msg = "Post {$post_id} is not published or does not exist.";
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			throw new \RuntimeException( $msg );
 		}
 
 		// ── 1. Gather post data ──────────────────────────────────────────────
 		$title     = get_the_title( $post );
 		$permalink = get_permalink( $post );
 		$excerpt   = self::get_excerpt( $post );
+		error_log( self::LOG_PREFIX . " Post #{$post_id}: \"{$title}\" | {$permalink}" );
 
 		// ── 2. YOURLS shortlink ──────────────────────────────────────────────
 		$shortlink = self::get_shortlink( $post_id, $permalink );
+		error_log( self::LOG_PREFIX . " Shortlink: {$shortlink}" );
 
 		// ── 3. Image selection ──────────────────────────────────────────────
-		$all_images   = self::collect_images( $post_id );
-		$image_sets   = self::build_image_sets( $all_images );
+		$all_images = self::collect_images( $post_id );
+		error_log( self::LOG_PREFIX . ' Images collected: ' . count( $all_images ) . ' — ' . implode( ', ', array_map( 'basename', $all_images ) ) );
+		$image_sets = self::build_image_sets( $all_images );
 
 		// ── 4. Determine content type ────────────────────────────────────────
 		$content_type = self::get_content_type( $post );
+		error_log( self::LOG_PREFIX . " Content type: {$content_type}" );
 
 		// ── 5. Generate captions via Anthropic ──────────────────────────────
+		error_log( self::LOG_PREFIX . ' Calling Anthropic for captions…' );
 		$captions = Anthropic_Client::generate_captions( [
 			'post_id'      => $post_id,
 			'title'        => $title,
@@ -86,12 +91,14 @@ class Amplification_Engine {
 		) );
 		$timezone     = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
 
+		error_log( self::LOG_PREFIX . " Postly workspace: {$workspace_id} | channels: " . ( $channel_ids ? implode( ',', $channel_ids ) : '(all)' ) . " | tz: {$timezone}" );
+
 		$client = new Postly_Client( $api_key, $workspace_id, $channel_ids );
 
 		// ── 7. Base schedule time ────────────────────────────────────────────
 		$base_dt = $options['schedule_at'] ?? new \DateTimeImmutable( 'now', new \DateTimeZone( $timezone ) );
-		// Align to a reasonable posting time (10:00 AM site timezone)
 		$base_dt = $base_dt->setTime( 10, 0, 0 );
+		error_log( self::LOG_PREFIX . ' Base schedule: ' . $base_dt->format( 'Y-m-d H:i T' ) );
 
 		// ── 8. Schedule 3 posts ──────────────────────────────────────────────
 		$post_results = [];
@@ -100,12 +107,13 @@ class Amplification_Engine {
 		for ( $i = 0; $i < 3; $i++ ) {
 			$offset_days = self::POST_INTERVAL_DAYS * $i;
 			$schedule_dt = $base_dt->modify( "+{$offset_days} days" );
-
-			// Upload images for this post slot
-			$uploaded_urls = self::upload_images( $client, $image_sets[ $i ] ?? [] );
-
 			$caption_key = $caption_keys[ $i ];
 			$caption     = $captions[ $caption_key ] ?? '';
+
+			error_log( self::LOG_PREFIX . " Slot " . ( $i + 1 ) . ": scheduled {$schedule_dt->format('Y-m-d H:i')} | images from set " . count( $image_sets[ $i ] ?? [] ) );
+
+			$uploaded_urls = self::upload_images( $client, $image_sets[ $i ] ?? [] );
+			error_log( self::LOG_PREFIX . ' Uploaded ' . count( $uploaded_urls ) . ' of ' . count( $image_sets[ $i ] ?? [] ) . ' images to Postly CDN' );
 
 			try {
 				$result = $client->create_post( [
@@ -115,15 +123,19 @@ class Amplification_Engine {
 					'timezone'    => $timezone,
 				] );
 
+				$postly_id = $result['_id'] ?? ( $result['id'] ?? null );
+				error_log( self::LOG_PREFIX . " Slot " . ( $i + 1 ) . " scheduled OK — Postly ID: {$postly_id}" );
+
 				$post_results[] = [
 					'slot'        => $i + 1,
 					'scheduled'   => $schedule_dt->format( 'Y-m-d H:i' ),
 					'caption_key' => $caption_key,
 					'status'      => 'scheduled',
-					'postly_id'   => $result['_id'] ?? ( $result['id'] ?? null ),
+					'postly_id'   => $postly_id,
 					'images'      => count( $uploaded_urls ),
 				];
 			} catch ( \RuntimeException $e ) {
+				error_log( self::LOG_PREFIX . " Slot " . ( $i + 1 ) . " FAILED: " . $e->getMessage() );
 				$post_results[] = [
 					'slot'        => $i + 1,
 					'scheduled'   => $schedule_dt->format( 'Y-m-d H:i' ),
@@ -134,6 +146,8 @@ class Amplification_Engine {
 				];
 			}
 		}
+
+		error_log( self::LOG_PREFIX . " ── Run complete for post #{$post_id} ──" );
 
 		// ── 9. Log results ───────────────────────────────────────────────────
 		$log_entry = [

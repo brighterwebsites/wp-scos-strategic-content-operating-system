@@ -590,6 +590,9 @@ class Admin_UI {
         if ( isset( $_POST['bw_anthropic_api_key'] ) ) {
             update_option( 'bw_anthropic_api_key', sanitize_text_field( $_POST['bw_anthropic_api_key'] ) );
         }
+        if ( isset( $_POST['bw_anthropic_model'] ) ) {
+            update_option( 'bw_anthropic_model', sanitize_text_field( $_POST['bw_anthropic_model'] ) );
+        }
 
         wp_redirect( add_query_arg( [ 'page' => self::SETTINGS_PAGE_SLUG, 'tab' => 'ai-keys', 'updated' => '1' ], admin_url( 'admin.php' ) ) );
         exit;

@@ -24,10 +24,11 @@ defined( 'ABSPATH' ) || exit;
 
 class Anthropic_Client {
 
-	const API_URL     = 'https://api.anthropic.com/v1/messages';
-	const API_VERSION = '2023-06-01';
-	const MODEL       = 'claude-3-5-sonnet-20241022';
-	const MAX_TOKENS  = 1500;
+	const API_URL         = 'https://api.anthropic.com/v1/messages';
+	const API_VERSION     = '2023-06-01';
+	const DEFAULT_MODEL   = 'claude-3-5-sonnet-latest';
+	const MAX_TOKENS      = 1500;
+	const LOG_PREFIX      = '[SCOS SMA Anthropic]';
 
 	/** Knowledge files relative to WP_CONTENT_DIR/ai-knowledge/ */
 	const KNOWLEDGE_FILES = [
@@ -53,14 +54,29 @@ class Anthropic_Client {
 	public static function generate_captions( array $post_context ): array {
 		$api_key = get_option( 'bw_anthropic_api_key', '' );
 		if ( ! $api_key ) {
-			throw new \RuntimeException( 'Anthropic API key is not configured.' );
+			$msg = 'Anthropic API key is not configured.';
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			throw new \RuntimeException( $msg );
 		}
 
 		self::maybe_create_htaccess();
 
+		$model     = (string) get_option( 'bw_anthropic_model', self::DEFAULT_MODEL ) ?: self::DEFAULT_MODEL;
 		$knowledge = self::read_knowledge_files();
 		$system    = self::system_prompt( $knowledge );
 		$prompt    = self::build_prompt( $post_context );
+
+		$post_id = $post_context['post_id'] ?? '?';
+		error_log( self::LOG_PREFIX . " Generating captions for post #{$post_id} using model {$model}" );
+
+		$payload = [
+			'model'      => $model,
+			'max_tokens' => self::MAX_TOKENS,
+			'system'     => $system,
+			'messages'   => [
+				[ 'role' => 'user', 'content' => $prompt ],
+			],
+		];
 
 		$response = wp_remote_post( self::API_URL, [
 			'timeout' => 60,
@@ -69,18 +85,13 @@ class Anthropic_Client {
 				'anthropic-version' => self::API_VERSION,
 				'content-type'      => 'application/json',
 			],
-			'body' => wp_json_encode( [
-				'model'      => self::MODEL,
-				'max_tokens' => self::MAX_TOKENS,
-				'system'     => $system,
-				'messages'   => [
-					[ 'role' => 'user', 'content' => $prompt ],
-				],
-			] ),
+			'body' => wp_json_encode( $payload ),
 		] );
 
 		if ( is_wp_error( $response ) ) {
-			throw new \RuntimeException( 'Anthropic API request failed: ' . $response->get_error_message() );
+			$msg = 'Anthropic API request failed: ' . $response->get_error_message();
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			throw new \RuntimeException( $msg );
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
@@ -89,11 +100,20 @@ class Anthropic_Client {
 
 		if ( $code !== 200 ) {
 			$err = $data['error']['message'] ?? $body;
-			throw new \RuntimeException( "Anthropic API error ({$code}): {$err}" );
+			$msg = "Anthropic API error ({$code}): {$err}";
+			// Log the full raw body so nothing is hidden
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			error_log( self::LOG_PREFIX . ' Full response body: ' . $body );
+			throw new \RuntimeException( $msg );
 		}
 
 		$text = $data['content'][0]['text'] ?? '';
-		return self::parse_captions( $text );
+		error_log( self::LOG_PREFIX . " Raw caption response for post #{$post_id}: " . substr( $text, 0, 500 ) );
+
+		$captions = self::parse_captions( $text );
+		error_log( self::LOG_PREFIX . " Captions parsed successfully for post #{$post_id}" );
+
+		return $captions;
 	}
 
 	// ──────────────────────────────────────────────────────────────────────────

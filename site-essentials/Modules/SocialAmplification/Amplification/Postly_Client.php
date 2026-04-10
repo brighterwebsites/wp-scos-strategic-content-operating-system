@@ -100,14 +100,21 @@ class Postly_Client {
 		// Postly requires full channel objects (same shape as GET /workspaces/{id}/socials).
 		// Fetch them fresh, then optionally filter to only the configured channel IDs.
 		$channels = $this->get_socials();
+		error_log( '[SCOS SMA Postly] get_socials() returned ' . count( $channels ) . ' channel(s): ' . wp_json_encode( $channels ) );
+
 		if ( ! empty( $this->channel_ids ) ) {
 			$channels = array_values( array_filter( $channels, function ( array $ch ) {
 				return in_array( (string) $ch['id'], $this->channel_ids, true )
 					|| in_array( (string) ( $ch['parent_id'] ?? '' ), $this->channel_ids, true );
 			} ) );
+			error_log( '[SCOS SMA Postly] After filtering to channel_ids [' . implode( ',', $this->channel_ids ) . ']: ' . count( $channels ) . ' channel(s)' );
 		}
+
 		if ( ! empty( $channels ) ) {
 			$body['target_platforms'] = $channels;
+			error_log( '[SCOS SMA Postly] Sending target_platforms: ' . wp_json_encode( $body['target_platforms'] ) );
+		} else {
+			error_log( '[SCOS SMA Postly] WARNING: No channels resolved — target_platforms omitted from POST /posts' );
 		}
 
 		if ( $schedule instanceof \DateTimeImmutable ) {
@@ -136,8 +143,9 @@ class Postly_Client {
 		}
 
 		try {
-			$data = $this->request( 'GET', "/workspaces/{$this->workspace_id}/socials" );
-			$cache[ $key ] = $data['data'] ?? ( is_array( $data ) && isset( $data[0] ) ? $data : [] );
+			$raw = $this->request( 'GET', "/workspaces/{$this->workspace_id}/socials" );
+			error_log( '[SCOS SMA Postly] Raw socials response: ' . wp_json_encode( $raw ) );
+			$cache[ $key ] = $raw['data'] ?? ( is_array( $raw ) && isset( $raw[0] ) ? $raw : [] );
 		} catch ( \RuntimeException $e ) {
 			error_log( '[SCOS SMA Postly] Failed to fetch socials: ' . $e->getMessage() );
 			$cache[ $key ] = [];

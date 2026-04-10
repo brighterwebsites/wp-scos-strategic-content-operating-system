@@ -2,8 +2,14 @@
 /**
  * Anthropic API Client
  *
- * Reads brand-voice.md, builds a structured prompt, calls the Anthropic
- * Messages API (claude-3-5-sonnet), and parses the JSON caption response.
+ * Reads knowledge files from wp-content/ai-knowledge/, builds a structured
+ * prompt, calls the Anthropic Messages API (claude-3-5-sonnet), and parses
+ * the JSON caption response.
+ *
+ * Knowledge files (all optional — missing files are silently skipped):
+ *   brand-core.md   — brand identity, tone, positioning
+ *   vocabulary.md   — approved / banned word list
+ *   social-media.md — platform-specific rules and formatting
  *
  * Automatically writes wp-content/ai-knowledge/.htaccess if the folder
  * exists but the file does not, so HTTP access is blocked from day one.
@@ -18,11 +24,17 @@ defined( 'ABSPATH' ) || exit;
 
 class Anthropic_Client {
 
-	const API_URL        = 'https://api.anthropic.com/v1/messages';
-	const API_VERSION    = '2023-06-01';
-	const MODEL          = 'claude-3-5-sonnet-20241022';
-	const MAX_TOKENS     = 1500;
-	const BRAND_VOICE_PATH = 'ai-knowledge/brand-voice.md';
+	const API_URL     = 'https://api.anthropic.com/v1/messages';
+	const API_VERSION = '2023-06-01';
+	const MODEL       = 'claude-3-5-sonnet-20241022';
+	const MAX_TOKENS  = 1500;
+
+	/** Knowledge files relative to WP_CONTENT_DIR/ai-knowledge/ */
+	const KNOWLEDGE_FILES = [
+		'brand_core'   => 'brand-core.md',
+		'vocabulary'   => 'vocabulary.md',
+		'social_media' => 'social-media.md',
+	];
 
 	/**
 	 * Generate three social media captions for the given post context.
@@ -46,8 +58,9 @@ class Anthropic_Client {
 
 		self::maybe_create_htaccess();
 
-		$brand_voice = self::read_brand_voice();
-		$prompt      = self::build_prompt( $post_context, $brand_voice );
+		$knowledge = self::read_knowledge_files();
+		$system    = self::system_prompt( $knowledge );
+		$prompt    = self::build_prompt( $post_context );
 
 		$response = wp_remote_post( self::API_URL, [
 			'timeout' => 60,
@@ -59,7 +72,7 @@ class Anthropic_Client {
 			'body' => wp_json_encode( [
 				'model'      => self::MODEL,
 				'max_tokens' => self::MAX_TOKENS,
-				'system'     => self::system_prompt( $brand_voice ),
+				'system'     => $system,
 				'messages'   => [
 					[ 'role' => 'user', 'content' => $prompt ],
 				],
@@ -85,58 +98,75 @@ class Anthropic_Client {
 
 	// ──────────────────────────────────────────────────────────────────────────
 
-	private static function system_prompt( string $brand_voice ): string {
-		$context = $brand_voice
-			? "You have been provided with the brand's voice guidelines below. Follow them precisely.\n\n{$brand_voice}"
-			: 'Write in a professional, engaging, and authentic tone suited for a landscape architecture / design studio.';
+	/**
+	 * Build the system prompt.
+	 *
+	 * Includes business identity from scos_biz_* options and all knowledge
+	 * file contents. All rule content lives here so the user turn stays short,
+	 * which improves Claude's instruction-following.
+	 *
+	 * @param  array{brand_core: string, vocabulary: string, social_media: string} $knowledge
+	 */
+	private static function system_prompt( array $knowledge ): string {
+		$business_name = (string) get_option( 'scos_biz_business_name', get_bloginfo( 'name' ) );
+		$service_desc  = (string) get_option( 'scos_biz_service_description', '' );
 
-		return <<<SYSTEM
-You are a social media copywriter creating posts for a professional service business.
-{$context}
+		$identity = $business_name;
+		if ( $service_desc ) {
+			$identity .= " — {$service_desc}";
+		}
 
-CRITICAL: Always respond with valid JSON only — no preamble, no markdown fences, no trailing text.
-The JSON must have exactly these keys: "post_1", "post_2", "post_3".
-Each value is a complete, ready-to-publish social media caption string.
-SYSTEM;
+		$parts = [];
+
+		if ( $knowledge['brand_core'] ) {
+			$parts[] = "[BRAND CORE]\n\n{$knowledge['brand_core']}";
+		}
+
+		if ( $knowledge['vocabulary'] ) {
+			$parts[] = "[VOCABULARY]\n\n{$knowledge['vocabulary']}";
+		}
+
+		if ( $knowledge['social_media'] ) {
+			$parts[] = "[SOCIAL MEDIA RULES]\n\n{$knowledge['social_media']}";
+		}
+
+		$guidelines = $parts
+			? "\n\nBefore writing anything, apply the following guidelines precisely:\n\n" . implode( "\n\n", $parts )
+			: '';
+
+		return "You are a social media copywriter for {$identity}.{$guidelines}\n\n"
+			. "Return valid JSON only. No preamble, no explanation, no markdown fences.\n"
+			. 'The JSON must have exactly these keys: "post_1", "post_2", "post_3". '
+			. 'Each value is a complete, ready-to-publish social media caption string.';
 	}
 
-	private static function build_prompt( array $ctx, string $brand_voice ): string {
+	/**
+	 * Build the per-post user prompt.
+	 * Rules stay in the system prompt — keep this as short as possible.
+	 */
+	private static function build_prompt( array $ctx ): string {
 		$title        = $ctx['title']        ?? '';
 		$excerpt      = $ctx['excerpt']      ?? '';
-		$permalink    = $ctx['permalink']    ?? '';
-		$shortlink    = $ctx['shortlink']    ?? $permalink;
+		$shortlink    = $ctx['shortlink']    ?? ( $ctx['permalink'] ?? '' );
 		$content_type = $ctx['content_type'] ?? 'project';
 
-		return <<<PROMPT
-Create 3 distinct social media captions for the following {$content_type}:
-
-Title: {$title}
-Description: {$excerpt}
-Link: {$shortlink}
-
-Requirements:
-- Post 1: Storytelling angle — draw the reader into the project's narrative.
-- Post 2: Results / transformation angle — focus on the outcome or value delivered.
-- Post 3: Behind-the-scenes / process angle — tease the craft or approach.
-
-Each caption should:
-- Be 2–4 sentences long.
-- Include the link naturally at the end or integrated into the copy.
-- Use 3–5 relevant hashtags at the end.
-- Be ready to post directly — no placeholders.
-
-Respond only with JSON: {"post_1": "...", "post_2": "...", "post_3": "..."}
-PROMPT;
+		return "Create 3 distinct social media captions for the following {$content_type}:\n\n"
+			. "Title: {$title}\n"
+			. "Description: {$excerpt}\n"
+			. "Link: {$shortlink}\n\n"
+			. "Post 1: Storytelling angle — draw the reader into the project.\n"
+			. "Post 2: Results / outcome angle — focus on what was delivered and why it holds up.\n"
+			. "Post 3: Behind-the-scenes / process angle — tease the craft or a specific build decision.\n\n"
+			. 'Each caption: 2–4 sentences, link included naturally, 3–5 hashtags at the end.';
 	}
 
 	/**
 	 * Parse the model's text response into the expected array.
-	 * Handles JSON that may be wrapped in markdown fences.
+	 * Handles JSON that may be wrapped in markdown fences despite the instruction.
 	 *
 	 * @throws \RuntimeException if captions cannot be parsed.
 	 */
 	private static function parse_captions( string $text ): array {
-		// Strip markdown code fences if present
 		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
 		$text = preg_replace( '/\s*```$/', '', $text );
 
@@ -156,25 +186,39 @@ PROMPT;
 		];
 	}
 
+	// ──────────────────────────────────────────────────────────────────────────
+	// Knowledge file helpers
+	// ──────────────────────────────────────────────────────────────────────────
+
 	/**
-	 * Read brand-voice.md from wp-content/ai-knowledge/.
-	 * Returns empty string if the file is missing (non-fatal).
+	 * Read all knowledge files and return their contents keyed by type.
+	 * Missing files return an empty string — non-fatal.
+	 *
+	 * @return array{brand_core: string, vocabulary: string, social_media: string}
 	 */
-	private static function read_brand_voice(): string {
-		$path = WP_CONTENT_DIR . '/' . self::BRAND_VOICE_PATH;
-		if ( ! file_exists( $path ) ) {
-			return '';
+	private static function read_knowledge_files(): array {
+		$base   = WP_CONTENT_DIR . '/ai-knowledge/';
+		$result = [];
+
+		foreach ( self::KNOWLEDGE_FILES as $key => $filename ) {
+			$path = $base . $filename;
+			if ( file_exists( $path ) ) {
+				$content = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$result[ $key ] = ( false !== $content ) ? $content : '';
+			} else {
+				$result[ $key ] = '';
+			}
 		}
-		$content = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-		return ( false !== $content ) ? $content : '';
+
+		return $result;
 	}
 
 	/**
 	 * Create a deny-all .htaccess in wp-content/ai-knowledge/ if absent.
-	 * PHP reads the file via filesystem — only direct HTTP access is blocked.
+	 * PHP reads files via filesystem — only direct HTTP access is blocked.
 	 */
 	private static function maybe_create_htaccess(): void {
-		$dir     = WP_CONTENT_DIR . '/ai-knowledge';
+		$dir      = WP_CONTENT_DIR . '/ai-knowledge';
 		$htaccess = $dir . '/.htaccess';
 
 		if ( ! is_dir( $dir ) || file_exists( $htaccess ) ) {

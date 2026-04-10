@@ -170,14 +170,16 @@ class Anthropic_Client {
 		$shortlink    = $ctx['shortlink']    ?? ( $ctx['permalink'] ?? '' );
 		$content_type = $ctx['content_type'] ?? 'project';
 
-		return "Create 3 distinct social media captions for the following {$content_type}:\n\n"
+		return "Create 3 social media captions for this {$content_type}:\n\n"
 			. "Title: {$title}\n"
 			. "Description: {$excerpt}\n"
 			. "Link: {$shortlink}\n\n"
-			. "Post 1: Storytelling angle — draw the reader into the project.\n"
-			. "Post 2: Results / outcome angle — focus on what was delivered and why it holds up.\n"
-			. "Post 3: Behind-the-scenes / process angle — tease the craft or a specific build decision.\n\n"
-			. 'Each caption: 2–4 sentences, link included naturally, 3–5 hashtags at the end.';
+			. "post_1: Storytelling angle — draw the reader into the project.\n"
+			. "post_2: Results / outcome angle — focus on what was delivered and why it holds up.\n"
+			. "post_3: Behind-the-scenes / process angle — tease the craft or a specific build decision.\n\n"
+			. "Each caption: 2–4 sentences, link included naturally, 3–5 hashtags at the end.\n\n"
+			. "Respond with ONLY this exact JSON structure, no other text:\n"
+			. '{"post_1": "caption one here", "post_2": "caption two here", "post_3": "caption three here"}';
 	}
 
 	/**
@@ -187,23 +189,46 @@ class Anthropic_Client {
 	 * @throws \RuntimeException if captions cannot be parsed.
 	 */
 	private static function parse_captions( string $text ): array {
+		// Strip markdown fences
 		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
 		$text = preg_replace( '/\s*```$/', '', $text );
+		$text = trim( $text );
 
-		$data = json_decode( trim( $text ), true );
+		$data = json_decode( $text, true );
 
-		if ( ! is_array( $data )
-			|| empty( $data['post_1'] )
-			|| empty( $data['post_2'] )
-			|| empty( $data['post_3'] ) ) {
-			throw new \RuntimeException( 'Anthropic response did not contain expected caption keys. Raw: ' . substr( $text, 0, 300 ) );
+		// ── Happy path: expected {post_1, post_2, post_3} object ─────────────
+		if ( is_array( $data ) && ! empty( $data['post_1'] ) && ! empty( $data['post_2'] ) && ! empty( $data['post_3'] ) ) {
+			return [
+				'post_1' => (string) $data['post_1'],
+				'post_2' => (string) $data['post_2'],
+				'post_3' => (string) $data['post_3'],
+			];
 		}
 
-		return [
-			'post_1' => (string) $data['post_1'],
-			'post_2' => (string) $data['post_2'],
-			'post_3' => (string) $data['post_3'],
-		];
+		// ── Fallback: model returned an array of objects ─────────────────────
+		// e.g. [{"angle":"storytelling","caption":"..."}, ...]
+		if ( is_array( $data ) && isset( $data[0] ) && is_array( $data[0] ) ) {
+			$captions = [];
+			foreach ( $data as $item ) {
+				// Accept any key that looks like text content
+				$caption = $item['caption'] ?? $item['text'] ?? $item['content'] ?? $item['post'] ?? '';
+				if ( $caption ) {
+					$captions[] = (string) $caption;
+				}
+			}
+			if ( count( $captions ) >= 3 ) {
+				return [
+					'post_1' => $captions[0],
+					'post_2' => $captions[1],
+					'post_3' => $captions[2],
+				];
+			}
+		}
+
+		// ── Nothing worked ────────────────────────────────────────────────────
+		throw new \RuntimeException(
+			'Anthropic response did not contain expected caption keys. Raw: ' . substr( $text, 0, 400 )
+		);
 	}
 
 	// ──────────────────────────────────────────────────────────────────────────

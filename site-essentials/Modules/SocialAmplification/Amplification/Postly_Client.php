@@ -97,11 +97,17 @@ class Postly_Client {
 			$body['media'] = $media;
 		}
 
-		// target_platforms: array of {identifier, id} objects, or omit to post to all workspace channels
+		// Postly requires full channel objects (same shape as GET /workspaces/{id}/socials).
+		// Fetch them fresh, then optionally filter to only the configured channel IDs.
+		$channels = $this->get_socials();
 		if ( ! empty( $this->channel_ids ) ) {
-			$body['target_platforms'] = array_map( static function ( string $id ) {
-				return [ 'identifier' => $id, 'id' => $id ];
-			}, $this->channel_ids );
+			$channels = array_values( array_filter( $channels, function ( array $ch ) {
+				return in_array( (string) $ch['id'], $this->channel_ids, true )
+					|| in_array( (string) ( $ch['parent_id'] ?? '' ), $this->channel_ids, true );
+			} ) );
+		}
+		if ( ! empty( $channels ) ) {
+			$body['target_platforms'] = $channels;
 		}
 
 		if ( $schedule instanceof \DateTimeImmutable ) {
@@ -113,6 +119,31 @@ class Postly_Client {
 		}
 
 		return $this->request( 'POST', '/posts', $body );
+	}
+
+	/**
+	 * Fetch connected social accounts for the workspace.
+	 * Results are cached per request to avoid redundant calls when scheduling 3 posts.
+	 *
+	 * @return array[]
+	 */
+	public function get_socials(): array {
+		static $cache = [];
+		$key = $this->workspace_id;
+
+		if ( isset( $cache[ $key ] ) ) {
+			return $cache[ $key ];
+		}
+
+		try {
+			$data = $this->request( 'GET', "/workspaces/{$this->workspace_id}/socials" );
+			$cache[ $key ] = $data['data'] ?? ( is_array( $data ) && isset( $data[0] ) ? $data : [] );
+		} catch ( \RuntimeException $e ) {
+			error_log( '[SCOS SMA Postly] Failed to fetch socials: ' . $e->getMessage() );
+			$cache[ $key ] = [];
+		}
+
+		return $cache[ $key ];
 	}
 
 	/**

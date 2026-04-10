@@ -140,10 +140,13 @@ if (!defined('ABSPATH')) {
                                 style="width:100%;max-width:560px;"
                                 placeholder="claude-3-5-sonnet-latest" />
                             <p class="description">
-                                <?php esc_html_e( 'Leave blank to use the default (claude-3-5-sonnet-latest). Override if your account has access to a specific model version, e.g. ', 'site-essentials' ); ?>
+                                <?php esc_html_e( 'Default: ', 'site-essentials' ); ?><code>claude-3-haiku-20240307</code>
+                                <?php esc_html_e( '(available on all plans). If you have access to a more capable model enter its exact API name, e.g.', 'site-essentials' ); ?>
+                                <code>claude-3-5-sonnet-20241022</code>,
                                 <code>claude-3-7-sonnet-20250219</code>.
-                                <?php esc_html_e( 'Check available models at ', 'site-essentials' ); ?>
-                                <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener">docs.anthropic.com/models</a>.
+                                <?php esc_html_e( 'If you get a 404 error the model name is wrong or not available on your plan — check ', 'site-essentials' ); ?>
+                                <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener">docs.anthropic.com/models</a>
+                                <?php esc_html_e( 'for exact version strings.', 'site-essentials' ); ?>
                             </p>
                         </td>
                     </tr>

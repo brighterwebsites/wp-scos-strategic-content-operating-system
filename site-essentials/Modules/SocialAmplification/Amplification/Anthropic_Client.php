@@ -26,7 +26,7 @@ class Anthropic_Client {
 
 	const API_URL         = 'https://api.anthropic.com/v1/messages';
 	const API_VERSION     = '2023-06-01';
-	const DEFAULT_MODEL   = 'claude-3-5-sonnet-latest';
+	const DEFAULT_MODEL   = 'claude-3-haiku-20240307';
 	const MAX_TOKENS      = 1500;
 	const LOG_PREFIX      = '[SCOS SMA Anthropic]';
 
@@ -241,7 +241,7 @@ class Anthropic_Client {
 		$dir      = WP_CONTENT_DIR . '/ai-knowledge';
 		$htaccess = $dir . '/.htaccess';
 
-		if ( ! is_dir( $dir ) || file_exists( $htaccess ) ) {
+		if ( ! is_dir( $dir ) || file_exists( $htaccess ) || ! is_writable( $dir ) ) {
 			return;
 		}
 
@@ -252,6 +252,6 @@ class Anthropic_Client {
 				 . "# Nginx: add to server block:\n"
 				 . "# location ^~ /wp-content/ai-knowledge/ { deny all; }\n";
 
-		file_put_contents( $htaccess, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		@file_put_contents( $htaccess, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 	}
 }

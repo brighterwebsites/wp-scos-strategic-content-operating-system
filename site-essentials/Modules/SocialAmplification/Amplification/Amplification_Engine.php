@@ -187,13 +187,16 @@ class Amplification_Engine {
 		}
 
 		try {
-			$result = \BW_YOURLS_Helper::create_shortlink( $slug, get_permalink( $post_id ) );
-			if ( ! empty( $result['shorturl'] ) ) {
-				return $result['shorturl'];
+				$result = \BW_YOURLS_Helper::create_shortlink( $slug, get_permalink( $post_id ) );
+				if ( is_wp_error( $result ) ) {
+					error_log( self::LOG_PREFIX . ' YOURLS WP_Error: ' . $result->get_error_message() );
+				} elseif ( is_array( $result ) && ! empty( $result['shorturl'] ) ) {
+					return $result['shorturl'];
+				}
+			} catch ( \Exception $e ) {
+				error_log( self::LOG_PREFIX . ' YOURLS exception: ' . $e->getMessage() );
+				// Non-fatal: fall back to permalink
 			}
-		} catch ( \Exception $e ) {
-			// Non-fatal: fall back to permalink
-		}
 
 		return $fallback;
 	}

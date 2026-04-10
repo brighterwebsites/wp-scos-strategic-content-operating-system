@@ -111,7 +111,14 @@ class Postly_Client {
 		}
 
 		if ( ! empty( $channels ) ) {
-			$body['target_platforms'] = $channels;
+			// Create post API expects [{identifier: platform_type, id: postly_parent_id}]
+			// NOT the full channel objects that GET /socials returns.
+			$body['target_platforms'] = array_map( static function ( array $ch ) {
+				return [
+					'identifier' => $ch['target']     ?? '',
+					'id'         => $ch['parent_id']  ?? $ch['id'],
+				];
+			}, $channels );
 			error_log( '[SCOS SMA Postly] Sending target_platforms: ' . wp_json_encode( $body['target_platforms'] ) );
 		} else {
 			error_log( '[SCOS SMA Postly] WARNING: No channels resolved — target_platforms omitted from POST /posts' );

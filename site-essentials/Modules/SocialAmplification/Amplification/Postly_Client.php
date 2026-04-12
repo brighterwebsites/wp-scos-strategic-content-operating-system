@@ -111,12 +111,19 @@ class Postly_Client {
 		}
 
 		if ( ! empty( $channels ) ) {
-			// Create post docs say target_platforms is "string" — try comma-separated parent_ids.
-			$parent_ids = array_filter( array_column( $channels, 'parent_id' ) );
-			$body['target_platforms'] = implode( ',', $parent_ids );
-			error_log( '[SCOS SMA Postly] Sending target_platforms (string): ' . $body['target_platforms'] );
+			// Format: [{identifier: channel.target, id: channel.id}]
+			// id = channel's own id field — NOT parent_id (confirmed by Postly developer).
+			$body['target_platforms'] = array_map( static function ( array $ch ) {
+				return [
+					'identifier' => $ch['target'] ?? '',
+					'id'         => $ch['id'],
+				];
+			}, $channels );
+			error_log( '[SCOS SMA Postly] Sending target_platforms: ' . wp_json_encode( $body['target_platforms'] ) );
 		} else {
-			error_log( '[SCOS SMA Postly] WARNING: No channels resolved — target_platforms omitted from POST /posts' );
+			// No channel filter — post to all connected channels in the workspace.
+			$body['target_platforms'] = 'all';
+			error_log( '[SCOS SMA Postly] No channels configured — sending target_platforms: all' );
 		}
 
 		if ( $schedule instanceof \DateTimeImmutable ) {

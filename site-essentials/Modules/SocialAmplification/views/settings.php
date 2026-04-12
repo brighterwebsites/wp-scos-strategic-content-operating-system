@@ -20,13 +20,15 @@ $yourls_user     = SMA::get_option( 'scos_sma_yourls_username',  'bw_yourls_user
 $yourls_pass     = SMA::get_option( 'scos_sma_yourls_password',  'bw_yourls_password' );
 
 // Postly / Anthropic fields
-$postly_api_key      = get_option( 'bw_postly_api_key', '' );
-$postly_workspace_id = get_option( 'bw_postly_workspace_id', '' );
-$postly_channel_ids  = get_option( 'bw_postly_channel_ids', '' );
-$acf_gallery_keys    = get_option( 'bw_social_acf_gallery_keys', '' );
-$acf_featured_key    = get_option( 'bw_social_acf_featured_key', '' );
-$webhook_secret      = get_option( 'bw_social_webhook_secret', '' );
-$social_enabled      = get_option( 'bw_social_enabled', '' );
+$postly_api_key        = get_option( 'bw_postly_api_key', '' );
+$postly_workspace_id   = get_option( 'bw_postly_workspace_id', '' );
+$postly_channel_ids    = get_option( 'bw_postly_channel_ids', '' );
+$acf_gallery_keys      = get_option( 'bw_social_acf_gallery_keys', '' );
+$acf_featured_key      = get_option( 'bw_social_acf_featured_key', '' );
+$webhook_secret        = get_option( 'bw_social_webhook_secret', '' );
+$social_enabled        = get_option( 'bw_social_enabled', '' );
+$publish_time_min      = get_option( 'bw_social_publish_time_min', '09:00' );
+$publish_time_max      = get_option( 'bw_social_publish_time_max', '17:00' );
 
 // Last run log entry
 $amplify_log      = get_option( \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::LOG_OPTION, [] );
@@ -189,6 +191,24 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 					</label>
 					<p class="description">
 						<?php esc_html_e( 'Requires Postly API key, Workspace ID, and Anthropic API key (in Settings → AI API Keys) to be configured.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<!-- Publish time window -->
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Publish Time Window', 'site-essentials' ); ?></th>
+				<td>
+					<label for="bw_social_publish_time_min"><?php esc_html_e( 'From', 'site-essentials' ); ?></label>
+					<input type="time" id="bw_social_publish_time_min" name="bw_social_publish_time_min"
+						value="<?php echo esc_attr( $publish_time_min ); ?>"
+						style="width:110px;" />
+					<label for="bw_social_publish_time_max" style="margin-left:12px;"><?php esc_html_e( 'To', 'site-essentials' ); ?></label>
+					<input type="time" id="bw_social_publish_time_max" name="bw_social_publish_time_max"
+						value="<?php echo esc_attr( $publish_time_max ); ?>"
+						style="width:110px;" />
+					<p class="description">
+						<?php esc_html_e( 'Posts are scheduled at a random time within this window (site timezone). Slot 1 is always pushed at least 60 minutes into the future to allow for Postly processing and human approval. Times are read in the site\'s configured timezone.', 'site-essentials' ); ?>
 					</p>
 				</td>
 			</tr>

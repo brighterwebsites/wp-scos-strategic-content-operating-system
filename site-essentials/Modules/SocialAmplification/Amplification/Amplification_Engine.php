@@ -95,18 +95,51 @@ class Amplification_Engine {
 
 		$client = new Postly_Client( $api_key, $workspace_id, $channel_ids );
 
-		// ── 7. Base schedule time ────────────────────────────────────────────
-		$base_dt = $options['schedule_at'] ?? new \DateTimeImmutable( 'now', new \DateTimeZone( $timezone ) );
-		$base_dt = $base_dt->setTime( 10, 0, 0 );
-		error_log( self::LOG_PREFIX . ' Base schedule: ' . $base_dt->format( 'Y-m-d H:i T' ) );
+		// ── 7. Publish time window ───────────────────────────────────────────
+		// Read configured window (defaults: 09:00–17:00 site time).
+		$time_min_str = (string) get_option( 'bw_social_publish_time_min', '09:00' );
+		$time_max_str = (string) get_option( 'bw_social_publish_time_max', '17:00' );
+		[ $min_h, $min_m ] = array_map( 'intval', explode( ':', $time_min_str . ':00' ) );
+		[ $max_h, $max_m ] = array_map( 'intval', explode( ':', $time_max_str . ':00' ) );
+		$min_minutes = $min_h * 60 + $min_m;
+		$max_minutes = max( $max_h * 60 + $max_m, $min_minutes + 1 );
 
-		// ── 8. Schedule 3 posts ──────────────────────────────────────────────
+		// Returns [hour, minute] picked randomly within the window.
+		$rand_in_window = static function () use ( $min_minutes, $max_minutes ): array {
+			$t = mt_rand( $min_minutes, $max_minutes );
+			return [ intdiv( $t, 60 ), $t % 60 ];
+		};
+
+		// ── 8. Base schedule time ────────────────────────────────────────────
+		$now     = new \DateTimeImmutable( 'now', new \DateTimeZone( $timezone ) );
+		$base_dt = $options['schedule_at'] ?? $now;
+
+		[ $rand_h, $rand_m ] = $rand_in_window();
+		$base_dt = $base_dt->setTime( $rand_h, $rand_m, 0 );
+
+		// Slot 1 guard: must be ≥ 60 min from now (API processing + human approval buffer).
+		// If the randomly chosen time is too soon, push to next day with a fresh random time.
+		if ( $base_dt <= $now->modify( '+60 minutes' ) ) {
+			[ $rand_h, $rand_m ] = $rand_in_window();
+			$base_dt = $now->modify( '+1 day' )->setTime( $rand_h, $rand_m, 0 );
+		}
+
+		error_log( self::LOG_PREFIX . ' Base schedule: ' . $base_dt->format( 'Y-m-d H:i T' ) . " (window {$time_min_str}–{$time_max_str})" );
+
+		// ── 9. Schedule 3 posts ──────────────────────────────────────────────
 		$post_results = [];
 		$caption_keys = [ 'post_1', 'post_2', 'post_3' ];
 
 		for ( $i = 0; $i < 3; $i++ ) {
 			$offset_days = self::POST_INTERVAL_DAYS * $i;
 			$schedule_dt = $base_dt->modify( "+{$offset_days} days" );
+
+			// Slots 2 and 3 get their own random time within the window.
+			if ( $i > 0 ) {
+				[ $rand_h, $rand_m ] = $rand_in_window();
+				$schedule_dt = $schedule_dt->setTime( $rand_h, $rand_m, 0 );
+			}
+
 			$caption_key = $caption_keys[ $i ];
 			$caption     = $captions[ $caption_key ] ?? '';
 
@@ -149,7 +182,7 @@ class Amplification_Engine {
 
 		error_log( self::LOG_PREFIX . " ── Run complete for post #{$post_id} ──" );
 
-		// ── 9. Log results ───────────────────────────────────────────────────
+		// ── 10. Log results ──────────────────────────────────────────────────
 		$log_entry = [
 			'post_id'    => $post_id,
 			'ran_at'     => current_time( 'mysql' ),
@@ -178,7 +211,7 @@ class Amplification_Engine {
 			return $fallback;
 		}
 
-		// Get the stored slug from scos_sa_shortlink_slug or legacy bw_shortlink_slug
+		// Slug stored on the post (scos_sa_shortlink_slug or legacy bw_shortlink_slug)
 		$slug = get_post_meta( $post_id, 'scos_sa_shortlink_slug', true )
 			?: get_post_meta( $post_id, 'bw_shortlink_slug', true );
 
@@ -186,17 +219,26 @@ class Amplification_Engine {
 			return $fallback;
 		}
 
+		// Build destination URL: permalink + UTM params.
+		// YOURLS stores this as the long URL the shortlink resolves to.
+		$long_url = add_query_arg( [
+			'utm_source'   => 'social_media',
+			'utm_medium'   => 'social',
+			'utm_content'  => 'case-study_link',
+			'utm_campaign' => 'none',
+		], get_permalink( $post_id ) );
+
 		try {
-				$result = \BW_YOURLS_Helper::create_shortlink( $slug, get_permalink( $post_id ) );
-				if ( is_wp_error( $result ) ) {
-					error_log( self::LOG_PREFIX . ' YOURLS WP_Error: ' . $result->get_error_message() );
-				} elseif ( is_array( $result ) && ! empty( $result['shorturl'] ) ) {
-					return $result['shorturl'];
-				}
-			} catch ( \Exception $e ) {
-				error_log( self::LOG_PREFIX . ' YOURLS exception: ' . $e->getMessage() );
-				// Non-fatal: fall back to permalink
+			// create_shortlink( $long_url, $keyword ) — long URL first, slug/keyword second.
+			$result = \BW_YOURLS_Helper::create_shortlink( $long_url, $slug );
+			if ( is_wp_error( $result ) ) {
+				error_log( self::LOG_PREFIX . ' YOURLS WP_Error: ' . $result->get_error_message() );
+			} elseif ( is_array( $result ) && ! empty( $result['shorturl'] ) ) {
+				return $result['shorturl'];
 			}
+		} catch ( \Exception $e ) {
+			error_log( self::LOG_PREFIX . ' YOURLS exception: ' . $e->getMessage() );
+		}
 
 		return $fallback;
 	}

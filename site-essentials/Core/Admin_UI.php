@@ -538,11 +538,13 @@ class Admin_UI {
 
         // ── Postly.ai / Anthropic pipeline settings ──────────────────────────
         $postly_fields = [
-            'bw_postly_api_key'          => 'sanitize_text_field',
-            'bw_postly_workspace_id'     => 'sanitize_text_field',
-            'bw_postly_channel_ids'      => 'sanitize_text_field',
-            'bw_social_acf_gallery_keys' => 'sanitize_text_field',
-            'bw_social_acf_featured_key' => 'sanitize_text_field',
+            'bw_postly_api_key'            => 'sanitize_text_field',
+            'bw_postly_workspace_id'       => 'sanitize_text_field',
+            'bw_postly_channel_ids'        => 'sanitize_text_field',
+            'bw_social_acf_gallery_keys'   => 'sanitize_text_field',
+            'bw_social_acf_featured_key'   => 'sanitize_text_field',
+            'bw_social_publish_time_min'   => 'sanitize_text_field',
+            'bw_social_publish_time_max'   => 'sanitize_text_field',
         ];
         foreach ( $postly_fields as $key => $sanitizer ) {
             if ( isset( $_POST[ $key ] ) ) {

@@ -237,6 +237,8 @@ function bw_cs_content_plan_options() {
 // Admin Columns
 // ==========================
 add_action('admin_init', function() {
+    // Suppressed when the new Content Architecture module is active.
+    if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
     foreach (bw_cs_post_types() as $pt) {
         add_filter("manage_edit-{$pt}_columns", function($cols) {
             $new = [];
@@ -1314,6 +1316,8 @@ add_action('save_post', function($post_id) {
 // Editor Sidebar Meta Boxes
 // ==========================
 add_action('add_meta_boxes', function() {
+    // Suppressed when the new Content Architecture module is active.
+    if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
     foreach (bw_cs_post_types() as $pt) {
         add_meta_box(
             'bw_content_strategy',

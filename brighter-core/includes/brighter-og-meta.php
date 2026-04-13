@@ -31,6 +31,8 @@ if (!defined('ABSPATH')) exit;
  */
 add_action('wp_head', 'brighter_output_og_meta_tags', 2);
 function brighter_output_og_meta_tags() {
+    // Suppressed when the SeoMeta module is active — Head_Output.php handles all OG/meta tags.
+    if ( defined( 'SCOS_SEO_ACTIVE' ) ) { return; }
     if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
         return;
     }

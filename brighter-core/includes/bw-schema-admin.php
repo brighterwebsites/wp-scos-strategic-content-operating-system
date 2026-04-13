@@ -11,8 +11,8 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Suppressed when site-essentials SiteSchema module is active
-if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) { return; }
+// Suppressed when site-essentials is installed — schema settings live in the SiteSchema module.
+if ( defined( 'SITE_ESSENTIALS_VERSION' ) ) { return; }
 
 // Register all schema options
 add_action('admin_init', function() {

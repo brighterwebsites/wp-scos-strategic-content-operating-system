@@ -14,6 +14,9 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Suppressed when the Content Architecture module is active — content stats will live at scos-content-stats-{post_type}.
+if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
+
 class BW_Content_Stats_Page {
 
     /**

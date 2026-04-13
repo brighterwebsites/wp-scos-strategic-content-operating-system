@@ -63,6 +63,8 @@ class BW_Talking_Points {
      * Add admin menu items manually
      */
     public function add_admin_menus() {
+        // Suppressed when site-essentials Social Amplification module is active.
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) { return; }
         // Add Talking Points submenu
         add_submenu_page(
             'brighter_support',

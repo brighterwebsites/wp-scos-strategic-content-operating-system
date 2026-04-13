@@ -10,9 +10,9 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Add Analytics submenu to Brighter Support — hidden when site-essentials Analytics module is active
+// Add Analytics submenu to Brighter Support — hidden when site-essentials is installed (analytics lives in the Analytics module).
 add_action('admin_menu', function() {
-    if ( defined( 'SCOS_ANALYTICS_ACTIVE' ) ) { return; }
+    if ( defined( 'SITE_ESSENTIALS_VERSION' ) ) { return; }
     add_submenu_page(
         'brighter_support',           // Parent slug
         'Analytics',                  // Page title

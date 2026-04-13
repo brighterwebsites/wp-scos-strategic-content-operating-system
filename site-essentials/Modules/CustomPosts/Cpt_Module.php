@@ -151,6 +151,10 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function init() {
+        if ( ! defined( 'SCOS_CPT_ACTIVE' ) ) {
+            define( 'SCOS_CPT_ACTIVE', true );
+        }
+
         $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
         $opts = wp_parse_args($opts, $this->get_default_options());
 

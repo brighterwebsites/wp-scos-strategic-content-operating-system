@@ -102,15 +102,17 @@ class Admin_UI {
             30                                                   // Position
         );
 
-        // 1. SEO
-        add_submenu_page(
-            self::PAGE_SLUG,
-            __( 'SEO Basics', 'site-essentials' ),
-            __( 'SEO', 'site-essentials' ),
-            'manage_options',
-            self::SEO_PAGE_SLUG,
-            [ $this, 'render_seo_page' ]
-        );
+        // 1. SEO (only when SeoMeta module is active)
+        if ( defined( 'SCOS_SEO_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'SEO Basics', 'site-essentials' ),
+                __( 'SEO', 'site-essentials' ),
+                'manage_options',
+                self::SEO_PAGE_SLUG,
+                [ $this, 'render_seo_page' ]
+            );
+        }
 
         // 2. Schema (only when SiteSchema module is active)
         if ( defined( 'SCOS_SITE_SCHEMA_ACTIVE' ) ) {
@@ -124,26 +126,19 @@ class Admin_UI {
             );
         }
 
-        // 3. Custom Posts
-        add_submenu_page(
-            self::PAGE_SLUG,
-            __( 'Recommended Custom Posts & Fields', 'site-essentials' ),
-            __( 'Custom Posts', 'site-essentials' ),
-            'manage_options',
-            self::CPT_PAGE_SLUG,
-            [ $this, 'render_cpt_page' ]
-        );
-
-        // 3b. FAQs list (only when FAQ module is active)
-        if ( defined( 'SCOS_FAQ_ACTIVE' ) ) {
+        // 3. Custom Posts (only when CPT module is active)
+        if ( defined( 'SCOS_CPT_ACTIVE' ) ) {
             add_submenu_page(
                 self::PAGE_SLUG,
-                __( 'FAQs', 'site-essentials' ),
-                __( 'FAQs', 'site-essentials' ),
-                'edit_posts',
-                'edit.php?post_type=faq'
+                __( 'Recommended Custom Posts & Fields', 'site-essentials' ),
+                __( 'Custom Posts', 'site-essentials' ),
+                'manage_options',
+                self::CPT_PAGE_SLUG,
+                [ $this, 'render_cpt_page' ]
             );
         }
+
+        // 3b. FAQs — CPT is registered with show_in_menu=true so it appears top-level automatically.
 
         // 4. Business Info (only when BusinessInfo module is active)
         if ( defined( 'SCOS_BIZ_ACTIVE' ) ) {
@@ -182,15 +177,17 @@ class Admin_UI {
             );
         }
 
-        // 7. Performance
-        add_submenu_page(
-            self::PAGE_SLUG,
-            __( 'Performance', 'site-essentials' ),
-            __( 'Performance', 'site-essentials' ),
-            'manage_options',
-            self::ESSENTIALS_PAGE_SLUG,
-            [ $this, 'render_performance_page' ]
-        );
+        // 7. Performance (only when Tweaks module is active)
+        if ( defined( 'SCOS_TWEAKS_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Performance', 'site-essentials' ),
+                __( 'Performance', 'site-essentials' ),
+                'manage_options',
+                self::ESSENTIALS_PAGE_SLUG,
+                [ $this, 'render_performance_page' ]
+            );
+        }
 
         // 8. Settings (always visible)
         add_submenu_page(

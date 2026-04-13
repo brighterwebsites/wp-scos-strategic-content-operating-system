@@ -120,7 +120,7 @@ class FAQ_Module {
 			'public'              => true,
 			'publicly_queryable'  => true,
 			'show_ui'             => true,
-			'show_in_menu'        => false, // Hidden — added via Admin_UI under Site Essentials
+			'show_in_menu'        => true, // Top-level menu — FAQs stay as a first-class admin menu item
 			'query_var'           => true,
 			'rewrite'             => [
 				'slug'       => 'faq/%scos_topic%',

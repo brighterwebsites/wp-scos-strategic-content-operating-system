@@ -325,8 +325,8 @@ function brighterweb_register_business_info_settings() {
     $registered = true;
 
     // Use scos_biz_ group/page when module is active; legacy names otherwise.
-    $group = defined( 'SCOS_BIZ_ACTIVE' ) ? 'scos_biz_settings_group' : 'brighterweb_business_info_group';
-    $page  = defined( 'SCOS_BIZ_ACTIVE' ) ? 'scos_biz_settings_page'  : $page;
+    $group = defined( 'SCOS_BIZ_ACTIVE' ) ? 'scos_biz_settings_group'    : 'brighterweb_business_info_group';
+    $page  = defined( 'SCOS_BIZ_ACTIVE' ) ? 'scos_biz_settings_page'     : 'brighterweb_business_info_page';
 
     $fields = brighter_get_business_info_fields();
 

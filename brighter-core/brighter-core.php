@@ -77,11 +77,10 @@ function brighter_get_whitelisted_modules() {
             //   and altc_topic slugs so existing DB term relationships stay valid
             //   until data is fully migrated to scos_content_cluster / scos_topic.
             'class-altc-taxonomies',
-            // 'class-altc-meta-boxes',    // REPLACED — SCOS_CA_ACTIVE guard makes this a no-op; CA Meta_Box.php handles editing
-            // 'class-altc-admin-columns', // REPLACED — SCOS_CA_ACTIVE guard makes this a no-op; CA Admin_Columns.php handles list views
-            // 'class-altc-admin-pages',   // REPLACED — CA Admin_Menu.php (scos-content-architecture) provides the new overview and topic pages
-            // 'class-altc-ga4-integration', // STUB — class has no hooks; GA4 integration is via scos-car-injection
-            // 'class-altc-migration',     // DORMANT — admin hooks are commented out inside the file; no active UI
+            // Deleted (all replaced by site-essentials ContentArchitecture module):
+            //   class-altc-meta-boxes, class-altc-admin-columns, class-altc-admin-pages,
+            //   class-altc-ga4-integration, class-altc-migration, migrate-tldr-field,
+            //   class-tldr-meta-box
 
             // ── Content Analysis ─────────────────────────────────────────────
             // class-content-analysis: keep — BW_Content_Analysis class and save_post
@@ -205,25 +204,19 @@ function brighter_load_modules() {
         'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
         'post-type-enhancements',       // Add author support to custom post types
 
-        // ── ALTC legacy modules ───────────────────────────────────────────────
-        // Keep: legacy taxonomy slugs needed for DB compat until migration confirmed
+        // ── ALTC legacy taxonomies ────────────────────────────────────────────
+        // Keep: legacy altc_strategic_lens and altc_topic slugs preserve existing
+        //       DB term relationships until data fully migrated to scos_* equivalents.
         'class-altc-taxonomies',
-        // 'class-altc-meta-boxes',    // REPLACED by CA Meta_Box.php (SCOS_CA_ACTIVE guard = no-op)
-        // 'class-altc-admin-columns', // REPLACED by CA Admin_Columns.php (SCOS_CA_ACTIVE guard = no-op)
-        // 'class-altc-admin-pages',   // REPLACED by CA Admin_Menu.php (scos-content-architecture)
-        // 'class-altc-ga4-integration', // STUB — no hooks registered
-        // 'class-altc-migration',     // DORMANT — admin hooks commented out inside file
 
         // ── Content Analysis ──────────────────────────────────────────────────
         // Keep: BW_Content_Analysis class still used by site-essentials CA module
         'class-content-analysis',
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        // 'migrate-tldr-field', // ONE-TIME MIGRATION — already complete
-        // 'class-tldr-meta-box', // REPLACED by SeoMeta Meta_Box.php (SCOS_SEO_ACTIVE guard = no-op)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
-        'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
-        'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
+        'tldr-shortcode',         // TLDR summary shortcode (frontend + backend)
+        'breadcrumb-shortcode',   // Breadcrumb shortcode (matches schema breadcrumbs)
     ];
 
     // Admin-only modules (backend only, not frontend)
@@ -234,17 +227,11 @@ function brighter_load_modules() {
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
         // NOTE: bw-schema-admin must be in main modules list (not admin-only) to work properly
-        // ALTC admin modules
-        'class-altc-meta-boxes',
-        'class-altc-admin-columns',
-        'class-altc-admin-pages',
-        'class-altc-migration',
         // Content Analysis (admin-only)
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-tldr-field', // One-time migration (admin only)
-        'class-tldr-meta-box', // TLDR field meta box (admin only)
-       // 'brighter-tweaks',
+        // Deleted: class-altc-meta-boxes, class-altc-admin-columns, class-altc-admin-pages,
+        //          class-altc-migration, migrate-tldr-field, class-tldr-meta-box
     ];
     
     // Load all modules - admin-only modules are safe to load on frontend

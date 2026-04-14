@@ -64,7 +64,9 @@ class Admin_UI {
         // Register all hooks immediately in constructor
         // This ensures hooks are registered before WordPress processes them
         add_action('admin_menu', [$this, 'add_admin_menu']);
+        add_action('admin_init', [$this, 'maybe_redirect_disabled_seo_page'], 0);
         add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_notices', [$this, 'maybe_notice_seo_module_disabled_redirect']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('wp_ajax_site_essentials_toggle_module', [$this, 'ajax_toggle_module']);
         add_action('wp_ajax_site_essentials_export_settings', [$this, 'ajax_export_settings']);
@@ -80,6 +82,63 @@ class Admin_UI {
         add_action('admin_post_scos_save_ai_keys',        [$this, 'save_ai_keys']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
+    }
+
+    /**
+     * If the SEO admin URL is hit while the SEO module is off, send users to Plugin Settings → Modules with a query flag for a notice.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function maybe_redirect_disabled_seo_page() {
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( empty( $_GET['page'] ) || ! is_string( $_GET['page'] ) ) {
+            return;
+        }
+        $page = sanitize_key( wp_unslash( $_GET['page'] ) );
+        if ( $page !== self::SEO_PAGE_SLUG ) {
+            return;
+        }
+        if ( $this->settings->is_module_enabled( 'seo' ) ) {
+            return;
+        }
+        wp_safe_redirect(
+            add_query_arg(
+                [
+                    'page'     => self::SETTINGS_PAGE_SLUG,
+                    'tab'      => 'modules',
+                    'scos_seo' => 'disabled',
+                ],
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    /**
+     * Admin notice after redirect from disabled SEO screen.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function maybe_notice_seo_module_disabled_redirect() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( empty( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== self::SETTINGS_PAGE_SLUG ) {
+            return;
+        }
+        if ( empty( $_GET['tab'] ) || sanitize_key( wp_unslash( $_GET['tab'] ) ) !== 'modules' ) {
+            return;
+        }
+        if ( empty( $_GET['scos_seo'] ) || sanitize_key( wp_unslash( $_GET['scos_seo'] ) ) !== 'disabled' ) {
+            return;
+        }
+        echo '<div class="notice notice-warning is-dismissible"><p>';
+        esc_html_e( 'The SEO Module is turned off. Enable the SEO Module card below to use sitemaps, on-page SEO, archive SEO, and related features.', 'site-essentials' );
+        echo '</p></div>';
     }
 
     /**
@@ -102,11 +161,11 @@ class Admin_UI {
             30                                                   // Position
         );
 
-        // 1. SEO (only when SeoMeta module is active)
-        if ( defined( 'SCOS_SEO_ACTIVE' ) ) {
+        // 1. SEO — single "SEO Module" toggle (sitemaps + meta + archives + advanced + redirections).
+        if ( $this->settings->is_module_enabled( 'seo' ) ) {
             add_submenu_page(
                 self::PAGE_SLUG,
-                __( 'SEO Basics', 'site-essentials' ),
+                __( 'SEO', 'site-essentials' ),
                 __( 'SEO', 'site-essentials' ),
                 'manage_options',
                 self::SEO_PAGE_SLUG,
@@ -327,7 +386,7 @@ class Admin_UI {
 
         // Check if SEO module is enabled
         if (!$this->settings->is_module_enabled('seo')) {
-            $this->render_module_disabled_notice('SEO', 'seo');
+            $this->render_module_disabled_notice(__('SEO Module', 'site-essentials'), 'seo');
             return;
         }
 

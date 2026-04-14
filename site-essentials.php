@@ -146,10 +146,7 @@ add_action('init', function() {
             \SiteEssentials\Modules\ContentArchitecture\ContentArchitecture_Module::class
         );
 
-        \SiteEssentials\Core\Module_Loader::register(
-            'seo_meta',
-            \SiteEssentials\Modules\SeoMeta\SeoMeta_Module::class
-        );
+        // SEO Meta is merged into the single "SEO Module" (id: seo) — see Seo_Module + SeoMeta_Module::bootstrap_features().
 
         \SiteEssentials\Core\Module_Loader::register(
             'social_amplification',

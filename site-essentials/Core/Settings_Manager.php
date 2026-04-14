@@ -101,6 +101,31 @@ class Settings_Manager {
 
         // Ensure defaults are merged (in case new settings added)
         $this->settings = wp_parse_args($this->settings, $this->get_default_settings());
+
+        if ( $this->merge_legacy_seo_meta_toggle_into_seo( $this->settings ) ) {
+            $this->settings['last_updated'] = time();
+            update_option( self::CORE_OPTION, $this->settings );
+        }
+    }
+
+    /**
+     * Merge legacy `seo_meta` entry in enabled_modules into `seo` (single SEO Module card).
+     *
+     * @since 1.0.0
+     * @param array $settings Reference to core settings array (typically $this->settings).
+     * @return bool True if enabled_modules was modified.
+     */
+    public function merge_legacy_seo_meta_toggle_into_seo( array &$settings ) {
+        $mods = $settings['enabled_modules'] ?? null;
+        if ( ! is_array( $mods ) || ! in_array( 'seo_meta', $mods, true ) ) {
+            return false;
+        }
+        $next = array_values( array_diff( $mods, [ 'seo_meta' ] ) );
+        if ( ! in_array( 'seo', $next, true ) ) {
+            $next[] = 'seo';
+        }
+        $settings['enabled_modules'] = $next;
+        return true;
     }
 
     /**
@@ -454,6 +479,9 @@ class Settings_Manager {
             } else {
                 $this->settings = $data[self::CORE_OPTION];
             }
+            if ( $this->merge_legacy_seo_meta_toggle_into_seo( $this->settings ) ) {
+                $this->settings['last_updated'] = time();
+            }
             update_option(self::CORE_OPTION, $this->settings);
         } elseif (isset($data['se_core'])) {
             // New format
@@ -461,6 +489,9 @@ class Settings_Manager {
                 $this->settings = array_merge($this->settings, $data['se_core']);
             } else {
                 $this->settings = $data['se_core'];
+            }
+            if ( $this->merge_legacy_seo_meta_toggle_into_seo( $this->settings ) ) {
+                $this->settings['last_updated'] = time();
             }
             update_option(self::CORE_OPTION, $this->settings);
         }
@@ -496,6 +527,11 @@ class Settings_Manager {
             // If specific modules specified, skip others
             if (!empty($module_ids) && !in_array($module_id, $module_ids, true)) {
                 continue;
+            }
+
+            // Legacy exports used seo_meta; settings now live under the unified seo module option.
+            if ( $module_id === 'seo_meta' ) {
+                $module_id = 'seo';
             }
 
             // Get the actual option name for storage

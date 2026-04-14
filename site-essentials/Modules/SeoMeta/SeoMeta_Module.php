@@ -30,6 +30,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class SeoMeta_Module implements Module_Interface {
 
+	/** @var bool Prevent double init when both Seo_Module and legacy paths call bootstrap. */
+	private static $features_bootstrapped = false;
+
 	public static function get_id() {
 		return 'seo_meta';
 	}
@@ -39,7 +42,7 @@ class SeoMeta_Module implements Module_Interface {
 	}
 
 	public static function get_description() {
-		return __( 'Per-page SEO meta fields: title, description, canonical, robots, TLDR, and breadcrumb label.', 'site-essentials' );
+		return __( 'Bootstrapped by the SEO Module (not a separate toggle).', 'site-essentials' );
 	}
 
 	public static function get_tier() {
@@ -55,12 +58,15 @@ class SeoMeta_Module implements Module_Interface {
 	}
 
 	/**
+	 * Load SEO meta / archive / head features (invoked from Seo_Module when the SEO Module is enabled).
+	 *
 	 * @since 1.0.0
 	 */
-	public function init() {
-		if ( ! defined( 'SCOS_SEO_ACTIVE' ) ) {
-			define( 'SCOS_SEO_ACTIVE', true );
+	public static function bootstrap_features() {
+		if ( self::$features_bootstrapped ) {
+			return;
 		}
+		self::$features_bootstrapped = true;
 
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Meta_Box.php';
@@ -79,6 +85,13 @@ class SeoMeta_Module implements Module_Interface {
 		Virtual_Files::init();
 		Exif_Stripper::init();
 		Redirections::init();
+	}
+
+	/**
+	 * @since 1.0.0
+	 */
+	public function init() {
+		self::bootstrap_features();
 	}
 
 	public function render_settings() {

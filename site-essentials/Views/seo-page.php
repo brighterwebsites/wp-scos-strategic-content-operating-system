@@ -22,8 +22,8 @@ defined( 'ABSPATH' ) || exit;
     <?php if ( ! $seo_module ) : ?>
         <div class="notice notice-warning">
             <p>
-                <strong><?php esc_html_e( 'SEO Module Not Enabled', 'site-essentials' ); ?></strong><br>
-                <?php esc_html_e( 'Please enable the SEO module in', 'site-essentials' ); ?>
+                <strong><?php esc_html_e( 'SEO Module not enabled', 'site-essentials' ); ?></strong><br>
+                <?php esc_html_e( 'Please enable the SEO Module in', 'site-essentials' ); ?>
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . \SiteEssentials\Core\Admin_UI::SETTINGS_PAGE_SLUG ) ); ?>">
                     <?php esc_html_e( 'Settings', 'site-essentials' ); ?>
                 </a>
@@ -62,12 +62,11 @@ defined( 'ABSPATH' ) || exit;
             <?php elseif ( 'meta' === $active_tab ) : ?>
                 <div style="margin-top: 20px;">
                     <?php
-                    // Archive_Settings is loaded when SeoMeta module is active.
                     if ( class_exists( '\SiteEssentials\Modules\SeoMeta\Archive_Settings' ) ) {
                         include SITE_ESSENTIALS_PATH . 'Modules/SeoMeta/views/archive-meta.php';
                     } else {
                         echo '<div class="notice notice-warning"><p>' .
-                             esc_html__( 'The SEO Meta module must be enabled to configure archive SEO settings.', 'site-essentials' ) .
+                             esc_html__( 'Archive SEO could not be loaded. Ensure the SEO Module is enabled and reload.', 'site-essentials' ) .
                              '</p></div>';
                     }
                     ?>

@@ -35,8 +35,8 @@ if (file_exists(SITE_ESSENTIALS_PATH . '../.git/HEAD')) {
     <div class="se-welcome-grid">
         <div class="se-welcome-card">
             <div class="dashicons dashicons-admin-site-alt3"></div>
-            <h2><?php esc_html_e('SEO & Sitemaps', 'site-essentials'); ?></h2>
-            <p><?php esc_html_e('XML sitemap generation, HTML sitemaps, and SEO optimization.', 'site-essentials'); ?></p>
+            <h2><?php esc_html_e('SEO Module', 'site-essentials'); ?></h2>
+            <p><?php esc_html_e('Sitemaps, on-page SEO, archive SEO, robots/LLMs.txt, image SEO, and redirections.', 'site-essentials'); ?></p>
             <a href="<?php echo esc_url(admin_url('admin.php?page=site-essentials-seo')); ?>" class="button button-primary">
                 <?php esc_html_e('Configure SEO', 'site-essentials'); ?>
             </a>

@@ -2,11 +2,8 @@
 /**
  * SEO Module
  *
- * Provides comprehensive SEO features:
- * - XML Sitemap generation
- * - Image sitemaps
- * - Sitemap index
- * - Google Search Console integration (future)
+ * Unified SEO: XML/HTML sitemaps, per-page meta (via SeoMeta bootstrap), archive SEO,
+ * robots.txt / LLMs.txt, image SEO, redirections, and related admin UI.
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
@@ -67,7 +64,7 @@ class Seo_Module implements Module_Interface {
      * @return string
      */
     public static function get_name() {
-        return __('SEO & Sitemaps', 'site-essentials');
+        return __('SEO Module', 'site-essentials');
     }
 
     /**
@@ -77,7 +74,7 @@ class Seo_Module implements Module_Interface {
      * @return string
      */
     public static function get_description() {
-        return __('XML sitemap generation, image sitemaps, and SEO optimization. Replacement for SEOPress sitemap issues.', 'site-essentials');
+        return __('XML/HTML sitemaps, per-page SEO meta (title, description, robots, TLDR), archive SEO, advanced (robots.txt, LLMs.txt), image SEO, and redirections.', 'site-essentials');
     }
 
     /**
@@ -119,6 +116,10 @@ class Seo_Module implements Module_Interface {
      * @return void
      */
     public function init() {
+        if ( ! defined( 'SCOS_SEO_ACTIVE' ) ) {
+            define( 'SCOS_SEO_ACTIVE', true );
+        }
+
         // Note: WordPress core sitemaps are disabled in main plugin file (site-essentials.php)
         // to ensure the filter runs early enough before WP core registers sitemaps
 
@@ -150,6 +151,9 @@ class Seo_Module implements Module_Interface {
             require_once __DIR__ . '/Schema_Meta_Box.php';
             Schema_Meta_Box::init();
         }
+
+        // Former "SEO Meta" module: meta box, head output, archive SEO UI, image SEO, virtual files, redirections.
+        \SiteEssentials\Modules\SeoMeta\SeoMeta_Module::bootstrap_features();
     }
 
     /**

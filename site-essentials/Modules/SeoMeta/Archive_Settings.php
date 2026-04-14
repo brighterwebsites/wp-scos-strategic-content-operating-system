@@ -493,7 +493,7 @@ class Archive_Settings {
 	// ── Bootstrap ────────────────────────────────────────────────────────────
 
 	/**
-	 * Called from SeoMeta_Module::init().
+	 * Called from SeoMeta_Module::bootstrap_features() (via Seo_Module).
 	 * Registers frontend redirect, author-slug, and admin media hooks.
 	 */
 	public static function init(): void {

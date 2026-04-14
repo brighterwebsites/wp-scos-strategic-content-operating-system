@@ -79,8 +79,9 @@ class BW_Social_Webhook_Manual {
      * Add meta box to post editor
      */
     public function add_meta_box() {
-        // Suppressed when the new Social Amplification module is active.
-        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+        // Suppressed when Social Amplification module is active, or Site Essentials is present
+        // (legacy box is redundant; enable the SA module for the new metabox + settings).
+        if ( defined( 'SCOS_SA_ACTIVE' ) || defined( 'SITE_ESSENTIALS_VERSION' ) ) {
             return;
         }
 
@@ -165,8 +166,7 @@ class BW_Social_Webhook_Manual {
      * Runs on init:20 so CPTs (faq, projects, etc.) are registered
      */
     public function register_admin_columns() {
-        // Suppressed when the new Social Amplification module is active.
-        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+        if ( defined( 'SCOS_SA_ACTIVE' ) || defined( 'SITE_ESSENTIALS_VERSION' ) ) {
             return;
         }
 
@@ -240,6 +240,9 @@ class BW_Social_Webhook_Manual {
      * Output inline JavaScript in admin footer
      */
     public function output_inline_script() {
+        if ( defined( 'SCOS_SA_ACTIVE' ) || defined( 'SITE_ESSENTIALS_VERSION' ) ) {
+            return;
+        }
         // Output on all admin pages (button may appear in meta box or admin columns)
         ?>
         <script type="text/javascript">

@@ -26,6 +26,7 @@ class Meta_Box {
 
 	public static function init() {
 		add_action( 'add_meta_boxes',        [ __CLASS__, 'register' ] );
+		add_action( 'add_meta_boxes',        [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
 		add_action( 'save_post',             [ __CLASS__, 'save' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 	}
@@ -42,6 +43,23 @@ class Meta_Box {
 				'normal',
 				'default'
 			);
+		}
+	}
+
+	/**
+	 * Remove legacy brighter-core "🚀 Social Amplification" and old breadcrumb slug box when superseded.
+	 *
+	 * @since 1.0.0
+	 * @param string $post_type Current post type on the edit screen.
+	 */
+	public static function remove_legacy_meta_boxes( string $post_type ): void {
+		if ( ! defined( 'SCOS_SA_ACTIVE' ) ) {
+			return;
+		}
+		$contexts = [ 'normal', 'side', 'advanced' ];
+		foreach ( $contexts as $ctx ) {
+			remove_meta_box( 'bw_social_webhook_trigger', $post_type, $ctx );
+			remove_meta_box( 'bw_breadcrumb_meta', $post_type, $ctx );
 		}
 	}
 

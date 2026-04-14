@@ -31,6 +31,7 @@ class Meta_Box {
 
 	public static function init() {
 		add_action( 'add_meta_boxes',        [ __CLASS__, 'register' ] );
+		add_action( 'add_meta_boxes',        [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
 		add_action( 'save_post',             [ __CLASS__, 'save' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 		add_filter( 'wp_insert_post_data',   [ __CLASS__, 'maybe_freeze_modified_date' ], 10, 2 );
@@ -48,6 +49,21 @@ class Meta_Box {
 				'normal',
 				'high'
 			);
+		}
+	}
+
+	/**
+	 * Remove legacy "Breadcrumb (Short Title)" box when SEO Meta owns breadcrumb label.
+	 *
+	 * @since 1.0.0
+	 * @param string $post_type Current post type on the edit screen.
+	 */
+	public static function remove_legacy_meta_boxes( string $post_type ): void {
+		if ( ! defined( 'SCOS_SEO_ACTIVE' ) ) {
+			return;
+		}
+		foreach ( [ 'normal', 'side', 'advanced' ] as $ctx ) {
+			remove_meta_box( 'bw_breadcrumb_meta', $post_type, $ctx );
 		}
 	}
 

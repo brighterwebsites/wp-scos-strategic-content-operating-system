@@ -20,7 +20,9 @@ class BW_ALTC_Taxonomies {
      * Initialize the taxonomies
      */
     public static function init() {
-        add_action('init', [__CLASS__, 'register_taxonomies']);
+        // Priority 20: run after Site Essentials loads enabled modules at init:5
+        // (defines SCOS_CA_ACTIVE) so show_ui/meta_box_cb reflect the new CA module.
+        add_action('init', [__CLASS__, 'register_taxonomies'], 20);
         add_action('init', [__CLASS__, 'register_post_meta']);
         add_action('init', [__CLASS__, 'register_term_meta']);
         
@@ -66,10 +68,10 @@ class BW_ALTC_Taxonomies {
     public static function register_taxonomies() {
         $post_types = self::get_supported_post_types();
 
-        // When the new Content Architecture module is active, keep the legacy
-        // taxonomies registered (so existing term relationships remain queryable)
-        // but hide all admin UI for them — the new module provides the UI.
-        $ui_active = ! defined( 'SCOS_CA_ACTIVE' );
+        // Keep legacy taxonomies registered for DB/query compat, but hide admin UI when
+        // Content Architecture is active OR Site Essentials is present (legacy sidebars
+        // are redundant; enable the CA module to edit cluster/topic via Content Architecture).
+        $ui_active = ! defined( 'SCOS_CA_ACTIVE' ) && ! defined( 'SITE_ESSENTIALS_VERSION' );
 
         // Register ALTC Strategic Lens taxonomy
         register_taxonomy('altc_strategic_lens', $post_types, [

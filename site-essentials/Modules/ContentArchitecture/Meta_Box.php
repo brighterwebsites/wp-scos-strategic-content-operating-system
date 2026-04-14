@@ -25,6 +25,8 @@ class Meta_Box {
 
 	public static function init() {
 		add_action( 'add_meta_boxes',          [ __CLASS__, 'register' ] );
+		// Late pass: strip legacy ALTC taxonomy + Content Management boxes if anything registered them earlier.
+		add_action( 'add_meta_boxes',          [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
 		add_action( 'save_post',               [ __CLASS__, 'save' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
 		add_action( 'wp_ajax_scos_ca_add_term', [ __CLASS__, 'ajax_add_term' ] );
@@ -47,6 +49,25 @@ class Meta_Box {
 				'high'
 			);
 		}
+	}
+
+	/**
+	 * Remove legacy brighter-core meta boxes superseded by this module.
+	 *
+	 * @since 1.0.0
+	 * @param string $post_type Current post type on the edit screen.
+	 */
+	public static function remove_legacy_meta_boxes( string $post_type ): void {
+		if ( ! defined( 'SCOS_CA_ACTIVE' ) ) {
+			return;
+		}
+		$contexts = [ 'normal', 'side', 'advanced' ];
+		foreach ( [ 'altc_strategic_lensdiv', 'altc_topicdiv' ] as $box_id ) {
+			foreach ( $contexts as $ctx ) {
+				remove_meta_box( $box_id, $post_type, $ctx );
+			}
+		}
+		remove_meta_box( 'bw_content_strategy', $post_type, 'side' );
 	}
 
 	/**

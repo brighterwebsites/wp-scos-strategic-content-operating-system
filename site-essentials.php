@@ -117,6 +117,8 @@ spl_autoload_register(function($class) {
  *
  * @since 1.0.0
  */
+// Priority 5: run before brighter-core (default init 10) so SCOS_* constants exist when
+// legacy code registers taxonomies / meta — avoids duplicate ALTC taxonomy UI and old metaboxes.
 add_action('init', function() {
     try {
         // Initialize Settings Manager (singleton)

@@ -232,13 +232,21 @@ function bw_cs_content_plan_options() {
         'archive' => ['label' => '🗑️ Archive', 'color' => '#dc2626', 'bg' => '#fee2e2'],
     ];
 }
+
+/**
+ * Whether legacy content-strategy list UI (columns, inline edit, quick/bulk) should be off.
+ * Mirrors metabox suppression: Site Essentials means use CA module when you need this data.
+ */
+function bw_cs_legacy_admin_disabled() {
+    return defined( 'SCOS_CA_ACTIVE' ) || defined( 'SITE_ESSENTIALS_VERSION' );
+}
+
 //this is ready to be depreciated fully please also search for other instances and uses of this and remove it, flag if we need to rework any other sections. 
 // ==========================
 // Admin Columns
 // ==========================
 add_action('admin_init', function() {
-    // Suppressed when the new Content Architecture module is active.
-    if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
+    if ( bw_cs_legacy_admin_disabled() ) { return; }
     foreach (bw_cs_post_types() as $pt) {
         add_filter("manage_edit-{$pt}_columns", function($cols) {
             $new = [];
@@ -442,6 +450,7 @@ foreach (['post', 'page'] as $pt) {
 // Hidden Columns by Default
 // ==========================
 // Make specified columns unchecked by default for ALL users
+if ( ! bw_cs_legacy_admin_disabled() ) {
 foreach (bw_cs_post_types() as $pt) {
     add_filter("default_hidden_columns", function($hidden, $screen) use ($pt) {
         // Only apply to our post types' edit screens
@@ -469,8 +478,10 @@ foreach (bw_cs_post_types() as $pt) {
         return array_unique(array_merge($hidden, $hide_by_default));
     }, 10, 2);
 }
+}
 
 add_action('pre_get_posts', function($q) {
+    if ( bw_cs_legacy_admin_disabled() ) { return; }
     if (!is_admin() || !$q->is_main_query()) return;
     $orderby = $q->get('orderby');
 
@@ -494,6 +505,7 @@ add_action('pre_get_posts', function($q) {
 // Inline Editing - JavaScript
 // ==========================
 add_action('admin_enqueue_scripts', function($hook) {
+    if ( bw_cs_legacy_admin_disabled() ) { return; }
     if ($hook !== 'edit.php') return;
     $screen = get_current_screen();
     if (!$screen || !in_array($screen->post_type, bw_cs_post_types(), true)) return;
@@ -978,6 +990,9 @@ add_action('admin_enqueue_scripts', function($hook) {
 // ==========================
 add_action('wp_ajax_bw_cs_save_field', function() {
     check_ajax_referer('bw_cs_inline');
+    if ( bw_cs_legacy_admin_disabled() ) {
+        wp_send_json_error( 'Legacy inline edit disabled when Site Essentials is active.' );
+    }
 
     $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
     $field = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
@@ -1023,6 +1038,9 @@ add_action('quick_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 add_action('bulk_edit_custom_box', 'bw_cs_quick_bulk_box', 10, 2);
 
 function bw_cs_quick_bulk_box($col, $post_type) {
+    if ( bw_cs_legacy_admin_disabled() ) {
+        return;
+    }
     // Allowed columns for quick/bulk edit
     $allowed_cols = ['bw_altc_notes', 'bw_intent', 'bw_purpose', 'bw_pillar', 'bw_service_pathway', 'bw_opt', 'bw_index', 'bw_progress', 'bw_next_step'];
     if (!in_array($col, $allowed_cols, true)) return;
@@ -1233,6 +1251,9 @@ add_action('admin_footer-edit.php', function() {
 // Save from Quick Edit / Bulk Edit
 add_action('save_post', function($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if ( bw_cs_legacy_admin_disabled() ) {
+        return;
+    }
 
     // Check if this is a quick/bulk edit request
     if (!isset($_REQUEST['_inline_edit']) && !isset($_REQUEST['bulk_edit'])) {
@@ -1316,8 +1337,7 @@ add_action('save_post', function($post_id) {
 // Editor Sidebar Meta Boxes
 // ==========================
 add_action('add_meta_boxes', function() {
-    // Suppressed when the new Content Architecture module is active.
-    if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
+    if ( bw_cs_legacy_admin_disabled() ) { return; }
     foreach (bw_cs_post_types() as $pt) {
         add_meta_box(
             'bw_content_strategy',

@@ -9,6 +9,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
+use SiteEssentials\Modules\SocialAmplification\Post_Framing;
 use SiteEssentials\Modules\SocialAmplification\SocialAmplification_Module as SMA;
 
 // Option reader: prefers scos_sma_* over legacy bw_*
@@ -43,12 +44,12 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 
 <!-- ── Quick links ── -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
-	<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=bw_talking_point' ) ); ?>"
+	<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . Post_Framing::POST_TYPE ) ); ?>"
 	   class="button button-secondary" style="display:inline-flex;align-items:center;gap:6px;">
 		<span class="dashicons dashicons-edit" style="margin-top:3px;font-size:16px;"></span>
 		<?php esc_html_e( 'Post Framing', 'site-essentials' ); ?>
 	</a>
-	<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=bw_talking_point' ) ); ?>"
+	<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Post_Framing::POST_TYPE ) ); ?>"
 	   class="button" style="display:inline-flex;align-items:center;gap:6px;">
 		<span class="dashicons dashicons-plus-alt2" style="margin-top:3px;font-size:16px;"></span>
 		<?php esc_html_e( 'Add Post Frame', 'site-essentials' ); ?>

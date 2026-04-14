@@ -1,11 +1,11 @@
 <?php
 /**
- * Post Framing — overrides the legacy bw_talking_point CPT
+ * Post Framing — Social Framing CPT (scos_social_framing)
  *
- * Renames "Talking Points" → "Post Framing" in every admin label, hides the
- * bw_content_type editable taxonomy (content type is now a structured dropdown),
- * removes old brighter_support menu items, and replaces the legacy meta box with
- * a new one that saves to scos_sma_pf_* keys (dual-reads legacy _bw_tp_* as fallback).
+ * Registers the Post Framing CPT and bw_content_type taxonomy when the Social
+ * Amplification module is active. One-time DB migration renames bw_talking_point
+ * posts to scos_social_framing. Legacy brighter-core BW_Talking_Points skips
+ * registration when SCOS_SA_ACTIVE is defined.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
@@ -19,6 +19,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Post_Framing {
+
+	/** CPT slug (B1) — replaces legacy bw_talking_point. */
+	public const POST_TYPE = 'scos_social_framing';
+
+	/** Option set after one-time post_type migration. */
+	private const MIGRATE_OPTION = 'scos_pf_post_type_migrated_v1';
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Content-type options (matches BW_Content_Type_Helper::get_content_type() output)
@@ -46,105 +52,154 @@ class Post_Framing {
 	// ─────────────────────────────────────────────────────────────────────────
 
 	public static function init(): void {
-		// Override labels and taxonomy AFTER BW_Talking_Points registers (priority 20)
-		add_action( 'init', [ static::class, 'override_cpt_labels' ], 20 );
-		add_action( 'init', [ static::class, 'override_taxonomy_visibility' ], 20 );
+		if ( ! defined( 'SCOS_SA_ACTIVE' ) ) {
+			return;
+		}
 
-		// Register scos_sma_pf_* post meta
-		add_action( 'init', [ static::class, 'register_post_meta' ], 20 );
+		add_action( 'init', [ static::class, 'maybe_migrate_post_type' ], 9 );
+		add_action( 'init', [ static::class, 'register_cpt_and_taxonomy' ], 11 );
+		add_action( 'init', [ static::class, 'register_post_meta' ], 12 );
 
-		// Replace the old meta box with the new one
 		add_action( 'add_meta_boxes', [ static::class, 'replace_meta_box' ], 20 );
+		add_action( 'save_post_' . self::POST_TYPE, [ static::class, 'save_meta' ], 20, 2 );
 
-		// Save new meta fields
-		add_action( 'save_post_bw_talking_point', [ static::class, 'save_meta' ], 20, 2 );
-
-		// Remove old brighter_support menu items (fires after BW_Talking_Points at priority 20)
 		add_action( 'admin_menu', [ static::class, 'remove_old_menus' ], 99 );
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// CPT Labels
-	// ─────────────────────────────────────────────────────────────────────────
-
-	public static function override_cpt_labels(): void {
-		global $wp_post_types;
-
-		if ( ! isset( $wp_post_types['bw_talking_point'] ) ) {
+	/**
+	 * One-time migration: bw_talking_point → scos_social_framing in wp_posts.
+	 */
+	public static function maybe_migrate_post_type(): void {
+		if ( get_option( self::MIGRATE_OPTION ) ) {
 			return;
 		}
 
-		$l = $wp_post_types['bw_talking_point']->labels;
+		global $wpdb;
 
-		$l->name                  = __( 'Post Framing', 'site-essentials' );
-		$l->singular_name         = __( 'Post Frame', 'site-essentials' );
-		$l->menu_name             = __( 'Post Framing', 'site-essentials' );
-		$l->add_new_item          = __( 'Add New Post Frame', 'site-essentials' );
-		$l->edit_item             = __( 'Edit Post Frame', 'site-essentials' );
-		$l->new_item              = __( 'New Post Frame', 'site-essentials' );
-		$l->view_item             = __( 'View Post Frame', 'site-essentials' );
-		$l->search_items          = __( 'Search Post Framing', 'site-essentials' );
-		$l->not_found             = __( 'No post frames found', 'site-essentials' );
-		$l->not_found_in_trash    = __( 'No post frames found in trash', 'site-essentials' );
-		$l->all_items             = __( 'All Post Frames', 'site-essentials' );
-		$wp_post_types['bw_talking_point']->description = __( 'AI framing templates for social post creation.', 'site-essentials' );
-	}
+		$updated = 0;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(1) FROM {$wpdb->posts} WHERE post_type = %s",
+				'bw_talking_point'
+			)
+		);
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Taxonomy visibility — keep registered for REST/query compat, hide admin UI
-	// ─────────────────────────────────────────────────────────────────────────
-
-	public static function override_taxonomy_visibility(): void {
-		global $wp_taxonomies;
-
-		if ( ! isset( $wp_taxonomies['bw_content_type'] ) ) {
-			return;
+		if ( $count > 0 ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$updated = (int) $wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$wpdb->posts} SET post_type = %s WHERE post_type = %s",
+					self::POST_TYPE,
+					'bw_talking_point'
+				)
+			);
 		}
 
-		$t                       = $wp_taxonomies['bw_content_type'];
-		$t->show_ui              = false;
-		$t->show_in_menu         = false;
-		$t->show_admin_column    = false;
-		$t->show_in_quick_edit   = false;
-		$t->show_in_nav_menus    = false;
-		$t->meta_box_cb          = false; // remove meta box from edit screen
+		update_option( self::MIGRATE_OPTION, time(), false );
+
+		if ( $updated > 0 ) {
+			flush_rewrite_rules( false );
+		}
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Post Meta Registration
-	// ─────────────────────────────────────────────────────────────────────────
+	/**
+	 * Register CPT + taxonomy (bw_content_type kept for Make.com / REST compat).
+	 */
+	public static function register_cpt_and_taxonomy(): void {
+		$labels = [
+			'name'               => __( 'Post Framing', 'site-essentials' ),
+			'singular_name'      => __( 'Post Frame', 'site-essentials' ),
+			'menu_name'          => __( 'Post Framing', 'site-essentials' ),
+			'add_new'            => __( 'Add New', 'site-essentials' ),
+			'add_new_item'       => __( 'Add New Post Frame', 'site-essentials' ),
+			'edit_item'          => __( 'Edit Post Frame', 'site-essentials' ),
+			'new_item'           => __( 'New Post Frame', 'site-essentials' ),
+			'view_item'          => __( 'View Post Frame', 'site-essentials' ),
+			'search_items'       => __( 'Search Post Framing', 'site-essentials' ),
+			'not_found'          => __( 'No post frames found', 'site-essentials' ),
+			'not_found_in_trash' => __( 'No post frames found in trash', 'site-essentials' ),
+			'all_items'          => __( 'All Post Frames', 'site-essentials' ),
+		];
+
+		register_post_type(
+			self::POST_TYPE,
+			[
+				'labels'              => $labels,
+				'description'         => __( 'AI framing templates for social post creation.', 'site-essentials' ),
+				'public'              => false,
+				'show_ui'             => true,
+				'show_in_menu'        => true,
+				'show_in_admin_bar'   => true,
+				'show_in_nav_menus'   => false,
+				'show_in_rest'        => true,
+				'capability_type'     => 'post',
+				'hierarchical'        => false,
+				'supports'            => [ 'title', 'editor' ],
+				'menu_icon'           => 'dashicons-megaphone',
+				'menu_position'       => 26,
+				'has_archive'         => false,
+				'rewrite'             => false,
+			]
+		);
+
+		$tax_labels = [
+			'name'          => __( 'Content Types', 'site-essentials' ),
+			'singular_name' => __( 'Content Type', 'site-essentials' ),
+			'search_items'  => __( 'Search Content Types', 'site-essentials' ),
+			'all_items'     => __( 'All Content Types', 'site-essentials' ),
+			'edit_item'     => __( 'Edit Content Type', 'site-essentials' ),
+			'update_item'   => __( 'Update Content Type', 'site-essentials' ),
+			'add_new_item'  => __( 'Add New Content Type', 'site-essentials' ),
+			'new_item_name' => __( 'New Content Type Name', 'site-essentials' ),
+			'menu_name'     => __( 'Content Types', 'site-essentials' ),
+		];
+
+		register_taxonomy(
+			'bw_content_type',
+			[ self::POST_TYPE ],
+			[
+				'labels'            => $tax_labels,
+				'hierarchical'      => false,
+				'public'            => false,
+				'show_ui'           => false,
+				'show_in_menu'      => false,
+				'show_admin_column' => false,
+				'show_in_quick_edit'=> false,
+				'show_in_nav_menus' => false,
+				'show_in_rest'      => true,
+				'query_var'         => true,
+				'rewrite'           => false,
+				'meta_box_cb'       => false,
+			]
+		);
+	}
 
 	public static function register_post_meta(): void {
 		$string_args = [
-			'type'         => 'string',
-			'single'       => true,
-			'show_in_rest' => false,
+			'type'          => 'string',
+			'single'        => true,
+			'show_in_rest'  => false,
 			'auth_callback' => static function () { return current_user_can( 'edit_posts' ); },
 		];
 		$int_args = array_merge( $string_args, [ 'type' => 'integer', 'sanitize_callback' => 'absint' ] );
 
-		register_post_meta( 'bw_talking_point', 'scos_sma_pf_content_type', array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_key' ] ) );
-		register_post_meta( 'bw_talking_point', 'scos_sma_pf_context',      array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_textarea_field' ] ) );
-		register_post_meta( 'bw_talking_point', 'scos_sma_pf_example',      array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_textarea_field' ] ) );
-		register_post_meta( 'bw_talking_point', 'scos_sma_pf_cta',          array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_textarea_field' ] ) );
-		register_post_meta( 'bw_talking_point', 'scos_sma_pf_words_min',    $int_args );
-		register_post_meta( 'bw_talking_point', 'scos_sma_pf_words_max',    $int_args );
+		register_post_meta( self::POST_TYPE, 'scos_sma_pf_content_type', array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_key' ] ) );
+		register_post_meta( self::POST_TYPE, 'scos_sma_pf_context', array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_textarea_field' ] ) );
+		register_post_meta( self::POST_TYPE, 'scos_sma_pf_example', array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_textarea_field' ] ) );
+		register_post_meta( self::POST_TYPE, 'scos_sma_pf_cta', array_merge( $string_args, [ 'sanitize_callback' => 'sanitize_textarea_field' ] ) );
+		register_post_meta( self::POST_TYPE, 'scos_sma_pf_words_min', $int_args );
+		register_post_meta( self::POST_TYPE, 'scos_sma_pf_words_max', $int_args );
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Meta Box
-	// ─────────────────────────────────────────────────────────────────────────
-
 	public static function replace_meta_box(): void {
-		remove_meta_box( 'bw_talking_point_details', 'bw_talking_point', 'normal' );
-		// Also remove the taxonomy meta box that WordPress auto-adds
-		remove_meta_box( 'tagsdiv-bw_content_type', 'bw_talking_point', 'side' );
+		remove_meta_box( 'tagsdiv-bw_content_type', self::POST_TYPE, 'side' );
 
 		add_meta_box(
 			'scos_pf_details',
 			__( 'Post Frame Details', 'site-essentials' ),
 			[ static::class, 'render_meta_box' ],
-			'bw_talking_point',
+			self::POST_TYPE,
 			'normal',
 			'high'
 		);
@@ -153,7 +208,6 @@ class Post_Framing {
 	public static function render_meta_box( \WP_Post $post ): void {
 		wp_nonce_field( 'scos_pf_meta', 'scos_pf_nonce' );
 
-		// Read from new keys; fall back to legacy _bw_tp_* for existing data
 		$content_type = get_post_meta( $post->ID, 'scos_sma_pf_content_type', true );
 		$context      = get_post_meta( $post->ID, 'scos_sma_pf_context', true )
 			?: get_post_meta( $post->ID, '_bw_tp_context', true );
@@ -168,7 +222,6 @@ class Post_Framing {
 			?: get_post_meta( $post->ID, '_bw_tp_word_count_max', true )
 			?: 130;
 
-		// Also check bw_content_type taxonomy for existing content type
 		if ( empty( $content_type ) ) {
 			$terms = wp_get_post_terms( $post->ID, 'bw_content_type', [ 'fields' => 'slugs' ] );
 			if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
@@ -194,7 +247,7 @@ class Post_Framing {
 					</option>
 				<?php endforeach; ?>
 			</select>
-			<p class="description"><?php esc_html_e( 'Structured type — matches what Make.com receives in the webhook payload. Not directly editable by users.', 'site-essentials' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Structured type — matches what Make.com receives in the webhook payload.', 'site-essentials' ); ?></p>
 		</div>
 
 		<div class="scos-pf-field">
@@ -230,23 +283,21 @@ class Post_Framing {
 		<?php
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Save
-	// ─────────────────────────────────────────────────────────────────────────
-
 	public static function save_meta( int $post_id, \WP_Post $post ): void {
 		if ( ! isset( $_POST['scos_pf_nonce'] )
-			|| ! wp_verify_nonce( $_POST['scos_pf_nonce'], 'scos_pf_meta' ) ) {
+			|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['scos_pf_nonce'] ) ), 'scos_pf_meta' ) ) {
 			return;
 		}
-		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
-		if ( ! current_user_can( 'edit_post', $post_id ) ) { return; }
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
 
-		// Content type — save new key + sync to legacy taxonomy for REST compat
 		if ( isset( $_POST['scos_sma_pf_content_type'] ) ) {
-			$ct = sanitize_key( $_POST['scos_sma_pf_content_type'] );
+			$ct = sanitize_key( wp_unslash( $_POST['scos_sma_pf_content_type'] ) );
 			update_post_meta( $post_id, 'scos_sma_pf_content_type', $ct );
-			// Keep taxonomy in sync so existing REST queries still work
 			if ( $ct ) {
 				$term = get_term_by( 'slug', $ct, 'bw_content_type' );
 				if ( ! $term ) {
@@ -261,13 +312,13 @@ class Post_Framing {
 		}
 
 		$textarea_fields = [
-			'scos_sma_pf_context'  => 'sanitize_textarea_field',
-			'scos_sma_pf_example'  => 'sanitize_textarea_field',
-			'scos_sma_pf_cta'      => 'sanitize_textarea_field',
+			'scos_sma_pf_context' => 'sanitize_textarea_field',
+			'scos_sma_pf_example' => 'sanitize_textarea_field',
+			'scos_sma_pf_cta'     => 'sanitize_textarea_field',
 		];
 		foreach ( $textarea_fields as $key => $cb ) {
 			if ( isset( $_POST[ $key ] ) ) {
-				update_post_meta( $post_id, $key, $cb( $_POST[ $key ] ) );
+				update_post_meta( $post_id, $key, $cb( wp_unslash( $_POST[ $key ] ) ) );
 			}
 		}
 
@@ -279,12 +330,12 @@ class Post_Framing {
 		}
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Old Menus
-	// ─────────────────────────────────────────────────────────────────────────
-
+	/**
+	 * Remove legacy Support submenu URLs (old CPT slug + taxonomy screen).
+	 */
 	public static function remove_old_menus(): void {
 		remove_submenu_page( 'brighter_support', 'edit.php?post_type=bw_talking_point' );
 		remove_submenu_page( 'brighter_support', 'edit-tags.php?taxonomy=bw_content_type&post_type=bw_talking_point' );
+		remove_submenu_page( 'brighter_support', 'edit-tags.php?taxonomy=bw_content_type&post_type=' . self::POST_TYPE );
 	}
 }

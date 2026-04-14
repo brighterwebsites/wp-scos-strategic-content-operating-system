@@ -3,7 +3,7 @@
  * Site Schema Module
  *
  * Manages site-wide JSON-LD schema templates (Local Business, Success Stories,
- * Product, Service) previously managed by brighter-core/bw-schema-admin.php.
+ * Product, Service), replacing the removed brighter-core schema admin screen.
  *
  * When active:
  * - Defines SCOS_SITE_SCHEMA_ACTIVE (legacy brighter-core bw-schema-admin removed)

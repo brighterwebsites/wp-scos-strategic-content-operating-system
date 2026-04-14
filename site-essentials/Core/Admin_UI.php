@@ -50,6 +50,9 @@ class Admin_UI {
     const SMA_PAGE_SLUG       = 'site-essentials-social-amplification';
     const SITE_SCHEMA_PAGE_SLUG = 'site-essentials-schema';
 
+    /** Legacy Support → Schema (bw-schema-admin); removed from brighter-core — redirect here. */
+    private const LEGACY_BRIGHTER_SCHEMA_PAGE = 'brighter-schema';
+
     /**
      * Constructor
      *
@@ -65,8 +68,10 @@ class Admin_UI {
         // This ensures hooks are registered before WordPress processes them
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'maybe_redirect_disabled_seo_page'], 0);
+        add_action('admin_init', [$this, 'maybe_redirect_legacy_brighter_schema_page'], 0);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_notices', [$this, 'maybe_notice_seo_module_disabled_redirect']);
+        add_action('admin_notices', [$this, 'maybe_notice_legacy_brighter_schema_removed']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('wp_ajax_site_essentials_toggle_module', [$this, 'ajax_toggle_module']);
         add_action('wp_ajax_site_essentials_export_settings', [$this, 'ajax_export_settings']);
@@ -82,6 +87,40 @@ class Admin_UI {
         add_action('admin_post_scos_save_ai_keys',        [$this, 'save_ai_keys']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
+    }
+
+    /**
+     * Old bookmarks to admin.php?page=brighter-schema → Site Essentials → Schema or Plugin Settings.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function maybe_redirect_legacy_brighter_schema_page() {
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( empty( $_GET['page'] ) || ! is_string( $_GET['page'] ) ) {
+            return;
+        }
+        $page = sanitize_key( wp_unslash( $_GET['page'] ) );
+        if ( $page !== self::LEGACY_BRIGHTER_SCHEMA_PAGE ) {
+            return;
+        }
+        if ( $this->settings->is_module_enabled( 'site_schema' ) ) {
+            wp_safe_redirect( admin_url( 'admin.php?page=' . self::SITE_SCHEMA_PAGE_SLUG ) );
+            exit;
+        }
+        wp_safe_redirect(
+            add_query_arg(
+                [
+                    'page'                 => self::SETTINGS_PAGE_SLUG,
+                    'tab'                  => 'modules',
+                    'scos_legacy_schema'   => 'removed',
+                ],
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
     }
 
     /**
@@ -115,6 +154,30 @@ class Admin_UI {
             )
         );
         exit;
+    }
+
+    /**
+     * After redirect from removed brighter-schema URL when Schema module is off.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function maybe_notice_legacy_brighter_schema_removed() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( empty( $_GET['page'] ) || sanitize_key( wp_unslash( $_GET['page'] ) ) !== self::SETTINGS_PAGE_SLUG ) {
+            return;
+        }
+        if ( empty( $_GET['tab'] ) || sanitize_key( wp_unslash( $_GET['tab'] ) ) !== 'modules' ) {
+            return;
+        }
+        if ( empty( $_GET['scos_legacy_schema'] ) || sanitize_key( wp_unslash( $_GET['scos_legacy_schema'] ) ) !== 'removed' ) {
+            return;
+        }
+        echo '<div class="notice notice-info is-dismissible"><p>';
+        esc_html_e( 'The legacy Support → Schema screen (brighter-schema) has been removed. Enable the Schema module below, then use Site Essentials → Schema for site-wide JSON-LD templates.', 'site-essentials' );
+        echo '</p></div>';
     }
 
     /**

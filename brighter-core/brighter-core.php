@@ -1,12 +1,13 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.3.0
+ * Version: 4.3.1
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.3.1 - REMOVE: bw-schema-admin (Support → Schema / brighter-schema); use Site Essentials → Schema.
  * 4.3.0 - FEATURE: Added ALTC (Authority-Led Topic Clusters) content optimization tracking system
  *         - New taxonomies: altc_strategic_lens, altc_topic
  *         - New post meta: bw_primary_altc_id, bw_primary_topic_id, bw_cont_maturity
@@ -29,7 +30,7 @@ if (!defined('ABSPATH')) exit;
 //error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.3.0');
+define('BRIGHTER_CORE_VERSION', '4.3.1');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
@@ -61,7 +62,7 @@ function brighter_get_whitelisted_modules() {
             'bw-content-strategy',
             'bw-ga4-seeder',
             'bw-ga4-seed-admin',
-            'bw-schema-admin',              // Schema admin interface (Local Business Schema settings)
+            // bw-schema-admin removed — site-wide schema UI is Site Essentials > Schema (SiteSchema_Module).
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
@@ -190,8 +191,6 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
-        'bw-schema-admin',
-
 	'bw-content-strategy',
  	'bw-ga4-seeder',
  	'bw-ga4-seed-admin',
@@ -226,7 +225,7 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
-        // NOTE: bw-schema-admin must be in main modules list (not admin-only) to work properly
+        // Legacy bw-schema-admin (Support > Schema) removed; use Site Essentials > Schema.
         // Content Analysis (admin-only)
         'class-content-analysis-seeder',
         'class-content-stats-page',

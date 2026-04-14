@@ -6,7 +6,7 @@
  * Product, Service) previously managed by brighter-core/bw-schema-admin.php.
  *
  * When active:
- * - Defines SCOS_SITE_SCHEMA_ACTIVE (hides legacy brighter-schema admin page)
+ * - Defines SCOS_SITE_SCHEMA_ACTIVE (legacy brighter-core bw-schema-admin removed)
  * - Stores schemas under scos_site_schema_* option keys
  * - Migrates existing bw_*_schema options on first admin_init
  * - Updates scos-schema-output.php reads via fallback in that file

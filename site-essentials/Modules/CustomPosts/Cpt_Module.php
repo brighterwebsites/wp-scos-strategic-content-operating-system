@@ -121,7 +121,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_version() {
-        return '1.1.0';
+        return '1.1.1';
     }
 
     /**
@@ -131,14 +131,15 @@ class Cpt_Module implements Module_Interface {
      * @return array
      */
     private function get_default_options() {
+        // All features opt-in: only explicit saves turn options on (avoids "Loaded" when toggle appears off).
         return [
-            'customer_success_stories'  => true,
+            'customer_success_stories'  => false,
             'include_categories'        => false,
             'include_tags'              => false,
             'archive_slug'              => 'projects',
-            'enable_faq'                => false,       // Placeholder for Module 8 integration
-            'enable_author_extension'   => false,       // Module 15: Author Extension
-            'enable_reviews'            => false,       // Reviews SSOT CPT
+            'enable_faq'                => false,
+            'enable_author_extension'   => false,
+            'enable_reviews'            => false,
         ];
     }
 
@@ -155,8 +156,8 @@ class Cpt_Module implements Module_Interface {
             define( 'SCOS_CPT_ACTIVE', true );
         }
 
-        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
-        $opts = wp_parse_args($opts, $this->get_default_options());
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
 
         // ─── Projects CPT ────────────────────────────────────────────────────
         if (!empty($opts['customer_success_stories'])) {
@@ -228,8 +229,11 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function register_projects_cpt() {
-        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
-        $opts = wp_parse_args($opts, $this->get_default_options());
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
+        if (empty($opts['customer_success_stories'])) {
+            return;
+        }
         $archive_slug = !empty($opts['archive_slug']) ? sanitize_title($opts['archive_slug']) : 'projects';
 
         // Derive human-readable display name from the slug (Fix 1 + Fix 2)
@@ -318,6 +322,11 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function register_reviews_cpt() {
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
+        if (empty($opts['enable_reviews'])) {
+            return;
+        }
         $labels = [
             'name'               => _x('Reviews', 'post type general name', 'site-essentials'),
             'singular_name'      => _x('Review', 'post type singular name', 'site-essentials'),
@@ -1305,8 +1314,8 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function render_settings() {
-        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
-        $opts = wp_parse_args($opts, $this->get_default_options());
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
 
         include __DIR__ . '/views/settings.php';
     }

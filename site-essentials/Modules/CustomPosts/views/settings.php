@@ -12,10 +12,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$author_extension_enabled = (bool) get_option( 'bw_author_extension_enabled', false );
-$faq_enabled      = ! empty( $opts['enable_faq'] );
-$projects_enabled = ! empty( $opts['customer_success_stories'] );
-$reviews_enabled  = ! empty( $opts['enable_reviews'] );
+// Card states follow saved CPT module options (init() syncs bw_author_extension_enabled from these on each load).
+$author_extension_enabled = ! empty( $opts['enable_author_extension'] );
+$faq_enabled              = ! empty( $opts['enable_faq'] );
+$projects_enabled         = ! empty( $opts['customer_success_stories'] );
+$reviews_enabled          = ! empty( $opts['enable_reviews'] );
 
 // Import result notices
 $import_status = isset( $_GET['reviews_import'] ) ? sanitize_text_field( $_GET['reviews_import'] ) : '';

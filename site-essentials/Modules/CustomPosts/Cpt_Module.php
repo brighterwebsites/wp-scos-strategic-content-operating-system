@@ -121,7 +121,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_version() {
-        return '1.1.1';
+        return '1.2.0';
     }
 
     /**
@@ -133,13 +133,17 @@ class Cpt_Module implements Module_Interface {
     private function get_default_options() {
         // All features opt-in: only explicit saves turn options on (avoids "Loaded" when toggle appears off).
         return [
-            'customer_success_stories'  => false,
-            'include_categories'        => false,
-            'include_tags'              => false,
-            'archive_slug'              => 'projects',
-            'enable_faq'                => false,
-            'enable_author_extension'   => false,
-            'enable_reviews'            => false,
+            'customer_success_stories'       => false,
+            'include_categories'             => false,
+            'include_tags'                   => false,
+            'archive_slug'                   => 'projects',
+            'enable_faq'                     => false,
+            'enable_author_extension'        => false,
+            'enable_reviews'                 => false,
+            // General (default WP posts) — UI on CPT page, not a module card.
+            'post_link_mode'                 => 'default', // default | custom_prefix | category_prefix
+            'general_post_slug_prefix'       => '',
+            'general_remove_category_base'   => false,
         ];
     }
 
@@ -211,6 +215,10 @@ class Cpt_Module implements Module_Interface {
             require_once __DIR__ . '/FAQ/FAQ_Module.php';
             \SiteEssentials\Modules\CustomPosts\FAQ\FAQ_Module::init();
         }
+
+        // ─── General: default post permalinks & category base (optional) ───────
+        require_once __DIR__ . '/General_Post_Permalink_Settings.php';
+        General_Post_Permalink_Settings::bootstrap( $opts );
     }
 
     // =========================================================================

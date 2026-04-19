@@ -18,6 +18,13 @@ $faq_enabled              = ! empty( $opts['enable_faq'] );
 $projects_enabled         = ! empty( $opts['customer_success_stories'] );
 $reviews_enabled          = ! empty( $opts['enable_reviews'] );
 
+$post_link_mode = isset( $opts['post_link_mode'] ) ? sanitize_key( (string) $opts['post_link_mode'] ) : 'default';
+if ( ! in_array( $post_link_mode, [ 'default', 'custom_prefix', 'category_prefix' ], true ) ) {
+	$post_link_mode = 'default';
+}
+$general_post_slug_prefix     = isset( $opts['general_post_slug_prefix'] ) ? (string) $opts['general_post_slug_prefix'] : '';
+$general_remove_category_base = ! empty( $opts['general_remove_category_base'] );
+
 // Import result notices
 $import_status = isset( $_GET['reviews_import'] ) ? sanitize_text_field( $_GET['reviews_import'] ) : '';
 if ( $import_status === 'success' ) {
@@ -78,8 +85,59 @@ $modules = [
 	<?php wp_nonce_field( 'site_essentials_cpt', 'site_essentials_cpt_nonce' ); ?>
 	<input type="hidden" name="action" value="site_essentials_save_cpt">
 
+	<!-- ── General Settings (not a module card) ─────────────────────────── -->
+	<div id="scos-cpt-general-settings" class="scos-cpt-section" style="border-top:0;padding-top:0;margin-bottom:28px;">
+		<h2 style="margin:0 0 12px;font-size:18px;"><?php esc_html_e( 'General Settings', 'site-essentials' ); ?></h2>
+		<p class="description" style="margin:0 0 16px;max-width:820px;">
+			<?php esc_html_e( 'These options apply to WordPress default posts only (post type “post”), not to Projects, FAQs, or other CPTs.', 'site-essentials' ); ?>
+		</p>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Single post URL', 'site-essentials' ); ?></th>
+				<td>
+					<fieldset>
+						<label style="display:block;margin-bottom:10px;">
+							<input type="radio" name="cpt_options[post_link_mode]" value="default" <?php checked( $post_link_mode, 'default' ); ?> />
+							<?php esc_html_e( 'Default — use your site Permalink settings (no extra segment from Site Essentials).', 'site-essentials' ); ?>
+						</label>
+						<label style="display:block;margin-bottom:10px;">
+							<input type="radio" name="cpt_options[post_link_mode]" value="custom_prefix" <?php checked( $post_link_mode, 'custom_prefix' ); ?> />
+							<?php esc_html_e( 'Single custom slug prefix for all posts', 'site-essentials' ); ?>
+							<input type="text" name="cpt_options[general_post_slug_prefix]" id="scos_cpt_general_post_prefix"
+								value="<?php echo esc_attr( $general_post_slug_prefix ); ?>"
+								class="regular-text code" style="max-width:240px;margin-left:8px;"
+								placeholder="<?php esc_attr_e( 'e.g. blog', 'site-essentials' ); ?>" />
+						</label>
+						<p class="description" style="margin:4px 0 10px 28px;">
+							<?php esc_html_e( 'Example: prefix “blog” → example.com/blog/my-post/. Saves a rewrite rule; flush runs when you save this page.', 'site-essentials' ); ?>
+						</p>
+						<label style="display:block;margin-bottom:10px;">
+							<input type="radio" name="cpt_options[post_link_mode]" value="category_prefix" <?php checked( $post_link_mode, 'category_prefix' ); ?> />
+							<?php esc_html_e( 'Use the first assigned category as the path segment before the post slug', 'site-essentials' ); ?>
+						</label>
+						<p class="description" style="margin:4px 0 0 28px;">
+							<?php esc_html_e( 'Outbound links use the first category (or “uncategorized”). For incoming URLs to resolve, set Settings → Permalinks to a structure that includes the category, e.g. /%category%/%postname%/, or ensure rewrites match your paths.', 'site-essentials' ); ?>
+						</p>
+					</fieldset>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Category URLs', 'site-essentials' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="cpt_options[general_remove_category_base]" value="1" <?php checked( $general_remove_category_base ); ?> />
+						<?php esc_html_e( 'Remove the default “category” base from category archive permalinks', 'site-essentials' ); ?>
+					</label>
+					<p class="description">
+						<?php esc_html_e( 'Adjusts rewrite rules and generated category links. Test category archives after enabling; save this page to flush rewrites.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+		</table>
+	</div>
+
 	<p style="color:#646970;margin:0 0 20px;">
-		<?php esc_html_e( 'Enable or disable modules below. Module settings are available on their respective pages (SEO, Essentials, etc.).', 'site-essentials' ); ?>
+		<?php esc_html_e( 'Enable or disable the feature modules below. Sub-pages appear when a module is on.', 'site-essentials' ); ?>
 	</p>
 
 	<!-- ── Module Cards Grid ── -->

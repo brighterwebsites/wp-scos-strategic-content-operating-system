@@ -1220,6 +1220,18 @@ class Admin_UI {
 
         $cpt_options = isset($_POST['cpt_options']) && is_array($_POST['cpt_options']) ? $_POST['cpt_options'] : [];
 
+        $post_link_mode = isset( $cpt_options['post_link_mode'] ) ? sanitize_key( (string) $cpt_options['post_link_mode'] ) : 'default';
+        if ( ! in_array( $post_link_mode, [ 'default', 'custom_prefix', 'category_prefix' ], true ) ) {
+            $post_link_mode = 'default';
+        }
+        $general_prefix = isset( $cpt_options['general_post_slug_prefix'] ) ? sanitize_title( (string) $cpt_options['general_post_slug_prefix'] ) : '';
+        if ( 'custom_prefix' !== $post_link_mode ) {
+            $general_prefix = '';
+        }
+        if ( 'custom_prefix' === $post_link_mode && '' === $general_prefix ) {
+            $post_link_mode = 'default';
+        }
+
         $opts = [
             'customer_success_stories'  => !empty($cpt_options['customer_success_stories']),
             'include_categories'        => !empty($cpt_options['include_categories']),
@@ -1228,6 +1240,9 @@ class Admin_UI {
             'enable_faq'                => !empty($cpt_options['enable_faq']),
             'enable_author_extension'   => !empty($cpt_options['enable_author_extension']),
             'enable_reviews'            => !empty($cpt_options['enable_reviews']),
+            'post_link_mode'            => $post_link_mode,
+            'general_post_slug_prefix'  => $general_prefix,
+            'general_remove_category_base' => ! empty( $cpt_options['general_remove_category_base'] ),
         ];
 
         $this->settings->update_module_settings('cpt', $opts);

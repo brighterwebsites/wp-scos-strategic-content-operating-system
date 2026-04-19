@@ -19,6 +19,12 @@ $raw_410   = Redirections::get_410_raw();
 $count_301 = count( Redirections::parse_301_rules( $raw_301 ) );
 $count_410 = count( Redirections::get_410_paths() );
 
+$disable_404_guess = (bool) get_option( Redirections::OPTION_DISABLE_404_GUESS, false );
+$bd_guard          = (string) get_option( Redirections::OPTION_BREAKDANCE_GUARD, 'off' );
+if ( ! in_array( $bd_guard, [ 'off', 'guard', 'protect' ], true ) ) {
+	$bd_guard = 'off';
+}
+
 if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 	echo '<div class="notice notice-success is-dismissible"><p>'
 	   . esc_html__( 'Redirections saved.', 'site-essentials' )
@@ -144,6 +150,44 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 			rows="10"
 			placeholder="<?php esc_attr_e( "# Paths that no longer exist\n/old-deleted-page\n/category/removed-category", 'site-essentials' ); ?>"
 		><?php echo esc_textarea( $raw_410 ); ?></textarea>
+	</div>
+
+	<!-- ── WordPress 404 “guess” redirect ───────────────────────────────── -->
+	<div class="scos-redir-section">
+		<div class="scos-redir-header">
+			<h2><?php esc_html_e( '404 redirect guessing', 'site-essentials' ); ?></h2>
+		</div>
+		<p class="scos-redir-desc">
+			<?php esc_html_e( 'By default, WordPress may redirect some 404 requests to a “similar” URL. That can fight explicit 301/410 rules and confuse audits. Turn this off to always return a true 404 unless one of your rules above matches.', 'site-essentials' ); ?>
+		</p>
+		<label>
+			<input type="checkbox" name="scos_disable_404_redirect_guess" value="1" <?php checked( $disable_404_guess ); ?> />
+			<?php esc_html_e( 'Stop WordPress from guessing redirects on 404s', 'site-essentials' ); ?>
+		</label>
+	</div>
+
+	<!-- ── Breakdance: avoid accidental block editor saves ─────────────── -->
+	<div class="scos-redir-section">
+		<div class="scos-redir-header">
+			<h2><?php esc_html_e( 'Breakdance: “Use default editor”', 'site-essentials' ); ?></h2>
+		</div>
+		<p class="scos-redir-desc">
+			<?php esc_html_e( 'When Breakdance data exists on a post, the launcher shows “Use default editor”. Saving from the block editor can clear Breakdance layout. Choose how strongly to discourage that (CSS only — not role-based).', 'site-essentials' ); ?>
+		</p>
+		<fieldset>
+			<label style="display:block;margin-bottom:8px;">
+				<input type="radio" name="scos_breakdance_editor_guard" value="off" <?php checked( $bd_guard, 'off' ); ?> />
+				<?php esc_html_e( 'Off (default)', 'site-essentials' ); ?>
+			</label>
+			<label style="display:block;margin-bottom:8px;">
+				<input type="radio" name="scos_breakdance_editor_guard" value="guard" <?php checked( $bd_guard, 'guard' ); ?> />
+				<?php esc_html_e( 'Guard — show a red warning above the buttons; style “Use default editor” as secondary', 'site-essentials' ); ?>
+			</label>
+			<label style="display:block;">
+				<input type="radio" name="scos_breakdance_editor_guard" value="protect" <?php checked( $bd_guard, 'protect' ); ?> />
+				<?php esc_html_e( 'Protect — hide “Use default editor” (strongest)', 'site-essentials' ); ?>
+			</label>
+		</fieldset>
 	</div>
 
 	<div class="scos-redir-save-bar">

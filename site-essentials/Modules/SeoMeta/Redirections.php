@@ -33,6 +33,15 @@ class Redirections {
 	const OPTION_301 = 'scos_redirects_301';
 	const OPTION_410 = 'scos_redirects_410';
 
+	/** When true, WordPress will not guess a redirect URL for 404 requests (see Redirections tab). */
+	const OPTION_DISABLE_404_GUESS = 'scos_disable_404_redirect_guess';
+
+	/**
+	 * off | guard | protect — Breakdance "Use default editor" handling (see Redirections tab).
+	 * Aligns with module-development.md scos_bd_protect / guard concept.
+	 */
+	public const OPTION_BREAKDANCE_GUARD = 'scos_breakdance_editor_guard';
+
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
 	public static function init(): void {
@@ -40,6 +49,20 @@ class Redirections {
 		if ( ! is_admin() ) {
 			add_action( 'template_redirect', [ __CLASS__, 'handle_redirect' ], 1 );
 		}
+	}
+
+	/**
+	 * Front-end filters that must work whenever options are set (not gated on SEO module).
+	 * Called from site-essentials.php on init.
+	 *
+	 * @return void
+	 */
+	public static function register_misc_http_filters(): void {
+		if ( ! get_option( self::OPTION_DISABLE_404_GUESS, false ) ) {
+			return;
+		}
+		// WP 5.5+ — canonical.php bails before DB guess when this returns false.
+		add_filter( 'do_redirect_guess_404_permalink', '__return_false', 999 );
 	}
 
 	// ── Redirect handler ──────────────────────────────────────────────────────
@@ -184,6 +207,17 @@ class Redirections {
 
 		update_option( self::OPTION_301, $raw_301, false );
 		update_option( self::OPTION_410, $raw_410, false );
+
+		$disable_guess = ! empty( $_POST['scos_disable_404_redirect_guess'] );
+		update_option( self::OPTION_DISABLE_404_GUESS, $disable_guess, false );
+
+		$bd_guard = isset( $_POST['scos_breakdance_editor_guard'] )
+			? sanitize_key( wp_unslash( $_POST['scos_breakdance_editor_guard'] ) )
+			: 'off';
+		if ( ! in_array( $bd_guard, [ 'off', 'guard', 'protect' ], true ) ) {
+			$bd_guard = 'off';
+		}
+		update_option( self::OPTION_BREAKDANCE_GUARD, $bd_guard, false );
 
 		wp_safe_redirect(
 			add_query_arg(

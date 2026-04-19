@@ -198,6 +198,20 @@ add_action('init', function() {
 }, 5); // Priority 5 to load early
 
 /**
+ * HTTP / admin helpers that rely on wp_options but must not depend on the SEO module being enabled.
+ *
+ * @since 1.0.0
+ */
+add_action(
+	'init',
+	static function () {
+		\SiteEssentials\Modules\SeoMeta\Redirections::register_misc_http_filters();
+		\SiteEssentials\Modules\SeoMeta\Breakdance_Editor_Guard::init();
+	},
+	6
+);
+
+/**
  * Initialize Admin UI
  *
  * CRITICAL: Just instantiate - all hooks register in __construct() automatically.

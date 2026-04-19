@@ -94,8 +94,9 @@ class General_Post_Permalink_Settings {
 		$base = get_option( 'category_base' );
 		$slug = ( $base !== '' && $base !== false ) ? trim( (string) $base, '/' ) : 'category';
 		$needle = '/' . $slug . '/';
-		if ( strpos( $termlink, $needle ) !== false ) {
-			return str_replace( $needle, '/', $termlink, 1 );
+		$pos    = strpos( $termlink, $needle );
+		if ( $pos !== false ) {
+			return substr_replace( $termlink, '/', $pos, strlen( $needle ) );
 		}
 		return $termlink;
 	}

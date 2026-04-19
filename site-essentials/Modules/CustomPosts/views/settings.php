@@ -116,7 +116,7 @@ $modules = [
 							<?php esc_html_e( 'Use the first assigned category as the path segment before the post slug', 'site-essentials' ); ?>
 						</label>
 						<p class="description" style="margin:4px 0 0 28px;">
-							<?php esc_html_e( 'Outbound links use the first category (or “uncategorized”). For incoming URLs to resolve, set Settings → Permalinks to a structure that includes the category, e.g. /%category%/%postname%/, or ensure rewrites match your paths.', 'site-essentials' ); ?>
+							<?php esc_html_e( 'Outbound links use the first assigned category (order on the post), or the default category when none is set. A rewrite rule is added per category slug so those URLs resolve; rules refresh when you save this page or when categories change. Pretty permalinks must stay enabled under Settings → Permalinks.', 'site-essentials' ); ?>
 						</p>
 					</fieldset>
 				</td>

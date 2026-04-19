@@ -18,11 +18,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class General_Post_Permalink_Settings {
 
+	/** Option: hash of category slugs used to know when to flush rewrites. */
+	private const OPTION_CAT_PREFIX_HASH = 'scos_cat_prefix_slug_hash';
+
 	/** @var string Sanitized custom segment when mode is custom_prefix. */
 	private static $custom_prefix = '';
 
 	/** @var string post_link_mode value from last bootstrap. */
 	private static $post_link_mode = 'default';
+
+	/**
+	 * Guards against re-entrancy if post_link runs during permalink/sample generation.
+	 *
+	 * @var int
+	 */
+	private static $post_link_depth = 0;
 
 	/**
 	 * @param array $opts Parsed `cpt` module settings.
@@ -42,6 +52,11 @@ class General_Post_Permalink_Settings {
 
 		if ( 'category_prefix' === self::$post_link_mode ) {
 			add_filter( 'post_link', [ self::class, 'post_link_first_category_prefix' ], 20, 3 );
+			add_action( 'init', [ self::class, 'register_category_prefix_rewrite_rules' ], 11 );
+			add_action( 'init', [ self::class, 'maybe_sync_category_prefix_flush' ], 20 );
+			add_action( 'created_term', [ self::class, 'on_category_term_saved' ], 10, 3 );
+			add_action( 'edited_term', [ self::class, 'on_category_term_saved' ], 10, 3 );
+			add_action( 'delete_term', [ self::class, 'on_category_term_deleted' ], 10, 4 );
 		} elseif ( self::$custom_prefix !== '' ) {
 			add_action( 'init', [ self::class, 'register_custom_prefix_rewrite_rule' ], 11 );
 			add_filter( 'post_link', [ self::class, 'post_link_custom_prefix' ], 20, 3 );
@@ -97,6 +112,142 @@ class General_Post_Permalink_Settings {
 	}
 
 	/**
+	 * Register one rewrite rule per category slug so /{cat-slug}/{post-name}/ resolves.
+	 * Without this, post_link URLs 404 because core has no rule for that path.
+	 *
+	 * @return void
+	 */
+	public static function register_category_prefix_rewrite_rules(): void {
+		if ( 'category_prefix' !== self::$post_link_mode ) {
+			return;
+		}
+		$slugs = self::get_all_category_slugs();
+		foreach ( $slugs as $slug ) {
+			if ( $slug === '' || self::is_reserved_url_segment( $slug ) ) {
+				continue;
+			}
+			add_rewrite_rule(
+				'^' . preg_quote( $slug, '/' ) . '/([^/]+)/?$',
+				'index.php?post_type=post&name=$matches[1]',
+				'top'
+			);
+		}
+	}
+
+	/**
+	 * After rules are registered, persist them if the category slug set changed.
+	 *
+	 * @return void
+	 */
+	public static function maybe_sync_category_prefix_flush(): void {
+		if ( 'category_prefix' !== self::$post_link_mode ) {
+			return;
+		}
+		$slugs = self::get_all_category_slugs();
+		sort( $slugs );
+		$hash = md5( wp_json_encode( $slugs ) );
+		$stored = (string) get_option( self::OPTION_CAT_PREFIX_HASH, '' );
+		if ( $hash === $stored ) {
+			return;
+		}
+		update_option( self::OPTION_CAT_PREFIX_HASH, $hash, false );
+		flush_rewrite_rules( false );
+	}
+
+	/**
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy name.
+	 * @return void
+	 */
+	public static function on_category_term_saved( $term_id, $tt_id, $taxonomy ): void {
+		unset( $term_id, $tt_id );
+		if ( 'category' !== $taxonomy || 'category_prefix' !== self::$post_link_mode ) {
+			return;
+		}
+		self::rewrite_flush_after_category_slugs_changed();
+	}
+
+	/**
+	 * @param int          $term_id       Term ID.
+	 * @param int          $tt_id         Term taxonomy ID.
+	 * @param string       $taxonomy      Taxonomy name.
+	 * @param mixed        $deleted_term  Copy of deleted term (WP_Term) when available.
+	 * @param array<mixed> $object_ids    Object IDs that were linked (WP 4.5+).
+	 * @return void
+	 */
+	public static function on_category_term_deleted( $term_id, $tt_id, $taxonomy, $deleted_term = null, $object_ids = null ): void {
+		unset( $term_id, $tt_id, $deleted_term, $object_ids );
+		if ( 'category' !== $taxonomy || 'category_prefix' !== self::$post_link_mode ) {
+			return;
+		}
+		self::rewrite_flush_after_category_slugs_changed();
+	}
+
+	/**
+	 * Recompute slug hash and flush so new/edited/removed categories get matching rules.
+	 *
+	 * @return void
+	 */
+	private static function rewrite_flush_after_category_slugs_changed(): void {
+		$slugs = self::get_all_category_slugs();
+		sort( $slugs );
+		update_option( self::OPTION_CAT_PREFIX_HASH, md5( wp_json_encode( $slugs ) ), false );
+		flush_rewrite_rules( false );
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private static function get_all_category_slugs(): array {
+		$terms = get_terms(
+			[
+				'taxonomy'   => 'category',
+				'hide_empty' => false,
+				'fields'     => 'slugs',
+			]
+		);
+		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+			return [];
+		}
+		$out = [];
+		foreach ( $terms as $slug ) {
+			if ( ! is_string( $slug ) || $slug === '' ) {
+				continue;
+			}
+			$out[] = sanitize_title( $slug );
+		}
+		return array_values( array_unique( $out ) );
+	}
+
+	/**
+	 * Avoid stealing core paths (feed, embed, wp-json is not matched as single segment).
+	 *
+	 * @param string $slug Category slug.
+	 * @return bool
+	 */
+	private static function is_reserved_url_segment( string $slug ): bool {
+		$reserved = [
+			'wp-admin',
+			'wp-content',
+			'wp-includes',
+			'feed',
+			'rss',
+			'embed',
+			'trackback',
+			'page',
+			'comments',
+			'search',
+			'author',
+			'attachment',
+			'post',
+			'category',
+			'tag',
+		];
+		return in_array( $slug, $reserved, true );
+	}
+
+	/**
 	 * @param string         $permalink Default permalink.
 	 * @param \WP_Post|null  $post        Post object.
 	 * @param bool           $leavename   Whether to leave the post name.
@@ -116,6 +267,7 @@ class General_Post_Permalink_Settings {
 
 	/**
 	 * Use wp_get_post_terms (not get_the_category) — safer inside post_link / early bootstrap.
+	 * Order by term_order so the first *assigned* category wins (matches UI intent).
 	 *
 	 * @param string         $permalink Default permalink.
 	 * @param \WP_Post|null  $post        Post object.
@@ -124,32 +276,60 @@ class General_Post_Permalink_Settings {
 	 */
 	public static function post_link_first_category_prefix( $permalink, $post, $leavename ) {
 		unset( $leavename );
+		if ( self::$post_link_depth > 2 ) {
+			return $permalink;
+		}
 		if ( ! $post instanceof \WP_Post || 'post' !== $post->post_type ) {
 			return $permalink;
 		}
 		if ( 'publish' !== $post->post_status ) {
 			return $permalink;
 		}
-
-		$terms = wp_get_post_terms(
-			$post->ID,
-			'category',
-			[
-				'number'     => 1,
-				'orderby'    => 'term_id',
-				'order'      => 'ASC',
-				'fields'     => 'all',
-				'hide_empty' => false,
-			]
-		);
-
-		if ( is_wp_error( $terms ) || empty( $terms ) ) {
-			$cat_slug = 'uncategorized';
-		} else {
-			$cat_slug = $terms[0]->slug;
+		// Pretty permalinks required; otherwise leave core ?p= links untouched.
+		if ( ! (string) get_option( 'permalink_structure' ) ) {
+			return $permalink;
 		}
 
-		return home_url( user_trailingslashit( $cat_slug . '/' . $post->post_name ) );
+		self::$post_link_depth++;
+		try {
+			$terms = wp_get_post_terms(
+				$post->ID,
+				'category',
+				[
+					'number'     => 1,
+					'orderby'    => 'term_order',
+					'order'      => 'ASC',
+					'fields'     => 'all',
+					'hide_empty' => false,
+				]
+			);
+
+			if ( is_wp_error( $terms ) || empty( $terms ) ) {
+				$cat_slug = self::get_default_category_slug_for_urls();
+			} else {
+				$cat_slug = $terms[0]->slug;
+			}
+
+			return home_url( user_trailingslashit( $cat_slug . '/' . $post->post_name ) );
+		} finally {
+			self::$post_link_depth--;
+		}
+	}
+
+	/**
+	 * Slug for posts with no category (matches default category term when possible).
+	 *
+	 * @return string
+	 */
+	private static function get_default_category_slug_for_urls(): string {
+		$default_id = (int) get_option( 'default_category' );
+		if ( $default_id > 0 ) {
+			$t = get_term( $default_id, 'category' );
+			if ( $t instanceof \WP_Term && ! is_wp_error( $t ) && $t->slug !== '' ) {
+				return $t->slug;
+			}
+		}
+		return 'uncategorized';
 	}
 
 	/**
@@ -191,7 +371,7 @@ class General_Post_Permalink_Settings {
 				'category',
 				[
 					'number'     => 1,
-					'orderby'    => 'term_id',
+					'orderby'    => 'term_order',
 					'order'      => 'ASC',
 					'hide_empty' => false,
 				]

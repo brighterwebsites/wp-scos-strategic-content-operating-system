@@ -198,6 +198,34 @@ add_action('init', function() {
 }, 5); // Priority 5 to load early
 
 /**
+ * WP-CLI commands — registered early and independently of module enable/disable state.
+ * This ensures `wp bw-social backfill` is always available when the plugin is present,
+ * regardless of whether the module loaded cleanly via Module_Loader.
+ */
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	add_action( 'plugins_loaded', static function () {
+		$cli_file = __DIR__ . '/site-essentials/Modules/SocialAmplification/CLI/Backfill_Command.php';
+		$engine   = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Amplification_Engine.php';
+		$postly   = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Postly_Client.php';
+		$anthropic = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php';
+		$hook     = __DIR__ . '/site-essentials/Modules/SocialAmplification/Publish_Hook.php';
+
+		if ( file_exists( $cli_file ) ) {
+			// Ensure all dependencies the CLI command uses are loaded.
+			foreach ( [ $anthropic, $postly, $engine, $hook, $cli_file ] as $f ) {
+				if ( file_exists( $f ) ) {
+					require_once $f;
+				}
+			}
+			\WP_CLI::add_command(
+				'bw-social backfill',
+				\SiteEssentials\Modules\SocialAmplification\CLI\Backfill_Command::class
+			);
+		}
+	}, 20 );
+}
+
+/**
  * HTTP / admin helpers that rely on wp_options but must not depend on the SEO module being enabled.
  *
  * @since 1.0.0

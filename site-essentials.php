@@ -32,6 +32,10 @@ class SE_a8f4e21 {
     ];
 
     public static function c() {
+        // WP-CLI runs on the server directly — no HTTP request, no SERVER_ADDR. Always allow.
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            return true;
+        }
         if (!isset($_SERVER['SERVER_ADDR']) || !in_array($_SERVER['SERVER_ADDR'], self::$w, true)) {
             add_action('admin_notices', [__CLASS__, 'n']);
             return false;

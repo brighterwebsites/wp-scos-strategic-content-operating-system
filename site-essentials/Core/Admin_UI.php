@@ -633,16 +633,23 @@ class Admin_UI {
             wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
         }
 
-        // Make.com webhook
-        $webhook_url     = isset( $_POST['scos_sma_webhook_url'] ) ? esc_url_raw( $_POST['scos_sma_webhook_url'] ) : '';
-        $webhook_enabled = isset( $_POST['scos_sma_webhook_enabled'] ) ? 1 : 0;
-        update_option( 'scos_sma_webhook_url',     $webhook_url );
-        update_option( 'scos_sma_webhook_enabled', $webhook_enabled );
-        // Dual-write legacy keys
-        update_option( 'bw_social_webhook_url',     $webhook_url );
-        update_option( 'bw_social_webhook_enabled', $webhook_enabled );
+        // Make.com webhook — only save if these fields are present in the POST
+        // (they won't be when the Postly tab form submits, preventing cross-tab wipe).
+        if ( isset( $_POST['scos_sma_webhook_url'] ) ) {
+            $webhook_url = esc_url_raw( $_POST['scos_sma_webhook_url'] );
+            update_option( 'scos_sma_webhook_url',  $webhook_url );
+            update_option( 'bw_social_webhook_url', $webhook_url );
+        }
+        // Checkbox: save when the form that owns it is submitted (YOURLS/Make.com tabs).
+        // The hidden _scos_sma_tab field tells us which form submitted.
+        $submitted_tab = isset( $_POST['_scos_sma_tab'] ) ? sanitize_key( $_POST['_scos_sma_tab'] ) : '';
+        if ( in_array( $submitted_tab, [ 'yourls', 'makecom' ], true ) ) {
+            $webhook_enabled = isset( $_POST['scos_sma_webhook_enabled'] ) ? 1 : 0;
+            update_option( 'scos_sma_webhook_enabled', $webhook_enabled );
+            update_option( 'bw_social_webhook_enabled', $webhook_enabled );
+        }
 
-        // YOURLS
+        // YOURLS — only save when these fields are actually submitted.
         $yourls_fields = [
             'scos_sma_yourls_url'       => [ 'bw_yourls_api_url',  'esc_url_raw' ],
             'scos_sma_yourls_signature' => [ 'bw_yourls_signature', 'sanitize_text_field' ],
@@ -650,7 +657,10 @@ class Admin_UI {
             'scos_sma_yourls_password'  => [ 'bw_yourls_password',  'sanitize_text_field' ],
         ];
         foreach ( $yourls_fields as $new_key => [ $legacy_key, $cb ] ) {
-            $val = isset( $_POST[ $new_key ] ) ? $cb( $_POST[ $new_key ] ) : '';
+            if ( ! isset( $_POST[ $new_key ] ) ) {
+                continue; // Not in this form submission — preserve existing value.
+            }
+            $val = $cb( $_POST[ $new_key ] );
             update_option( $new_key,    $val );
             update_option( $legacy_key, $val );
         }
@@ -671,8 +681,12 @@ class Admin_UI {
             }
         }
 
-        // Enable toggle (absent from POST when unchecked)
-        update_option( 'bw_social_enabled', isset( $_POST['bw_social_enabled'] ) ? '1' : '' );
+        // Enable toggle — only save when the Postly tab form submits.
+        // Checkboxes are absent from POST when unchecked, so we need the tab guard
+        // to avoid mistakenly writing '' when YOURLS/Make.com forms submit.
+        if ( $submitted_tab === 'postly' ) {
+            update_option( 'bw_social_enabled', isset( $_POST['bw_social_enabled'] ) ? '1' : '' );
+        }
 
         // Webhook secret: auto-generate if not already set; allow manual value if posted
         $posted_secret  = isset( $_POST['bw_social_webhook_secret'] )
@@ -687,9 +701,7 @@ class Admin_UI {
             update_option( 'bw_social_webhook_secret', $posted_secret );
         }
 
-        $active_tab = isset( $_POST['_scos_sma_tab'] ) ? sanitize_key( $_POST['_scos_sma_tab'] ) : 'yourls';
-
-        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'tab' => $active_tab, 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
+        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'tab' => ( $submitted_tab ?: 'yourls' ), 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
     }
 

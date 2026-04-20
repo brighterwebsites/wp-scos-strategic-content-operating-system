@@ -111,7 +111,9 @@ class Postly_Client {
 		if ( $schedule instanceof \DateTimeImmutable ) {
 			$body['one_off_schedule'] = [
 				'one_off_date' => $schedule->format( 'Y-m-d' ),
-				'time'         => $schedule->format( \DateTimeInterface::ATOM ),
+				// Send local wall-clock time so Postly applies the provided timezone
+				// without double-converting from an offset ISO timestamp.
+				'time'         => $schedule->format( 'H:i' ),
 				'timezone'     => $timezone,
 			];
 		}

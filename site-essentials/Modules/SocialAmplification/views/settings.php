@@ -34,6 +34,25 @@ $publish_time_max      = get_option( 'bw_social_publish_time_max', '17:00' );
 // Last run log entry
 $amplify_log      = get_option( \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::LOG_OPTION, [] );
 $last_log_entries = is_array( $amplify_log ) ? array_slice( array_reverse( $amplify_log, true ), 0, 5, true ) : [];
+$unamplified_projects = get_posts( [
+	'post_type'      => 'projects',
+	'post_status'    => 'publish',
+	'posts_per_page' => 50,
+	'orderby'        => 'date',
+	'order'          => 'DESC',
+	'meta_query'     => [
+		'relation' => 'OR',
+		[
+			'key'     => '_scos_sa_amplified',
+			'compare' => 'NOT EXISTS',
+		],
+		[
+			'key'     => '_scos_sa_amplified',
+			'value'   => '1',
+			'compare' => '!=',
+		],
+	],
+] );
 
 $active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'yourls';
 $page_url   = admin_url( 'admin.php?page=site-essentials-social-amplification' );
@@ -90,6 +109,10 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 	<a href="<?php echo esc_url( add_query_arg( 'tab', 'postly', $page_url ) ); ?>"
 	   class="nav-tab <?php echo $active_tab === 'postly'  ? 'nav-tab-active' : ''; ?>">
 		<?php esc_html_e( 'Postly.ai', 'site-essentials' ); ?>
+	</a>
+	<a href="<?php echo esc_url( add_query_arg( 'tab', 'backfill', $page_url ) ); ?>"
+	   class="nav-tab <?php echo $active_tab === 'backfill' ? 'nav-tab-active' : ''; ?>">
+		<?php esc_html_e( 'Schedule Existing Content', 'site-essentials' ); ?>
 	</a>
 	<a href="<?php echo esc_url( add_query_arg( 'tab', 'docs', $page_url ) ); ?>"
 	   class="nav-tab <?php echo $active_tab === 'docs'    ? 'nav-tab-active' : ''; ?>">
@@ -166,6 +189,66 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 			</td>
 		</tr>
 	</table>
+
+<?php elseif ( $active_tab === 'backfill' ) : ?>
+
+	<h3 style="margin-top:0;"><?php esc_html_e( 'Schedule Existing Content', 'site-essentials' ); ?></h3>
+	<p class="description" style="margin-bottom:18px;">
+		<?php esc_html_e( 'Run Social Amplification for existing projects posts. Choose date range or select specific posts.', 'site-essentials' ); ?>
+	</p>
+
+	<div id="scos-sa-backfill-wrap"
+		data-secret="<?php echo esc_attr( $webhook_secret ); ?>"
+		data-rest="<?php echo esc_attr( rest_url( 'bw-social/v1/backfill' ) ); ?>">
+
+		<p>
+			<label><input type="radio" name="scos_sa_backfill_mode" value="date" checked> <?php esc_html_e( 'By date range', 'site-essentials' ); ?></label>
+			&nbsp;&nbsp;
+			<label><input type="radio" name="scos_sa_backfill_mode" value="posts"> <?php esc_html_e( 'Select posts', 'site-essentials' ); ?></label>
+		</p>
+
+		<div class="scos-sa-backfill-mode" data-mode="date">
+			<table class="form-table">
+				<tr>
+					<th><label for="scos_sa_backfill_from"><?php esc_html_e( 'Date from', 'site-essentials' ); ?></label></th>
+					<td><input type="date" id="scos_sa_backfill_from" value="<?php echo esc_attr( gmdate( 'Y-m-01' ) ); ?>"></td>
+				</tr>
+				<tr>
+					<th><label for="scos_sa_backfill_to"><?php esc_html_e( 'Date to', 'site-essentials' ); ?></label></th>
+					<td><input type="date" id="scos_sa_backfill_to" value="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>"></td>
+				</tr>
+				<tr>
+					<th><label for="scos_sa_backfill_limit"><?php esc_html_e( 'Limit', 'site-essentials' ); ?></label></th>
+					<td><input type="number" id="scos_sa_backfill_limit" min="1" max="100" value="5"></td>
+				</tr>
+			</table>
+		</div>
+
+		<div class="scos-sa-backfill-mode" data-mode="posts" style="display:none;">
+			<p><strong><?php esc_html_e( 'Unamplified projects', 'site-essentials' ); ?></strong></p>
+			<div style="max-height:220px;overflow:auto;border:1px solid #dcdcde;padding:10px;background:#fff;">
+				<?php if ( empty( $unamplified_projects ) ) : ?>
+					<p><?php esc_html_e( 'No unamplified projects found.', 'site-essentials' ); ?></p>
+				<?php else : ?>
+					<?php foreach ( $unamplified_projects as $project ) : ?>
+						<label style="display:block;margin-bottom:6px;">
+							<input type="checkbox" class="scos-sa-backfill-post-id" value="<?php echo esc_attr( $project->ID ); ?>">
+							<?php echo esc_html( get_the_title( $project ) ); ?>
+							<span style="color:#8c8f94;">(<?php echo esc_html( mysql2date( 'Y-m-d', $project->post_date ) ); ?>)</span>
+						</label>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</div>
+		</div>
+
+		<p style="margin-top:14px;">
+			<button type="button" class="button button-primary" id="scos-sa-run-backfill">
+				<?php esc_html_e( 'Run Backfill', 'site-essentials' ); ?>
+			</button>
+		</p>
+		<div id="scos-sa-backfill-status" class="scos-sa-result" hidden></div>
+		<div id="scos-sa-backfill-results"></div>
+	</div>
 
 <?php elseif ( $active_tab === 'postly' ) : ?>
 

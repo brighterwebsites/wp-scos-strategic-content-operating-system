@@ -60,19 +60,24 @@ class SocialAmplification_Module implements Module_Interface {
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Meta_Box.php';
 		require_once __DIR__ . '/Post_Framing.php';
+		require_once __DIR__ . '/Admin_Columns.php';
 
 		// ── Postly.ai amplification pipeline ──────────────────────────────
 		require_once __DIR__ . '/Amplification/Anthropic_Client.php';
 		require_once __DIR__ . '/Amplification/Postly_Client.php';
 		require_once __DIR__ . '/Amplification/Amplification_Engine.php';
 		require_once __DIR__ . '/Amplification/REST_Endpoint.php';
+		require_once __DIR__ . '/Amplification/Backfill_Endpoint.php';
 		require_once __DIR__ . '/Publish_Hook.php';
 
 		Meta_Fields::init();
 		Meta_Box::init();
 		Post_Framing::init();
+		Admin_Columns::init();
 		Amplification\REST_Endpoint::init();
+		Amplification\Backfill_Endpoint::init();
 		Publish_Hook::init();
+		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_settings_assets' ] );
 
 		// WP-CLI backfill command
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -140,5 +145,19 @@ class SocialAmplification_Module implements Module_Interface {
 
 	public function render_settings() {
 		include __DIR__ . '/views/settings.php';
+	}
+
+	public static function enqueue_settings_assets( string $hook ): void {
+		if ( 'site-essentials_page_site-essentials-social-amplification' !== $hook ) {
+			return;
+		}
+		$js_path = SITE_ESSENTIALS_PATH . 'Modules/SocialAmplification/assets/backfill.js';
+		wp_enqueue_script(
+			'scos-sa-backfill',
+			SITE_ESSENTIALS_URL . 'Modules/SocialAmplification/assets/backfill.js',
+			[],
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0',
+			true
+		);
 	}
 }

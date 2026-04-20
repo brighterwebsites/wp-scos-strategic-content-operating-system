@@ -29,6 +29,7 @@ class Meta_Box {
 		add_action( 'add_meta_boxes',        [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
 		add_action( 'save_post',             [ __CLASS__, 'save' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+		add_action( 'wp_ajax_scos_sa_amplify', [ __CLASS__, 'ajax_re_amplify' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -81,6 +82,11 @@ class Meta_Box {
 		$yourls_base    = $yourls_api_url
 			? preg_replace( '#/yourls-api\.php$#', '', $yourls_api_url )
 			: '';
+		$amplified      = get_post_meta( $post->ID, '_scos_sa_amplified', true ) === '1';
+		$log            = get_option( \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::LOG_OPTION, [] );
+		$log_entry      = is_array( $log ) ? ( $log[ $post->ID ] ?? [] ) : [];
+		$ran_at         = (string) ( $log_entry['ran_at'] ?? '' );
+		$log_posts      = (array) ( $log_entry['posts'] ?? [] );
 
 		include __DIR__ . '/views/meta-box.php';
 	}
@@ -134,13 +140,38 @@ class Meta_Box {
 		);
 		wp_localize_script( 'scos-sa-meta-box', 'scosSA', [
 			'nonce'   => wp_create_nonce( 'bw_social_webhook' ),
+			'amplifyNonce' => wp_create_nonce( 'scos_sa_amplify' ),
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),
 			'i18n'    => [
 				'sending' => __( 'Sending…', 'site-essentials' ),
 				'sent'    => __( 'Sent!', 'site-essentials' ),
 				'create'  => __( 'Create Social Post', 'site-essentials' ),
 				'error'   => __( 'Error', 'site-essentials' ),
+				'reAmplify' => __( 'Reset & Re-amplify', 'site-essentials' ),
+				'amplifying' => __( 'Running...', 'site-essentials' ),
 			],
 		] );
+	}
+
+	public static function ajax_re_amplify(): void {
+		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$nonce   = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+
+		if ( ! wp_verify_nonce( $nonce, 'scos_sa_amplify' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid nonce.', 'site-essentials' ) ], 403 );
+		}
+		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'site-essentials' ) ], 403 );
+		}
+
+		delete_post_meta( $post_id, \SiteEssentials\Modules\SocialAmplification\Publish_Hook::AMPLIFIED_META );
+
+		try {
+			$result = \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::run( $post_id );
+			update_post_meta( $post_id, \SiteEssentials\Modules\SocialAmplification\Publish_Hook::AMPLIFIED_META, '1' );
+			wp_send_json_success( [ 'result' => $result ] );
+		} catch ( \RuntimeException $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ], 500 );
+		}
 	}
 }

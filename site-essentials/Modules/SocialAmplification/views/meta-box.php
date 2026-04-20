@@ -9,6 +9,9 @@
  *   $webhook_url      string
  *   $is_published     bool
  *   $yourls_base      string  base URL e.g. https://bweb1.com.au (or empty)
+ *   $amplified        bool
+ *   $ran_at           string
+ *   $log_posts        array
  *
  * @package SiteEssentials
  */
@@ -90,5 +93,67 @@ $can_trigger        = $is_published && $webhook_configured;
 		<div id="scos-sa-status-msg" class="scos-sa-result" hidden></div>
 
 	</div><!-- /trigger -->
+
+	<!-- ── Amplification Status / Re-run ── -->
+	<div class="scos-sa-section scos-sa-section--amplify">
+		<div class="scos-sa-amplify-header">
+			<strong><?php esc_html_e( 'Postly Amplification Status', 'site-essentials' ); ?></strong>
+			<span class="scos-sa-amplify-badge <?php echo $amplified ? 'is-yes' : 'is-no'; ?>">
+				<?php if ( $amplified ) : ?>
+					<?php esc_html_e( 'Amplified', 'site-essentials' ); ?>
+				<?php else : ?>
+					<?php esc_html_e( 'Not yet amplified', 'site-essentials' ); ?>
+				<?php endif; ?>
+			</span>
+		</div>
+
+		<?php if ( $ran_at ) : ?>
+			<p class="scos-sa-help">
+				<?php
+				printf(
+					/* translators: %s date */
+					esc_html__( 'Last ran: %s', 'site-essentials' ),
+					esc_html( mysql2date( 'j M Y g:i a', $ran_at ) )
+				);
+				?>
+			</p>
+		<?php endif; ?>
+
+		<?php if ( ! empty( $log_posts ) ) : ?>
+			<table class="widefat striped scos-sa-slot-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Slot', 'site-essentials' ); ?></th>
+						<th><?php esc_html_e( 'Scheduled', 'site-essentials' ); ?></th>
+						<th><?php esc_html_e( 'Status', 'site-essentials' ); ?></th>
+						<th><?php esc_html_e( 'Postly ID', 'site-essentials' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $log_posts as $slot_row ) : ?>
+					<tr>
+						<td><?php echo esc_html( (string) ( $slot_row['slot'] ?? '—' ) ); ?></td>
+						<td><?php echo esc_html( (string) ( $slot_row['scheduled'] ?? '—' ) ); ?></td>
+						<td><?php echo esc_html( (string) ( $slot_row['status'] ?? '—' ) ); ?></td>
+						<td><?php echo esc_html( (string) ( $slot_row['postly_id'] ?? '—' ) ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+
+		<?php if ( $is_published ) : ?>
+			<p style="margin-top:12px;">
+				<button type="button"
+					id="scos-sa-reamp-btn"
+					class="button button-secondary"
+					data-post-id="<?php echo esc_attr( $post->ID ); ?>">
+					<?php esc_html_e( 'Reset & Re-amplify', 'site-essentials' ); ?>
+				</button>
+			</p>
+		<?php endif; ?>
+		<div id="scos-sa-reamp-msg" class="scos-sa-result" hidden></div>
+		<div id="scos-sa-reamp-results"></div>
+	</div>
 
 </div><!-- /scos-sa-wrap -->

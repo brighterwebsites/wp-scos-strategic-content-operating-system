@@ -97,33 +97,16 @@ class Postly_Client {
 			$body['media'] = $media;
 		}
 
-		// target_platforms: string field per Postly docs.
-		// Values: "all", "facebook", "facebook,instagram", or comma-separated channel IDs.
-		// When specific channel_ids are configured, filter socials and build explicit list.
-		// Otherwise send "all" — do NOT fetch socials unnecessarily.
+		// target_platforms: Postly expects a STRING ("all", platform names, or comma-separated channel IDs).
+		// Use configured channel IDs directly; fallback to "all".
 		if ( ! empty( $this->channel_ids ) ) {
-			$channels = $this->get_socials();
-			error_log( '[SCOS SMA Postly] get_socials() returned ' . count( $channels ) . ' channel(s): ' . wp_json_encode( $channels ) );
-
-			$filtered = array_values( array_filter( $channels, function ( array $ch ) {
-				return in_array( (string) $ch['id'], $this->channel_ids, true );
-			} ) );
-			error_log( '[SCOS SMA Postly] Filtered to channel_ids [' . implode( ',', $this->channel_ids ) . ']: ' . count( $filtered ) . ' channel(s)' );
-
-			if ( ! empty( $filtered ) ) {
-				// Explicit channel IDs as array of {identifier, id} objects.
-				// identifier = target (platform name), id = channel id field (NOT parent_id).
-				$body['target_platforms'] = array_map( static function ( array $ch ) {
-					return [ 'identifier' => $ch['target'] ?? '', 'id' => $ch['id'] ];
-				}, $filtered );
-			} else {
-				$body['target_platforms'] = 'all';
-			}
+			$ids = array_values( array_unique( array_filter( array_map( 'strval', $this->channel_ids ) ) ) );
+			$body['target_platforms'] = ! empty( $ids ) ? implode( ',', $ids ) : 'all';
 		} else {
 			$body['target_platforms'] = 'all';
 		}
 
-		error_log( '[SCOS SMA Postly] Sending target_platforms: ' . ( is_string( $body['target_platforms'] ) ? $body['target_platforms'] : wp_json_encode( $body['target_platforms'] ) ) );
+		error_log( '[SCOS SMA Postly] Sending target_platforms (string): ' . $body['target_platforms'] );
 
 		if ( $schedule instanceof \DateTimeImmutable ) {
 			$body['one_off_schedule'] = [

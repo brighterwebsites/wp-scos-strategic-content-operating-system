@@ -190,7 +190,9 @@ class Backfill_Command {
 			if ( in_array( $dow, [ 1, 3, 5 ], true ) ) { // Mon, Wed, Fri
 				$date_str = $day->format( 'Y-m-d' );
 				if ( ! in_array( $date_str, $occupied, true ) ) {
-					$slots[] = $day->setTime( 10, 0, 0 );
+					// Pass the date at midnight — Amplification_Engine will apply a
+					// random time within the configured publish window.
+					$slots[] = $day->setTime( 0, 0, 0 );
 				}
 			}
 			$day = $day->modify( '+1 day' );
@@ -223,13 +225,14 @@ class Backfill_Command {
 				if ( empty( $page ) ) {
 					break;
 				}
-				foreach ( $page as $post ) {
-					$sched = $post['one_off_schedule'] ?? [];
-					$d     = $sched['one_off_date'] ?? '';
-					if ( $d ) {
-						$dates[] = $d;
-					}
+			foreach ( $page as $post ) {
+				$sched = $post['one_off_schedule'] ?? [];
+				$d     = $sched['one_off_date'] ?? '';
+				if ( $d ) {
+					// Postly returns ISO-8601 (e.g. "2026-05-19T00:00:00.000Z") — extract date part only.
+					$dates[] = substr( $d, 0, 10 );
 				}
+			}
 				$skip += count( $page );
 			} while ( count( $page ) >= 50 ); // Postly default page size appears to be 50
 

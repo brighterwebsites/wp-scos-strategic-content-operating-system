@@ -110,7 +110,7 @@ class Backfill_Command {
 
 			if ( $dry_run ) {
 				$slot_str = $slot_dt ? $slot_dt->format( 'Y-m-d H:i' ) : '(no slot available)';
-				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} "{$title}" — slot: {$slot_str}" );
+				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} \"{$title}\" -- slot: {$slot_str}" );
 				continue;
 			}
 
@@ -125,10 +125,10 @@ class Backfill_Command {
 				update_post_meta( $post->ID, Publish_Hook::AMPLIFIED_META, '1' );
 
 				$scheduled = array_column( $result['posts'] ?? [], 'scheduled' );
-				\WP_CLI::success( "#{$post->ID} "{$title}" — scheduled posts at: " . implode( ', ', $scheduled ) );
+				\WP_CLI::success( "#{$post->ID} \"{$title}\" -- scheduled posts at: " . implode( ', ', $scheduled ) );
 				$success++;
 			} catch ( \RuntimeException $e ) {
-				\WP_CLI::warning( "#{$post->ID} "{$title}" — FAILED: " . $e->getMessage() );
+				\WP_CLI::warning( "#{$post->ID} \"{$title}\" -- FAILED: " . $e->getMessage() );
 				$failed++;
 			}
 

@@ -73,11 +73,25 @@ class General_Post_Permalink_Settings {
 		if ( ! is_array( $rules ) ) {
 			return $rules;
 		}
+
+		// Build explicit per-category archive rules (no broad catch-all).
+		// The previous naive str_replace('category/', ...) could generate:
+		//   (.+?)/?$ => index.php?category_name=$matches[1]
+		// which hijacks CPT archives/pages and causes widespread 404s.
 		$new_rules = [];
-		foreach ( $rules as $pattern => $rewrite ) {
-			$new_pattern = str_replace( 'category/', '', $pattern );
-			$new_rules[ $new_pattern ] = $rewrite;
+		$slugs     = self::get_all_category_slugs();
+
+		foreach ( $slugs as $slug ) {
+			if ( $slug === '' || self::is_reserved_url_segment( $slug ) ) {
+				continue;
+			}
+
+			$quoted = preg_quote( $slug, '/' );
+			$new_rules[ $quoted . '/?$' ]                           = 'index.php?category_name=' . $slug;
+			$new_rules[ $quoted . '/page/?([0-9]{1,})/?$' ]         = 'index.php?category_name=' . $slug . '&paged=$matches[1]';
+			$new_rules[ $quoted . '/(?:feed/)?(feed|rdf|rss|rss2|atom)/?$' ] = 'index.php?category_name=' . $slug . '&feed=$matches[1]';
 		}
+
 		return $new_rules;
 	}
 

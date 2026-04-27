@@ -82,7 +82,7 @@ class General_Post_Permalink_Settings {
 		$slugs     = self::get_all_category_slugs();
 
 		foreach ( $slugs as $slug ) {
-			if ( $slug === '' || self::is_reserved_url_segment( $slug ) ) {
+			if ( $slug === '' || self::is_reserved_url_segment( $slug ) || self::is_protected_root_segment( $slug ) ) {
 				continue;
 			}
 
@@ -138,7 +138,7 @@ class General_Post_Permalink_Settings {
 		}
 		$slugs = self::get_all_category_slugs();
 		foreach ( $slugs as $slug ) {
-			if ( $slug === '' || self::is_reserved_url_segment( $slug ) ) {
+			if ( $slug === '' || self::is_reserved_url_segment( $slug ) || self::is_protected_root_segment( $slug ) ) {
 				continue;
 			}
 			add_rewrite_rule(
@@ -260,6 +260,60 @@ class General_Post_Permalink_Settings {
 			'tag',
 		];
 		return in_array( $slug, $reserved, true );
+	}
+
+	/**
+	 * Protect root segments already used by CPT archives or custom taxonomy rewrite bases.
+	 * These WP-post/category URL options must never override CPT/custom-tax URLs.
+	 *
+	 * @param string $slug Candidate root segment.
+	 * @return bool
+	 */
+	private static function is_protected_root_segment( string $slug ): bool {
+		$slug = sanitize_title( $slug );
+		if ( $slug === '' ) {
+			return false;
+		}
+
+		$protected = [];
+
+		// CPT archive rewrite roots (excluding default "post" and "page").
+		$post_types = get_post_types( [ 'public' => true ], 'objects' );
+		foreach ( $post_types as $pt => $obj ) {
+			if ( ! $obj instanceof \WP_Post_Type || in_array( $pt, [ 'post', 'page', 'attachment' ], true ) ) {
+				continue;
+			}
+			if ( empty( $obj->rewrite ) || ! is_array( $obj->rewrite ) ) {
+				continue;
+			}
+			$pt_slug = isset( $obj->rewrite['slug'] ) ? sanitize_title( (string) $obj->rewrite['slug'] ) : '';
+			if ( $pt_slug !== '' ) {
+				$protected[] = explode( '/', trim( $pt_slug, '/' ) )[0];
+			}
+		}
+
+		// Custom taxonomy rewrite roots (excluding WP default category/tag).
+		$taxes = get_taxonomies( [ 'public' => true ], 'objects' );
+		foreach ( $taxes as $tax => $obj ) {
+			if ( ! $obj instanceof \WP_Taxonomy || in_array( $tax, [ 'category', 'post_tag' ], true ) ) {
+				continue;
+			}
+			$rw = $obj->rewrite;
+			if ( empty( $rw ) ) {
+				continue;
+			}
+			$tax_slug = '';
+			if ( is_array( $rw ) && isset( $rw['slug'] ) ) {
+				$tax_slug = sanitize_title( (string) $rw['slug'] );
+			} elseif ( is_string( $rw ) ) {
+				$tax_slug = sanitize_title( $rw );
+			}
+			if ( $tax_slug !== '' ) {
+				$protected[] = explode( '/', trim( $tax_slug, '/' ) )[0];
+			}
+		}
+
+		return in_array( $slug, array_unique( array_filter( $protected ) ), true );
 	}
 
 	/**

@@ -9,13 +9,14 @@
  * Finds published `projects` posts whose **publish date** falls in the window
  * [--post-from] … [--before] (default: no lower bound … today inclusive),
  * skips any that have already been amplified, and schedules them using a
- * Mon/Wed/Fri spread calendar. These flags do **not** set the first social slot;
- * slots still start from tomorrow based on Postly occupancy.
+ * Mon/Wed/Fri spread calendar. Optional: --schedule-from (first slot not before this
+ * date) and --slot-gap-days (minimum days between slots in this run).
  *
  * The spread calendar works by:
  *  1. Fetching existing Postly scheduled posts for the workspace.
- *  2. Building a list of Mon/Wed/Fri slots starting from tomorrow.
- *  3. Assigning each project to the next free slot.
+ *  2. Building a list of Mon/Wed/Fri slots starting from max(tomorrow, --schedule-from).
+ *  3. Assigning each project to the next free slot, optionally enforcing --slot-gap-days
+ *     between consecutive slots in this run (wider spread when batching).
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\CLI
@@ -44,6 +45,16 @@ class Backfill_Command {
 	 * : **WordPress post publish date** lower bound: include posts published **on or after**
 	 * this date (YYYY-MM-DD). Optional; omit for no minimum (oldest posts first).
 	 *
+	 * [--schedule-from=<date>]
+	 * : **Social calendar** lower bound: do not assign the first (or any) slot to a Mon/Wed/Fri
+	 * **before** this date (YYYY-MM-DD in the site timezone). Default: tomorrow.
+	 * Does not filter WordPress posts — use --post-from / --before for that.
+	 *
+	 * [--slot-gap-days=<n>]
+	 * : Minimum **calendar days** between consecutive slots **in this run** (0 = default:
+	 * pack into the next available Mon/Wed/Fri like before). Example: `7` spaces slots
+	 * at least a week apart for the batch. Still respects Postly occupied dates.
+	 *
 	 * [--limit=<n>]
 	 * : Maximum number of posts to process. Default: 3.
 	 *
@@ -54,7 +65,7 @@ class Backfill_Command {
 	 *
 	 *     wp bw-social backfill
 	 *     wp bw-social backfill --post-from=2025-01-01 --before=2025-12-31 --limit=5
-	 *     wp bw-social backfill --dry-run
+	 *     wp bw-social backfill --schedule-from=2026-05-01 --slot-gap-days=7 --limit=5 --dry-run
 	 *
 	 * @when after_wp_load
 	 *
@@ -65,6 +76,9 @@ class Backfill_Command {
 		$before    = \WP_CLI\Utils\get_flag_value( $assoc_args, 'before', date( 'Y-m-d' ) );
 		$post_from = \WP_CLI\Utils\get_flag_value( $assoc_args, 'post-from', '' );
 		$post_from = is_string( $post_from ) ? trim( $post_from ) : '';
+		$sched_from = \WP_CLI\Utils\get_flag_value( $assoc_args, 'schedule-from', '' );
+		$sched_from = is_string( $sched_from ) ? trim( $sched_from ) : '';
+		$slot_gap  = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'slot-gap-days', 0 );
 		$limit     = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'limit', 3 );
 		$dry_run   = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
 
@@ -74,8 +88,14 @@ class Backfill_Command {
 		if ( $post_from !== '' && ! $this->validate_ymd( $post_from ) ) {
 			\WP_CLI::error( 'Invalid --post-from= date. Use YYYY-MM-DD.' );
 		}
+		if ( $sched_from !== '' && ! $this->validate_ymd( $sched_from ) ) {
+			\WP_CLI::error( 'Invalid --schedule-from= date. Use YYYY-MM-DD.' );
+		}
 		if ( $post_from !== '' && strcmp( $post_from, $before ) > 0 ) {
 			\WP_CLI::error( '--post-from must be on or before --before.' );
+		}
+		if ( $slot_gap < 0 || $slot_gap > 365 ) {
+			\WP_CLI::error( '--slot-gap-days must be between 0 and 365.' );
 		}
 
 		$this->validate_settings();
@@ -120,7 +140,17 @@ class Backfill_Command {
 
 		// ── Build spread schedule ────────────────────────────────────────────
 		$timezone = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
-		$slots    = $this->get_free_slots( count( $pending ), $timezone );
+		if ( $sched_from !== '' || $slot_gap > 0 ) {
+			\WP_CLI::line(
+				sprintf(
+					'Calendar: schedule-from=%s, slot-gap-days=%d (site TZ: %s)',
+					$sched_from !== '' ? $sched_from : '(tomorrow)',
+					$slot_gap,
+					$timezone
+				)
+			);
+		}
+		$slots = $this->get_free_slots( count( $pending ), $timezone, $sched_from, $slot_gap );
 
 		if ( count( $slots ) < count( $pending ) ) {
 			\WP_CLI::warning( 'Not enough free schedule slots for all posts. Some may overlap.' );
@@ -204,32 +234,51 @@ class Backfill_Command {
 	}
 
 	/**
-	 * Build a list of Mon/Wed/Fri 10:00 AM slots starting from tomorrow,
-	 * skipping days that already have Postly posts scheduled.
+	 * Build a list of Mon/Wed/Fri slots, skipping Postly-occupied dates.
 	 *
-	 * @param  int    $count    Number of slots needed.
-	 * @param  string $timezone WP timezone string.
+	 * @param  int    $count             Number of slots needed.
+	 * @param  string $timezone          WP timezone string.
+	 * @param  string $schedule_from     YYYY-MM-DD or '' — first slot on this calendar day or later (also never before tomorrow).
+	 * @param  int    $slot_gap_days     Minimum days between consecutive slots (0 = pack tightly on MWF).
 	 * @return \DateTimeImmutable[]
 	 */
-	private function get_free_slots( int $count, string $timezone ): array {
-		$tz     = new \DateTimeZone( $timezone );
-		$today  = new \DateTimeImmutable( 'today', $tz );
+	private function get_free_slots( int $count, string $timezone, string $schedule_from = '', int $slot_gap_days = 0 ): array {
+		$tz         = new \DateTimeZone( $timezone );
+		$today      = new \DateTimeImmutable( 'today', $tz );
+		$tomorrow   = $today->modify( '+1 day' )->setTime( 0, 0, 0 );
+		$scan_start = $tomorrow;
 
-		// Fetch existing Postly posts to identify occupied dates
+		if ( $schedule_from !== '' ) {
+			$floor = new \DateTimeImmutable( $schedule_from . ' 00:00:00', $tz );
+			if ( $floor > $scan_start ) {
+				$scan_start = $floor;
+			}
+		}
+
 		$occupied = $this->get_occupied_dates( $tz );
 
-		$slots    = [];
-		$day      = $today->modify( '+1 day' );
-		$max_days = 365; // safety limit
+		$slots         = [];
+		$day           = $scan_start;
+		$next_earliest = null; // next slot date must be >= this (Y-m-d compare).
 
-		while ( count( $slots ) < $count && $max_days-- > 0 ) {
+		$guard = max( 500, $count * ( 7 + max( 0, $slot_gap_days ) ) * 3 );
+
+		while ( count( $slots ) < $count && $guard-- > 0 ) {
+			if ( $next_earliest !== null && $day->format( 'Y-m-d' ) < $next_earliest->format( 'Y-m-d' ) ) {
+				$day = $day->modify( '+1 day' );
+				continue;
+			}
+
 			$dow = (int) $day->format( 'N' ); // 1=Mon … 7=Sun
-			if ( in_array( $dow, [ 1, 3, 5 ], true ) ) { // Mon, Wed, Fri
+			if ( in_array( $dow, [ 1, 3, 5 ], true ) ) {
 				$date_str = $day->format( 'Y-m-d' );
 				if ( ! in_array( $date_str, $occupied, true ) ) {
-					// Pass the date at midnight — Amplification_Engine will apply a
-					// random time within the configured publish window.
 					$slots[] = $day->setTime( 0, 0, 0 );
+					if ( $slot_gap_days > 0 ) {
+						$next_earliest = $day->modify( '+' . $slot_gap_days . ' days' )->setTime( 0, 0, 0 );
+					} else {
+						$next_earliest = null;
+					}
 				}
 			}
 			$day = $day->modify( '+1 day' );

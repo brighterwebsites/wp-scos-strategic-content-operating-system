@@ -4,11 +4,13 @@
  *
  * Usage:
  *   wp bw-social backfill
- *   wp bw-social backfill --before=2026-01-01 --limit=10 --dry-run
+ *   wp bw-social backfill --post-from=2025-06-01 --before=2025-12-31 --limit=10 --dry-run
  *
- * Finds published `projects` posts published before --before (default: today),
+ * Finds published `projects` posts whose **publish date** falls in the window
+ * [--post-from] … [--before] (default: no lower bound … today inclusive),
  * skips any that have already been amplified, and schedules them using a
- * Mon/Wed/Fri spread calendar.
+ * Mon/Wed/Fri spread calendar. These flags do **not** set the first social slot;
+ * slots still start from tomorrow based on Postly occupancy.
  *
  * The spread calendar works by:
  *  1. Fetching existing Postly scheduled posts for the workspace.
@@ -35,7 +37,12 @@ class Backfill_Command {
 	 * ## OPTIONS
 	 *
 	 * [--before=<date>]
-	 * : Only include posts published before this date (YYYY-MM-DD). Default: today.
+	 * : **WordPress post publish date** upper bound: include posts published **on or before**
+	 * this date (YYYY-MM-DD). Default: today. Does not control the first Postly schedule day.
+	 *
+	 * [--post-from=<date>]
+	 * : **WordPress post publish date** lower bound: include posts published **on or after**
+	 * this date (YYYY-MM-DD). Optional; omit for no minimum (oldest posts first).
 	 *
 	 * [--limit=<n>]
 	 * : Maximum number of posts to process. Default: 3.
@@ -46,7 +53,7 @@ class Backfill_Command {
 	 * ## EXAMPLES
 	 *
 	 *     wp bw-social backfill
-	 *     wp bw-social backfill --before=2025-12-31 --limit=5
+	 *     wp bw-social backfill --post-from=2025-01-01 --before=2025-12-31 --limit=5
 	 *     wp bw-social backfill --dry-run
 	 *
 	 * @when after_wp_load
@@ -55,11 +62,31 @@ class Backfill_Command {
 	 * @param  array $assoc_args Named args.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		$before  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'before', date( 'Y-m-d' ) );
-		$limit   = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'limit', 3 );
-		$dry_run = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$before    = \WP_CLI\Utils\get_flag_value( $assoc_args, 'before', date( 'Y-m-d' ) );
+		$post_from = \WP_CLI\Utils\get_flag_value( $assoc_args, 'post-from', '' );
+		$post_from = is_string( $post_from ) ? trim( $post_from ) : '';
+		$limit     = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'limit', 3 );
+		$dry_run   = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+
+		if ( ! $this->validate_ymd( $before ) ) {
+			\WP_CLI::error( 'Invalid --before= date. Use YYYY-MM-DD.' );
+		}
+		if ( $post_from !== '' && ! $this->validate_ymd( $post_from ) ) {
+			\WP_CLI::error( 'Invalid --post-from= date. Use YYYY-MM-DD.' );
+		}
+		if ( $post_from !== '' && strcmp( $post_from, $before ) > 0 ) {
+			\WP_CLI::error( '--post-from must be on or before --before.' );
+		}
 
 		$this->validate_settings();
+
+		$date_clause = [
+			'before'    => $before,
+			'inclusive' => true,
+		];
+		if ( $post_from !== '' ) {
+			$date_clause['after'] = $post_from;
+		}
 
 		// ── Query projects ────────────────────────────────────────────────────
 		$posts = get_posts( [
@@ -68,13 +95,12 @@ class Backfill_Command {
 			'numberposts' => $limit * 3, // fetch extra to account for already-amplified
 			'order'       => 'ASC',
 			'orderby'     => 'date',
-			'date_query'  => [
-				[ 'before' => $before, 'inclusive' => true ],
-			],
+			'date_query'  => [ $date_clause ],
 		] );
 
 		if ( empty( $posts ) ) {
-			\WP_CLI::line( 'No published projects found before ' . $before . '.' );
+			$range = $post_from !== '' ? "{$post_from} … {$before}" : "≤ {$before}";
+			\WP_CLI::line( 'No published projects found in publish-date window ' . $range . '.' );
 			return;
 		}
 
@@ -144,6 +170,17 @@ class Backfill_Command {
 	// ──────────────────────────────────────────────────────────────────────────
 	// Helpers
 	// ──────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * @param string $d YYYY-MM-DD.
+	 */
+	private function validate_ymd( string $d ): bool {
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $d ) ) {
+			return false;
+		}
+		$parts = array_map( 'intval', explode( '-', $d ) );
+		return checkdate( $parts[1], $parts[2], $parts[0] );
+	}
 
 	/**
 	 * Abort early with a clear message if required settings are missing.

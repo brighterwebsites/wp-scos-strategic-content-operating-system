@@ -122,6 +122,63 @@ class Postly_Client {
 	}
 
 	/**
+	 * Create a GMB post with platform-specific settings.
+	 *
+	 * @param array{
+	 *   gmb_caption:string,
+	 *   cta_url:string,
+	 *   image_url:string,
+	 *   schedule_at:\DateTimeImmutable,
+	 *   timezone:string,
+	 *   gmb_channel_id:string
+	 * } $params
+	 */
+	public function create_gmb_post( array $params ): array {
+		$caption        = (string) ( $params['gmb_caption'] ?? '' );
+		$cta_url        = (string) ( $params['cta_url'] ?? '' );
+		$image_url      = (string) ( $params['image_url'] ?? '' );
+		$timezone       = (string) ( $params['timezone'] ?? 'UTC' );
+		$gmb_channel_id = (string) ( $params['gmb_channel_id'] ?? '' );
+		$schedule       = $params['schedule_at'] ?? null;
+
+		$body = [
+			'text'              => '',
+			'workspace'         => $this->workspace_id,
+			'target_platforms'  => $gmb_channel_id,
+			'platform_settings' => [
+				[
+					'identifier'         => 'googleMyBusiness',
+					'type'               => 'update',
+					'language_code'      => 'en-AU',
+					'summary'            => $caption,
+					'call_to_action'     => 'learn_more',
+					'call_to_action_url' => $cta_url,
+				],
+			],
+		];
+
+		if ( $image_url !== '' ) {
+			$body['media'] = [
+				[
+					'url'  => $image_url,
+					'type' => 'image/jpeg',
+				],
+			];
+		}
+
+		if ( $schedule instanceof \DateTimeImmutable ) {
+			$body['one_off_schedule'] = [
+				'one_off_date' => $schedule->format( 'Y-m-d' ),
+				'time'         => $schedule->format( 'H:i' ),
+				'timezone'     => $timezone,
+			];
+		}
+
+		error_log( '[SCOS SMA Postly] Sending GMB payload: ' . wp_json_encode( $body ) );
+		return $this->request( 'POST', '/posts', $body );
+	}
+
+	/**
 	 * Fetch connected social accounts for the workspace.
 	 * Results are cached per request to avoid redundant calls when scheduling 3 posts.
 	 *

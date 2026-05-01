@@ -24,6 +24,7 @@ $yourls_pass     = SMA::get_option( 'scos_sma_yourls_password',  'bw_yourls_pass
 $postly_api_key        = get_option( 'bw_postly_api_key', '' );
 $postly_workspace_id   = get_option( 'bw_postly_workspace_id', '' );
 $postly_channel_ids    = get_option( 'bw_postly_channel_ids', '' );
+$postly_gmb_channel_id = get_option( 'se_postly_gmb_channel_id', '' );
 $acf_gallery_keys      = get_option( 'bw_social_acf_gallery_keys', '' );
 $acf_featured_key      = get_option( 'bw_social_acf_featured_key', '' );
 $webhook_secret        = get_option( 'bw_social_webhook_secret', '' );
@@ -340,7 +341,21 @@ $post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_
 						class="regular-text code" style="width:100%;max-width:560px;"
 						placeholder="<?php esc_attr_e( 'id1, id2, id3', 'site-essentials' ); ?>" />
 					<p class="description">
-						<?php esc_html_e( 'Comma-separated Postly social channel IDs to post to. Leave blank to post to all channels connected in the workspace. Find IDs via the Postly API: GET /workspaces/{id}/socials.', 'site-essentials' ); ?>
+						<?php esc_html_e( 'For Facebook, Instagram, Pinterest etc. Do not include your GMB channel ID here. Comma-separated Postly social channel IDs to post to. Leave blank to disable standard social posting.', 'site-essentials' ); ?>
+					</p>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row">
+					<label for="se_postly_gmb_channel_id"><?php esc_html_e( 'GMB Channel ID', 'site-essentials' ); ?></label>
+				</th>
+				<td>
+					<input type="text" id="se_postly_gmb_channel_id" name="se_postly_gmb_channel_id"
+						value="<?php echo esc_attr( $postly_gmb_channel_id ); ?>"
+						class="regular-text code" style="width:100%;max-width:560px;" />
+					<p class="description">
+						<?php esc_html_e( 'Your GMB channel ID from Postly. Find it in Postly → Channels. Only one GMB profile per workspace is supported.', 'site-essentials' ); ?>
 					</p>
 				</td>
 			</tr>

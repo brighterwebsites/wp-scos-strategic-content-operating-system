@@ -31,12 +31,9 @@ if ( $ntfy_enabled && class_exists( 'Brighter_Ntfy_Client' ) ) {
 // Handle test-push action
 $test_result = null;
 if ( isset( $_POST['scos_ntfy_test'] ) && check_admin_referer( 'scos_ntfy_test' ) && $ntfy_ok ) {
-	$prefix = method_exists( 'Brighter_Ntfy_Notifications', 'get_topic_prefix' )
-		? Brighter_Ntfy_Notifications::get_topic_prefix()
-		: sanitize_title( parse_url( home_url(), PHP_URL_HOST ) );
-
+	// Topic bw-test matches Brighter_Ntfy_Client::test_connection() and legacy Support tab.
 	$result = $ntfy_client->send(
-		$prefix . '-general',
+		'bw-test',
 		sprintf(
 			__( 'Manual test from Site Essentials on %s', 'site-essentials' ),
 			home_url()
@@ -45,9 +42,10 @@ if ( isset( $_POST['scos_ntfy_test'] ) && check_admin_referer( 'scos_ntfy_test' 
 			'title'    => __( '✅ Monitoring Test', 'site-essentials' ),
 			'priority' => 'default',
 			'tags'     => [ 'test', 'white_check_mark' ],
+			'click'    => admin_url( 'admin.php?page=site-essentials-essentials&tab=monitoring' ),
 		]
 	);
-	$test_result = $result ? 'success' : 'failed';
+	$test_result = is_wp_error( $result ) ? 'failed' : 'success';
 }
 ?>
 
@@ -114,47 +112,48 @@ define('NTFY_PASSWORD', 'your-password');</pre>
 		</p>
 
 		<?php
+		// Constant names must match brighter-core: see Brighter_Ntfy_Notifications::is_monitor_enabled().
 		$monitors = [
 			[
 				'id'          => 'downtime',
 				'label'       => __( 'Downtime Monitor', 'site-essentials' ),
 				'description' => __( 'Checks HTTP response, database, and filesystem health every ~5 minutes via WP-Cron.', 'site-essentials' ),
-				'constant'    => 'NTFY_DOWNTIME_ENABLED',
+				'constant'    => 'NTFY_MONITOR_DOWNTIME',
 				'status'      => 'active',
 			],
 			[
 				'id'          => 'robots',
 				'label'       => __( 'Robots.txt Monitor', 'site-essentials' ),
 				'description' => __( 'Daily check that robots.txt does not block all crawlers.', 'site-essentials' ),
-				'constant'    => 'NTFY_ROBOTS_ENABLED',
+				'constant'    => 'NTFY_MONITOR_ROBOTS',
 				'status'      => 'active',
 			],
 			[
 				'id'          => 'sitemap',
 				'label'       => __( 'Sitemap Monitor', 'site-essentials' ),
 				'description' => __( 'Daily check that the XML sitemap is accessible.', 'site-essentials' ),
-				'constant'    => 'NTFY_SITEMAP_ENABLED',
+				'constant'    => 'NTFY_MONITOR_SITEMAP',
 				'status'      => 'active',
 			],
 			[
 				'id'          => 'smtp',
 				'label'       => __( 'SMTP / Email Monitor', 'site-essentials' ),
 				'description' => __( 'Sends an alert if WordPress email fails to deliver (hooks into wp_mail failures).', 'site-essentials' ),
-				'constant'    => 'NTFY_SMTP_ENABLED',
+				'constant'    => 'NTFY_MONITOR_SMTP',
 				'status'      => 'active',
 			],
 			[
 				'id'          => 'forms',
 				'label'       => __( 'Form Submission Monitor', 'site-essentials' ),
-				'description' => __( 'Notifies on new contact form submissions. Opt-in per form.', 'site-essentials' ),
-				'constant'    => 'NTFY_FORMS_ENABLED',
+				'description' => __( 'Notifies on new contact form submissions. Opt-in per form. Implementation is partial.', 'site-essentials' ),
+				'constant'    => 'NTFY_MONITOR_FORMS',
 				'status'      => 'partial',
 			],
 			[
 				'id'          => 'cron',
 				'label'       => __( 'WP-Cron Monitor', 'site-essentials' ),
-				'description' => __( 'Alerts when WP-Cron stops running. Requires an external cron job.', 'site-essentials' ),
-				'constant'    => 'NTFY_CRON_ENABLED',
+				'description' => __( 'Alerts when WP-Cron stops running. Requires an external cron job. Implementation is partial.', 'site-essentials' ),
+				'constant'    => 'NTFY_MONITOR_CRON',
 				'status'      => 'partial',
 			],
 		];
@@ -170,7 +169,9 @@ define('NTFY_PASSWORD', 'your-password');</pre>
 			</thead>
 			<tbody>
 				<?php foreach ( $monitors as $mon ) :
-					$is_on = defined( $mon['constant'] ) && constant( $mon['constant'] ) === true;
+					$is_on = $ntfy_loaded && method_exists( 'Brighter_Ntfy_Notifications', 'is_monitor_enabled' )
+						? Brighter_Ntfy_Notifications::is_monitor_enabled( $mon['id'] )
+						: ( defined( $mon['constant'] ) && constant( $mon['constant'] ) === true );
 				?>
 				<tr>
 					<td><strong><?php echo esc_html( $mon['label'] ); ?></strong></td>
@@ -179,14 +180,20 @@ define('NTFY_PASSWORD', 'your-password');</pre>
 					<td>
 						<?php if ( ! $ntfy_enabled ) : ?>
 							<span style="color:#999;">—</span>
-						<?php elseif ( $mon['status'] === 'partial' ) : ?>
-							<span style="color:#ffb900;" title="<?php esc_attr_e( 'Partially implemented', 'site-essentials' ); ?>">
-								⚡ <?php esc_html_e( 'Partial', 'site-essentials' ); ?>
-							</span>
 						<?php elseif ( $is_on ) : ?>
-							<span style="color:#46b450;">✓ <?php esc_html_e( 'On', 'site-essentials' ); ?></span>
+							<span style="color:#46b450;">
+								✓ <?php esc_html_e( 'On', 'site-essentials' ); ?>
+								<?php if ( $mon['status'] === 'partial' ) : ?>
+									<span style="color:#ffb900;font-size:11px;"> (<?php esc_html_e( 'partial', 'site-essentials' ); ?>)</span>
+								<?php endif; ?>
+							</span>
 						<?php else : ?>
-							<span style="color:#dc3232;">✗ <?php esc_html_e( 'Off', 'site-essentials' ); ?></span>
+							<span style="color:#dc3232;">
+								✗ <?php esc_html_e( 'Off', 'site-essentials' ); ?>
+								<?php if ( $mon['status'] === 'partial' ) : ?>
+									<span style="color:#ffb900;font-size:11px;"> (<?php esc_html_e( 'partial', 'site-essentials' ); ?>)</span>
+								<?php endif; ?>
+							</span>
 						<?php endif; ?>
 					</td>
 				</tr>
@@ -195,9 +202,9 @@ define('NTFY_PASSWORD', 'your-password');</pre>
 		</table>
 
 		<p class="description" style="margin-top:12px;">
-			<?php esc_html_e( 'Set constants to', 'site-essentials' ); ?>
-			<code>true</code>
-			<?php esc_html_e( 'in wp-config.php to enable individual monitors. All monitors default to off when NTFY_ENABLED is true, except Downtime which defaults to on.', 'site-essentials' ); ?>
+			<?php esc_html_e( 'Use', 'site-essentials' ); ?>
+			<code>NTFY_MONITOR_*</code>
+			<?php esc_html_e( 'constants in wp-config.php (e.g. NTFY_MONITOR_SMTP). If a constant is omitted, brighter-core falls back to enabled for most monitors; forms stay opt-in (off).', 'site-essentials' ); ?>
 		</p>
 	</div>
 

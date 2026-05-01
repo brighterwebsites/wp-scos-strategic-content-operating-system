@@ -34,6 +34,7 @@ class Anthropic_Client {
 		'brand_core'   => 'brand-core.md',
 		'vocabulary'   => 'vocabulary.md',
 		'social_media' => 'social-media.md',
+		'gmb_rules'    => 'social-media-gmb.md',
 	];
 
 	/**
@@ -115,6 +116,70 @@ class Anthropic_Client {
 		return $captions;
 	}
 
+	/**
+	 * Generate one GMB caption for the given post context.
+	 *
+	 * @throws \RuntimeException
+	 */
+	public static function generate_gmb_caption( array $post_context ): string {
+		$api_key = get_option( 'bw_anthropic_api_key', '' );
+		if ( ! $api_key ) {
+			$msg = 'Anthropic API key is not configured.';
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			throw new \RuntimeException( $msg );
+		}
+
+		self::maybe_create_htaccess();
+
+		$model     = (string) get_option( 'bw_anthropic_model', self::DEFAULT_MODEL ) ?: self::DEFAULT_MODEL;
+		$knowledge = self::read_knowledge_files();
+		$system    = self::system_prompt_gmb( $knowledge );
+		$prompt    = self::build_gmb_prompt( $post_context );
+		$post_id   = $post_context['post_id'] ?? '?';
+
+		error_log( self::LOG_PREFIX . " Generating GMB caption for post #{$post_id} using model {$model}" );
+
+		$payload = [
+			'model'      => $model,
+			'max_tokens' => 500,
+			'system'     => $system,
+			'messages'   => [
+				[ 'role' => 'user', 'content' => $prompt ],
+			],
+		];
+
+		$response = wp_remote_post( self::API_URL, [
+			'timeout' => 60,
+			'headers' => [
+				'x-api-key'         => $api_key,
+				'anthropic-version' => self::API_VERSION,
+				'content-type'      => 'application/json',
+			],
+			'body' => wp_json_encode( $payload ),
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			$msg = 'Anthropic API request failed (GMB): ' . $response->get_error_message();
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			throw new \RuntimeException( $msg );
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( $code !== 200 ) {
+			$err = $data['error']['message'] ?? $body;
+			$msg = "Anthropic API error (GMB, {$code}): {$err}";
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			error_log( self::LOG_PREFIX . ' Full GMB response body: ' . $body );
+			throw new \RuntimeException( $msg );
+		}
+
+		$text = $data['content'][0]['text'] ?? '';
+		return self::parse_gmb_caption( $text );
+	}
+
 	// ──────────────────────────────────────────────────────────────────────────
 
 	/**
@@ -181,6 +246,27 @@ class Anthropic_Client {
 			. '{"post_1": "caption one here", "post_2": "caption two here", "post_3": "caption three here"}';
 	}
 
+	private static function build_gmb_prompt( array $ctx ): string {
+		$title        = $ctx['title']        ?? '';
+		$excerpt      = $ctx['excerpt']      ?? '';
+		$content_type = $ctx['content_type'] ?? 'project';
+
+		return "Generate 1 Google Business Profile post for the following project.\n\n"
+			. "Project Title: {$title}\n"
+			. "Project Summary: {$excerpt}\n"
+			. "Content Type: {$content_type}\n\n"
+			. "Rules:\n"
+			. "- Write 1–3 short sentences only (150–300 characters total).\n"
+			. "- Lead with the customer benefit or outcome in the first sentence.\n"
+			. "- Do NOT include any URLs, phone numbers, or hashtags.\n"
+			. "- Do NOT use em dashes or en dashes.\n"
+			. "- Write in plain Australian English.\n"
+			. "- The post will have a \"Learn More\" button added automatically — do not reference it in the text.\n"
+			. "- Do not fabricate specific details not present in the title or summary.\n\n"
+			. "Return valid JSON only:\n"
+			. "{\"gmb_caption\": \"...\"}";
+	}
+
 	/**
 	 * Parse the model's text response into the expected array.
 	 * Handles JSON that may be wrapped in markdown fences despite the instruction.
@@ -230,6 +316,21 @@ class Anthropic_Client {
 		);
 	}
 
+	private static function parse_gmb_caption( string $text ): string {
+		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
+		$text = preg_replace( '/\s*```$/', '', $text );
+		$text = trim( $text );
+
+		$data = json_decode( $text, true );
+		if ( is_array( $data ) && ! empty( $data['gmb_caption'] ) ) {
+			return trim( (string) $data['gmb_caption'] );
+		}
+
+		throw new \RuntimeException(
+			'Anthropic GMB response did not contain expected gmb_caption key. Raw: ' . substr( $text, 0, 400 )
+		);
+	}
+
 	// ──────────────────────────────────────────────────────────────────────────
 	// Knowledge file helpers
 	// ──────────────────────────────────────────────────────────────────────────
@@ -255,6 +356,39 @@ class Anthropic_Client {
 		}
 
 		return $result;
+	}
+
+	private static function system_prompt_gmb( array $knowledge ): string {
+		$business_name = (string) get_option( 'scos_biz_business_name', get_bloginfo( 'name' ) );
+		$service_desc  = (string) get_option( 'scos_biz_service_description', '' );
+		$identity      = $business_name . ( $service_desc ? " — {$service_desc}" : '' );
+
+		$parts = [];
+		if ( ! empty( $knowledge['brand_core'] ) ) {
+			$parts[] = "[BRAND CORE]\n\n{$knowledge['brand_core']}";
+		}
+		if ( ! empty( $knowledge['vocabulary'] ) ) {
+			$parts[] = "[VOCABULARY]\n\n{$knowledge['vocabulary']}";
+		}
+
+		if ( ! empty( $knowledge['gmb_rules'] ) ) {
+			$parts[] = "[GMB RULES]\n\n{$knowledge['gmb_rules']}";
+		} else {
+			error_log( self::LOG_PREFIX . ' social-media-gmb.md missing. Falling back to inline GMB rules.' );
+			$parts[] = "[GMB RULES]\n\n"
+				. "- No URLs in caption body.\n"
+				. "- No phone numbers.\n"
+				. "- No hashtags.\n"
+				. "- No em dash or en dash characters.\n"
+				. "- 150-300 characters total.\n"
+				. "- 1-3 sentences, plain Australian English.\n"
+				. "- One idea only.\n";
+		}
+
+		return "You are a social media copywriter for {$identity}.\n\n"
+			. implode( "\n\n", $parts ) . "\n\n"
+			. "Return valid JSON only. No preamble, no explanation, no markdown fences.\n"
+			. 'The JSON must have exactly this key: "gmb_caption".';
 	}
 
 	/**

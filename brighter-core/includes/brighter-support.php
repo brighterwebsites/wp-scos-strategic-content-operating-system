@@ -327,6 +327,12 @@ function brighter_support_render_page() {
     $is_agency_user = brighter_support_is_agency_user();
     $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'support';
 
+    // Retired tabs (bookmarks still pointed here)
+    if (in_array($active_tab, ['api', 'monitoring'], true)) {
+        wp_safe_redirect(admin_url('admin.php?page=brighter_support&tab=support'));
+        exit;
+    }
+
     echo '<div class="wrap">';
     echo '<h1>' . esc_html__('Welcome to Your Website Support Hub', 'brighterwebsites') . '</h1>';
     

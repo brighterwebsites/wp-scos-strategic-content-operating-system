@@ -31,9 +31,7 @@ class Brighter_API_Admin {
      * Initialize admin hooks
      */
     public function init() {
-        // Add API tab to Support menu
-        add_filter('brighter_support_tabs', array($this, 'add_api_tab'), 10, 2);
-        add_filter('brighter_support_tab_content', array($this, 'render_api_tab_content'), 10, 2);
+        // Support → API tab retired (SCOS / Site Essentials). Token & REST remain; use AJAX if needed.
 
         // Handle AJAX requests
         add_action('wp_ajax_brighter_api_regenerate_token', array($this, 'ajax_regenerate_token'));

@@ -93,7 +93,7 @@ class Brighter_Ntfy_Form_Monitor {
             'title' => '📝 Form: ' . $form_name,
             'priority' => 'default',
             'tags' => ['form', 'inbox_tray'],
-            'click' => admin_url('admin.php?page=brighter_support&tab=monitoring'),
+            'click' => admin_url('admin.php?page=brighter_support&tab=support'),
         ]);
         
         error_log('[ntfy Form Monitor] Form submission notification sent: ' . $form_name);

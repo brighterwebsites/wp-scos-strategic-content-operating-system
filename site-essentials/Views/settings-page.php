@@ -138,7 +138,7 @@ if (!defined('ABSPATH')) {
                                 value="<?php echo esc_attr( $anthropic_model ); ?>"
                                 class="regular-text code"
                                 style="width:100%;max-width:560px;"
-                                placeholder="claude-3-5-sonnet-latest" />
+                                placeholder="claude-haiku-4-5-20251001" />
                             <p class="description">
                                 <?php esc_html_e( 'Default: ', 'site-essentials' ); ?><code>claude-haiku-4-5-20251001</code>
                                 <?php esc_html_e( '(Claude Haiku 4.5). Legacy Haiku 3 IDs are retired. Enter the exact API model string for your plan, e.g.', 'site-essentials' ); ?>

@@ -151,6 +151,14 @@ class Backfill_Command {
 			);
 		}
 		$slots = $this->get_free_slots( count( $pending ), $timezone, $sched_from, $slot_gap );
+		$gmb_channel_id = trim( (string) get_option( 'se_postly_gmb_channel_id', '' ) );
+		$gmb_slots      = [];
+		if ( $gmb_channel_id !== '' ) {
+			$gmb_slots = $this->get_gmb_free_slots( count( $pending ), $timezone, $sched_from, $slot_gap );
+			\WP_CLI::line( sprintf( 'GMB enabled (%s). Using separate Tue/Thu calendar (%d slots).', $gmb_channel_id, count( $gmb_slots ) ) );
+		} else {
+			\WP_CLI::line( 'GMB not configured; skipping GMB backfill flow.' );
+		}
 
 		if ( count( $slots ) < count( $pending ) ) {
 			\WP_CLI::warning( 'Not enough free schedule slots for all posts. Some may overlap.' );
@@ -166,13 +174,23 @@ class Backfill_Command {
 
 			if ( $dry_run ) {
 				$slot_str = $slot_dt ? $slot_dt->format( 'Y-m-d H:i' ) : '(no slot available)';
-				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} \"{$title}\" -- slot: {$slot_str}" );
+				$gmb_slot = $gmb_slots[ $i ] ?? null;
+				$gmb_str  = $gmb_slot ? $gmb_slot->format( 'Y-m-d H:i' ) : ( $gmb_channel_id !== '' ? '(no GMB slot available)' : '(GMB disabled)' );
+				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} \"{$title}\" -- standard slot: {$slot_str}; gmb slot: {$gmb_str}" );
 				continue;
 			}
 
-			$options = [];
+			$options = [
+				'run_standard' => true,
+				'run_gmb'      => ( $gmb_channel_id !== '' ),
+			];
 			if ( $slot_dt ) {
-				$options['schedule_at'] = $slot_dt;
+				$options['standard_schedule_at'] = $slot_dt;
+			}
+
+			$gmb_slot = $gmb_slots[ $i ] ?? null;
+			if ( $gmb_slot && $gmb_channel_id !== '' ) {
+				$options['gmb_schedule_at'] = $gmb_slot;
 			}
 
 			try {
@@ -180,8 +198,14 @@ class Backfill_Command {
 				// Mark as amplified
 				update_post_meta( $post->ID, Publish_Hook::AMPLIFIED_META, '1' );
 
-				$scheduled = array_column( $result['posts'] ?? [], 'scheduled' );
-				\WP_CLI::success( "#{$post->ID} \"{$title}\" -- scheduled posts at: " . implode( ', ', $scheduled ) );
+				$scheduled_standard = array_column( $result['standard_posts'] ?? [], 'scheduled' );
+				$scheduled_gmb      = array_column( $result['gmb_posts'] ?? [], 'scheduled' );
+				\WP_CLI::success(
+					"#{$post->ID} \"{$title}\" -- standard: "
+					. ( $scheduled_standard ? implode( ', ', $scheduled_standard ) : 'none' )
+					. ' | gmb: '
+					. ( $scheduled_gmb ? implode( ', ', $scheduled_gmb ) : 'none' )
+				);
 				$success++;
 			} catch ( \RuntimeException $e ) {
 				\WP_CLI::warning( "#{$post->ID} \"{$title}\" -- FAILED: " . $e->getMessage() );
@@ -271,6 +295,54 @@ class Backfill_Command {
 
 			$dow = (int) $day->format( 'N' ); // 1=Mon … 7=Sun
 			if ( in_array( $dow, [ 1, 3, 5 ], true ) ) {
+				$date_str = $day->format( 'Y-m-d' );
+				if ( ! in_array( $date_str, $occupied, true ) ) {
+					$slots[] = $day->setTime( 0, 0, 0 );
+					if ( $slot_gap_days > 0 ) {
+						$next_earliest = $day->modify( '+' . $slot_gap_days . ' days' )->setTime( 0, 0, 0 );
+					} else {
+						$next_earliest = null;
+					}
+				}
+			}
+			$day = $day->modify( '+1 day' );
+		}
+
+		return $slots;
+	}
+
+	/**
+	 * Build a separate GMB calendar: Tue/Thu slots only (max 2/week naturally).
+	 *
+	 * @return \DateTimeImmutable[]
+	 */
+	private function get_gmb_free_slots( int $count, string $timezone, string $schedule_from = '', int $slot_gap_days = 0 ): array {
+		$tz         = new \DateTimeZone( $timezone );
+		$today      = new \DateTimeImmutable( 'today', $tz );
+		$tomorrow   = $today->modify( '+1 day' )->setTime( 0, 0, 0 );
+		$scan_start = $tomorrow;
+
+		if ( $schedule_from !== '' ) {
+			$floor = new \DateTimeImmutable( $schedule_from . ' 00:00:00', $tz );
+			if ( $floor > $scan_start ) {
+				$scan_start = $floor;
+			}
+		}
+
+		$occupied      = $this->get_occupied_dates( $tz );
+		$slots         = [];
+		$day           = $scan_start;
+		$next_earliest = null;
+		$guard         = max( 500, $count * ( 7 + max( 0, $slot_gap_days ) ) * 3 );
+
+		while ( count( $slots ) < $count && $guard-- > 0 ) {
+			if ( $next_earliest !== null && $day->format( 'Y-m-d' ) < $next_earliest->format( 'Y-m-d' ) ) {
+				$day = $day->modify( '+1 day' );
+				continue;
+			}
+
+			$dow = (int) $day->format( 'N' ); // 2=Tue, 4=Thu
+			if ( in_array( $dow, [ 2, 4 ], true ) ) {
 				$date_str = $day->format( 'Y-m-d' );
 				if ( ! in_array( $date_str, $occupied, true ) ) {
 					$slots[] = $day->setTime( 0, 0, 0 );

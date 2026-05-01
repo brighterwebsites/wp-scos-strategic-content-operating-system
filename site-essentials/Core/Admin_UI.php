@@ -670,6 +670,7 @@ class Admin_UI {
             'bw_postly_api_key'            => 'sanitize_text_field',
             'bw_postly_workspace_id'       => 'sanitize_text_field',
             'bw_postly_channel_ids'        => 'sanitize_text_field',
+            'se_postly_gmb_channel_id'     => 'sanitize_text_field',
             'bw_social_acf_gallery_keys'   => 'sanitize_text_field',
             'bw_social_acf_featured_key'   => 'sanitize_text_field',
             'bw_social_publish_time_min'   => 'sanitize_text_field',

@@ -25,7 +25,6 @@ defined( 'ABSPATH' ) || exit;
 
 class Amplification_Engine {
 
-	const POST_INTERVAL_DAYS = 42;
 	const IMAGES_PER_POST    = 4;
 	const LOG_OPTION         = 'scos_sa_amplify_log';
 	const LOG_PREFIX         = '[SCOS SMA Engine]';
@@ -62,40 +61,22 @@ class Amplification_Engine {
 		$shortlink = self::get_shortlink( $post_id, $permalink );
 		error_log( self::LOG_PREFIX . " Shortlink: {$shortlink}" );
 
-		// ── 3. Image selection ──────────────────────────────────────────────
-		$all_images = self::collect_images( $post_id );
-		error_log( self::LOG_PREFIX . ' Images collected: ' . count( $all_images ) . ' — ' . implode( ', ', array_map( 'basename', $all_images ) ) );
-		$image_sets = self::build_image_sets( $all_images );
-
-		// ── 4. Determine content type ────────────────────────────────────────
+		// ── 3. Determine content type ────────────────────────────────────────
 		$content_type = self::get_content_type( $post );
 		error_log( self::LOG_PREFIX . " Content type: {$content_type}" );
 
-		// ── 5. Generate captions via Anthropic ──────────────────────────────
-		error_log( self::LOG_PREFIX . ' Calling Anthropic for captions…' );
-		$captions = Anthropic_Client::generate_captions( [
+		$context = [
 			'post_id'      => $post_id,
 			'title'        => $title,
 			'excerpt'      => $excerpt,
 			'permalink'    => $permalink,
 			'shortlink'    => $shortlink,
 			'content_type' => $content_type,
-		] );
+		];
 
-		// ── 6. Build Postly client ───────────────────────────────────────────
-		$api_key      = get_option( 'bw_postly_api_key', '' );
-		$workspace_id = get_option( 'bw_postly_workspace_id', '' );
-		$channel_ids  = array_filter( array_map(
-			'trim',
-			explode( ',', (string) get_option( 'bw_postly_channel_ids', '' ) )
-		) );
-		$timezone     = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
+		$timezone = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
 
-		error_log( self::LOG_PREFIX . " Postly workspace: {$workspace_id} | channels: " . ( $channel_ids ? implode( ',', $channel_ids ) : '(all)' ) . " | tz: {$timezone}" );
-
-		$client = new Postly_Client( $api_key, $workspace_id, $channel_ids );
-
-		// ── 7. Publish time window ───────────────────────────────────────────
+		// ── 4. Publish time window ───────────────────────────────────────────
 		// Read configured window (defaults: 09:00–17:00 site time).
 		$time_min_str = (string) get_option( 'bw_social_publish_time_min', '09:00' );
 		$time_max_str = (string) get_option( 'bw_social_publish_time_max', '17:00' );
@@ -110,9 +91,9 @@ class Amplification_Engine {
 			return [ intdiv( $t, 60 ), $t % 60 ];
 		};
 
-		// ── 8. Base schedule time ────────────────────────────────────────────
+		// ── 5. Base schedule time ────────────────────────────────────────────
 		$now     = new \DateTimeImmutable( 'now', new \DateTimeZone( $timezone ) );
-		$base_dt = $options['schedule_at'] ?? $now;
+		$base_dt = $options['schedule_at'] ?? $options['standard_schedule_at'] ?? $now;
 
 		[ $rand_h, $rand_m ] = $rand_in_window();
 		$base_dt = $base_dt->setTime( $rand_h, $rand_m, 0 );
@@ -124,70 +105,45 @@ class Amplification_Engine {
 			$base_dt = $now->modify( '+1 day' )->setTime( $rand_h, $rand_m, 0 );
 		}
 
-		error_log( self::LOG_PREFIX . ' Base schedule: ' . $base_dt->format( 'Y-m-d H:i T' ) . " (window {$time_min_str}–{$time_max_str})" );
+		error_log( self::LOG_PREFIX . ' Base schedule (standard default): ' . $base_dt->format( 'Y-m-d H:i T' ) . " (window {$time_min_str}–{$time_max_str})" );
 
-		// ── 9. Schedule 3 posts ──────────────────────────────────────────────
-		$post_results = [];
-		$caption_keys = [ 'post_1', 'post_2', 'post_3' ];
+		$platform_configs = self::get_platform_configs();
+		$run_standard     = array_key_exists( 'run_standard', $options ) ? (bool) $options['run_standard'] : true;
+		$run_gmb          = array_key_exists( 'run_gmb', $options ) ? (bool) $options['run_gmb'] : true;
 
-		for ( $i = 0; $i < 3; $i++ ) {
-			$offset_days = self::POST_INTERVAL_DAYS * $i;
-			$schedule_dt = $base_dt->modify( "+{$offset_days} days" );
+		$standard_results = [];
+		$gmb_results      = [];
 
-			// Slots 2 and 3 get their own random time within the window.
-			if ( $i > 0 ) {
-				[ $rand_h, $rand_m ] = $rand_in_window();
-				$schedule_dt = $schedule_dt->setTime( $rand_h, $rand_m, 0 );
-			}
+		if ( $run_standard ) {
+			$standard_results = self::run_standard_flow(
+				$post_id,
+				$context,
+				$platform_configs['standard'],
+				$timezone,
+				$options['standard_schedule_at'] ?? $base_dt
+			);
+		}
 
-			$caption_key = $caption_keys[ $i ];
-			$caption     = $captions[ $caption_key ] ?? '';
-
-			error_log( self::LOG_PREFIX . " Slot " . ( $i + 1 ) . ": scheduled {$schedule_dt->format('Y-m-d H:i')} | images from set " . count( $image_sets[ $i ] ?? [] ) );
-
-			$uploaded_urls = self::upload_images( $client, $image_sets[ $i ] ?? [] );
-			error_log( self::LOG_PREFIX . ' Uploaded ' . count( $uploaded_urls ) . ' of ' . count( $image_sets[ $i ] ?? [] ) . ' images to Postly CDN' );
-
-			try {
-				$result = $client->create_post( [
-					'text'        => $caption,
-					'media_urls'  => $uploaded_urls,
-					'schedule_at' => $schedule_dt,
-					'timezone'    => $timezone,
-				] );
-
-				$postly_id = $result['_id'] ?? ( $result['id'] ?? null );
-				error_log( self::LOG_PREFIX . " Slot " . ( $i + 1 ) . " scheduled OK — Postly ID: {$postly_id}" );
-
-				$post_results[] = [
-					'slot'        => $i + 1,
-					'scheduled'   => $schedule_dt->format( 'Y-m-d H:i' ),
-					'caption_key' => $caption_key,
-					'status'      => 'scheduled',
-					'postly_id'   => $postly_id,
-					'images'      => count( $uploaded_urls ),
-				];
-			} catch ( \RuntimeException $e ) {
-				error_log( self::LOG_PREFIX . " Slot " . ( $i + 1 ) . " FAILED: " . $e->getMessage() );
-				$post_results[] = [
-					'slot'        => $i + 1,
-					'scheduled'   => $schedule_dt->format( 'Y-m-d H:i' ),
-					'caption_key' => $caption_key,
-					'status'      => 'error',
-					'error'       => $e->getMessage(),
-					'images'      => count( $uploaded_urls ),
-				];
-			}
+		if ( $run_gmb ) {
+			$gmb_results = self::run_gmb_flow(
+				$post_id,
+				$context,
+				$platform_configs['gmb'],
+				$timezone,
+				$options['gmb_schedule_at'] ?? null
+			);
 		}
 
 		error_log( self::LOG_PREFIX . " ── Run complete for post #{$post_id} ──" );
 
-		// ── 10. Log results ──────────────────────────────────────────────────
+		// ── 6. Log results ───────────────────────────────────────────────────
 		$log_entry = [
-			'post_id'    => $post_id,
-			'ran_at'     => current_time( 'mysql' ),
-			'shortlink'  => $shortlink,
-			'posts'      => $post_results,
+			'post_id'         => $post_id,
+			'ran_at'          => current_time( 'mysql' ),
+			'shortlink'       => $shortlink,
+			'posts'           => $standard_results, // Back-compat with existing UI expectations.
+			'standard_posts'  => $standard_results,
+			'gmb_posts'       => $gmb_results,
 		];
 
 		self::write_log( $post_id, $log_entry );
@@ -204,6 +160,164 @@ class Amplification_Engine {
 			return wp_strip_all_tags( $post->post_excerpt );
 		}
 		return wp_trim_words( wp_strip_all_tags( $post->post_content ), 40, '...' );
+	}
+
+	private static function get_platform_configs(): array {
+		return [
+			'standard' => [
+				'count'    => 3,
+				'gap_days' => 42,
+				'adapter'  => 'standard',
+			],
+			'gmb'      => [
+				'count'    => 1,
+				'gap_days' => 0,
+				'adapter'  => 'gmb',
+			],
+		];
+	}
+
+	private static function run_standard_flow(
+		int $post_id,
+		array $context,
+		array $config,
+		string $timezone,
+		\DateTimeImmutable $base_dt
+	): array {
+		$channel_ids = array_filter( array_map(
+			'trim',
+			explode( ',', (string) get_option( 'bw_postly_channel_ids', '' ) )
+		) );
+
+		if ( empty( $channel_ids ) ) {
+			error_log( self::LOG_PREFIX . ' Standard not configured: bw_postly_channel_ids is blank. Skipping standard flow.' );
+			return [];
+		}
+
+		$api_key      = get_option( 'bw_postly_api_key', '' );
+		$workspace_id = get_option( 'bw_postly_workspace_id', '' );
+		error_log( self::LOG_PREFIX . " Standard flow workspace: {$workspace_id} | channels: " . implode( ',', $channel_ids ) . " | tz: {$timezone}" );
+
+		$all_images = self::collect_images( $post_id );
+		error_log( self::LOG_PREFIX . ' Standard images collected: ' . count( $all_images ) . ' — ' . implode( ', ', array_map( 'basename', $all_images ) ) );
+		$image_sets = self::build_image_sets( $all_images );
+
+		error_log( self::LOG_PREFIX . ' Calling Anthropic for standard captions…' );
+		$captions = Anthropic_Client::generate_captions( $context );
+		$client   = new Postly_Client( $api_key, $workspace_id, $channel_ids );
+
+		$post_results = [];
+		$caption_keys = [ 'post_1', 'post_2', 'post_3' ];
+
+		for ( $i = 0; $i < (int) $config['count']; $i++ ) {
+			$offset_days = (int) $config['gap_days'] * $i;
+			$schedule_dt = $base_dt->modify( "+{$offset_days} days" );
+			$caption_key = $caption_keys[ $i ] ?? 'post_1';
+			$caption     = $captions[ $caption_key ] ?? '';
+
+			error_log( self::LOG_PREFIX . " Standard slot " . ( $i + 1 ) . ": scheduled {$schedule_dt->format('Y-m-d H:i')} | images from set " . count( $image_sets[ $i ] ?? [] ) );
+
+			$uploaded_urls = self::upload_images( $client, $image_sets[ $i ] ?? [] );
+			error_log( self::LOG_PREFIX . ' Standard uploaded ' . count( $uploaded_urls ) . ' of ' . count( $image_sets[ $i ] ?? [] ) . ' images to Postly CDN' );
+
+			try {
+				$result = $client->create_post( [
+					'text'        => $caption,
+					'media_urls'  => $uploaded_urls,
+					'schedule_at' => $schedule_dt,
+					'timezone'    => $timezone,
+				] );
+
+				$postly_id = $result['_id'] ?? ( $result['id'] ?? null );
+				$post_results[] = [
+					'platform'    => 'standard',
+					'slot'        => $i + 1,
+					'scheduled'   => $schedule_dt->format( 'Y-m-d H:i' ),
+					'caption_key' => $caption_key,
+					'status'      => 'scheduled',
+					'postly_id'   => $postly_id,
+					'images'      => count( $uploaded_urls ),
+				];
+			} catch ( \RuntimeException $e ) {
+				$post_results[] = [
+					'platform'    => 'standard',
+					'slot'        => $i + 1,
+					'scheduled'   => $schedule_dt->format( 'Y-m-d H:i' ),
+					'caption_key' => $caption_key,
+					'status'      => 'error',
+					'error'       => $e->getMessage(),
+					'images'      => count( $uploaded_urls ),
+				];
+			}
+		}
+
+		return $post_results;
+	}
+
+	private static function run_gmb_flow(
+		int $post_id,
+		array $context,
+		array $config,
+		string $timezone,
+		?\DateTimeImmutable $base_dt = null
+	): array {
+		$gmb_channel_id = trim( (string) get_option( 'se_postly_gmb_channel_id', '' ) );
+		if ( '' === $gmb_channel_id ) {
+			error_log( self::LOG_PREFIX . ' GMB not configured: se_postly_gmb_channel_id is blank. Skipping GMB flow.' );
+			return [];
+		}
+
+		$api_key      = get_option( 'bw_postly_api_key', '' );
+		$workspace_id = get_option( 'bw_postly_workspace_id', '' );
+		$client       = new Postly_Client( $api_key, $workspace_id );
+		$now          = new \DateTimeImmutable( 'now', new \DateTimeZone( $timezone ) );
+
+		$schedule_dt = $base_dt ?: $now->modify( '+60 minutes' );
+		if ( $schedule_dt <= $now->modify( '+60 minutes' ) ) {
+			$schedule_dt = $now->modify( '+60 minutes' );
+		}
+
+		$image_url  = self::get_featured_og_image( $post_id );
+		$shortlink  = $context['shortlink'] ?? '';
+		$permalink  = $context['permalink'] ?? '';
+		$gmb_caption = Anthropic_Client::generate_gmb_caption( $context );
+		$cta_url     = self::build_cta_url( $permalink, $shortlink );
+
+		$post_results = [];
+		for ( $i = 0; $i < (int) $config['count']; $i++ ) {
+			try {
+				$result = $client->create_gmb_post( [
+					'gmb_caption'    => $gmb_caption,
+					'cta_url'        => $cta_url,
+					'image_url'      => $image_url,
+					'schedule_at'    => $schedule_dt,
+					'timezone'       => $timezone,
+					'gmb_channel_id' => $gmb_channel_id,
+				] );
+
+				$postly_id = $result['_id'] ?? ( $result['id'] ?? null );
+				$post_results[] = [
+					'platform'  => 'gmb',
+					'slot'      => 1,
+					'scheduled' => $schedule_dt->format( 'Y-m-d H:i' ),
+					'status'    => 'scheduled',
+					'postly_id' => $postly_id,
+					'images'    => $image_url ? 1 : 0,
+				];
+			} catch ( \RuntimeException $e ) {
+				error_log( self::LOG_PREFIX . ' GMB call failed: ' . $e->getMessage() );
+				$post_results[] = [
+					'platform'  => 'gmb',
+					'slot'      => 1,
+					'scheduled' => $schedule_dt->format( 'Y-m-d H:i' ),
+					'status'    => 'error',
+					'error'     => $e->getMessage(),
+					'images'    => $image_url ? 1 : 0,
+				];
+			}
+		}
+
+		return $post_results;
 	}
 
 	private static function get_shortlink( int $post_id, string $fallback ): string {
@@ -241,6 +355,52 @@ class Amplification_Engine {
 		}
 
 		return $fallback;
+	}
+
+	private static function build_cta_url( string $permalink, string $shortlink ): string {
+		$base_url = $shortlink ?: $permalink;
+		if ( ! $base_url ) {
+			return '';
+		}
+
+		$query = wp_parse_url( $base_url, PHP_URL_QUERY );
+		if ( is_string( $query ) && $query !== '' ) {
+			parse_str( $query, $existing_params );
+			$utm_keys = [ 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content' ];
+			foreach ( $utm_keys as $utm_key ) {
+				if ( ! empty( $existing_params[ $utm_key ] ) ) {
+					error_log( self::LOG_PREFIX . " CTA URL already has {$utm_key}; skipping duplicate UTM injection." );
+					return $base_url;
+				}
+			}
+		}
+
+		return add_query_arg( [
+			'utm_source'   => 'social_media',
+			'utm_medium'   => 'social',
+			'utm_content'  => 'gmb_learn_more',
+			'utm_campaign' => 'none',
+		], $base_url );
+	}
+
+	private static function get_featured_og_image( int $post_id ): string {
+		$featured_id = get_post_thumbnail_id( $post_id );
+		if ( ! $featured_id ) {
+			return '';
+		}
+
+		$og = wp_get_attachment_image_url( $featured_id, 'og-image' );
+		if ( $og ) {
+			return $og;
+		}
+
+		$sized = wp_get_attachment_image_url( $featured_id, [ 1200, 630 ] );
+		if ( $sized ) {
+			return $sized;
+		}
+
+		$full = wp_get_attachment_image_url( $featured_id, 'full' );
+		return $full ?: '';
 	}
 
 	/**

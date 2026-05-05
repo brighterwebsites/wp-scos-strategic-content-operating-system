@@ -42,7 +42,9 @@ add_filter('wp_redirect', function($location) {
  */
 add_action('admin_menu', 'brighter_support_add_menu');
 function brighter_support_add_menu() {
-    if ( ! current_user_can( 'administrator' ) ) {
+    $current_user = wp_get_current_user(); // SCOS-AGENCY-PASS2 — modified to email-domain gate
+    // TODO: replace with agency role config when role system is built
+    if ( ! str_ends_with( $current_user->user_email, '@brighterwebsites.com.au' ) ) { // SCOS-AGENCY-PASS2 — modified to email-domain gate
         return;
     }
     add_menu_page(

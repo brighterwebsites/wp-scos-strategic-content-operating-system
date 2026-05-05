@@ -328,15 +328,19 @@ class Admin_UI {
             );
         }
 
-        // 8. Agency white label (always visible as SE submenu)
-        add_submenu_page(
-            self::PAGE_SLUG,
-            __( 'Agency', 'site-essentials' ),
-            __( 'Agency', 'site-essentials' ),
-            'manage_options',
-            self::AGENCY_PAGE_SLUG,
-            [ $this, 'render_agency_page' ]
-        );
+        // 8. Agency white label — restricted to agency staff email domain // SCOS-AGENCY-PASS2 — modified to email-domain gate
+        $current_user = wp_get_current_user(); // SCOS-AGENCY-PASS2 — modified to email-domain gate
+        // TODO: replace with agency role config when role system is built
+        if ( str_ends_with( $current_user->user_email, '@brighterwebsites.com.au' ) ) { // SCOS-AGENCY-PASS2 — modified to email-domain gate
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Agency', 'site-essentials' ),
+                __( 'Agency', 'site-essentials' ),
+                'manage_options',
+                self::AGENCY_PAGE_SLUG,
+                [ $this, 'render_agency_page' ]
+            );
+        }
 
         // 9. Settings (always visible)
         add_submenu_page(

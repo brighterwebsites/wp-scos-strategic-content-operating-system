@@ -88,25 +88,34 @@ add_action('wp_footer', function() {
  * Redirect all users to Brighter Support page on login
  * Compatible with WPGhost redirect override
  */
+// SCOS-SUPPORT-PASS2 — login redirect wired to Agency Access tab options
 add_filter( 'login_redirect', 'bw_redirect_to_support_page', 100, 3 );
 function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
     // Only redirect on successful login (user object exists)
-    if ( isset( $user->ID ) ) {
-        // Set a transient to show the notice (expires in 60 seconds)
-        set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
+    if ( ! isset( $user->ID ) || ! isset( $user->roles ) ) {
+        return $redirect_to;
+    }
 
-        $default = admin_url( 'admin.php?page=brighter_support&tab=support' );
-        if ( function_exists( 'scos_se_agency_get' ) && function_exists( 'scos_agency_sanitize_login_redirect' ) ) {
-            if ( user_can( $user, 'manage_options' ) ) {
-                $custom = scos_agency_sanitize_login_redirect( (string) scos_se_agency_get( 'login_redirect_admin' ) );
-            } else {
-                $custom = scos_agency_sanitize_login_redirect( (string) scos_se_agency_get( 'login_redirect_editor' ) );
-            }
-            if ( $custom !== '' ) {
-                return $custom;
-            }
-        }
-        return $default;
+    // Set a transient to show the notice (expires in 60 seconds)
+    set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
+
+    // SCOS-SUPPORT-PASS2 — removed hardcoded redirect, now controlled via Agency > Access tab
+    $fallback = admin_url( 'admin.php?page=site-essentials-support' ); // SCOS-SUPPORT-PASS2 — updated fallback from brighter_support to site-essentials-support
+    $roles    = (array) $user->roles;
+
+    if ( in_array( 'administrator', $roles, true ) ) { // SCOS-SUPPORT-PASS2 — administrator redirect
+        $url = get_option( 'se_agency_login_redirect_admin', '' );
+        return $url ? admin_url( ltrim( $url, '/' ) ) : $fallback;
+    }
+
+    if ( in_array( 'shop_manager', $roles, true ) ) { // SCOS-SUPPORT-PASS2 — shop_manager redirect
+        $url = get_option( 'se_agency_login_redirect_shop_manager', '' );
+        return $url ? admin_url( ltrim( $url, '/' ) ) : $fallback;
+    }
+
+    if ( in_array( 'editor', $roles, true ) ) { // SCOS-SUPPORT-PASS2 — editor redirect
+        $url = get_option( 'se_agency_login_redirect_editor', '' );
+        return $url ? admin_url( ltrim( $url, '/' ) ) : $fallback;
     }
 
     return $redirect_to;

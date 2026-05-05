@@ -298,17 +298,151 @@ $page_url = admin_url( 'admin.php' );
 				</div>
 			</div>
 
-		<?php elseif ( 'support-settings' === $active_tab ) : ?>
+		<?php elseif ( 'support-settings' === $active_tab ) : // SCOS-SUPPORT-PASS2 — replaced empty state with working form ?>
 
-			<div class="scos-card">
-				<div class="scos-card__body">
-					<div class="scos-empty">
-						<div class="scos-empty__icon">&#x2699;&#xFE0F;</div>
-						<p class="scos-empty__title"><?php esc_html_e( 'Support settings', 'site-essentials' ); ?></p>
-						<p class="scos-empty__desc"><?php esc_html_e( 'Configuration for the client Support landing page. Coming in the next pass.', 'site-essentials' ); ?></p>
+			<?php /* Support settings uses its own nonce so it can be submitted independently */ // SCOS-SUPPORT-PASS2 — support-settings form ?>
+			<form method="post"
+				action="<?php echo esc_url( add_query_arg( [ 'page' => Admin_UI::AGENCY_PAGE_SLUG, 'tab' => 'support-settings' ], admin_url( 'admin.php' ) ) ); ?>">
+				<?php wp_nonce_field( 'se_support_save', 'se_support_nonce' ); ?>
+				<input type="hidden" name="se_support_save" value="1" />
+
+				<?php /* ── Card 1 — Support tools ─────────────────────────── */ ?>
+				<div class="scos-card">
+					<div class="scos-card__header">
+						<h2 class="scos-card__title"><?php esc_html_e( 'Support tools', 'site-essentials' ); ?></h2>
+						<p class="scos-card__desc"><?php esc_html_e( 'Links shown on the client Support landing page. Leave title or URL empty to hide.', 'site-essentials' ); ?></p>
+					</div>
+					<div class="scos-card__body">
+						<?php
+						$tool_placeholders = [
+							1 => [ 'title' => 'Quick Guide',              'url' => 'https://' ],
+							2 => [ 'title' => 'Website Manual',           'url' => 'https://' ],
+							3 => [ 'title' => 'Website Ranking Report',   'url' => 'https://' ],
+							4 => [ 'title' => 'Maps Ranking Report',      'url' => 'https://' ],
+							5 => [ 'title' => 'Client Portal',            'url' => 'https://' ],
+							6 => [ 'title' => '',                         'url' => 'https://' ],
+						];
+						for ( $i = 1; $i <= 6; $i++ ) :
+						?>
+						<div class="scos-metabox__row scos-metabox__row--inline">
+							<div>
+								<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_title">
+									<?php /* translators: %d slot number */ ?>
+									<?php echo esc_html( sprintf( __( 'Tool %d — Title', 'site-essentials' ), $i ) ); ?>
+								</label>
+								<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_title</div>
+								<input type="text"
+									id="se_support_tool_<?php echo esc_attr( $i ); ?>_title"
+									name="se_support_tool_<?php echo esc_attr( $i ); ?>_title"
+									class="scos-input"
+									value="<?php echo esc_attr( get_option( "se_support_tool_{$i}_title", '' ) ); ?>"
+									placeholder="<?php echo esc_attr( $tool_placeholders[ $i ]['title'] ); ?>" />
+							</div>
+							<div>
+								<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_url">
+									<?php echo esc_html( sprintf( __( 'Tool %d — URL', 'site-essentials' ), $i ) ); ?>
+								</label>
+								<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_url</div>
+								<input type="url"
+									id="se_support_tool_<?php echo esc_attr( $i ); ?>_url"
+									name="se_support_tool_<?php echo esc_attr( $i ); ?>_url"
+									class="scos-input"
+									value="<?php echo esc_url( get_option( "se_support_tool_{$i}_url", '' ) ); ?>"
+									placeholder="<?php echo esc_attr( $tool_placeholders[ $i ]['url'] ); ?>" />
+							</div>
+						</div>
+						<?php endfor; ?>
 					</div>
 				</div>
-			</div>
+
+				<?php /* ── Card 2 — AI tools ──────────────────────────────── */ ?>
+				<div class="scos-card">
+					<div class="scos-card__header">
+						<h2 class="scos-card__title"><?php esc_html_e( 'AI tools', 'site-essentials' ); ?></h2>
+						<p class="scos-card__desc"><?php esc_html_e( 'AI assistant links shown on the Support landing page. Leave title or URL empty to hide.', 'site-essentials' ); ?></p>
+					</div>
+					<div class="scos-card__body">
+						<?php
+						$ai_placeholders = [
+							1 => 'Content Writing Assistant',
+							2 => 'Research Assistant',
+							3 => 'Social Media Assistant',
+							4 => 'Competitor & Market Research',
+						];
+						for ( $i = 1; $i <= 4; $i++ ) :
+						?>
+						<div class="scos-metabox__row scos-metabox__row--inline">
+							<div>
+								<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_title">
+									<?php echo esc_html( sprintf( __( 'AI tool %d — Title', 'site-essentials' ), $i ) ); ?>
+								</label>
+								<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_title</div>
+								<input type="text"
+									id="se_support_ai_<?php echo esc_attr( $i ); ?>_title"
+									name="se_support_ai_<?php echo esc_attr( $i ); ?>_title"
+									class="scos-input"
+									value="<?php echo esc_attr( get_option( "se_support_ai_{$i}_title", '' ) ); ?>"
+									placeholder="<?php echo esc_attr( $ai_placeholders[ $i ] ); ?>" />
+							</div>
+							<div>
+								<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_url">
+									<?php echo esc_html( sprintf( __( 'AI tool %d — URL', 'site-essentials' ), $i ) ); ?>
+								</label>
+								<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_url</div>
+								<input type="url"
+									id="se_support_ai_<?php echo esc_attr( $i ); ?>_url"
+									name="se_support_ai_<?php echo esc_attr( $i ); ?>_url"
+									class="scos-input"
+									value="<?php echo esc_url( get_option( "se_support_ai_{$i}_url", '' ) ); ?>"
+									placeholder="https://" />
+							</div>
+						</div>
+						<?php endfor; ?>
+					</div>
+				</div>
+
+				<?php /* ── Card 3 — Third-party scripts ───────────────────── */ ?>
+				<div class="scos-card">
+					<div class="scos-card__header">
+						<h2 class="scos-card__title"><?php esc_html_e( 'Third-party scripts', 'site-essentials' ); ?></h2>
+						<p class="scos-card__desc"><?php esc_html_e( 'Output in WordPress admin only. Never rendered on the public site.', 'site-essentials' ); ?></p>
+					</div>
+					<div class="scos-card__body">
+						<table class="scos-form">
+							<tbody>
+								<tr>
+									<th>
+										<label for="se_support_script_commenter"><?php esc_html_e( 'Commenter script', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">se_support_script_commenter</div>
+									</th>
+									<td>
+										<textarea id="se_support_script_commenter" name="se_support_script_commenter"
+											class="scos-textarea" rows="4"><?php echo esc_textarea( get_option( 'se_support_script_commenter', '' ) ); ?></textarea>
+										<p class="description"><?php esc_html_e( 'Paste the full script tag.', 'site-essentials' ); ?></p>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<label for="se_support_script_ahrefs"><?php esc_html_e( 'Ahrefs analytics script', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">se_support_script_ahrefs</div>
+									</th>
+									<td>
+										<textarea id="se_support_script_ahrefs" name="se_support_script_ahrefs"
+											class="scos-textarea" rows="4"><?php echo esc_textarea( get_option( 'se_support_script_ahrefs', '' ) ); ?></textarea>
+										<p class="description"><?php esc_html_e( 'Paste the full script tag.', 'site-essentials' ); ?></p>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+					<div class="scos-card__footer">
+						<button type="submit" class="scos-btn scos-btn--primary">
+							<?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+						</button>
+					</div>
+				</div>
+
+			</form>
 
 		<?php elseif ( 'access' === $active_tab ) : ?>
 
@@ -338,6 +472,17 @@ $page_url = admin_url( 'admin.php' );
 								<td>
 									<input type="url" id="se_agency_login_redirect_editor" name="se_agency_login_redirect_editor" class="scos-input"
 										value="<?php echo esc_url( get_option( 'se_agency_login_redirect_editor', admin_url( 'admin.php?page=site-essentials-support' ) ) ); ?>" />
+								</td>
+							</tr>
+							<tr> <?php // SCOS-SUPPORT-PASS2 — shop_manager redirect field added ?>
+								<th>
+									<label for="se_agency_login_redirect_shop_manager"><?php esc_html_e( 'Shop Manager redirect', 'site-essentials' ); ?></label>
+									<div class="scos-form__slug">se_agency_login_redirect_shop_manager</div>
+								</th>
+								<td>
+									<input type="url" id="se_agency_login_redirect_shop_manager" name="se_agency_login_redirect_shop_manager" class="scos-input"
+										value="<?php echo esc_url( get_option( 'se_agency_login_redirect_shop_manager', admin_url( 'admin.php?page=site-essentials-support' ) ) ); ?>"
+										placeholder="<?php echo esc_attr( admin_url( 'admin.php?page=site-essentials-support' ) ); ?>" />
 								</td>
 							</tr>
 						</tbody>

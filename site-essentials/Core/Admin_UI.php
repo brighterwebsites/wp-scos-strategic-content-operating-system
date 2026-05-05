@@ -490,13 +490,17 @@ class Admin_UI {
     }
 
     /**
-     * Support hub shell (top-level menu — placeholder only).
+     * Support hub landing page — read-only, accessible to administrator/editor/shop_manager.
      *
      * @since 1.0.0
      * @return void
      */
     public function render_support_page() {
-        if ( ! current_user_can( 'manage_options' ) ) {
+        // SCOS-SUPPORT-PASS2 — multi-role support page access
+        $allowed_roles = [ 'administrator', 'editor', 'shop_manager' ];
+        $user          = wp_get_current_user();
+        $has_access    = (bool) array_intersect( $allowed_roles, (array) $user->roles );
+        if ( ! $has_access ) {
             wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
         }
 
@@ -555,15 +559,45 @@ class Admin_UI {
             }
 
             if ( 'access' === $post_tab ) {
-                $redir_admin  = isset( $_POST['se_agency_login_redirect_admin'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_admin'] ) ) : '';
-                $redir_editor = isset( $_POST['se_agency_login_redirect_editor'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_editor'] ) ) : '';
+                $redir_admin        = isset( $_POST['se_agency_login_redirect_admin'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_admin'] ) ) : '';
+                $redir_editor       = isset( $_POST['se_agency_login_redirect_editor'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_editor'] ) ) : '';
+                $redir_shop_manager = isset( $_POST['se_agency_login_redirect_shop_manager'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_shop_manager'] ) ) : ''; // SCOS-SUPPORT-PASS2 — shop_manager redirect field added
                 update_option( 'se_agency_login_redirect_admin', $redir_admin );
                 update_option( 'se_agency_login_redirect_editor', $redir_editor );
+                update_option( 'se_agency_login_redirect_shop_manager', $redir_shop_manager ); // SCOS-SUPPORT-PASS2 — shop_manager redirect field added
             }
 
             wp_safe_redirect(
                 add_query_arg(
                     [ 'page' => self::AGENCY_PAGE_SLUG, 'tab' => $post_tab, 'updated' => '1' ],
+                    admin_url( 'admin.php' )
+                )
+            );
+            exit;
+        }
+
+        // SCOS-SUPPORT-PASS2 — support-settings tab has its own nonce
+        if (
+            isset( $_POST['se_support_save'], $_POST['se_support_nonce'] ) &&
+            wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['se_support_nonce'] ) ), 'se_support_save' )
+        ) {
+            // Support tool links — 6 slots
+            for ( $i = 1; $i <= 6; $i++ ) {
+                update_option( "se_support_tool_{$i}_title", sanitize_text_field( wp_unslash( $_POST["se_support_tool_{$i}_title"] ?? '' ) ) );
+                update_option( "se_support_tool_{$i}_url",   esc_url_raw( wp_unslash( $_POST["se_support_tool_{$i}_url"] ?? '' ) ) );
+            }
+            // AI tool links — 4 slots
+            for ( $i = 1; $i <= 4; $i++ ) {
+                update_option( "se_support_ai_{$i}_title", sanitize_text_field( wp_unslash( $_POST["se_support_ai_{$i}_title"] ?? '' ) ) );
+                update_option( "se_support_ai_{$i}_url",   esc_url_raw( wp_unslash( $_POST["se_support_ai_{$i}_url"] ?? '' ) ) );
+            }
+            // Third-party scripts
+            update_option( 'se_support_script_commenter', sanitize_textarea_field( wp_unslash( $_POST['se_support_script_commenter'] ?? '' ) ) );
+            update_option( 'se_support_script_ahrefs',    sanitize_textarea_field( wp_unslash( $_POST['se_support_script_ahrefs'] ?? '' ) ) );
+
+            wp_safe_redirect(
+                add_query_arg(
+                    [ 'page' => self::AGENCY_PAGE_SLUG, 'tab' => 'support-settings', 'updated' => '1' ],
                     admin_url( 'admin.php' )
                 )
             );

@@ -1,0 +1,81 @@
+/* SCOS Plugin UI — Design Tokens
+ * Lightly-branded WP admin: WP layout & conventions, distinct card styling,
+ * indigo accent. Drop into your plugin's admin.css and reference vars throughout.
+ */
+
+:root {
+  /* ── Brand / accent ─────────────────────────────────────── */
+  --scos-accent: #4f46e5;          /* indigo-600 */
+  --scos-accent-hover: #4338ca;    /* indigo-700 */
+  --scos-accent-soft: #eef2ff;     /* indigo-50  */
+  --scos-accent-border: #c7d2fe;   /* indigo-200 */
+  --scos-accent-ink: #3730a3;      /* indigo-800 — text on soft */
+
+  /* ── Status colors ──────────────────────────────────────── */
+  --scos-success: #15803d;
+  --scos-success-soft: #f0fdf4;
+  --scos-success-border: #bbf7d0;
+  --scos-warning: #b45309;
+  --scos-warning-soft: #fffbeb;
+  --scos-warning-border: #fde68a;
+  --scos-danger: #b91c1c;
+  --scos-danger-soft: #fef2f2;
+  --scos-danger-border: #fecaca;
+  --scos-info: #1d4ed8;
+  --scos-info-soft: #eff6ff;
+  --scos-info-border: #bfdbfe;
+
+  /* ── Tier badges ────────────────────────────────────────── */
+  --scos-tier-basic: #2563eb;
+  --scos-tier-pro: #ea580c;
+  --scos-tier-enterprise: #7c3aed;
+
+  /* ── Neutrals (matched to WP admin grays) ───────────────── */
+  --scos-bg: #f0f0f1;              /* WP admin body bg */
+  --scos-surface: #ffffff;
+  --scos-surface-muted: #f6f7f7;
+  --scos-border: #dcdcde;          /* WP card border */
+  --scos-border-strong: #c3c4c7;
+  --scos-divider: #e5e5e7;
+
+  --scos-ink: #1d2327;             /* WP heading ink */
+  --scos-ink-muted: #50575e;       /* WP body text */
+  --scos-ink-subtle: #787c82;      /* WP muted */
+
+  /* ── Type ───────────────────────────────────────────────── */
+  --scos-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --scos-font-mono: Menlo, Consolas, Monaco, "Liberation Mono", monospace;
+
+  --scos-fs-xs: 11px;
+  --scos-fs-sm: 12px;
+  --scos-fs-md: 13px;              /* WP base */
+  --scos-fs-lg: 14px;
+  --scos-fs-xl: 16px;
+  --scos-fs-2xl: 20px;
+  --scos-fs-3xl: 23px;             /* WP h1 */
+
+  /* ── Spacing (4-step) ───────────────────────────────────── */
+  --scos-s-1: 4px;
+  --scos-s-2: 8px;
+  --scos-s-3: 12px;
+  --scos-s-4: 16px;
+  --scos-s-5: 20px;
+  --scos-s-6: 24px;
+  --scos-s-8: 32px;
+  --scos-s-10: 40px;
+  --scos-s-12: 48px;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --scos-r-sm: 4px;
+  --scos-r-md: 6px;
+  --scos-r-lg: 8px;
+  --scos-r-pill: 999px;
+
+  /* ── Elevation ──────────────────────────────────────────── */
+  --scos-shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+  --scos-shadow-md: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --scos-shadow-lg: 0 4px 12px rgba(0,0,0,.08);
+
+  /* ── Focus ──────────────────────────────────────────────── */
+  --scos-focus-ring: 0 0 0 2px #fff, 0 0 0 4px var(--scos-accent);
+}

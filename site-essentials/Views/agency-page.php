@@ -18,9 +18,14 @@ $page_url = admin_url( 'admin.php' );
 
 	<form id="se-agency-form" method="post"
 		action="<?php echo esc_url( add_query_arg( [ 'page' => Admin_UI::AGENCY_PAGE_SLUG, 'tab' => $active_tab ], $page_url ) ); ?>">
-		<?php wp_nonce_field( 'se_agency_save', 'se_agency_nonce' ); ?>
-		<input type="hidden" name="se_agency_save" value="1" />
-		<input type="hidden" name="se_agency_tab" value="<?php echo esc_attr( $active_tab ); ?>" />
+		<?php if ( 'support-settings' === $active_tab ) : // SCOS-SUPPORT-PASS2 — switch nonce/trigger for support-settings tab ?>
+			<?php wp_nonce_field( 'se_support_save', 'se_support_nonce' ); ?>
+			<input type="hidden" name="se_support_save" value="1" />
+		<?php else : ?>
+			<?php wp_nonce_field( 'se_agency_save', 'se_agency_nonce' ); ?>
+			<input type="hidden" name="se_agency_save" value="1" />
+			<input type="hidden" name="se_agency_tab" value="<?php echo esc_attr( $active_tab ); ?>" />
+		<?php endif; ?>
 
 		<header class="scos__header">
 			<div>
@@ -300,12 +305,6 @@ $page_url = admin_url( 'admin.php' );
 
 		<?php elseif ( 'support-settings' === $active_tab ) : // SCOS-SUPPORT-PASS2 — replaced empty state with working form ?>
 
-			<?php /* Support settings uses its own nonce so it can be submitted independently */ // SCOS-SUPPORT-PASS2 — support-settings form ?>
-			<form method="post"
-				action="<?php echo esc_url( add_query_arg( [ 'page' => Admin_UI::AGENCY_PAGE_SLUG, 'tab' => 'support-settings' ], admin_url( 'admin.php' ) ) ); ?>">
-				<?php wp_nonce_field( 'se_support_save', 'se_support_nonce' ); ?>
-				<input type="hidden" name="se_support_save" value="1" />
-
 				<?php /* ── Card 1 — Support tools ─────────────────────────── */ ?>
 				<div class="scos-card">
 					<div class="scos-card__header">
@@ -441,8 +440,6 @@ $page_url = admin_url( 'admin.php' );
 						</button>
 					</div>
 				</div>
-
-			</form>
 
 		<?php elseif ( 'access' === $active_tab ) : ?>
 

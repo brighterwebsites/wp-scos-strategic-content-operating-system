@@ -50,6 +50,7 @@ class Admin_UI {
     const SMA_PAGE_SLUG       = 'site-essentials-social-amplification';
     const SITE_SCHEMA_PAGE_SLUG = 'site-essentials-schema';
     const SUPPORT_PAGE_SLUG     = 'site-essentials-support';
+    const AGENCY_PAGE_SLUG      = 'site-essentials-agency';
 
     /** Legacy Support → Schema (bw-schema-admin); removed from brighter-core — redirect here. */
     private const LEGACY_BRIGHTER_SCHEMA_PAGE = 'brighter-schema';
@@ -229,6 +230,17 @@ class Admin_UI {
             30                                                   // Position
         );
 
+        // Top-level Support shell — highest priority, near top of admin menu
+        add_menu_page(
+            __( 'Support', 'site-essentials' ),
+            __( 'Support', 'site-essentials' ),
+            'manage_options',
+            self::SUPPORT_PAGE_SLUG,
+            [ $this, 'render_support_page' ],
+            'dashicons-sos',
+            2
+        );
+
         // 1. SEO — single "SEO Module" toggle (sitemaps + meta + archives + advanced + redirections).
         if ( $this->settings->is_module_enabled( 'seo' ) ) {
             add_submenu_page(
@@ -316,14 +328,14 @@ class Admin_UI {
             );
         }
 
-        // 8. Support & agency white label (always visible)
+        // 8. Agency white label (always visible as SE submenu)
         add_submenu_page(
             self::PAGE_SLUG,
-            __( 'Support & agency', 'site-essentials' ),
-            __( 'Support', 'site-essentials' ),
+            __( 'Agency', 'site-essentials' ),
+            __( 'Agency', 'site-essentials' ),
             'manage_options',
-            self::SUPPORT_PAGE_SLUG,
-            [ $this, 'render_support_page' ]
+            self::AGENCY_PAGE_SLUG,
+            [ $this, 'render_agency_page' ]
         );
 
         // 9. Settings (always visible)
@@ -376,7 +388,30 @@ class Admin_UI {
      * @return void
      */
     public function enqueue_assets($hook) {
-        // Only load on Site Essentials pages
+        // New pages use tokens.css + scos-ui.css only — admin.css excluded
+        // Agency is a submenu under site-essentials → hook is {parent}_page_{slug}
+        $scos_ui_hooks = [
+            'toplevel_page_' . self::SUPPORT_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::AGENCY_PAGE_SLUG,
+        ];
+
+        if ( in_array( $hook, $scos_ui_hooks, true ) ) {
+            wp_enqueue_style(
+                'scos-tokens',
+                SITE_ESSENTIALS_URL . 'assets/css/tokens.css',
+                [],
+                SITE_ESSENTIALS_VERSION
+            );
+            wp_enqueue_style(
+                'scos-ui',
+                SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css',
+                [ 'scos-tokens' ],
+                SITE_ESSENTIALS_VERSION
+            );
+            return;
+        }
+
+        // Only load admin.css on other Site Essentials pages
         $allowed_hooks = [
             'toplevel_page_' . self::PAGE_SLUG,
             'toplevel_page_' . self::SEO_PAGE_SLUG,
@@ -388,7 +423,6 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SITE_SCHEMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
-            self::PAGE_SLUG . '_page_' . self::SUPPORT_PAGE_SLUG,
         ];
 
         if (!in_array($hook, $allowed_hooks, true)) {
@@ -452,23 +486,87 @@ class Admin_UI {
     }
 
     /**
-     * Support hub & agency white label (se_agency_* / se_support_*).
+     * Support hub shell (top-level menu — placeholder only).
      *
      * @since 1.0.0
      * @return void
      */
     public function render_support_page() {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
-        }
-
-        $allowed = [ 'agency-setup', 'support', 'support-settings', 'access' ];
-        $active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'agency-setup';
-        if ( ! in_array( $active_tab, $allowed, true ) ) {
-            $active_tab = 'agency-setup';
+            wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
         }
 
         include SITE_ESSENTIALS_PATH . 'Views/support-page.php';
+    }
+
+    /**
+     * Agency white label settings page (se_agency_* options).
+     *
+     * Handles inline save before render (direct POST pattern — no admin-post.php).
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_agency_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
+        }
+
+        $active_tab  = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'agency-settings';
+        $valid_tabs  = [ 'agency-settings', 'support-settings', 'access' ];
+        if ( ! in_array( $active_tab, $valid_tabs, true ) ) {
+            $active_tab = 'agency-settings';
+        }
+
+        $saved = false;
+
+        // Inline save — fires before render, redirects after save
+        if (
+            isset( $_POST['se_agency_save'], $_POST['se_agency_nonce'] ) &&
+            wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['se_agency_nonce'] ) ), 'se_agency_save' )
+        ) {
+            $post_tab = isset( $_POST['se_agency_tab'] ) ? sanitize_key( wp_unslash( $_POST['se_agency_tab'] ) ) : $active_tab;
+
+            if ( 'agency-settings' === $post_tab ) {
+                $text_fields = [
+                    'se_agency_name', 'se_agency_contact', 'se_agency_url',
+                    'se_agency_email', 'se_agency_phone', 'se_agency_location',
+                    'se_agency_generator', 'se_agency_credit_prefix',
+                    'se_agency_credit_anchor', 'se_agency_credit_utm',
+                    'se_agency_credit_target', 'se_agency_credit_rel',
+                    'se_agency_meta_designer', 'se_agency_meta_author',
+                ];
+                foreach ( $text_fields as $key ) {
+                    if ( isset( $_POST[ $key ] ) ) {
+                        update_option( $key, sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) );
+                    }
+                }
+                if ( isset( $_POST['se_agency_logo'] ) ) {
+                    update_option( 'se_agency_logo', absint( $_POST['se_agency_logo'] ) );
+                }
+                if ( isset( $_POST['se_agency_humans_txt'] ) ) {
+                    update_option( 'se_agency_humans_txt', sanitize_textarea_field( wp_unslash( $_POST['se_agency_humans_txt'] ) ) );
+                }
+                update_option( 'se_agency_humans_txt_enabled', ! empty( $_POST['se_agency_humans_txt_enabled'] ) ? '1' : '' );
+            }
+
+            if ( 'access' === $post_tab ) {
+                $redir_admin  = isset( $_POST['se_agency_login_redirect_admin'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_admin'] ) ) : '';
+                $redir_editor = isset( $_POST['se_agency_login_redirect_editor'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_editor'] ) ) : '';
+                update_option( 'se_agency_login_redirect_admin', $redir_admin );
+                update_option( 'se_agency_login_redirect_editor', $redir_editor );
+            }
+
+            wp_safe_redirect(
+                add_query_arg(
+                    [ 'page' => self::AGENCY_PAGE_SLUG, 'tab' => $post_tab, 'updated' => '1' ],
+                    admin_url( 'admin.php' )
+                )
+            );
+            exit;
+        }
+
+        include SITE_ESSENTIALS_PATH . 'Views/agency-page.php';
     }
 
     /**

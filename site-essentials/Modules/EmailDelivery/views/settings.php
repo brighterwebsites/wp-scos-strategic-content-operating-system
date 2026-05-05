@@ -190,6 +190,14 @@ if ( isset( $_GET['scos_email_saved'] ) && '1' === sanitize_text_field( wp_unsla
 	<?php endif; ?>
 </div>
 
+<?php
+// Footer-localized `siteEssentials` is not available when this inline script runs (script loads later).
+$se_email_ajax = [
+	'ajaxurl' => admin_url( 'admin-ajax.php' ),
+	'nonce'   => wp_create_nonce( 'site_essentials_admin' ),
+];
+?>
+
 <script>
 (function() {
 	var keyInput = document.getElementById('se_email_api_key');
@@ -205,13 +213,15 @@ if ( isset( $_GET['scos_email_saved'] ) && '1' === sanitize_text_field( wp_unsla
 			}
 		});
 	}
+	var seAjax = <?php echo wp_json_encode( $se_email_ajax ); ?>;
 	var testBtn = document.getElementById('se_email_send_test');
 	var testOut = document.getElementById('se_email_test_result');
-	if (testBtn && testOut && typeof siteEssentials !== 'undefined') {
+	if (testBtn && testOut && seAjax && seAjax.ajaxurl && seAjax.nonce) {
 		testBtn.addEventListener('click', function() {
 			testOut.textContent = <?php echo wp_json_encode( __( 'Sending…', 'site-essentials' ) ); ?>;
+			testOut.style.color = '';
 			var xhr = new XMLHttpRequest();
-			xhr.open('POST', siteEssentials.ajaxurl, true);
+			xhr.open('POST', seAjax.ajaxurl, true);
 			xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
 			xhr.onload = function() {
 				try {
@@ -232,7 +242,11 @@ if ( isset( $_GET['scos_email_saved'] ) && '1' === sanitize_text_field( wp_unsla
 					testOut.style.color = '#b91c1c';
 				}
 			};
-			xhr.send('action=scos_send_test_email&nonce=' + encodeURIComponent(siteEssentials.nonce));
+			xhr.onerror = function() {
+				testOut.textContent = <?php echo wp_json_encode( __( 'Network error.', 'site-essentials' ) ); ?>;
+				testOut.style.color = '#b91c1c';
+			};
+			xhr.send('action=scos_send_test_email&nonce=' + encodeURIComponent(seAjax.nonce));
 		});
 	}
 })();

@@ -240,10 +240,38 @@ function bw_schema_get_post_thumbnail_url($post_id) {
 }
 
 /**
+ * Whether an option name may be read via %%_cmeta_options_<name>%% schema placeholders.
+ * Restricted to known-safe prefixes; extend with {@see 'bw_schema_options_placeholder_key_allowed'}.
+ *
+ * @param string $option_key Option name (no table prefix).
+ * @return bool
+ */
+function bw_schema_options_placeholder_key_allowed($option_key) {
+    $option_key = (string) $option_key;
+    if ($option_key === '' || strlen($option_key) > 191) {
+        return false;
+    }
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $option_key)) {
+        return false;
+    }
+    $prefixes = (array) apply_filters(
+        'bw_schema_options_placeholder_allowed_prefixes',
+        ['se_', 'scos_', 'site_essentials_']
+    );
+    foreach ($prefixes as $pfx) {
+        $pfx = (string) $pfx;
+        if ($pfx !== '' && strpos($option_key, $pfx) === 0) {
+            return (bool) apply_filters('bw_schema_options_placeholder_key_allowed', true, $option_key);
+        }
+    }
+    return (bool) apply_filters('bw_schema_options_placeholder_key_allowed', false, $option_key);
+}
+
+/**
  * Resolve a single schema variable for a given post/context.
  * Used by bw_schema_replace_variables. Variable names are case-sensitive.
  *
- * @param string $name   Variable name without %%, e.g. post_title, _cmeta_my_key, _acf_my_field
+ * @param string $name   Variable name without %%, e.g. post_title, _cmeta_my_key, _cmeta_options_se_my_key, _acf_my_field
  * @param int    $post_id Post ID (0 for site-only context, e.g. Local Business)
  * @return string|int|float|array|null Resolved value; arrays allowed for ACF (Stage 3 repeaters)
  */
@@ -259,6 +287,22 @@ function bw_schema_resolve_variable($name, $post_id) {
     }
     if ($name === 'site_url') {
         return home_url('/');
+    }
+
+    // Custom options: %%_cmeta_options_option_key%% → get_option( 'option_key' ). Must run before _cmeta_ (post meta) and before post-only gate.
+    if (strpos($name, '_cmeta_options_') === 0) {
+        $option_key = substr($name, strlen('_cmeta_options_'));
+        if ($option_key === '' || !bw_schema_options_placeholder_key_allowed($option_key)) {
+            return '';
+        }
+        $val = get_option($option_key, null);
+        if ($val === null) {
+            return '';
+        }
+        if (is_array($val) || is_object($val)) {
+            return $val;
+        }
+        return $val === '' ? '' : (string) $val;
     }
 
     // Post-level (require valid post)

@@ -49,6 +49,7 @@ class Admin_UI {
     const ANALYTICS_PAGE_SLUG = 'site-essentials-analytics';
     const SMA_PAGE_SLUG       = 'site-essentials-social-amplification';
     const SITE_SCHEMA_PAGE_SLUG = 'site-essentials-schema';
+    const SUPPORT_PAGE_SLUG     = 'site-essentials-support';
 
     /** Legacy Support → Schema (bw-schema-admin); removed from brighter-core — redirect here. */
     private const LEGACY_BRIGHTER_SCHEMA_PAGE = 'brighter-schema';
@@ -85,6 +86,7 @@ class Admin_UI {
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
         add_action('admin_post_site_essentials_save_sma', [$this, 'save_sma_settings']);
         add_action('admin_post_scos_save_ai_keys',        [$this, 'save_ai_keys']);
+        add_action('admin_post_site_essentials_save_support', [$this, 'save_support_hub_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
     }
@@ -311,7 +313,17 @@ class Admin_UI {
             );
         }
 
-        // 8. Settings (always visible)
+        // 8. Support & agency white label (always visible)
+        add_submenu_page(
+            self::PAGE_SLUG,
+            __( 'Support & agency', 'site-essentials' ),
+            __( 'Support', 'site-essentials' ),
+            'manage_options',
+            self::SUPPORT_PAGE_SLUG,
+            [ $this, 'render_support_page' ]
+        );
+
+        // 9. Settings (always visible)
         add_submenu_page(
             self::PAGE_SLUG,
             __( 'Plugin Settings', 'site-essentials' ),
@@ -373,6 +385,7 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SITE_SCHEMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SUPPORT_PAGE_SLUG,
         ];
 
         if (!in_array($hook, $allowed_hooks, true)) {
@@ -433,6 +446,26 @@ class Admin_UI {
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'modules';
 
         include SITE_ESSENTIALS_PATH . 'Views/settings-page.php';
+    }
+
+    /**
+     * Support hub & agency white label (se_agency_* / se_support_*).
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_support_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $allowed = [ 'agency-setup', 'support', 'support-settings', 'access' ];
+        $active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'agency-setup';
+        if ( ! in_array( $active_tab, $allowed, true ) ) {
+            $active_tab = 'agency-setup';
+        }
+
+        include SITE_ESSENTIALS_PATH . 'Views/support-page.php';
     }
 
     /**
@@ -1283,6 +1316,126 @@ class Admin_UI {
         ], admin_url('admin.php'));
 
         wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    /**
+     * Save Support & agency options (tabbed forms).
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function save_support_hub_settings() {
+        if ( ! isset( $_POST['site_essentials_support_nonce'] ) ||
+            ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['site_essentials_support_nonce'] ) ), 'site_essentials_support' ) ) {
+            wp_die( esc_html__( 'Security check failed', 'site-essentials' ) );
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $tab = isset( $_POST['se_support_save_tab'] ) ? sanitize_key( wp_unslash( $_POST['se_support_save_tab'] ) ) : '';
+        $allowed = [ 'agency-setup', 'support', 'support-settings', 'access' ];
+        if ( ! in_array( $tab, $allowed, true ) ) {
+            wp_die( esc_html__( 'Invalid tab.', 'site-essentials' ) );
+        }
+
+        $staff_ok = function_exists( 'scos_agency_user_can_manage_agency_setup' )
+            && scos_agency_user_can_manage_agency_setup( wp_get_current_user() );
+
+        if ( in_array( $tab, [ 'agency-setup', 'access' ], true ) && ! $staff_ok ) {
+            wp_die( esc_html__( 'You do not have permission to save these settings.', 'site-essentials' ) );
+        }
+
+        if ( 'agency-setup' === $tab ) {
+            update_option( 'se_agency_name', sanitize_text_field( wp_unslash( $_POST['se_agency_name'] ?? '' ) ) );
+            update_option( 'se_agency_contact', sanitize_text_field( wp_unslash( $_POST['se_agency_contact'] ?? '' ) ) );
+            update_option( 'se_agency_url', esc_url_raw( wp_unslash( $_POST['se_agency_url'] ?? '' ) ) );
+            update_option( 'se_agency_email', sanitize_email( wp_unslash( $_POST['se_agency_email'] ?? '' ) ) );
+            update_option( 'se_agency_phone', sanitize_text_field( wp_unslash( $_POST['se_agency_phone'] ?? '' ) ) );
+            update_option( 'se_agency_logo_id', absint( $_POST['se_agency_logo_id'] ?? 0 ) );
+            update_option( 'se_agency_location', sanitize_text_field( wp_unslash( $_POST['se_agency_location'] ?? '' ) ) );
+            update_option( 'se_agency_meta_designer', sanitize_text_field( wp_unslash( $_POST['se_agency_meta_designer'] ?? '' ) ) );
+            update_option( 'se_agency_meta_web_author', sanitize_text_field( wp_unslash( $_POST['se_agency_meta_web_author'] ?? '' ) ) );
+            update_option( 'se_agency_meta_generator', sanitize_text_field( wp_unslash( $_POST['se_agency_meta_generator'] ?? '' ) ) );
+            update_option( 'se_agency_credit_prefix', sanitize_text_field( wp_unslash( $_POST['se_agency_credit_prefix'] ?? '' ) ) );
+            update_option( 'se_agency_credit_anchor', sanitize_text_field( wp_unslash( $_POST['se_agency_credit_anchor'] ?? '' ) ) );
+            update_option( 'se_agency_credit_utm', sanitize_text_field( wp_unslash( $_POST['se_agency_credit_utm'] ?? '' ) ) );
+            update_option( 'se_agency_credit_target', sanitize_text_field( wp_unslash( $_POST['se_agency_credit_target'] ?? '' ) ) );
+            update_option( 'se_agency_credit_rel', sanitize_text_field( wp_unslash( $_POST['se_agency_credit_rel'] ?? '' ) ) );
+            update_option( 'se_agency_humans_txt', sanitize_textarea_field( wp_unslash( $_POST['se_agency_humans_txt'] ?? '' ) ) );
+            $redir_admin  = isset( $_POST['se_agency_login_redirect_admin'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_admin'] ) ) : '';
+            $redir_editor = isset( $_POST['se_agency_login_redirect_editor'] ) ? esc_url_raw( wp_unslash( $_POST['se_agency_login_redirect_editor'] ) ) : '';
+            if ( function_exists( 'scos_agency_sanitize_login_redirect' ) ) {
+                $redir_admin  = scos_agency_sanitize_login_redirect( $redir_admin );
+                $redir_editor = scos_agency_sanitize_login_redirect( $redir_editor );
+            }
+            update_option( 'se_agency_login_redirect_admin', $redir_admin );
+            update_option( 'se_agency_login_redirect_editor', $redir_editor );
+        }
+
+        if ( 'support' === $tab ) {
+            update_option( 'se_support_landing_html', wp_kses_post( wp_unslash( $_POST['se_support_landing_html'] ?? '' ) ) );
+        }
+
+        if ( 'support-settings' === $tab ) {
+            $urls = [
+                'se_support_manual_full'            => 'se_support_manual_full',
+                'se_support_manual_quick'           => 'se_support_manual_quick',
+                'se_support_website_ranking'        => 'se_support_website_ranking',
+                'se_support_map_ranking'            => 'se_support_map_ranking',
+                'se_support_ai_content'             => 'se_support_ai_content',
+                'se_support_ai_research'            => 'se_support_ai_research',
+                'se_support_ai_social'              => 'se_support_ai_social',
+                'se_support_ai_competitor'          => 'se_support_ai_competitor',
+                'se_support_management_portal'      => 'se_support_management_portal',
+            ];
+            foreach ( $urls as $post_key => $opt_key ) {
+                update_option( $opt_key, esc_url_raw( wp_unslash( $_POST[ $post_key ] ?? '' ) ) );
+            }
+
+            $allowed_tags = [
+                'script' => [
+                    'src'      => true,
+                    'type'     => true,
+                    'async'    => true,
+                    'defer'    => true,
+                    'data-key' => true,
+                    'id'       => true,
+                ],
+                'link'   => [
+                    'rel'         => true,
+                    'href'        => true,
+                    'as'          => true,
+                    'type'        => true,
+                    'crossorigin' => true,
+                ],
+            ];
+            if ( isset( $_POST['se_support_simple_commenter_script'] ) ) {
+                $raw = wp_unslash( $_POST['se_support_simple_commenter_script'] );
+                update_option( 'se_support_simple_commenter_script', is_string( $raw ) ? wp_kses( $raw, $allowed_tags ) : '' );
+            }
+            if ( isset( $_POST['se_support_ahrefs_script'] ) ) {
+                $raw = wp_unslash( $_POST['se_support_ahrefs_script'] );
+                update_option( 'se_support_ahrefs_script', is_string( $raw ) ? wp_kses( $raw, $allowed_tags ) : '' );
+            }
+        }
+
+        if ( 'access' === $tab ) {
+            $domains = isset( $_POST['se_agency_staff_domains'] ) ? sanitize_text_field( wp_unslash( $_POST['se_agency_staff_domains'] ) ) : '';
+            $domains = preg_replace( '/[^a-zA-Z0-9@.,\s\-]/', '', $domains );
+            update_option( 'se_agency_staff_domains', $domains );
+        }
+
+        $redirect_url = add_query_arg(
+            [
+                'page'    => self::SUPPORT_PAGE_SLUG,
+                'tab'     => $tab,
+                'updated' => 'true',
+            ],
+            admin_url( 'admin.php' )
+        );
+        wp_safe_redirect( $redirect_url );
         exit;
     }
 

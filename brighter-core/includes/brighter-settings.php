@@ -58,41 +58,17 @@ add_action('admin_enqueue_scripts', function($hook) {
  */
 add_action('admin_init', function() {
 
-    // 🔧 Register options (all in one group now)
-    register_setting('brighter_support_settings', 'manual_full_link');
-    register_setting('brighter_support_settings', 'manual_quick_link');
-    register_setting('brighter_support_settings', 'website_ranking_link');
-    register_setting('brighter_support_settings', 'map_ranking_link');
     register_setting('brighter_support_settings', 'brighter_login_logo');
     register_setting('brighter_support_settings', 'brc_token'); // 👈 token saved here
 
-    // 📘 Section: Manual & API Settings
     add_settings_section(
         'manual_links_section',
-        'Edit Manual Links & API Token',
-        '__return_false',
+        'Login branding & API token',
+        function () {
+            echo '<p>' . esc_html__( 'Manual and ranking URLs are configured in Site Essentials ? Support ? Support settings.', 'brighterwebsites' ) . '</p>';
+        },
         'brighter_support_page'
     );
-
-    // 📚 Full Manual URL
-    add_settings_field('manual_full_link', 'Full Manual URL', function() {
-        echo '<input type="url" name="manual_full_link" value="' . esc_url(get_option('manual_full_link')) . '" class="regular-text">';
-    }, 'brighter_support_page', 'manual_links_section');
-
-    // ⚡ Quick Guide URL
-    add_settings_field('manual_quick_link', 'Quick Guide URL', function() {
-        echo '<input type="url" name="manual_quick_link" value="' . esc_url(get_option('manual_quick_link')) . '" class="regular-text">';
-    }, 'brighter_support_page', 'manual_links_section');
-
-    // 🌐 Website Ranking Link
-    add_settings_field('website_ranking_link', 'Ranks Pro Website Ranking Link', function() {
-        echo '<input type="url" name="website_ranking_link" value="' . esc_url(get_option('website_ranking_link')) . '" class="regular-text">';
-    }, 'brighter_support_page', 'manual_links_section');
-
-    // 📍 Map Ranking Link
-    add_settings_field('map_ranking_link', 'Ranks Pro Map Ranking Link', function() {
-        echo '<input type="url" name="map_ranking_link" value="' . esc_url(get_option('map_ranking_link')) . '" class="regular-text">';
-    }, 'brighter_support_page', 'manual_links_section');
 
     // 🔒 Login Page Logo
     add_settings_field('brighter_login_logo', 'Login Page Logo URL', function() {

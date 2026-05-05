@@ -108,7 +108,7 @@ define('NTFY_PASSWORD', 'your-password');</pre>
 		<h2 style="margin-top:0;"><?php esc_html_e( 'Automated Monitors', 'site-essentials' ); ?></h2>
 		<p class="description" style="margin-bottom:16px;">
 			<?php esc_html_e( 'Monitors run via WP-Cron and send push notifications when issues are detected. Toggle each monitor with a constant in wp-config.php.', 'site-essentials' ); ?>
-			<?php esc_html_e( 'Note: cron and forms monitors are partially implemented.', 'site-essentials' ); ?>
+			<?php esc_html_e( 'Note: WP-Cron and form monitors are opt-in and partially implemented; enable their constants only if you need them.', 'site-essentials' ); ?>
 		</p>
 
 		<?php
@@ -152,7 +152,7 @@ define('NTFY_PASSWORD', 'your-password');</pre>
 			[
 				'id'          => 'cron',
 				'label'       => __( 'WP-Cron Monitor', 'site-essentials' ),
-				'description' => __( 'Alerts when WP-Cron stops running. Requires an external cron job. Implementation is partial.', 'site-essentials' ),
+				'description' => __( 'Stub only (missed-event detection not implemented). Opt-in: set NTFY_MONITOR_CRON true in wp-config to load; no useful alerts yet.', 'site-essentials' ),
 				'constant'    => 'NTFY_MONITOR_CRON',
 				'status'      => 'partial',
 			],

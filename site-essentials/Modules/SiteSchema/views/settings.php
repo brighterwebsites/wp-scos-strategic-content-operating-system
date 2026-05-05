@@ -169,6 +169,7 @@ if ( isset( $_GET['scos_schema_saved'] ) ) {
 		<li><code>%%post_author%%</code>, <code>%%post_thumbnail_url%%</code></li>
 		<li><code>%%site_name%%</code>, <code>%%site_url%%</code></li>
 		<li><code>%%_cmeta_meta_key%%</code> &mdash; <?php esc_html_e( 'Custom post meta', 'site-essentials' ); ?></li>
+		<li><code>%%_cmeta_options_option_key%%</code> &mdash; <?php esc_html_e( 'WordPress option value (allowed option name prefixes: se_, scos_, site_essentials_; works in site-wide schema without a post)', 'site-essentials' ); ?></li>
 		<li><code>%%_acf_field_name%%</code> &mdash; <?php esc_html_e( 'ACF field', 'site-essentials' ); ?></li>
 	</ul>
 	<p class="description"><?php esc_html_e( 'Multiple blocks: use a single array [ { … }, { … } ].', 'site-essentials' ); ?></p>

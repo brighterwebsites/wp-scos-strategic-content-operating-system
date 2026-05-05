@@ -42,6 +42,7 @@ function brighter_get_whitelisted_modules() {
 
     if ($whitelist === null) {
         $whitelist = [
+            'scos-support-options',
             'brighter-business-info',
             'brighter-support',
             'brighter-frontend',
@@ -180,6 +181,7 @@ function brighter_load_module($module) {
 function brighter_load_modules() {
     // Define which modules to load
     $modules = [
+        'scos-support-options',
         'brighter-business-info',
         'brighter-frontend',
         'brighter-og-meta',             // Open Graph & Meta Tags

@@ -55,7 +55,16 @@ add_action('wp_footer', function() {
             }
         </style>
          <div class="gs-admin-bar-links">
-            <a href="https://brighterwebsites.com.au/support" target="_blank" rel="noopener">💬 Support</a>
+            <?php
+            $support_href = 'https://brighterwebsites.com.au/support';
+            if ( function_exists( 'scos_se_agency_get' ) ) {
+                $base = rtrim( (string) scos_se_agency_get( 'url' ), '/' );
+                if ( $base !== '' ) {
+                    $support_href = preg_match( '#/support$#i', $base ) ? $base : trailingslashit( $base ) . 'support';
+                }
+            }
+            ?>
+            <a href="<?php echo esc_url( $support_href ); ?>" target="_blank" rel="noopener">💬 Support</a>
             <a href="<?php echo esc_url(admin_url('edit.php')); ?>">📊 Dashboard</a>
 
             <?php if ($post && $post->ID):
@@ -85,11 +94,21 @@ function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
     if ( isset( $user->ID ) ) {
         // Set a transient to show the notice (expires in 60 seconds)
         set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
-        
-        // Redirect to Brighter Support page
-        return admin_url( 'admin.php?page=brighter_support&tab=support' );
+
+        $default = admin_url( 'admin.php?page=brighter_support&tab=support' );
+        if ( function_exists( 'scos_se_agency_get' ) && function_exists( 'scos_agency_sanitize_login_redirect' ) ) {
+            if ( user_can( $user, 'manage_options' ) ) {
+                $custom = scos_agency_sanitize_login_redirect( (string) scos_se_agency_get( 'login_redirect_admin' ) );
+            } else {
+                $custom = scos_agency_sanitize_login_redirect( (string) scos_se_agency_get( 'login_redirect_editor' ) );
+            }
+            if ( $custom !== '' ) {
+                return $custom;
+            }
+        }
+        return $default;
     }
-    
+
     return $redirect_to;
 }
 

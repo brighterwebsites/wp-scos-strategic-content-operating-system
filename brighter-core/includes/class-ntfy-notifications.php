@@ -124,8 +124,8 @@ class Brighter_Ntfy_Notifications {
         }
         
         // Otherwise, default to enabled if NTFY_ENABLED is true
-        // Exception: forms are opt-in (default false)
-        if ($monitor === 'forms') {
+        // Exception: forms and cron are opt-in (default false). Cron monitor is stubbed until check_missed_events() exists.
+        if ($monitor === 'forms' || $monitor === 'cron') {
             return false;
         }
         

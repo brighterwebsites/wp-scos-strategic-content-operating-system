@@ -86,6 +86,9 @@ class Admin_UI {
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
         add_action('admin_post_site_essentials_save_sma', [$this, 'save_sma_settings']);
         add_action('admin_post_scos_save_ai_keys',        [$this, 'save_ai_keys']);
+        add_action('admin_post_scos_save_email_settings',   [$this, 'save_email_settings']);
+        add_action('wp_ajax_scos_send_test_email',          [$this, 'ajax_send_test_email']);
+        add_action('admin_notices',                         [$this, 'maybe_notice_email_no_api_key']);
         add_action('admin_post_site_essentials_save_support', [$this, 'save_support_hub_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
@@ -763,6 +766,119 @@ class Admin_UI {
 
         wp_redirect( add_query_arg( [ 'page' => self::SETTINGS_PAGE_SLUG, 'tab' => 'ai-keys', 'updated' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
+    }
+
+    /**
+     * Save Email / transactional delivery settings (Plugin Settings → Email).
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function save_email_settings(): void {
+        if ( ! isset( $_POST['scos_email_nonce'] )
+            || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['scos_email_nonce'] ) ), 'scos_save_email_settings' ) ) {
+            wp_die( esc_html__( 'Security check failed.', 'site-essentials' ) );
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
+        }
+
+        $prev_enabled = (bool) get_option( 'se_email_enabled', false );
+        $enabled      = isset( $_POST['se_email_enabled'] ) ? 1 : 0;
+        update_option( 'se_email_enabled', $enabled );
+
+        $api_from_wpconfig = defined( 'SE_EMAIL_API_KEY' ) && is_string( SE_EMAIL_API_KEY ) && SE_EMAIL_API_KEY !== '';
+        if ( ! $api_from_wpconfig && isset( $_POST['se_email_api_key'] ) ) {
+            update_option( 'se_email_api_key', sanitize_text_field( wp_unslash( $_POST['se_email_api_key'] ) ) );
+        }
+
+        update_option(
+            'se_email_from_address',
+            isset( $_POST['se_email_from_address'] ) ? sanitize_email( wp_unslash( $_POST['se_email_from_address'] ) ) : ''
+        );
+        update_option(
+            'se_email_from_name',
+            isset( $_POST['se_email_from_name'] ) ? sanitize_text_field( wp_unslash( $_POST['se_email_from_name'] ) ) : ''
+        );
+        update_option(
+            'se_email_reply_to',
+            isset( $_POST['se_email_reply_to'] ) ? sanitize_email( wp_unslash( $_POST['se_email_reply_to'] ) ) : ''
+        );
+
+        if ( $enabled ) {
+            if ( ! \SiteEssentials\Modules\EmailDelivery\Email_Logger::table_exists() ) {
+                \SiteEssentials\Modules\EmailDelivery\Email_Logger::create_table();
+            }
+            \SiteEssentials\Modules\EmailDelivery\Email_Logger::schedule_prune_cron();
+        } else {
+            \SiteEssentials\Modules\EmailDelivery\Email_Logger::unschedule_prune_cron();
+        }
+
+        wp_safe_redirect(
+            add_query_arg(
+                [
+                    'page'               => self::SETTINGS_PAGE_SLUG,
+                    'tab'                => 'email',
+                    'scos_email_saved'   => '1',
+                ],
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    /**
+     * AJAX: send transactional email test to site admin email.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function ajax_send_test_email(): void {
+        check_ajax_referer( 'site_essentials_admin', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'site-essentials' ) ], 403 );
+        }
+
+        $admin_email = sanitize_email( get_bloginfo( 'admin_email' ) );
+        $result      = \SiteEssentials\Modules\EmailDelivery\Email_Delivery::send_test_email( $admin_email );
+
+        if ( ! empty( $result['success'] ) ) {
+            wp_send_json_success(
+                [
+                    'message'    => isset( $result['message'] ) ? $result['message'] : '',
+                    'message_id' => isset( $result['message_id'] ) ? $result['message_id'] : '',
+                ]
+            );
+        }
+
+        wp_send_json_error(
+            [
+                'message' => isset( $result['message'] ) ? $result['message'] : __( 'Send failed.', 'site-essentials' ),
+            ]
+        );
+    }
+
+    /**
+     * Admin notice when transactional email is enabled but no API key is configured.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function maybe_notice_email_no_api_key(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( ! get_option( 'se_email_enabled', false ) ) {
+            return;
+        }
+        if ( \SiteEssentials\Modules\EmailDelivery\Email_Delivery::get_api_key() !== '' ) {
+            return;
+        }
+
+        echo '<div class="notice notice-warning"><p>';
+        esc_html_e( 'Site Essentials Email is enabled but no API key is configured. Add a key in Plugin Settings → Email or define SE_EMAIL_API_KEY in wp-config.php.', 'site-essentials' );
+        echo '</p></div>';
     }
 
     /**

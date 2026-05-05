@@ -284,3 +284,23 @@ add_action('init', function() {
         flush_rewrite_rules();
     }
 }, 20);
+
+/**
+ * Email delivery log prune (WP-Cron weekly).
+ *
+ * @since 1.0.0
+ */
+add_action( 'scos_email_log_prune', [ '\SiteEssentials\Modules\EmailDelivery\Email_Logger', 'prune_old_entries' ] );
+
+/**
+ * CyberPanel transactional email transport (pre_wp_mail).
+ *
+ * @since 1.0.0
+ */
+add_action(
+    'init',
+    static function () {
+        ( new \SiteEssentials\Modules\EmailDelivery\Email_Delivery() )->boot();
+    },
+    15
+);

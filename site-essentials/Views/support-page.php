@@ -125,6 +125,26 @@ $agency_url   = get_option( 'se_agency_url', '' );
 	</div>
 	<?php endif; ?>
 
+	<?php /* ── Performance & Search — hardcoded standard tools ──── */ ?>
+	<p class="scos__section-label"><?php esc_html_e( 'Performance &amp; Search', 'site-essentials' ); ?></p>
+	<div class="scos-support__grid">
+		<a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" class="scos-support__tile">
+			<?php esc_html_e( 'Google Search Console', 'site-essentials' ); ?>
+		</a>
+		<a href="https://analytics.google.com/analytics/web/" target="_blank" rel="noopener noreferrer" class="scos-support__tile">
+			<?php esc_html_e( 'Google Analytics', 'site-essentials' ); ?>
+		</a>
+		<a href="https://app.ahrefs.com/site-audit" target="_blank" rel="noopener noreferrer" class="scos-support__tile">
+			<?php esc_html_e( 'AHREFS Site Audit', 'site-essentials' ); ?>
+		</a>
+		<a href="https://pagespeed.web.dev/" target="_blank" rel="noopener noreferrer" class="scos-support__tile">
+			<?php esc_html_e( 'PageSpeed Insights', 'site-essentials' ); ?>
+		</a>
+		<a href="<?php echo esc_url( admin_url( 'site-health.php' ) ); ?>" class="scos-support__tile">
+			<?php esc_html_e( 'WP Website Health', 'site-essentials' ); ?>
+		</a>
+	</div>
+
 	<?php /* ── Empty state — nothing configured yet ────────────── */ ?>
 	<?php if ( empty( $tools ) && empty( $ai_tools ) && ! $agency_email && ! $agency_phone && ! $agency_url ) : ?>
 	<div class="scos-empty">

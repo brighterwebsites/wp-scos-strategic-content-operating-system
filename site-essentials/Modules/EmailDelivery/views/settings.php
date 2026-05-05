@@ -114,6 +114,9 @@ if ( isset( $_GET['scos_email_saved'] ) && '1' === sanitize_text_field( wp_unsla
 							<input type="text" name="se_email_from_name" id="se_email_from_name" class="regular-text"
 								value="<?php echo esc_attr( is_string( $from_name ) ? $from_name : '' ); ?>"
 								style="max-width:560px;width:100%;">
+							<p class="description">
+								<?php esc_html_e( 'Stored for reference. CyberPanel Email API sends using the From email only (plain address).', 'site-essentials' ); ?>
+							</p>
 						</td>
 					</tr>
 					<tr>

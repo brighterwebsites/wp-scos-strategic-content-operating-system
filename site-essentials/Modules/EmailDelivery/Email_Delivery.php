@@ -161,15 +161,12 @@ class Email_Delivery {
 			return new \WP_Error( 'se_email_no_key', __( 'API key is not configured.', 'site-essentials' ) );
 		}
 
-		$from_name    = self::get_config( 'SE_EMAIL_FROM_NAME', 'se_email_from_name' );
 		$from_address = self::get_config( 'SE_EMAIL_FROM_ADDRESS', 'se_email_from_address' );
 		if ( $from_address === '' || ! is_email( $from_address ) ) {
 			return new \WP_Error( 'se_email_no_from', __( 'From email address is invalid or empty.', 'site-essentials' ) );
 		}
 
-		$from_header = $from_name !== ''
-			? sprintf( '%s <%s>', self::encode_rfc2047_name( $from_name ), $from_address )
-			: $from_address;
+		// CyberPanel Email API `from` must be a bare address (see platform.cyberpersons.com JSON examples).
 
 		$parsed       = self::parse_headers( isset( $atts['headers'] ) ? $atts['headers'] : '' );
 		$reply_option = self::get_config( 'SE_EMAIL_REPLY_TO', 'se_email_reply_to' );
@@ -194,7 +191,7 @@ class Email_Delivery {
 		$combined_to = implode( ', ', $to_addresses );
 
 		$body = [
-			'from'    => $from_header,
+			'from'    => $from_address,
 			'to'      => $combined_to,
 			'subject' => $subject,
 			'html'    => $html,
@@ -275,27 +272,61 @@ class Email_Delivery {
 		$data = json_decode( $raw, true );
 
 		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $data ) && isset( $data['message'] ) && is_string( $data['message'] )
-				? $data['message']
-				: mb_substr( $raw, 0, 500 );
-			return new \WP_Error( 'se_email_http', $msg !== '' ? $msg : __( 'Email API request failed.', 'site-essentials' ) );
+			$msg = is_array( $data ) ? self::extract_api_error_message( $data ) : '';
+			if ( $msg === '' && is_string( $raw ) ) {
+				$msg = mb_substr( $raw, 0, 500 );
+			}
+			return new \WP_Error(
+				'se_email_http',
+				$msg !== '' ? $msg : __( 'Email API request failed.', 'site-essentials' )
+			);
 		}
 
+		if ( ! is_array( $data ) ) {
+			return new \WP_Error( 'se_email_api', __( 'Invalid JSON from email API.', 'site-essentials' ) );
+		}
+
+		// Some responses use HTTP 200 with {"success":false,"error":{"message":"..."}}.
+		if ( isset( $data['success'] ) && false === $data['success'] ) {
+			$msg = self::extract_api_error_message( $data );
+			return new \WP_Error(
+				'se_email_api',
+				$msg !== '' ? $msg : __( 'Email API rejected the request.', 'site-essentials' )
+			);
+		}
+
+		// Success: {"success":true,"data":{"message_id":"..."}}
+		$payload = isset( $data['data'] ) && is_array( $data['data'] ) ? $data['data'] : $data;
+
 		$message_id = '';
-		if ( is_array( $data ) ) {
-			foreach ( [ 'message_id', 'messageId', 'id' ] as $key ) {
-				if ( isset( $data[ $key ] ) && is_string( $data[ $key ] ) ) {
-					$message_id = $data[ $key ];
-					break;
-				}
-				if ( isset( $data[ $key ] ) && is_numeric( $data[ $key ] ) ) {
-					$message_id = (string) $data[ $key ];
-					break;
-				}
+		foreach ( [ 'message_id', 'messageId', 'id' ] as $key ) {
+			if ( isset( $payload[ $key ] ) && is_string( $payload[ $key ] ) ) {
+				$message_id = $payload[ $key ];
+				break;
+			}
+			if ( isset( $payload[ $key ] ) && is_numeric( $payload[ $key ] ) ) {
+				$message_id = (string) $payload[ $key ];
+				break;
 			}
 		}
 
 		return [ 'message_id' => $message_id ];
+	}
+
+	/**
+	 * Pull human-readable message from CyberPanel-style error payloads.
+	 *
+	 * @param array<string, mixed> $data Decoded JSON body.
+	 * @return string
+	 */
+	private static function extract_api_error_message( array $data ): string {
+		if ( isset( $data['error'] ) && is_array( $data['error'] ) && isset( $data['error']['message'] ) && is_string( $data['error']['message'] ) ) {
+			return $data['error']['message'];
+		}
+		if ( isset( $data['message'] ) && is_string( $data['message'] ) ) {
+			return $data['message'];
+		}
+		return '';
 	}
 
 	/**
@@ -407,23 +438,6 @@ class Email_Delivery {
 		}
 
 		return self::parse_address_list( $flat );
-	}
-
-	/**
-	 * Encode display name for From header (ASCII fallback).
-	 *
-	 * @param string $name From name.
-	 * @return string
-	 */
-	private static function encode_rfc2047_name( string $name ): string {
-		$name = trim( $name );
-		if ( $name === '' ) {
-			return '';
-		}
-		if ( preg_match( '/[^\x20-\x7E]/', $name ) ) {
-			return sprintf( '=?UTF-8?B?%s?=', base64_encode( $name ) );
-		}
-		return $name;
 	}
 
 	/**

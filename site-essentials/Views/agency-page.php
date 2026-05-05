@@ -16,10 +16,10 @@ $page_url = admin_url( 'admin.php' );
 ?>
 <div class="wrap scos">
 
-	<form id="se-agency-form" method="post" action="<?php echo esc_url( $page_url ); ?>">
+	<form id="se-agency-form" method="post"
+		action="<?php echo esc_url( add_query_arg( [ 'page' => Admin_UI::AGENCY_PAGE_SLUG, 'tab' => $active_tab ], $page_url ) ); ?>">
 		<?php wp_nonce_field( 'se_agency_save', 'se_agency_nonce' ); ?>
 		<input type="hidden" name="se_agency_save" value="1" />
-		<input type="hidden" name="page" value="<?php echo esc_attr( Admin_UI::AGENCY_PAGE_SLUG ); ?>" />
 		<input type="hidden" name="se_agency_tab" value="<?php echo esc_attr( $active_tab ); ?>" />
 
 		<header class="scos__header">

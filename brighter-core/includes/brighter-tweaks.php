@@ -886,6 +886,9 @@ class Brighter_Tweaks {
             case 'gif': return ['as' => 'image', 'type' => 'image/gif'];
             case 'svg': return ['as' => 'image', 'type' => 'image/svg+xml'];
             case 'avif': return ['as' => 'image', 'type' => 'image/avif'];
+            case 'mp4':  return ['as' => 'video', 'type' => 'video/mp4'];
+            case 'webm': return ['as' => 'video', 'type' => 'video/webm'];
+            case 'ogv':  return ['as' => 'video', 'type' => 'video/ogg'];
             default: return ['as' => 'fetch', 'type' => ''];
         }
     }

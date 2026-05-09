@@ -4,7 +4,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Tweaks
- * @version    1.1.0
+ * @version    1.2.0
  *
  * Variables available:
  * @var array $tweaks Current tweak settings
@@ -16,8 +16,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $groups = [
     'performance' => [
-        'label' => __( 'Performance & Speed', 'site-essentials' ),
-        'tweaks' => [
+        'label'     => __( 'Performance & Speed', 'site-essentials' ),
+        'guide_url' => 'https://brighterwebsites.com.au/software/performance/wordpress-performance-tweaks/#performance-speed',
+        'tweaks'    => [
             'disable_emojis' => [
                 'label'       => __( 'Disable Emojis', 'site-essentials' ),
                 'description' => __( 'Removes the WordPress emoji script, inline CSS, and DNS-prefetch hint. Saves one HTTP request per page load. Safe to enable on any site — native OS emoji still render.', 'site-essentials' ),
@@ -40,13 +41,22 @@ $groups = [
             ],
             'remove_google_fonts' => [
                 'label'       => __( 'Remove Google Fonts', 'site-essentials' ),
-                'description' => __( 'Dequeues and strips all <code>fonts.googleapis.com</code> stylesheet links from the page — including Breakdance\'s font handle. Use when you self-host fonts or no longer need Google Fonts loaded by your theme or page builder. Add preload tags via the <strong>Asset Preloads</strong> tab if replacing with self-hosted files.<br><strong>LiteSpeed Cache:</strong> Turn off both <em>Remove Google Fonts</em> <strong>and</strong> <em>Load Google Fonts Asynchronously</em> in LiteSpeed ▸ Page Optimisation ▸ CSS Settings. When either is on, LiteSpeed re-injects fonts via its own pipeline after our removal.', 'site-essentials' ),
+                'description' => wp_kses(
+                    sprintf(
+                        /* translators: 1: asset-preloading tab URL, 2: font optimisation guide URL */
+                        __( 'Dequeues and strips all <code>fonts.googleapis.com</code> stylesheet links from the page — including Breakdance\'s font handle. Use when you self-host fonts or no longer need Google Fonts loaded by your theme or page builder.<br><br>For self-hosted fonts: add woff2 preload tags in <a href="%1$s">Asset Preloading &rarr; Font Preload</a>.<br><br><strong>LiteSpeed Cache recommended settings when this is ON:</strong> Remove Google Fonts &rarr; ON (removes the stylesheet request) &bull; Load Google Fonts Asynchronously &rarr; OFF (prevents fonts.googleapis.com being re-injected via LiteSpeed\'s own pipeline).<br><br><a href="%2$s" target="_blank" rel="noopener noreferrer">Full guide: Breakdance + LiteSpeed + Google Font Optimisation Best Practice</a>', 'site-essentials' ),
+                        esc_url( admin_url( 'admin.php?page=site-essentials-essentials&tab=asset-preloading#font-preload' ) ),
+                        'https://brighterwebsites.com.au/software/performance/font-optimisation/'
+                    ),
+                    [ 'code' => [], 'strong' => [], 'em' => [], 'br' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ]
+                ),
             ],
         ],
     ],
     'security' => [
-        'label' => __( 'Security & Hardening', 'site-essentials' ),
-        'tweaks' => [
+        'label'     => __( 'Security & Hardening', 'site-essentials' ),
+        'guide_url' => 'https://brighterwebsites.com.au/software/performance/wordpress-performance-tweaks/#security',
+        'tweaks'    => [
             'disable_xmlrpc' => [
                 'label'       => __( 'Disable XML-RPC', 'site-essentials' ),
                 'description' => __( 'Rejects all XML-RPC POST requests and strips the <code>X-Pingback</code> header. Blocks a common brute-force vector. Enable unless you use the WordPress mobile app, Jetpack, or a service that requires XML-RPC. <em>Note: visiting <code>/xmlrpc.php</code> directly in a browser always shows "accepts POST requests only" — this is WordPress core behavior and is normal whether XML-RPC is enabled or disabled.</em>', 'site-essentials' ),
@@ -55,11 +65,16 @@ $groups = [
                 'label'       => __( 'Restrict REST API to Logged-In Users', 'site-essentials' ),
                 'description' => __( 'Returns a 401 error for unauthenticated REST API requests. Protects user enumeration and content exposure. <strong>WooCommerce, Brighter, and other whitelisted endpoints remain open.</strong> Verify no public-facing integrations break before enabling.', 'site-essentials' ),
             ],
+            'restrict_rest_users' => [
+                'label'       => __( 'Restrict REST API Users Endpoint', 'site-essentials' ),
+                'description' => __( 'Removes <code>/wp/v2/users</code> from the REST API for unauthenticated requests. Logged-in users retain access. Prevents public username enumeration without affecting plugins that require authenticated REST user lookups. Use alongside "Restrict REST API to Logged-In Users" for full coverage, or use this alone for a lighter restriction.', 'site-essentials' ),
+            ],
         ],
     ],
     'seo_cleanup' => [
-        'label' => __( 'SEO & Metadata Code Cleanup', 'site-essentials' ),
-        'tweaks' => [
+        'label'     => __( 'SEO & Metadata Code Cleanup', 'site-essentials' ),
+        'guide_url' => 'https://brighterwebsites.com.au/software/performance/wordpress-performance-tweaks/#meta-code',
+        'tweaks'    => [
             'remove_rsd_link' => [
                 'label'       => __( 'Remove RSD Link', 'site-essentials' ),
                 'description' => __( 'Removes the <code>&lt;link rel="EditURI"&gt;</code> Really Simple Discovery tag from <code>&lt;head&gt;</code>. Only needed by desktop blog editors (MarsEdit, etc.). Zero SEO or user-facing impact.', 'site-essentials' ),
@@ -87,6 +102,8 @@ $groups = [
         ],
     ],
 ];
+
+$allowed_desc_tags = [ 'code' => [], 'strong' => [], 'em' => [], 'br' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ];
 ?>
 
 <div class="se-module-settings-tweaks">
@@ -97,33 +114,53 @@ $groups = [
         <input type="hidden" name="action" value="site_essentials_save_tweaks">
 
         <?php foreach ( $groups as $group_id => $group ) : ?>
-            <h3 style="margin:28px 0 4px;padding-bottom:8px;border-bottom:1px solid #dcdcde;font-size:14px;font-weight:600">
-                <?php echo esc_html( $group['label'] ); ?>
-            </h3>
-            <table class="form-table" role="presentation" style="margin-top:0">
-                <tbody>
-                    <?php foreach ( $group['tweaks'] as $tweak_id => $tweak_data ) : ?>
+        <div class="scos-card">
+            <div class="scos-card__header">
+                <div>
+                    <h2 class="scos-card__title">
+                        <?php echo esc_html( $group['label'] ); ?>
+                        <?php if ( ! empty( $group['guide_url'] ) ) : ?>
+                        <a href="<?php echo esc_url( $group['guide_url'] ); ?>"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="scos-badge scos-badge--soft">
+                            <?php esc_html_e( 'guide', 'site-essentials' ); ?>
+                        </a>
+                        <?php endif; ?>
+                    </h2>
+                </div>
+            </div>
+            <div class="scos-card__body">
+                <table class="scos-form">
+                    <tbody>
+                        <?php foreach ( $group['tweaks'] as $tweak_id => $tweak_data ) : ?>
                         <tr>
-                            <th scope="row" style="width:220px">
-                                <label for="tweak_<?php echo esc_attr( $tweak_id ); ?>">
-                                    <?php echo esc_html( $tweak_data['label'] ); ?>
-                                </label>
-                            </th>
-                            <td>
-                                <label style="display:flex;align-items:flex-start;gap:8px">
+                            <td class="scos-checkbox-row">
+                                <label>
                                     <input type="checkbox"
                                            id="tweak_<?php echo esc_attr( $tweak_id ); ?>"
                                            name="enabled_tweaks[<?php echo esc_attr( $tweak_id ); ?>]"
                                            value="1"
-                                           style="margin-top:3px;flex-shrink:0"
-                                           <?php checked( ! empty( $tweaks[ $tweak_id ] ) ); ?>>
-                                    <span class="description" style="line-height:1.5"><?php echo wp_kses( $tweak_data['description'], [ 'code' => [], 'strong' => [], 'em' => [] ] ); ?></span>
+                                           <?php checked( ! empty( $tweaks[ $tweak_id ] ) ); ?> />
+                                    <span class="scos-checkbox-row__label"><?php echo esc_html( $tweak_data['label'] ); ?></span>
                                 </label>
+                                <p class="description">
+                                    <?php
+                                    // Google Fonts description is pre-escaped via wp_kses above
+                                    if ( 'remove_google_fonts' === $tweak_id ) {
+                                        echo $tweak_data['description']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                                    } else {
+                                        echo wp_kses( $tweak_data['description'], $allowed_desc_tags );
+                                    }
+                                    ?>
+                                </p>
                             </td>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
         <?php endforeach; ?>
 
         <p class="submit" style="margin-top:24px">

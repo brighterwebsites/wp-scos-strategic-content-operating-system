@@ -455,6 +455,12 @@ class Admin_UI {
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce'   => wp_create_nonce('site_essentials_admin'),
         ]);
+
+        // Tweaks tab uses scos-card layout — also load design system CSS on Performance page
+        if ( $hook === self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
     }
 
     /**
@@ -1406,6 +1412,7 @@ class Admin_UI {
             // Security & Hardening
             'disable_xmlrpc'          => isset( $enabled_tweaks['disable_xmlrpc'] ),
             'disable_rest_api'        => isset( $enabled_tweaks['disable_rest_api'] ),
+            'restrict_rest_users'     => isset( $enabled_tweaks['restrict_rest_users'] ),
             // SEO & Metadata Code Cleanup
             'remove_rsd_link'         => isset( $enabled_tweaks['remove_rsd_link'] ),
             'remove_wlw_link'         => isset( $enabled_tweaks['remove_wlw_link'] ),

@@ -257,6 +257,16 @@ class Tweaks_Module implements Module_Interface {
             case 'disable_rest_api':
                 $this->disable_rest_api();
                 break;
+
+            case 'restrict_rest_users':
+                add_filter( 'rest_endpoints', function( $endpoints ) {
+                    if ( ! is_user_logged_in() ) {
+                        unset( $endpoints['/wp/v2/users'] );
+                        unset( $endpoints['/wp/v2/users/(?P<id>[\d]+)'] );
+                    }
+                    return $endpoints;
+                } );
+                break;
         }
     }
 
@@ -568,6 +578,7 @@ class Tweaks_Module implements Module_Interface {
             // Security & Hardening
             'disable_xmlrpc'           => false,
             'disable_rest_api'         => false,
+            'restrict_rest_users'      => false,
             // SEO & Metadata Code Cleanup
             'remove_rsd_link'          => false,
             'remove_wlw_link'          => false,

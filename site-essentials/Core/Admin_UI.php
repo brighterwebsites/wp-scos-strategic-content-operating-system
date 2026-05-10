@@ -650,7 +650,7 @@ class Admin_UI {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
 
-        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'tweaks';
+        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'performance';
         $tweaks_module = Module_Loader::get_module('tweaks');
 
         // Image Optimization tab: brighter-support-image-settings must be loaded (brighter-core)

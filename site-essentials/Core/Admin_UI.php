@@ -461,6 +461,12 @@ class Admin_UI {
             wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
+
+        // Analytics page uses SCOS design system
+        if ( $hook === self::PAGE_SLUG . '_page_' . self::ANALYTICS_PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
     }
 
     /**
@@ -716,16 +722,9 @@ class Admin_UI {
             return;
         }
 
-        if ( isset( $_GET['scos_analytics_saved'] ) ) {
-            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'site-essentials' ) . '</p></div>';
-        }
-
-        echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__( 'Analytics', 'site-essentials' ) . '</h1>';
-        echo '<div class="site-essentials-content">';
-        echo '<div class="card se-module-settings-card" data-module-id="analytics">';
+        echo '<div class="wrap scos">';
         $analytics_module->render_settings();
-        echo '</div></div></div>';
+        echo '</div>';
     }
 
     /**

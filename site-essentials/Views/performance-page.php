@@ -116,14 +116,17 @@ elseif ( $active_tab === 'image-optimization' ) :
 						</tbody>
 					</table>
 				</div>
-				<div class="scos-card__footer">
-					<a href="https://brighterwebsites.com.au/software/image-optimisation/#image-thumbnails"
-					   target="_blank" rel="noopener" class="scos-btn scos-btn--ghost">
-						<?php esc_html_e( 'View guide', 'site-essentials' ); ?>
-					</a>
-				</div>
-			</form>
-		</div>
+			<div class="scos-card__footer">
+				<button type="submit" class="scos-btn scos-btn--primary">
+					<?php esc_html_e( 'Save Thumbnail Settings', 'site-essentials' ); ?>
+				</button>
+				<a href="https://brighterwebsites.com.au/software/image-optimisation/#image-thumbnails"
+				   target="_blank" rel="noopener" class="scos-btn scos-btn--ghost">
+					<?php esc_html_e( 'View guide', 'site-essentials' ); ?>
+				</a>
+			</div>
+		</form>
+	</div>
 
 		<!-- Card 3: Registered Image Sizes (info only — no form inputs) -->
 		<div class="scos-card">

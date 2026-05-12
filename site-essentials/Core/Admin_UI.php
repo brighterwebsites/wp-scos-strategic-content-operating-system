@@ -467,6 +467,12 @@ class Admin_UI {
             wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
+
+        // Social Amplification page uses SCOS design system
+        if ( $hook === self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
     }
 
     /**
@@ -780,16 +786,10 @@ class Admin_UI {
             return;
         }
 
-        if ( isset( $_GET['scos_sma_saved'] ) ) {
-            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'site-essentials' ) . '</p></div>';
-        }
-
-        echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__( 'Social Amplification', 'site-essentials' ) . '</h1>';
-        echo '<div class="site-essentials-content">';
-        echo '<div class="card se-module-settings-card" data-module-id="social_amplification">';
+        // SCOS-SA-PASS1 — saved notice moved into view; wrapper updated to wrap scos
+        echo '<div class="wrap scos">';
         $sma_module->render_settings();
-        echo '</div></div></div>';
+        echo '</div>';
     }
 
     /**
@@ -817,10 +817,11 @@ class Admin_UI {
             update_option( 'scos_sma_webhook_url',  $webhook_url );
             update_option( 'bw_social_webhook_url', $webhook_url );
         }
-        // Checkbox: save when the form that owns it is submitted (YOURLS/Make.com tabs).
+        // Checkbox: save when the Make.com tab form submits.
         // The hidden _scos_sma_tab field tells us which form submitted.
+        // SCOS-SA-PASS1 — tab slug updated from 'makecom' to 'make'.
         $submitted_tab = isset( $_POST['_scos_sma_tab'] ) ? sanitize_key( $_POST['_scos_sma_tab'] ) : '';
-        if ( in_array( $submitted_tab, [ 'yourls', 'makecom' ], true ) ) {
+        if ( $submitted_tab === 'make' ) {
             $webhook_enabled = isset( $_POST['scos_sma_webhook_enabled'] ) ? 1 : 0;
             update_option( 'scos_sma_webhook_enabled', $webhook_enabled );
             update_option( 'bw_social_webhook_enabled', $webhook_enabled );
@@ -843,6 +844,7 @@ class Admin_UI {
         }
 
         // ── Postly.ai / Anthropic pipeline settings ──────────────────────────
+        // SCOS-SA-PASS1 — new scheduling/backfill fields (scos_sa_*) added.
         $postly_fields = [
             'bw_postly_api_key'            => 'sanitize_text_field',
             'bw_postly_workspace_id'       => 'sanitize_text_field',
@@ -852,10 +854,22 @@ class Admin_UI {
             'bw_social_acf_featured_key'   => 'sanitize_text_field',
             'bw_social_publish_time_min'   => 'sanitize_text_field',
             'bw_social_publish_time_max'   => 'sanitize_text_field',
+            'scos_sa_backfill_date_from'   => 'sanitize_text_field',
+            'scos_sa_backfill_date_to'     => 'sanitize_text_field',
         ];
         foreach ( $postly_fields as $key => $sanitizer ) {
             if ( isset( $_POST[ $key ] ) ) {
                 update_option( $key, $sanitizer( $_POST[ $key ] ) );
+            }
+        }
+
+        // Integer Postly fields submitted only on the Postly tab form.
+        if ( $submitted_tab === 'postly' ) {
+            if ( isset( $_POST['scos_sa_postly_post_count'] ) ) {
+                update_option( 'scos_sa_postly_post_count', absint( $_POST['scos_sa_postly_post_count'] ) );
+            }
+            if ( isset( $_POST['scos_sa_backfill_limit'] ) ) {
+                update_option( 'scos_sa_backfill_limit', absint( $_POST['scos_sa_backfill_limit'] ) );
             }
         }
 
@@ -879,7 +893,8 @@ class Admin_UI {
             update_option( 'bw_social_webhook_secret', $posted_secret );
         }
 
-        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'tab' => ( $submitted_tab ?: 'yourls' ), 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
+        // SCOS-SA-PASS1 — scos_sma_tab param used by hash-based JS tab switcher after redirect.
+        wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'scos_sma_tab' => ( $submitted_tab ?: 'yourls' ), 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
     }
 

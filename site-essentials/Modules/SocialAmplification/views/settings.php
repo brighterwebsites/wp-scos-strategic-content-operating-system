@@ -3,6 +3,7 @@
  * Social Amplification — Settings page view
  *
  * Rendered by SocialAmplification_Module::render_settings() via Admin_UI.
+ * SCOS-SA-PASS1 — full UI rebuild to SCOS design system (Template A: tabbed settings).
  *
  * @package SiteEssentials
  */
@@ -12,15 +13,14 @@ defined( 'ABSPATH' ) || exit;
 use SiteEssentials\Modules\SocialAmplification\Post_Framing;
 use SiteEssentials\Modules\SocialAmplification\SocialAmplification_Module as SMA;
 
-// Option reader: prefers scos_sma_* over legacy bw_*
-$webhook_url     = SMA::get_option( 'scos_sma_webhook_url',     'bw_social_webhook_url' );
-$webhook_enabled = SMA::get_option( 'scos_sma_webhook_enabled', 'bw_social_webhook_enabled', 0 );
-$yourls_url      = SMA::get_option( 'scos_sma_yourls_url',      'bw_yourls_api_url' );
-$yourls_sig      = SMA::get_option( 'scos_sma_yourls_signature', 'bw_yourls_signature' );
-$yourls_user     = SMA::get_option( 'scos_sma_yourls_username',  'bw_yourls_username' );
-$yourls_pass     = SMA::get_option( 'scos_sma_yourls_password',  'bw_yourls_password' );
+// SCOS-SA-PASS1 — option reader: existing keys preserved; scos_sa_ prefix is target migration state.
+// TODO: migrate key to scos_sa_ prefix — SCOS-SA-PASS1
+$yourls_url  = SMA::get_option( 'scos_sma_yourls_url',       'bw_yourls_api_url' );
+$yourls_sig  = SMA::get_option( 'scos_sma_yourls_signature', 'bw_yourls_signature' );
+$yourls_user = SMA::get_option( 'scos_sma_yourls_username',  'bw_yourls_username' );
+$yourls_pass = SMA::get_option( 'scos_sma_yourls_password',  'bw_yourls_password' );
 
-// Postly / Anthropic fields
+// TODO: migrate key to scos_sa_ prefix — SCOS-SA-PASS1
 $postly_api_key        = get_option( 'bw_postly_api_key', '' );
 $postly_workspace_id   = get_option( 'bw_postly_workspace_id', '' );
 $postly_channel_ids    = get_option( 'bw_postly_channel_ids', '' );
@@ -32,563 +32,723 @@ $social_enabled        = get_option( 'bw_social_enabled', '' );
 $publish_time_min      = get_option( 'bw_social_publish_time_min', '09:00' );
 $publish_time_max      = get_option( 'bw_social_publish_time_max', '17:00' );
 
-// Last run log entry
-$amplify_log      = get_option( \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::LOG_OPTION, [] );
-$last_log_entries = is_array( $amplify_log ) ? array_slice( array_reverse( $amplify_log, true ), 0, 5, true ) : [];
-$unamplified_projects = get_posts( [
-	'post_type'      => 'projects',
-	'post_status'    => 'publish',
-	'posts_per_page' => 50,
-	'orderby'        => 'date',
-	'order'          => 'DESC',
-	'meta_query'     => [
-		'relation' => 'OR',
-		[
-			'key'     => '_scos_sa_amplified',
-			'compare' => 'NOT EXISTS',
-		],
-		[
-			'key'     => '_scos_sa_amplified',
-			'value'   => '1',
-			'compare' => '!=',
-		],
-	],
-] );
+// New scos_sa_* scheduling fields
+$postly_post_count    = get_option( 'scos_sa_postly_post_count', 3 );
+$backfill_date_from   = get_option( 'scos_sa_backfill_date_from', '' );
+$backfill_date_to     = get_option( 'scos_sa_backfill_date_to', '' );
+$backfill_limit       = get_option( 'scos_sa_backfill_limit', 5 );
 
-$active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'yourls';
-$page_url   = admin_url( 'admin.php?page=site-essentials-social-amplification' );
+// TODO: migrate key to scos_sa_ prefix — SCOS-SA-PASS1
+$make_webhook_url    = SMA::get_option( 'scos_sma_webhook_url',     'bw_social_webhook_url' );
+$make_auto_trigger   = SMA::get_option( 'scos_sma_webhook_enabled', 'bw_social_webhook_enabled', 0 );
 
-// Meta box status
-$post_types = \SiteEssentials\Modules\SocialAmplification\Meta_Fields::get_post_types();
+$page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 ?>
 
-<!-- ── Quick links ── -->
-<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
-	<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . Post_Framing::POST_TYPE ) ); ?>"
-	   class="button button-secondary" style="display:inline-flex;align-items:center;gap:6px;">
-		<span class="dashicons dashicons-edit" style="margin-top:3px;font-size:16px;"></span>
-		<?php esc_html_e( 'Post Framing', 'site-essentials' ); ?>
-	</a>
-	<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Post_Framing::POST_TYPE ) ); ?>"
-	   class="button" style="display:inline-flex;align-items:center;gap:6px;">
-		<span class="dashicons dashicons-plus-alt2" style="margin-top:3px;font-size:16px;"></span>
-		<?php esc_html_e( 'Add Post Frame', 'site-essentials' ); ?>
-	</a>
-</div>
+<?php // SCOS-SA-PASS1 — page chrome: canonical header + scos__tabs nav ?>
 
-<!-- ── Status bar ── -->
-<div class="scos-sma-status-bar" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
-	<span style="color:#16a34a;font-size:18px;">&#10003;</span>
-	<div>
-		<strong><?php esc_html_e( 'Single page meta box enabled', 'site-essentials' ); ?></strong>
-		<span style="color:#555;margin-left:8px;">
-			<?php
-			printf(
-				/* translators: %s: comma-separated post type list */
-				esc_html__( 'Active on: %s', 'site-essentials' ),
-				'<code>' . esc_html( implode( ', ', $post_types ) ) . '</code>'
-			);
-			?>
-		</span>
-	</div>
-	<a href="<?php echo esc_url( admin_url( 'admin.php?page=site-essentials-social-amplification&tab=yourls' ) ); ?>"
-	   style="margin-left:auto;white-space:nowrap;">
-		<?php esc_html_e( 'View settings ↓', 'site-essentials' ); ?>
-	</a>
-</div>
-
-<!-- ── Tabs ── -->
-<h2 class="nav-tab-wrapper" style="margin-bottom:0;">
-	<a href="<?php echo esc_url( add_query_arg( 'tab', 'yourls', $page_url ) ); ?>"
-	   class="nav-tab <?php echo $active_tab === 'yourls'  ? 'nav-tab-active' : ''; ?>">
-		<?php esc_html_e( 'YOURLS Integration', 'site-essentials' ); ?>
-	</a>
-	<a href="<?php echo esc_url( add_query_arg( 'tab', 'makecom', $page_url ) ); ?>"
-	   class="nav-tab <?php echo $active_tab === 'makecom' ? 'nav-tab-active' : ''; ?>">
-		<?php esc_html_e( 'Make.com Integration', 'site-essentials' ); ?>
-	</a>
-	<a href="<?php echo esc_url( add_query_arg( 'tab', 'postly', $page_url ) ); ?>"
-	   class="nav-tab <?php echo $active_tab === 'postly'  ? 'nav-tab-active' : ''; ?>">
-		<?php esc_html_e( 'Postly.ai', 'site-essentials' ); ?>
-	</a>
-	<a href="<?php echo esc_url( add_query_arg( 'tab', 'backfill', $page_url ) ); ?>"
-	   class="nav-tab <?php echo $active_tab === 'backfill' ? 'nav-tab-active' : ''; ?>">
-		<?php esc_html_e( 'Schedule Existing Content', 'site-essentials' ); ?>
-	</a>
-	<a href="<?php echo esc_url( add_query_arg( 'tab', 'docs', $page_url ) ); ?>"
-	   class="nav-tab <?php echo $active_tab === 'docs'    ? 'nav-tab-active' : ''; ?>">
-		<?php esc_html_e( 'Documentation', 'site-essentials' ); ?>
-	</a>
-</h2>
-
-<div style="background:#fff;border:1px solid #c3c4c7;border-top:none;border-radius:0 0 4px 4px;padding:24px 28px;">
-
-<?php if ( $active_tab === 'docs' ) : ?>
-
-	<!-- ── Documentation ── -->
-	<h3 style="margin-top:0;"><?php esc_html_e( 'Documentation', 'site-essentials' ); ?></h3>
-
-	<table class="form-table" style="max-width:900px;">
-		<tr>
-			<th scope="row"><?php esc_html_e( 'Webhook Payload', 'site-essentials' ); ?></th>
-			<td>
-				<p><?php esc_html_e( 'When "Create Social Post" is clicked, WordPress POSTs this JSON to your Make.com webhook URL:', 'site-essentials' ); ?></p>
-				<pre style="background:#f5f5f5;padding:14px 18px;overflow-x:auto;border-radius:4px;font-size:12px;line-height:1.6;max-width:640px;">{
-  "post_id":                 123,
-  "post_url":                "https://example.com/blog/post-title/",
-  "post_title":              "Post Title",
-  "post_type":               "post",
-  "post_excerpt":            "Brief excerpt...",
-  "post_date":               "2025-12-02T10:30:00+00:00",
-  "post_modified":           "2025-12-02T11:00:00+00:00",
-  "breadcrumb":              "seo-signals",
-  "content_type":            "article",
-  "featured_image_url":      "https://.../image.jpg",
-  "featured_image_caption":  "Image caption",
-  "featured_image_social_url": "https://.../image-1080x1080.jpg",
-  "site_url":                "https://example.com",
-  "trigger_time":            "2025-12-02 11:00:00",
-  "trigger_type":            "manual"
-}</pre>
-			</td>
-		</tr>
-
-		<tr>
-			<th scope="row"><?php esc_html_e( 'API Documentation', 'site-essentials' ); ?></th>
-			<td>
-				<p><strong><?php esc_html_e( 'Generate Prompt endpoint (Make.com calls this for AI post generation):', 'site-essentials' ); ?></strong></p>
-				<code style="display:block;background:#f5f5f5;padding:8px 12px;margin:8px 0;border-radius:4px;word-break:break-all;">
-					<?php echo esc_html( get_site_url() ); ?>/wp-json/brighter-core/v1/social-amplification/generate-prompt
-				</code>
-				<p class="description">
-					<?php esc_html_e( 'Include header: ', 'site-essentials' ); ?>
-					<code>X-Brighter-Token: &lt;your-token&gt;</code><br>
-					<?php esc_html_e( 'Returns: post context, framing options (Post Frames matched by content type), H2 source material, and TL;DR for AI prompt assembly.', 'site-essentials' ); ?>
-				</p>
-
-				<p><strong><?php esc_html_e( 'Create Shortlink endpoint:', 'site-essentials' ); ?></strong></p>
-				<code style="display:block;background:#f5f5f5;padding:8px 12px;margin:8px 0;border-radius:4px;word-break:break-all;">
-					POST <?php echo esc_html( get_site_url() ); ?>/wp-json/brighter-core/v1/social-amplification/create-shortlink
-				</code>
-				<p class="description"><?php esc_html_e( 'Parameters: post_id, platform (facebook/linkedin/twitter/instagram/gmb), format (link/img/reel/video)', 'site-essentials' ); ?></p>
-			</td>
-		</tr>
-
-		<tr>
-			<th scope="row"><?php esc_html_e( 'Make.com Scenario Blueprint', 'site-essentials' ); ?></th>
-			<td>
-				<p><?php esc_html_e( 'The Social Amplification Make.com scenario handles AI prompt generation, post framing selection, and social content scheduling.', 'site-essentials' ); ?></p>
-				<p>
-					<a href="https://us2.make.com/public/shared-scenario/8mA5tz0TNtE/gs-social-amplification"
-					   target="_blank" rel="noopener noreferrer" class="button button-secondary">
-						&#x29C9; <?php esc_html_e( 'View / Copy Shared Scenario', 'site-essentials' ); ?>
-					</a>
-				</p>
-				<p class="description">
-					<?php esc_html_e( 'Open the link to preview the scenario. Use "Save a copy" in Make.com to add it to your account. You will need to reconnect your HTTP / ChatGPT / Gemini / Google Sheets modules and set your webhook URL below.', 'site-essentials' ); ?>
-				</p>
-			</td>
-		</tr>
-	</table>
-
-<?php elseif ( $active_tab === 'backfill' ) : ?>
-
-	<h3 style="margin-top:0;"><?php esc_html_e( 'Schedule Existing Content', 'site-essentials' ); ?></h3>
-	<p class="description" style="margin-bottom:18px;">
-		<?php esc_html_e( 'Run Social Amplification for existing projects posts. Choose date range or select specific posts.', 'site-essentials' ); ?>
-	</p>
-
-	<div id="scos-sa-backfill-wrap"
-		data-secret="<?php echo esc_attr( $webhook_secret ); ?>"
-		data-rest="<?php echo esc_attr( rest_url( 'bw-social/v1/backfill' ) ); ?>">
-
-		<p>
-			<label><input type="radio" name="scos_sa_backfill_mode" value="date" checked> <?php esc_html_e( 'By date range', 'site-essentials' ); ?></label>
-			&nbsp;&nbsp;
-			<label><input type="radio" name="scos_sa_backfill_mode" value="posts"> <?php esc_html_e( 'Select posts', 'site-essentials' ); ?></label>
-		</p>
-
-		<div class="scos-sa-backfill-mode" data-mode="date">
-			<table class="form-table">
-				<tr>
-					<th><label for="scos_sa_backfill_from"><?php esc_html_e( 'Date from', 'site-essentials' ); ?></label></th>
-					<td><input type="date" id="scos_sa_backfill_from" value="<?php echo esc_attr( gmdate( 'Y-m-01' ) ); ?>"></td>
-				</tr>
-				<tr>
-					<th><label for="scos_sa_backfill_to"><?php esc_html_e( 'Date to', 'site-essentials' ); ?></label></th>
-					<td><input type="date" id="scos_sa_backfill_to" value="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>"></td>
-				</tr>
-				<tr>
-					<th><label for="scos_sa_backfill_limit"><?php esc_html_e( 'Limit', 'site-essentials' ); ?></label></th>
-					<td><input type="number" id="scos_sa_backfill_limit" min="1" max="100" value="5"></td>
-				</tr>
-			</table>
-		</div>
-
-		<div class="scos-sa-backfill-mode" data-mode="posts" style="display:none;">
-			<p><strong><?php esc_html_e( 'Unamplified projects', 'site-essentials' ); ?></strong></p>
-			<div style="max-height:220px;overflow:auto;border:1px solid #dcdcde;padding:10px;background:#fff;">
-				<?php if ( empty( $unamplified_projects ) ) : ?>
-					<p><?php esc_html_e( 'No unamplified projects found.', 'site-essentials' ); ?></p>
-				<?php else : ?>
-					<?php foreach ( $unamplified_projects as $project ) : ?>
-						<label style="display:block;margin-bottom:6px;">
-							<input type="checkbox" class="scos-sa-backfill-post-id" value="<?php echo esc_attr( $project->ID ); ?>">
-							<?php echo esc_html( get_the_title( $project ) ); ?>
-							<span style="color:#8c8f94;">(<?php echo esc_html( mysql2date( 'Y-m-d', $project->post_date ) ); ?>)</span>
-						</label>
-					<?php endforeach; ?>
-				<?php endif; ?>
-			</div>
-		</div>
-
-		<p style="margin-top:14px;">
-			<button type="button" class="button button-primary" id="scos-sa-run-backfill">
-				<?php esc_html_e( 'Run Backfill', 'site-essentials' ); ?>
-			</button>
-		</p>
-		<div id="scos-sa-backfill-status" class="scos-sa-result" hidden></div>
-		<div id="scos-sa-backfill-results"></div>
-	</div>
-
-<?php elseif ( $active_tab === 'postly' ) : ?>
-
-	<!-- ── Postly.ai Settings ── -->
-	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-		<?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
-		<input type="hidden" name="action" value="site_essentials_save_sma">
-		<input type="hidden" name="_scos_sma_tab" value="postly">
-
-		<h3 style="margin-top:0;"><?php esc_html_e( 'Postly.ai Social Amplification', 'site-essentials' ); ?></h3>
-		<p class="description" style="margin-bottom:18px;">
-			<?php esc_html_e( 'Automatically generate and schedule 3 social posts when a Projects post is published. Uses Anthropic AI for caption generation and Postly.ai for scheduling. Anthropic API key is managed in Settings → AI API Keys.', 'site-essentials' ); ?>
-		</p>
-
-		<table class="form-table">
-
-			<!-- Enable toggle -->
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Enable Social Amplification', 'site-essentials' ); ?></th>
-				<td>
-					<label>
-						<input type="checkbox" name="bw_social_enabled" value="1" <?php checked( $social_enabled, '1' ); ?> />
-						<?php esc_html_e( 'Automatically amplify when a Projects post is published', 'site-essentials' ); ?>
-					</label>
-					<p class="description">
-						<?php esc_html_e( 'Requires Postly API key, Workspace ID, and Anthropic API key (in Settings → AI API Keys) to be configured.', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<!-- Publish time window -->
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Publish Time Window', 'site-essentials' ); ?></th>
-				<td>
-					<label for="bw_social_publish_time_min"><?php esc_html_e( 'From', 'site-essentials' ); ?></label>
-					<input type="time" id="bw_social_publish_time_min" name="bw_social_publish_time_min"
-						value="<?php echo esc_attr( $publish_time_min ); ?>"
-						style="width:110px;" />
-					<label for="bw_social_publish_time_max" style="margin-left:12px;"><?php esc_html_e( 'To', 'site-essentials' ); ?></label>
-					<input type="time" id="bw_social_publish_time_max" name="bw_social_publish_time_max"
-						value="<?php echo esc_attr( $publish_time_max ); ?>"
-						style="width:110px;" />
-					<p class="description">
-						<?php esc_html_e( 'Posts are scheduled at a random time within this window (site timezone). Slot 1 is always pushed at least 60 minutes into the future to allow for Postly processing and human approval. Times are read in the site\'s configured timezone.', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<!-- Postly API Key -->
-			<tr>
-				<th scope="row">
-					<label for="bw_postly_api_key"><?php esc_html_e( 'Postly API Key', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<input type="password" id="bw_postly_api_key" name="bw_postly_api_key"
-						value="<?php echo esc_attr( $postly_api_key ); ?>"
-						class="regular-text code" autocomplete="new-password"
-						style="width:100%;max-width:560px;" />
-					<p class="description">
-						<?php esc_html_e( 'Your Postly.ai API key. Get it from ', 'site-essentials' ); ?>
-						<a href="https://app.postly.ai" target="_blank" rel="noopener">app.postly.ai</a>.
-					</p>
-				</td>
-			</tr>
-
-			<!-- Postly Workspace ID -->
-			<tr>
-				<th scope="row">
-					<label for="bw_postly_workspace_id"><?php esc_html_e( 'Postly Workspace ID', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<input type="text" id="bw_postly_workspace_id" name="bw_postly_workspace_id"
-						value="<?php echo esc_attr( $postly_workspace_id ); ?>"
-						class="regular-text code" style="width:100%;max-width:560px;" />
-					<p class="description">
-						<?php esc_html_e( 'The workspace ID from your Postly account (find it in the Workspace settings URL).', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<!-- Channel IDs (optional) -->
-			<tr>
-				<th scope="row">
-					<label for="bw_postly_channel_ids"><?php esc_html_e( 'Target Channel IDs', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<input type="text" id="bw_postly_channel_ids" name="bw_postly_channel_ids"
-						value="<?php echo esc_attr( $postly_channel_ids ); ?>"
-						class="regular-text code" style="width:100%;max-width:560px;"
-						placeholder="<?php esc_attr_e( 'id1, id2, id3', 'site-essentials' ); ?>" />
-					<p class="description">
-						<?php esc_html_e( 'For Facebook, Instagram, Pinterest etc. Do not include your GMB channel ID here. Comma-separated Postly social channel IDs to post to. Leave blank to disable standard social posting.', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<tr>
-				<th scope="row">
-					<label for="se_postly_gmb_channel_id"><?php esc_html_e( 'GMB Channel ID', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<input type="text" id="se_postly_gmb_channel_id" name="se_postly_gmb_channel_id"
-						value="<?php echo esc_attr( $postly_gmb_channel_id ); ?>"
-						class="regular-text code" style="width:100%;max-width:560px;" />
-					<p class="description">
-						<?php esc_html_e( 'Your GMB channel ID from Postly. Find it in Postly → Channels. Only one GMB profile per workspace is supported.', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<!-- ACF Gallery Keys -->
-			<tr>
-				<th scope="row">
-					<label for="bw_social_acf_gallery_keys"><?php esc_html_e( 'ACF Gallery Field Keys', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<input type="text" id="bw_social_acf_gallery_keys" name="bw_social_acf_gallery_keys"
-						value="<?php echo esc_attr( $acf_gallery_keys ); ?>"
-						class="regular-text code" style="width:100%;max-width:560px;"
-						placeholder="<?php esc_attr_e( 'project_gallery, secondary_gallery', 'site-essentials' ); ?>" />
-					<p class="description">
-						<?php esc_html_e( 'Comma-separated ACF field keys that contain gallery images. These are combined with the featured image for post image sets.', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<!-- ACF Featured Image Key (optional override) -->
-			<tr>
-				<th scope="row">
-					<label for="bw_social_acf_featured_key"><?php esc_html_e( 'ACF Featured Image Key', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<input type="text" id="bw_social_acf_featured_key" name="bw_social_acf_featured_key"
-						value="<?php echo esc_attr( $acf_featured_key ); ?>"
-						class="regular-text code" style="width:100%;max-width:560px;" />
-					<p class="description">
-						<?php esc_html_e( 'Optional. ACF field key for a custom featured/hero image. Overrides the standard WordPress featured image as the first image. Leave blank to use the WP featured image.', 'site-essentials' ); ?>
-					</p>
-				</td>
-			</tr>
-
-			<!-- Webhook Secret -->
-			<tr>
-				<th scope="row">
-					<label for="bw_social_webhook_secret"><?php esc_html_e( 'Webhook Secret', 'site-essentials' ); ?></label>
-				</th>
-				<td>
-					<?php if ( $webhook_secret ) : ?>
-						<div style="display:flex;align-items:center;gap:10px;max-width:560px;">
-							<input type="text" id="bw_social_webhook_secret_display"
-								value="<?php echo esc_attr( $webhook_secret ); ?>"
-								class="regular-text code" readonly style="flex:1;background:#f6f7f7;" />
-							<button type="button" class="button"
-								onclick="navigator.clipboard.writeText('<?php echo esc_js( $webhook_secret ); ?>').then(()=>this.textContent='Copied!').catch(()=>{})">
-								<?php esc_html_e( 'Copy', 'site-essentials' ); ?>
-							</button>
-						</div>
-					<?php else : ?>
-						<p class="description" style="color:#b45309;"><?php esc_html_e( 'Not yet generated — save settings to auto-generate.', 'site-essentials' ); ?></p>
-					<?php endif; ?>
-					<p class="description">
-						<?php esc_html_e( 'Auto-generated. Used to authenticate the internal REST endpoint (POST /wp-json/bw-social/v1/amplify). Keep private.', 'site-essentials' ); ?>
-					</p>
-					<!-- Hidden: preserve secret across saves (will not change if already set) -->
-					<input type="hidden" name="bw_social_webhook_secret" value="<?php echo esc_attr( $webhook_secret ); ?>" />
-				</td>
-			</tr>
-
-		</table>
-
-		<?php submit_button( __( 'Save Postly Settings', 'site-essentials' ) ); ?>
-
-	</form>
-
-	<!-- ── Status / Recent Runs ── -->
-	<hr style="margin:28px 0 20px;">
-	<h3 style="margin-top:0;"><?php esc_html_e( 'Recent Amplification Runs', 'site-essentials' ); ?></h3>
-
-	<?php if ( empty( $last_log_entries ) ) : ?>
-		<p class="description"><?php esc_html_e( 'No posts have been amplified yet.', 'site-essentials' ); ?></p>
-	<?php else : ?>
-		<table class="widefat striped" style="max-width:900px;">
-			<thead>
-				<tr>
-					<th><?php esc_html_e( 'Post', 'site-essentials' ); ?></th>
-					<th><?php esc_html_e( 'Run At', 'site-essentials' ); ?></th>
-					<th><?php esc_html_e( 'Shortlink', 'site-essentials' ); ?></th>
-					<th><?php esc_html_e( 'Posts Scheduled', 'site-essentials' ); ?></th>
-				</tr>
-			</thead>
-			<tbody>
-			<?php foreach ( $last_log_entries as $pid => $entry ) :
-				$post_title = get_the_title( $pid );
-				$scheduled_count = count( array_filter( $entry['posts'] ?? [], static fn( $p ) => ( $p['status'] ?? '' ) === 'scheduled' ) );
-				$error_count     = count( array_filter( $entry['posts'] ?? [], static fn( $p ) => ( $p['status'] ?? '' ) === 'error' ) );
-			?>
-				<tr>
-					<td>
-						<a href="<?php echo esc_url( get_edit_post_link( $pid ) ); ?>">
-							<?php echo esc_html( $post_title ?: "#$pid" ); ?>
-						</a>
-					</td>
-					<td><?php echo esc_html( $entry['ran_at'] ?? '—' ); ?></td>
-					<td>
-						<?php if ( ! empty( $entry['shortlink'] ) ) : ?>
-							<a href="<?php echo esc_url( $entry['shortlink'] ); ?>" target="_blank" rel="noopener">
-								<?php echo esc_html( $entry['shortlink'] ); ?>
-							</a>
-						<?php else : ?>—<?php endif; ?>
-					</td>
-					<td>
-						<?php if ( $scheduled_count > 0 ) : ?>
-							<span style="color:#16a34a;">&#10003; <?php echo esc_html( $scheduled_count ); ?> scheduled</span>
-						<?php endif; ?>
-						<?php if ( $error_count > 0 ) : ?>
-							<span style="color:#b45309;margin-left:8px;">&#x26A0; <?php echo esc_html( $error_count ); ?> failed</span>
-						<?php endif; ?>
-					</td>
-				</tr>
-			<?php endforeach; ?>
-			</tbody>
-		</table>
-	<?php endif; ?>
-
-<?php else : ?>
-
-	<!-- ── Settings form (YOURLS + Make.com tabs share one form) ── -->
-	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-		<?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
-		<input type="hidden" name="action" value="site_essentials_save_sma">
-		<input type="hidden" name="_scos_sma_tab" value="<?php echo esc_attr( $active_tab ); ?>">
-
-		<?php if ( $active_tab === 'yourls' ) : ?>
-
-			<h3 style="margin-top:0;"><?php esc_html_e( 'YOURLS Shortlink Integration', 'site-essentials' ); ?></h3>
-			<p class="description" style="margin-bottom:18px;">
-				<?php esc_html_e( 'Configure your self-hosted YOURLS installation. The shortlink slug entered on each post page is used as the YOURLS keyword.', 'site-essentials' ); ?>
-			</p>
-
-			<table class="form-table">
-				<tr>
-					<th scope="row">
-						<label for="scos_sma_yourls_url"><?php esc_html_e( 'YOURLS API URL', 'site-essentials' ); ?></label>
-					</th>
-					<td>
-						<input type="url" id="scos_sma_yourls_url" name="scos_sma_yourls_url"
-							value="<?php echo esc_attr( $yourls_url ); ?>"
-							class="regular-text code" style="width:100%;max-width:560px;"
-							placeholder="https://bweb1.com.au/yourls-api.php" />
-						<p class="description"><?php esc_html_e( 'Full path to yourls-api.php on your YOURLS installation.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						<label for="scos_sma_yourls_signature"><?php esc_html_e( 'Signature Token', 'site-essentials' ); ?></label>
-					</th>
-					<td>
-						<input type="text" id="scos_sma_yourls_signature" name="scos_sma_yourls_signature"
-							value="<?php echo esc_attr( $yourls_sig ); ?>"
-							class="regular-text code" style="width:100%;max-width:560px;"
-							autocomplete="off" />
-						<p class="description">
-							<?php esc_html_e( 'Recommended. Found in YOURLS Admin → Tools → Signature Token.', 'site-essentials' ); ?><br>
-							<strong><?php esc_html_e( 'OR', 'site-essentials' ); ?></strong>
-							<?php esc_html_e( 'use the username + password below (less secure).', 'site-essentials' ); ?>
-						</p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						<label for="scos_sma_yourls_username"><?php esc_html_e( 'Username', 'site-essentials' ); ?></label>
-					</th>
-					<td>
-						<input type="text" id="scos_sma_yourls_username" name="scos_sma_yourls_username"
-							value="<?php echo esc_attr( $yourls_user ); ?>"
-							class="regular-text" autocomplete="off" />
-						<p class="description"><?php esc_html_e( 'Only needed if not using signature token.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						<label for="scos_sma_yourls_password"><?php esc_html_e( 'Password', 'site-essentials' ); ?></label>
-					</th>
-					<td>
-						<input type="password" id="scos_sma_yourls_password" name="scos_sma_yourls_password"
-							value="<?php echo esc_attr( $yourls_pass ); ?>"
-							class="regular-text" autocomplete="new-password" />
-						<p class="description"><?php esc_html_e( 'Only needed if not using signature token.', 'site-essentials' ); ?></p>
-					</td>
-				</tr>
-			</table>
-
-		<?php else : /* make.com tab */ ?>
-
-			<h3 style="margin-top:0;"><?php esc_html_e( 'Make.com Integration', 'site-essentials' ); ?></h3>
-			<p class="description" style="margin-bottom:18px;">
-				<?php esc_html_e( 'Configure the Make.com webhook that receives the social post trigger. The "Create Social Post" button on each post sends a payload to this URL.', 'site-essentials' ); ?>
-			</p>
-
-			<table class="form-table">
-				<tr>
-					<th scope="row">
-						<label for="scos_sma_webhook_url"><?php esc_html_e( 'Webhook URL', 'site-essentials' ); ?></label>
-					</th>
-					<td>
-						<input type="url" id="scos_sma_webhook_url" name="scos_sma_webhook_url"
-							value="<?php echo esc_attr( $webhook_url ); ?>"
-							class="regular-text code" style="width:100%;max-width:560px;"
-							placeholder="https://hook.us2.make.com/..." />
-						<p class="description">
-							<?php esc_html_e( 'Your Make.com custom webhook URL (starts with https://hook.us2.make.com/…).', 'site-essentials' ); ?>
-							<a href="<?php echo esc_url( add_query_arg( 'tab', 'docs', $page_url ) ); ?>">
-								<?php esc_html_e( 'See payload reference →', 'site-essentials' ); ?>
-							</a>
-						</p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						<label for="scos_sma_webhook_enabled"><?php esc_html_e( 'Auto-trigger on Publish', 'site-essentials' ); ?></label>
-					</th>
-					<td>
-						<label>
-							<input type="checkbox" id="scos_sma_webhook_enabled" name="scos_sma_webhook_enabled" value="1"
-								<?php checked( $webhook_enabled, 1 ); ?> />
-							<?php esc_html_e( 'Automatically notify Make.com when a post is published or updated', 'site-essentials' ); ?>
-						</label>
-						<p class="description">
-							<?php esc_html_e( 'Leave off to use manual "Create Social Post" button only — recommended for controlled social scheduling.', 'site-essentials' ); ?>
-						</p>
-					</td>
-				</tr>
-			</table>
-
-		<?php endif; ?>
-
-		<?php submit_button( __( 'Save Settings', 'site-essentials' ) ); ?>
-
-	</form>
-
+<?php if ( isset( $_GET['scos_sma_saved'] ) ) : ?>
+  <div class="scos-notice scos-notice--success" style="margin-bottom:var(--scos-s-5)">
+    <?php esc_html_e( 'Settings saved.', 'site-essentials' ); ?>
+  </div>
 <?php endif; ?>
-</div>
+
+<header class="scos__header">
+  <div>
+    <h1 class="scos__title"><?php esc_html_e( 'Social Amplification', 'site-essentials' ); ?></h1>
+    <p class="scos__subtitle">Site Essentials &rsaquo; Social Amplification</p>
+  </div>
+  <div class="scos__header-actions">
+    <button type="submit" id="scos-sa-header-save" form="scos-sa-form-yourls" class="scos-btn scos-btn--primary">
+      <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+    </button>
+  </div>
+</header>
+
+<nav class="scos__tabs" id="scos-sa-tabs">
+  <a href="#settings" class="scos__tab" data-tab="settings"><?php esc_html_e( 'Settings', 'site-essentials' ); ?></a>
+  <a href="#yourls"   class="scos__tab" data-tab="yourls"><?php esc_html_e( 'Short link – YOURLS', 'site-essentials' ); ?></a>
+  <a href="#postly"   class="scos__tab" data-tab="postly"><?php esc_html_e( 'Postly.ai API settings', 'site-essentials' ); ?></a>
+  <a href="#make"     class="scos__tab" data-tab="make"><?php esc_html_e( 'Make.com settings', 'site-essentials' ); ?></a>
+</nav>
+
+<?php // SCOS-SA-PASS1 — minimal hash-based tab switcher ?>
+<script>
+(function() {
+  var TABS     = ['settings','yourls','postly','make'];
+  var FORMS    = { yourls: 'scos-sa-form-yourls', postly: 'scos-sa-form-postly', make: 'scos-sa-form-make' };
+  var panels   = {};
+  var links    = {};
+  var saveBtn;
+
+  function activate(tab) {
+    if ( TABS.indexOf(tab) === -1 ) tab = TABS[0];
+    TABS.forEach(function(t) {
+      if (panels[t]) panels[t].style.display = (t === tab) ? '' : 'none';
+      if (links[t])  links[t].classList.toggle('scos__tab--active', t === tab);
+    });
+    // Update header Save button: show only when the active tab has a form
+    if (saveBtn) {
+      var formId = FORMS[tab];
+      if (formId) {
+        saveBtn.setAttribute('form', formId);
+        saveBtn.style.display = '';
+      } else {
+        saveBtn.style.display = 'none';
+      }
+    }
+    if (history.replaceState) history.replaceState(null, '', '#' + tab);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    saveBtn = document.getElementById('scos-sa-header-save');
+    TABS.forEach(function(t) {
+      panels[t] = document.getElementById('scos-sa-panel-' + t);
+      links[t]  = document.querySelector('[data-tab="' + t + '"]');
+      if (links[t]) {
+        links[t].addEventListener('click', function(e) {
+          e.preventDefault();
+          activate(t);
+        });
+      }
+    });
+
+    // On load: check hash first, then ?scos_sma_tab= query param
+    var hash    = window.location.hash.replace('#','');
+    var params  = new URLSearchParams(window.location.search);
+    var initial = TABS.indexOf(hash) !== -1 ? hash : ( params.get('scos_sma_tab') || TABS[0] );
+    activate(initial);
+  });
+})();
+</script>
+
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+<?php // Tab 1 — Settings                                                            ?>
+<?php // SCOS-SA-PASS1 — new tab; CPT buttons + guide tiles                         ?>
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+
+<div id="scos-sa-panel-settings">
+
+  <div class="scos-card">
+    <div class="scos-card__header">
+      <h3 class="scos-card__title"><?php esc_html_e( 'Post framing & social post types', 'site-essentials' ); ?></h3>
+      <p class="scos-card__desc"><?php esc_html_e( 'Manage the framing types and post type templates used during social content generation.', 'site-essentials' ); ?></p>
+    </div>
+    <div class="scos-card__body">
+      <div style="display:flex;gap:var(--scos-s-2)">
+        <a href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . Post_Framing::POST_TYPE ) ); ?>"
+           class="scos-btn">
+          <span class="dashicons dashicons-edit"></span> <?php esc_html_e( 'Post framing', 'site-essentials' ); ?>
+        </a>
+        <a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Post_Framing::POST_TYPE ) ); ?>"
+           class="scos-btn">
+          <span class="dashicons dashicons-plus"></span> <?php esc_html_e( 'Add post frame', 'site-essentials' ); ?>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="scos-card">
+    <div class="scos-card__header">
+      <h3 class="scos-card__title"><?php esc_html_e( 'Social Amplification setup guide', 'site-essentials' ); ?></h3>
+      <p class="scos-card__desc">
+        <?php esc_html_e( 'Create, schedule, and automate social content using your website\'s existing content as inspiration and context. Uses on-site text and images for automated post creation — publish in one click direct from your website, or set up a review gate before anything goes live.', 'site-essentials' ); ?>
+      </p>
+    </div>
+    <div class="scos-card__body">
+      <div class="scos-support__grid">
+
+        <a href="https://brighterwebsites.com.au/software/social-amplification/make-com-integration/"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong><?php esc_html_e( 'Social automation via Make.com', 'site-essentials' ); ?></strong>
+          <span><?php esc_html_e( 'Set up website-to-social automation using Make.com scenarios.', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="https://brighterwebsites.com.au/software/social-amplification/postly-ai-integration/"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong><?php esc_html_e( 'Social automation via Postly.ai', 'site-essentials' ); ?></strong>
+          <span><?php esc_html_e( 'Schedule and automate posts using the Postly.ai API.', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="https://brighterwebsites.com.au/software/social-amplification/yourls-shortlink-integration/"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong><?php esc_html_e( 'Short links & UTM tracking via YOURLS', 'site-essentials' ); ?></strong>
+          <span><?php esc_html_e( 'Auto-generate branded short links with UTM parameters on post creation.', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="https://brighterwebsites.com.au/software/social-amplification/postly-ai-integration/#ai-knowledge"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong><?php esc_html_e( 'AI content generation setup', 'site-essentials' ); ?></strong>
+          <span><?php esc_html_e( 'Configure Claude API and AI knowledge documents for brand-voice content.', 'site-essentials' ); ?></span>
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#scos-sa-panel-settings -->
+
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+<?php // Tab 2 — YOURLS                                                              ?>
+<?php // SCOS-SA-PASS1 — scos-card, scos-form; existing keys preserved              ?>
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+
+<div id="scos-sa-panel-yourls">
+
+  <form id="scos-sa-form-yourls" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+    <?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
+    <input type="hidden" name="action" value="site_essentials_save_sma">
+    <input type="hidden" name="_scos_sma_tab" value="yourls">
+
+    <div class="scos-card">
+      <div class="scos-card__header">
+        <h3 class="scos-card__title"><?php esc_html_e( 'Shortlink integration – YOURLS', 'site-essentials' ); ?></h3>
+        <a href="https://brighterwebsites.com.au/software/social-amplification/yourls-shortlink-integration/"
+           target="_blank" rel="noopener" class="scos-badge scos-badge--soft"><?php esc_html_e( 'Guide', 'site-essentials' ); ?></a>
+      </div>
+      <div class="scos-card__body">
+
+        <p class="description" style="margin-bottom:var(--scos-s-4)">
+          <?php esc_html_e( 'Configure your self-hosted YOURLS installation. The shortlink slug entered on each post page is used as the YOURLS keyword to create your shortlink. UTM parameters are automatically attached to the redirected URL.', 'site-essentials' ); ?>
+        </p>
+
+        <div class="scos-notice scos-notice--info" style="margin-bottom:var(--scos-s-5)">
+          <strong class="scos-notice__title"><?php esc_html_e( 'Example redirection', 'site-essentials' ); ?></strong>
+          <code>shrtlnk.com/mypage</code> &rarr;
+          <code>mydomainname.com.au/my-long-page-title?utm_source=social_media&amp;utm_medium=social&amp;utm_content=[page-type]&amp;utm_campaign=none</code>
+        </div>
+
+        <?php // SCOS-SA-PASS1 — input name uses scos_sma_yourls_url (existing key); slug label shows target scos_sa_ key ?>
+        <?php // TODO: migrate key scos_sma_yourls_url → scos_sa_yourls_api_url — SCOS-SA-PASS1 ?>
+        <table class="scos-form">
+          <tbody>
+            <tr>
+              <th>
+                <label for="scos_sma_yourls_url"><?php esc_html_e( 'YOURLS API URL', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_yourls_api_url</div>
+              </th>
+              <td>
+                <input id="scos_sma_yourls_url" name="scos_sma_yourls_url" type="url"
+                       class="scos-input" placeholder="https://yourdomain.com/yourls-api.php"
+                       value="<?php echo esc_attr( $yourls_url ); ?>">
+                <p class="description"><?php esc_html_e( 'Full path to yourls-api.php on your YOURLS installation.', 'site-essentials' ); ?></p>
+              </td>
+            </tr>
+            <?php // TODO: migrate key scos_sma_yourls_signature → scos_sa_yourls_token — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="scos_sma_yourls_signature"><?php esc_html_e( 'Signature token', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_yourls_token</div>
+              </th>
+              <td>
+                <input id="scos_sma_yourls_signature" name="scos_sma_yourls_signature" type="text"
+                       class="scos-input scos-input--mono"
+                       value="<?php echo esc_attr( $yourls_sig ); ?>">
+                <p class="description">
+                  <strong><?php esc_html_e( 'Recommended.', 'site-essentials' ); ?></strong>
+                  <?php esc_html_e( 'Found in YOURLS Admin &rarr; Tools &rarr; Signature Token.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <hr style="border:none;border-top:1px solid var(--scos-border);margin:var(--scos-s-5) 0">
+
+        <table class="scos-form">
+          <tbody>
+            <tr>
+              <th>
+                <label for="scos_sma_yourls_username"><?php esc_html_e( 'Username', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_yourls_username</div>
+              </th>
+              <td>
+                <input id="scos_sma_yourls_username" name="scos_sma_yourls_username" type="text"
+                       class="scos-input"
+                       value="<?php echo esc_attr( $yourls_user ); ?>">
+                <p class="description"><?php esc_html_e( 'Only needed if not using a signature token.', 'site-essentials' ); ?></p>
+              </td>
+            </tr>
+            <tr>
+              <th>
+                <label for="scos_sma_yourls_password"><?php esc_html_e( 'Password', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_yourls_password</div>
+              </th>
+              <td>
+                <input id="scos_sma_yourls_password" name="scos_sma_yourls_password" type="password"
+                       class="scos-input"
+                       value="<?php echo esc_attr( $yourls_pass ); ?>">
+                <p class="description"><?php esc_html_e( 'Only needed if not using a signature token.', 'site-essentials' ); ?></p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div>
+      <div class="scos-card__footer">
+        <button type="submit" class="scos-btn scos-btn--primary">
+          <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+        </button>
+      </div>
+    </div><!-- /.scos-card -->
+
+  </form>
+
+</div><!-- /#scos-sa-panel-yourls -->
+
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+<?php // Tab 3 — Postly.ai API settings                                              ?>
+<?php // SCOS-SA-PASS1 — 3 cards: Scheduling, Postly API, AI knowledge docs         ?>
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+
+<div id="scos-sa-panel-postly">
+
+  <form id="scos-sa-form-postly" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+    <?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
+    <input type="hidden" name="action" value="site_essentials_save_sma">
+    <input type="hidden" name="_scos_sma_tab" value="postly">
+
+    <?php // ── Card 1: Scheduling ──────────────────────────────────────────────── ?>
+
+    <div class="scos-card">
+      <div class="scos-card__header">
+        <h3 class="scos-card__title"><?php esc_html_e( 'Scheduling', 'site-essentials' ); ?></h3>
+        <a href="https://brighterwebsites.com.au/software/social-amplification/postly-ai-integration/"
+           target="_blank" rel="noopener" class="scos-badge scos-badge--soft"><?php esc_html_e( 'Guide', 'site-essentials' ); ?></a>
+      </div>
+      <div class="scos-card__body">
+
+        <p class="scos__section-label"><?php esc_html_e( 'New content', 'site-essentials' ); ?></p>
+
+        <table class="scos-form">
+          <tbody>
+
+            <?php // TODO: migrate key bw_social_enabled → scos_sa_postly_enabled — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="bw_social_enabled"><?php esc_html_e( 'Enable social amplification', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_enabled</div>
+              </th>
+              <td>
+                <label class="scos-checkbox-row">
+                  <input id="bw_social_enabled" name="bw_social_enabled" type="checkbox"
+                         value="1" <?php checked( $social_enabled, '1' ); ?>>
+                  <?php esc_html_e( 'Automatically amplify when a Projects post is published', 'site-essentials' ); ?>
+                </label>
+                <p class="description">
+                  <?php
+                  printf(
+                    /* translators: %s: link to AI API Keys settings page */
+                    esc_html__( 'Requires Postly API key, Workspace ID, and Anthropic API key (in %s) to be configured.', 'site-essentials' ),
+                    '<a href="' . esc_url( admin_url( 'admin.php?page=site-essentials-settings&tab=ai-keys' ) ) . '">' . esc_html__( 'Settings &rarr; AI API Keys', 'site-essentials' ) . '</a>'
+                  );
+                  ?>
+                </p>
+              </td>
+            </tr>
+
+            <?php // TODO: migrate keys bw_social_publish_time_min/max → scos_sa_postly_window_from/to — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label><?php esc_html_e( 'Publish time window', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_window_from / _to</div>
+              </th>
+              <td>
+                <div style="display:flex;align-items:center;gap:var(--scos-s-2)">
+                  <span><?php esc_html_e( 'From', 'site-essentials' ); ?></span>
+                  <input id="bw_social_publish_time_min" name="bw_social_publish_time_min"
+                         type="time" class="scos-input" style="width:130px"
+                         value="<?php echo esc_attr( $publish_time_min ); ?>">
+                  <span><?php esc_html_e( 'To', 'site-essentials' ); ?></span>
+                  <input id="bw_social_publish_time_max" name="bw_social_publish_time_max"
+                         type="time" class="scos-input" style="width:130px"
+                         value="<?php echo esc_attr( $publish_time_max ); ?>">
+                </div>
+                <p class="description">
+                  <?php esc_html_e( 'Posts are scheduled at a random time within this window (site timezone). Slot 1 is always pushed at least 60 minutes into the future to allow for Postly processing and approval.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <th>
+                <label for="scos_sa_postly_post_count"><?php esc_html_e( 'Posts to create', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_post_count</div>
+              </th>
+              <td>
+                <input id="scos_sa_postly_post_count" name="scos_sa_postly_post_count"
+                       type="number" class="scos-input" style="width:80px" min="1" max="10"
+                       value="<?php echo esc_attr( $postly_post_count ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Number of social posts generated per project publish. GMB always creates 1 post regardless of this setting.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+
+        <hr style="border:none;border-top:1px solid var(--scos-border);margin:var(--scos-s-5) 0">
+
+        <p class="scos__section-label"><?php esc_html_e( 'Existing content backfill', 'site-essentials' ); ?></p>
+
+        <?php
+        // SCOS-SA-PASS1 — backfill data attributes preserved so backfill.js continues to work.
+        $bw_secret = get_option( 'bw_social_webhook_secret', '' );
+        ?>
+        <div id="scos-sa-backfill-wrap"
+             data-secret="<?php echo esc_attr( $bw_secret ); ?>"
+             data-rest="<?php echo esc_attr( rest_url( 'bw-social/v1/backfill' ) ); ?>">
+
+          <table class="scos-form">
+            <tbody>
+              <tr>
+                <th>
+                  <label><?php esc_html_e( 'Date range', 'site-essentials' ); ?></label>
+                  <div class="scos-form__slug">scos_sa_backfill_date_from / _to</div>
+                </th>
+                <td>
+                  <div style="display:flex;align-items:center;gap:var(--scos-s-2)">
+                    <span><?php esc_html_e( 'From', 'site-essentials' ); ?></span>
+                    <input name="scos_sa_backfill_date_from" id="scos_sa_backfill_from"
+                           type="date" class="scos-input" style="width:160px"
+                           value="<?php echo esc_attr( $backfill_date_from ?: gmdate( 'Y-m-01' ) ); ?>">
+                    <span><?php esc_html_e( 'To', 'site-essentials' ); ?></span>
+                    <input name="scos_sa_backfill_date_to" id="scos_sa_backfill_to"
+                           type="date" class="scos-input" style="width:160px"
+                           value="<?php echo esc_attr( $backfill_date_to ?: gmdate( 'Y-m-d' ) ); ?>">
+                  </div>
+                  <p class="description"><?php esc_html_e( 'Run social amplification for existing project posts published within this date range.', 'site-essentials' ); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th>
+                  <label for="scos_sa_backfill_limit"><?php esc_html_e( 'Limit', 'site-essentials' ); ?></label>
+                  <div class="scos-form__slug">scos_sa_backfill_limit</div>
+                </th>
+                <td>
+                  <input id="scos_sa_backfill_limit" name="scos_sa_backfill_limit"
+                         type="number" class="scos-input" style="width:80px" min="1"
+                         value="<?php echo esc_attr( $backfill_limit ); ?>">
+                  <p class="description"><?php esc_html_e( 'Maximum number of posts to process in this backfill run.', 'site-essentials' ); ?></p>
+                  <div class="scos-notice scos-notice--info" style="margin-top:var(--scos-s-3)">
+                    <?php esc_html_e( 'Additional scheduling options (days between posts, start date offset, per-post count) are available via CLI.', 'site-essentials' ); ?>
+                    <a href="https://brighterwebsites.com.au/software/social-amplification/social-amplification-technical-documentation/"
+                       target="_blank" rel="noopener"><?php esc_html_e( 'View CLI reference &rarr;', 'site-essentials' ); ?></a>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div id="scos-sa-backfill-status" class="scos-sa-result" hidden></div>
+          <div id="scos-sa-backfill-results"></div>
+
+        </div><!-- /#scos-sa-backfill-wrap -->
+
+      </div>
+      <div class="scos-card__footer" style="display:flex;justify-content:space-between;align-items:center">
+        <button type="button" id="scos-sa-run-backfill" class="scos-btn">
+          <span class="dashicons dashicons-controls-play"></span> <?php esc_html_e( 'Run backfill', 'site-essentials' ); ?>
+        </button>
+        <button type="submit" class="scos-btn scos-btn--primary">
+          <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+        </button>
+      </div>
+    </div><!-- /.scos-card Scheduling -->
+
+    <?php // ── Card 2: Postly API – integration ──────────────────────────────── ?>
+
+    <div class="scos-card">
+      <div class="scos-card__header">
+        <h3 class="scos-card__title"><?php esc_html_e( 'Postly API – integration', 'site-essentials' ); ?></h3>
+      </div>
+      <div class="scos-card__body">
+
+        <p class="scos__section-label"><?php esc_html_e( 'Workspace settings', 'site-essentials' ); ?></p>
+
+        <table class="scos-form">
+          <tbody>
+            <?php // TODO: migrate key bw_postly_api_key → scos_sa_postly_api_key — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="bw_postly_api_key"><?php esc_html_e( 'Postly API key', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_api_key</div>
+              </th>
+              <td>
+                <input id="bw_postly_api_key" name="bw_postly_api_key" type="text"
+                       class="scos-input scos-input--mono"
+                       value="<?php echo esc_attr( $postly_api_key ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Your Postly.ai API key. Get it from', 'site-essentials' ); ?>
+                  <a href="https://app.postly.ai" target="_blank" rel="noopener">app.postly.ai</a>.
+                </p>
+              </td>
+            </tr>
+            <?php // TODO: migrate key bw_postly_workspace_id → scos_sa_postly_workspace_id — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="bw_postly_workspace_id"><?php esc_html_e( 'Postly workspace ID', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_workspace_id</div>
+              </th>
+              <td>
+                <input id="bw_postly_workspace_id" name="bw_postly_workspace_id" type="text"
+                       class="scos-input scos-input--mono"
+                       value="<?php echo esc_attr( $postly_workspace_id ); ?>">
+                <p class="description"><?php esc_html_e( 'Found in the Workspace settings URL in your Postly account.', 'site-essentials' ); ?></p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <hr style="border:none;border-top:1px solid var(--scos-border);margin:var(--scos-s-5) 0">
+
+        <p class="scos__section-label"><?php esc_html_e( 'Social channel settings', 'site-essentials' ); ?></p>
+
+        <table class="scos-form">
+          <tbody>
+            <?php // TODO: migrate key bw_postly_channel_ids → scos_sa_postly_channel_ids — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="bw_postly_channel_ids"><?php esc_html_e( 'Target channel IDs', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_channel_ids</div>
+              </th>
+              <td>
+                <input id="bw_postly_channel_ids" name="bw_postly_channel_ids" type="text"
+                       class="scos-input scos-input--mono" placeholder="id1, id2, id3"
+                       value="<?php echo esc_attr( $postly_channel_ids ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Comma-separated Postly channel IDs. Leave blank to disable standard social posting.', 'site-essentials' ); ?>
+                </p>
+                <div class="scos-notice scos-notice--info" style="margin-top:var(--scos-s-3)">
+                  <?php esc_html_e( 'Use this field for', 'site-essentials' ); ?>
+                  <strong><?php esc_html_e( 'Facebook and Instagram only.', 'site-essentials' ); ?></strong>
+                  <?php esc_html_e( 'Pinterest and GMB require additional channel configuration — use the GMB field below.', 'site-essentials' ); ?>
+                </div>
+              </td>
+            </tr>
+            <?php // TODO: migrate key se_postly_gmb_channel_id → scos_sa_postly_gmb_channel_id — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="se_postly_gmb_channel_id"><?php esc_html_e( 'GMB channel ID', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_gmb_channel_id</div>
+              </th>
+              <td>
+                <input id="se_postly_gmb_channel_id" name="se_postly_gmb_channel_id" type="text"
+                       class="scos-input scos-input--mono"
+                       value="<?php echo esc_attr( $postly_gmb_channel_id ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Your GMB channel ID from Postly &rarr; Channels. Only one GMB profile per workspace is supported.', 'site-essentials' ); ?>
+                </p>
+                <div class="scos-notice scos-notice--warning" style="margin-top:var(--scos-s-3)">
+                  <strong class="scos-notice__title"><?php esc_html_e( 'In development', 'site-essentials' ); ?></strong>
+                  <?php esc_html_e( 'GMB posting is functional but not yet self-service. Full setup currently requires CLI commands.', 'site-essentials' ); ?>
+                  <a href="https://brighterwebsites.com.au/software/social-amplification/postly-ai-integration/"
+                     target="_blank" rel="noopener"><?php esc_html_e( 'Check for updates &rarr;', 'site-essentials' ); ?></a>
+                  <?php esc_html_e( 'or', 'site-essentials' ); ?>
+                  <a href="https://brighterwebsites.com.au/software/social-amplification/"
+                     target="_blank" rel="noopener"><?php esc_html_e( 'contact Brighter Websites', 'site-essentials' ); ?></a>
+                  <?php esc_html_e( 'for assisted setup.', 'site-essentials' ); ?>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <hr style="border:none;border-top:1px solid var(--scos-border);margin:var(--scos-s-5) 0">
+
+        <p class="scos__section-label"><?php esc_html_e( 'ACF field settings', 'site-essentials' ); ?></p>
+
+        <table class="scos-form">
+          <tbody>
+            <?php // TODO: migrate key bw_social_acf_gallery_keys → scos_sa_postly_acf_gallery_keys — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="bw_social_acf_gallery_keys"><?php esc_html_e( 'ACF gallery field keys', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_acf_gallery_keys</div>
+              </th>
+              <td>
+                <input id="bw_social_acf_gallery_keys" name="bw_social_acf_gallery_keys"
+                       type="text" class="scos-input scos-input--mono"
+                       placeholder="project_gallery, secondary_gallery"
+                       value="<?php echo esc_attr( $acf_gallery_keys ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Comma-separated ACF field keys containing gallery images. Combined with the featured image for post image sets.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+            <?php // TODO: migrate key bw_social_acf_featured_key → scos_sa_postly_acf_hero_key — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="bw_social_acf_featured_key"><?php esc_html_e( 'ACF featured image key', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_acf_hero_key</div>
+              </th>
+              <td>
+                <input id="bw_social_acf_featured_key" name="bw_social_acf_featured_key"
+                       type="text" class="scos-input scos-input--mono"
+                       value="<?php echo esc_attr( $acf_featured_key ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Optional. Overrides the standard WordPress featured image as the first image. Leave blank to use the WP featured image.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+            <?php // TODO: migrate key bw_social_webhook_secret → scos_sa_postly_webhook_secret — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label><?php esc_html_e( 'Webhook secret', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_webhook_secret</div>
+              </th>
+              <td>
+                <?php if ( $webhook_secret ) : ?>
+                  <code class="scos-input--mono" style="font-size:var(--scos-fs-xs)"><?php echo esc_html( $webhook_secret ); ?></code>
+                <?php else : ?>
+                  <p style="color:var(--scos-warning);font-weight:500"><?php esc_html_e( 'Not yet generated — save settings to auto-generate.', 'site-essentials' ); ?></p>
+                <?php endif; ?>
+                <p class="description">
+                  <?php esc_html_e( 'Auto-generated. Authenticates the internal REST endpoint (POST /wp-json/bw-social/v1/amplify). Keep private.', 'site-essentials' ); ?>
+                </p>
+                <input type="hidden" name="bw_social_webhook_secret" value="<?php echo esc_attr( $webhook_secret ); ?>">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div>
+      <div class="scos-card__footer">
+        <button type="submit" class="scos-btn scos-btn--primary">
+          <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+        </button>
+      </div>
+    </div><!-- /.scos-card Postly API -->
+
+  </form>
+
+  <?php // ── Card 3: AI knowledge documents (read-only, outside form) ─────── ?>
+
+  <div class="scos-card">
+    <div class="scos-card__header">
+      <h3 class="scos-card__title"><?php esc_html_e( 'AI knowledge documents', 'site-essentials' ); ?></h3>
+      <a href="https://brighterwebsites.com.au/software/social-amplification/postly-ai-integration/#ai-knowledge"
+         target="_blank" rel="noopener" class="scos-badge scos-badge--soft"><?php esc_html_e( 'Guide', 'site-essentials' ); ?></a>
+    </div>
+    <div class="scos-card__body">
+
+      <p class="description" style="margin-bottom:var(--scos-s-4)">
+        <?php esc_html_e( 'These markdown files are read by the AI during post generation. Edit them to control brand voice, vocabulary, and per-channel posting rules. Located at', 'site-essentials' ); ?>
+        <code>/wp-content/ai-knowledge/</code>
+      </p>
+
+      <div class="scos-support__grid">
+
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/brand-core.md' ) ); ?>"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong>brand-core.md</strong>
+          <span><?php esc_html_e( 'Brand voice for social media — how your posts should sound, tone, style, and personality.', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/vocabulary.md' ) ); ?>"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong>vocabulary.md</strong>
+          <span><?php esc_html_e( 'Words and phrases to use and never use in generated content.', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/social-media.md' ) ); ?>"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong>social-media.md</strong>
+          <span><?php esc_html_e( 'Rules for Facebook & Instagram posts — word length, hashtag and emoji usage, link inclusion.', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/social-media-gmb.md' ) ); ?>"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong>social-media-gmb.md</strong>
+          <span><?php esc_html_e( 'Rules for Google Business posts — ensures GMB terms of use compliance (no contact details or URLs in body).', 'site-essentials' ); ?></span>
+        </a>
+
+      </div>
+
+    </div>
+  </div><!-- /.scos-card AI knowledge docs -->
+
+</div><!-- /#scos-sa-panel-postly -->
+
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+<?php // Tab 4 — Make.com settings                                                   ?>
+<?php // SCOS-SA-PASS1 — single scos-card; tab slug changed from makecom to make    ?>
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+
+<div id="scos-sa-panel-make">
+
+  <form id="scos-sa-form-make" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+    <?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
+    <input type="hidden" name="action" value="site_essentials_save_sma">
+    <input type="hidden" name="_scos_sma_tab" value="make">
+
+    <div class="scos-card">
+      <div class="scos-card__header">
+        <h3 class="scos-card__title"><?php esc_html_e( 'Make.com integration', 'site-essentials' ); ?></h3>
+        <a href="https://brighterwebsites.com.au/software/social-amplification/make-com-integration/"
+           target="_blank" rel="noopener" class="scos-badge scos-badge--soft"><?php esc_html_e( 'Guide', 'site-essentials' ); ?></a>
+      </div>
+      <div class="scos-card__body">
+
+        <p class="description" style="margin-bottom:var(--scos-s-4)">
+          <?php esc_html_e( 'Configure the Make.com webhook that receives the social post trigger. The "Create Social Post" button on each post sends a payload to this URL.', 'site-essentials' ); ?>
+        </p>
+
+        <table class="scos-form">
+          <tbody>
+
+            <?php // TODO: migrate key scos_sma_webhook_url → scos_sa_make_webhook_url — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="scos_sma_webhook_url"><?php esc_html_e( 'Webhook URL', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_make_webhook_url</div>
+              </th>
+              <td>
+                <div style="display:flex;align-items:flex-start;gap:var(--scos-s-4)">
+                  <input id="scos_sma_webhook_url" name="scos_sma_webhook_url" type="url"
+                         class="scos-input" placeholder="https://hook.us2.make.com/..."
+                         value="<?php echo esc_attr( $make_webhook_url ); ?>"
+                         style="flex:1">
+                  <a href="https://brighterwebsites.com.au/software/social-amplification/social-amplification-technical-documentation/"
+                     target="_blank" rel="noopener"
+                     style="white-space:nowrap;font-size:var(--scos-fs-sm);color:var(--scos-accent);padding-top:8px">
+                    <?php esc_html_e( 'See payload reference &rarr;', 'site-essentials' ); ?>
+                  </a>
+                </div>
+                <p class="description"><?php esc_html_e( 'Your Make.com custom webhook URL (starts with https://hook.us2.make.com/...).', 'site-essentials' ); ?></p>
+              </td>
+            </tr>
+
+            <?php // TODO: migrate key scos_sma_webhook_enabled → scos_sa_make_auto_trigger — SCOS-SA-PASS1 ?>
+            <tr>
+              <th>
+                <label for="scos_sma_webhook_enabled"><?php esc_html_e( 'Auto-trigger on publish', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_make_auto_trigger</div>
+              </th>
+              <td>
+                <label class="scos-checkbox-row">
+                  <input id="scos_sma_webhook_enabled" name="scos_sma_webhook_enabled" type="checkbox"
+                         value="1" <?php checked( $make_auto_trigger, 1 ); ?>>
+                  <?php esc_html_e( 'Automatically notify Make.com when a post is published or updated', 'site-essentials' ); ?>
+                </label>
+                <p class="description">
+                  <em><?php esc_html_e( 'Leave off to use the manual "Create Social Post" button only — recommended for controlled social scheduling.', 'site-essentials' ); ?></em>
+                </p>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+
+      </div>
+      <div class="scos-card__footer">
+        <button type="submit" class="scos-btn scos-btn--primary">
+          <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+        </button>
+      </div>
+    </div><!-- /.scos-card Make.com -->
+
+  </form>
+
+</div><!-- /#scos-sa-panel-make -->

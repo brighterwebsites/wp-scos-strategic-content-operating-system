@@ -83,6 +83,19 @@ elseif ( $active_tab === 'image-optimization' ) :
 			</div>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'brighter_optimisation_settings' ); ?>
+				<?php
+				// Preserve Card 2 (Thumbnails) fields so options.php does not clear them on Card 1 submit.
+				$_img_sizes = function_exists( 'brighter_get_image_sizes_config' ) ? array_keys( brighter_get_image_sizes_config() ) : [];
+				foreach ( $_img_sizes as $_size ) {
+					if ( get_option( 'enable_size_' . $_size, 1 ) ) {
+						echo '<input type="hidden" name="enable_size_' . esc_attr( $_size ) . '" value="1">';
+					}
+				}
+				?>
+				<input type="hidden" name="brighter_enable_custom_hero"  value="<?php echo esc_attr( get_option( 'brighter_enable_custom_hero', 0 ) ? '1' : '0' ); ?>">
+				<input type="hidden" name="brighter_custom_hero_width"   value="<?php echo esc_attr( get_option( 'brighter_custom_hero_width', 0 ) ); ?>">
+				<input type="hidden" name="brighter_custom_hero_height"  value="<?php echo esc_attr( get_option( 'brighter_custom_hero_height', 0 ) ); ?>">
+				<input type="hidden" name="jpeg_quality"                 value="<?php echo esc_attr( get_option( 'jpeg_quality', 75 ) ); ?>">
 				<div class="scos-card__body">
 					<table class="form-table" role="presentation">
 						<tbody>
@@ -109,6 +122,16 @@ elseif ( $active_tab === 'image-optimization' ) :
 			</div>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'brighter_optimisation_settings' ); ?>
+				<?php
+				// Preserve Card 1 (Image Settings) fields so options.php does not clear them on Card 2 submit.
+				if ( get_option( 'enable_image_resize', 'yes' ) === 'yes' ) {
+					echo '<input type="hidden" name="enable_image_resize" value="yes">';
+				}
+				if ( get_option( 'disable_big_image_threshold', 0 ) ) {
+					echo '<input type="hidden" name="disable_big_image_threshold" value="1">';
+				}
+				?>
+				<input type="hidden" name="image_max_dimension" value="<?php echo esc_attr( get_option( 'image_max_dimension', 2480 ) ); ?>">
 				<div class="scos-card__body">
 					<table class="form-table" role="presentation">
 						<tbody>

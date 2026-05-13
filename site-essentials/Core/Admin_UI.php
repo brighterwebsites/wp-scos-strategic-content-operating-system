@@ -392,11 +392,16 @@ class Admin_UI {
      * @return void
      */
     public function enqueue_assets($hook) {
-        // New pages use tokens.css + scos-ui.css only — admin.css excluded
-        // Agency is a submenu under site-essentials → hook is {parent}_page_{slug}
+        // Pure SCOS pages: only tokens.css + scos-ui.css, no legacy admin.css.
+        // Consolidating all SCOS-only pages here avoids duplicate conditional checks
+        // lower in the function and ensures reliable enqueuing on all server configs
+        // (including WooCommerce sites with high OPcache pressure).
         $scos_ui_hooks = [
             'toplevel_page_' . self::SUPPORT_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::AGENCY_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::ANALYTICS_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
         ];
 
         if ( in_array( $hook, $scos_ui_hooks, true ) ) {
@@ -462,23 +467,6 @@ class Admin_UI {
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
 
-        // Analytics page uses SCOS design system
-        if ( $hook === self::PAGE_SLUG . '_page_' . self::ANALYTICS_PAGE_SLUG ) {
-            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
-            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
-        }
-
-        // Social Amplification page uses SCOS design system
-        if ( $hook === self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG ) {
-            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
-            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
-        }
-
-        // Business Info page uses SCOS design system — SCOS-BIZ-PASS1
-        if ( $hook === self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG ) {
-            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
-            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
-        }
     }
 
     /**

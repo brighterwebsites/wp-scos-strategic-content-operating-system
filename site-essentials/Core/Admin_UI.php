@@ -473,6 +473,12 @@ class Admin_UI {
             wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
+
+        // Business Info page uses SCOS design system — SCOS-BIZ-PASS1
+        if ( $hook === self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
     }
 
     /**
@@ -747,23 +753,19 @@ class Admin_UI {
             wp_die( __( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
         }
 
-        echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__( 'Business Info', 'site-essentials' ) . '</h1>';
-        echo '<div class="site-essentials-content">';
-        echo '<div class="card se-module-settings-card" data-module-id="business_info">';
-
+        // SCOS-BIZ-PASS1 — wrapper updated to wrap scos; page chrome now in the view
         $biz_module = Module_Loader::get_module( 'business_info' );
-        if ( $biz_module ) {
-            $biz_module->render_settings();
-        } elseif ( function_exists( 'brighterweb_render_business_info_form' ) ) {
-            brighterweb_render_business_info_form();
-        } else {
-            echo '<div class="notice notice-warning"><p>';
+
+        if ( ! $biz_module ) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
             esc_html_e( 'Business Info module is not loaded. Ensure brighter-core is active.', 'site-essentials' );
-            echo '</p></div>';
+            echo '</p></div></div>';
+            return;
         }
 
-        echo '</div></div></div>';
+        echo '<div class="wrap scos">';
+        $biz_module->render_settings();
+        echo '</div>';
     }
 
     /**

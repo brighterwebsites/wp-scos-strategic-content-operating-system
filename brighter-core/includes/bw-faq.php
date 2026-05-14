@@ -515,35 +515,11 @@ add_shortcode('faqs', 'faq_selector_shortcode');
 // 7. REST API ENDPOINTS
 // ============================================
 
+// brighter-core/v1/faqs is registered with token auth in class-brighter-api-endpoints.php.
+// The legacy public registrations below were removed to avoid duplicate route conflicts
+// where WordPress merges both handlers and produces unpredictable permission behaviour.
 function register_faq_rest_routes() {
-    // Get all FAQs
-    register_rest_route('brighter-core/v1', '/faqs', array(
-        'methods'  => 'GET',
-        'callback' => 'get_all_faqs_api',
-        'permission_callback' => '__return_true',
-    ));
-
-    // Search FAQs
-    register_rest_route('brighter-core/v1', '/faqs/search', array(
-        'methods'  => 'GET',
-        'callback' => 'search_faqs_api',
-        'permission_callback' => '__return_true',
-        'args' => array(
-            'q' => array(
-                'required' => true,
-                'type'     => 'string',
-            ),
-        ),
-    ));
-
-    // Export FAQs for AI training
-    register_rest_route('brighter-core/v1', '/faqs/export', array(
-        'methods'  => 'GET',
-        'callback' => 'export_faqs_api',
-        'permission_callback' => function() {
-            return current_user_can('manage_options');
-        },
-    ));
+    // Intentionally empty — route is owned by Brighter_API_Endpoints (class-brighter-api-endpoints.php).
 }
 add_action('rest_api_init', 'register_faq_rest_routes');
 

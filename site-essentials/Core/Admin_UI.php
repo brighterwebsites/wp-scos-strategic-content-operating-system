@@ -1436,14 +1436,21 @@ class Admin_UI {
             'disable_rest_api'        => isset( $enabled_tweaks['disable_rest_api'] ),
             'restrict_rest_users'     => isset( $enabled_tweaks['restrict_rest_users'] ),
             // SEO & Metadata Code Cleanup
-            'remove_rsd_link'         => isset( $enabled_tweaks['remove_rsd_link'] ),
-            'remove_wlw_link'         => isset( $enabled_tweaks['remove_wlw_link'] ),
-            'remove_wp_version'       => isset( $enabled_tweaks['remove_wp_version'] ),
-            'remove_shortlink'        => isset( $enabled_tweaks['remove_shortlink'] ),
-            'remove_rest_api_links'   => isset( $enabled_tweaks['remove_rest_api_links'] ),
-            'disable_embeds_inbound'  => isset( $enabled_tweaks['disable_embeds_inbound'] ),
+            'remove_rsd_link'                 => isset( $enabled_tweaks['remove_rsd_link'] ),
+            'remove_wlw_link'                 => isset( $enabled_tweaks['remove_wlw_link'] ),
+            'remove_wp_version'               => isset( $enabled_tweaks['remove_wp_version'] ),
+            'remove_shortlink'                => isset( $enabled_tweaks['remove_shortlink'] ),
+            'remove_rest_api_links'           => isset( $enabled_tweaks['remove_rest_api_links'] ),
+            'disable_embeds_inbound'          => isset( $enabled_tweaks['disable_embeds_inbound'] ),
+            'disable_rss_feeds'               => isset( $enabled_tweaks['disable_rss_feeds'] ),
+            'disable_rss_head_links'          => isset( $enabled_tweaks['disable_rss_head_links'] ),
+            'disable_relational_links'        => isset( $enabled_tweaks['disable_relational_links'] ),
+            'disable_gutenberg_block_library' => isset( $enabled_tweaks['disable_gutenberg_block_library'] ),
+            'disable_dashicons_frontend'      => isset( $enabled_tweaks['disable_dashicons_frontend'] ),
+            // Admin UX/UI
+            'allow_editors_form_submissions'  => isset( $enabled_tweaks['allow_editors_form_submissions'] ),
             // Legacy key — kept so previously saved data isn't lost
-            'disable_embeds'          => isset( $enabled_tweaks['disable_embeds'] ),
+            'disable_embeds'                  => isset( $enabled_tweaks['disable_embeds'] ),
         ];
 
         // Save settings

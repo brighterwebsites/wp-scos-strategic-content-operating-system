@@ -267,6 +267,59 @@ class Tweaks_Module implements Module_Interface {
                     return $endpoints;
                 } );
                 break;
+
+            case 'disable_rss_feeds':
+                add_filter( 'feed_links_show_posts_feed',    '__return_false' );
+                add_filter( 'feed_links_show_comments_feed', '__return_false' );
+                remove_action( 'wp_head', 'feed_links',       2 );
+                remove_action( 'wp_head', 'feed_links_extra', 3 );
+                add_action( 'template_redirect', function() {
+                    if ( is_feed() ) {
+                        global $wp_query;
+                        $wp_query->set_404();
+                        status_header( 404 );
+                    }
+                }, 1 );
+                break;
+
+            case 'disable_rss_head_links':
+                remove_action( 'wp_head', 'feed_links',       2 );
+                remove_action( 'wp_head', 'feed_links_extra', 3 );
+                break;
+
+            case 'disable_relational_links':
+                remove_action( 'wp_head', 'adjacent_posts_rel_link_wp_head', 10 );
+                break;
+
+            case 'disable_gutenberg_block_library':
+                add_action( 'wp_enqueue_scripts', function() {
+                    wp_dequeue_style( 'wp-block-library' );
+                    wp_dequeue_style( 'wp-block-library-theme' );
+                    wp_dequeue_style( 'wc-block-style' );
+                    global $wp_styles;
+                    if ( isset( $wp_styles->queue ) ) {
+                        foreach ( $wp_styles->queue as $handle ) {
+                            if ( strpos( $handle, 'wp-block-' ) === 0 ) {
+                                wp_dequeue_style( $handle );
+                            }
+                        }
+                    }
+                }, 100 );
+                break;
+
+            case 'disable_dashicons_frontend':
+                add_action( 'wp_enqueue_scripts', function() {
+                    if ( ! is_user_logged_in() ) {
+                        wp_dequeue_style( 'dashicons' );
+                    }
+                }, 100 );
+                break;
+
+            case 'allow_editors_form_submissions':
+                add_filter( 'breakdance_form_submission_capability', function() {
+                    return 'edit_posts';
+                } );
+                break;
         }
     }
 
@@ -580,14 +633,21 @@ class Tweaks_Module implements Module_Interface {
             'disable_rest_api'         => false,
             'restrict_rest_users'      => false,
             // SEO & Metadata Code Cleanup
-            'remove_rsd_link'          => false,
-            'remove_wlw_link'          => false,
-            'remove_wp_version'        => false,
-            'remove_shortlink'         => false,
-            'remove_rest_api_links'    => false,
-            'disable_embeds_inbound'   => false,
+            'remove_rsd_link'                 => false,
+            'remove_wlw_link'                 => false,
+            'remove_wp_version'               => false,
+            'remove_shortlink'                => false,
+            'remove_rest_api_links'           => false,
+            'disable_embeds_inbound'          => false,
+            'disable_rss_feeds'               => false,
+            'disable_rss_head_links'          => false,
+            'disable_relational_links'        => false,
+            'disable_gutenberg_block_library' => false,
+            'disable_dashicons_frontend'      => false,
+            // Admin UX/UI
+            'allow_editors_form_submissions'  => false,
             // Legacy key — preserved for backwards compat but hidden from UI
-            'disable_embeds'           => false,
+            'disable_embeds'                  => false,
         ];
     }
 

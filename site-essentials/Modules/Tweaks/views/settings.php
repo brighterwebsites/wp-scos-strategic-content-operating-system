@@ -99,6 +99,32 @@ $groups = [
                 'label'       => __( 'Disable Inbound Embeds', 'site-essentials' ),
                 'description' => __( 'Stops other sites from discovering and embedding <em>your</em> content. Removes the oEmbed discovery <code>&lt;link&gt;</code> tags and the REST API endpoint. Zero impact on outbound embeds (YouTube, etc. still work on your pages).', 'site-essentials' ),
             ],
+            'disable_rss_feeds' => [
+                'label'       => __( 'Disable RSS Feeds', 'site-essentials' ),
+                'description' => __( 'Disables all RSS feed generation (post feeds, comment feeds, category feeds) and removes <code>&lt;link rel="alternate"&gt;</code> tags from <code>&lt;head&gt;</code>. Reduces crawl budget waste and prevents duplicate content in Google Search Console. <strong>Note:</strong> Also update <code>robots.txt</code> to remove any feed disallow rules.', 'site-essentials' ),
+            ],
+            'disable_relational_links' => [
+                'label'       => __( 'Disable Relational Links', 'site-essentials' ),
+                'description' => __( 'Removes <code>rel="prev"</code> and <code>rel="next"</code> link tags from single posts and pages. These can confuse pagination signals. Safe to disable on sites with custom pagination.', 'site-essentials' ),
+            ],
+            'disable_gutenberg_block_library' => [
+                'label'       => __( 'Remove Gutenberg Block Library CSS', 'site-essentials' ),
+                'description' => __( 'Aggressively removes Gutenberg block library CSS from the frontend. Safe for Breakdance-only sites (no native blocks in use). Dequeues: <code>wp-block-library</code>, <code>wp-block-library-theme</code>, <code>wp-block-*</code> variants, and <code>wc-block-style</code>.', 'site-essentials' ),
+            ],
+            'disable_dashicons_frontend' => [
+                'label'       => __( 'Disable Dashicons for Logged-Out Users', 'site-essentials' ),
+                'description' => __( 'Prevents <code>dashicons.css</code> from loading on the frontend for logged-out users. Dashicons are only needed in the WordPress admin. Saves ~6 KB.', 'site-essentials' ),
+            ],
+        ],
+    ],
+    'admin_ui' => [
+        'label'     => __( 'Admin UX/UI', 'site-essentials' ),
+        'guide_url' => '',
+        'tweaks'    => [
+            'allow_editors_form_submissions' => [
+                'label'       => __( 'Allow Editors to View Form Submissions', 'site-essentials' ),
+                'description' => __( 'Grants users with the <code>edit_posts</code> capability (Editors and above) access to Breakdance form submission data. By default, only Admins can view submissions.', 'site-essentials' ),
+            ],
         ],
     ],
 ];

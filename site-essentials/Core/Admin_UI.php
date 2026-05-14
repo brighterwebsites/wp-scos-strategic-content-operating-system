@@ -93,8 +93,6 @@ class Admin_UI {
         add_action('admin_post_site_essentials_save_support', [$this, 'save_support_hub_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
-        // Third-party scripts saved in Support Settings → output to public <head>
-        add_action('wp_head', [$this, 'output_support_scripts']);
     }
 
     /**

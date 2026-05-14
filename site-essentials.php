@@ -251,6 +251,21 @@ add_action(
  *
  * @since 1.0.0
  */
+// Third-party scripts (se_support_script_*) → public <head>. Registered outside is_admin()
+// because Admin_UI is only instantiated in admin context and wp_head is a frontend hook.
+add_action( 'wp_head', function() {
+    $commenter = get_option( 'se_support_script_commenter', '' );
+    $ahrefs    = get_option( 'se_support_script_ahrefs', '' );
+    if ( $commenter !== '' ) {
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-stored trusted code field
+        echo "\n" . $commenter . "\n";
+    }
+    if ( $ahrefs !== '' ) {
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-stored trusted code field
+        echo "\n" . $ahrefs . "\n";
+    }
+} );
+
 add_action('init', function() {
     if (is_admin()) {
         try {

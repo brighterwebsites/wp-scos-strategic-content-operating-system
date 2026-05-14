@@ -93,6 +93,8 @@ class Admin_UI {
         add_action('admin_post_site_essentials_save_support', [$this, 'save_support_hub_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
+        // Third-party scripts saved in Support Settings → output to public <head>
+        add_action('wp_head', [$this, 'output_support_scripts']);
     }
 
     /**
@@ -507,6 +509,23 @@ class Admin_UI {
      * @since 1.0.0
      * @return void
      */
+    public function output_support_scripts(): void {
+        $commenter = get_option( 'se_support_script_commenter', '' );
+        $ahrefs    = get_option( 'se_support_script_ahrefs', '' );
+
+        if ( $commenter !== '' ) {
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-stored trusted code field
+            echo "\n" . $commenter . "\n";
+        }
+        if ( $ahrefs !== '' ) {
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-stored trusted code field
+            echo "\n" . $ahrefs . "\n";
+        }
+    }
+
+    /**
+     * @return void
+     */
     public function render_support_page() {
         // SCOS-SUPPORT-PASS2 — multi-role support page access
         $allowed_roles = [ 'administrator', 'editor', 'shop_manager' ];
@@ -603,9 +622,10 @@ class Admin_UI {
                 update_option( "se_support_ai_{$i}_title", sanitize_text_field( wp_unslash( $_POST["se_support_ai_{$i}_title"] ?? '' ) ) );
                 update_option( "se_support_ai_{$i}_url",   esc_url_raw( wp_unslash( $_POST["se_support_ai_{$i}_url"] ?? '' ) ) );
             }
-            // Third-party scripts
-            update_option( 'se_support_script_commenter', sanitize_textarea_field( wp_unslash( $_POST['se_support_script_commenter'] ?? '' ) ) );
-            update_option( 'se_support_script_ahrefs',    sanitize_textarea_field( wp_unslash( $_POST['se_support_script_ahrefs'] ?? '' ) ) );
+            // Third-party scripts — stored verbatim (manage_options only); sanitize_textarea_field
+            // would strip <script> tags, so we use wp_unslash + trim for code fields.
+            update_option( 'se_support_script_commenter', trim( wp_unslash( $_POST['se_support_script_commenter'] ?? '' ) ) );
+            update_option( 'se_support_script_ahrefs',    trim( wp_unslash( $_POST['se_support_script_ahrefs'] ?? '' ) ) );
 
             wp_safe_redirect(
                 add_query_arg(

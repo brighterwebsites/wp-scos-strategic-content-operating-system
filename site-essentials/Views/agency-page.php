@@ -404,7 +404,7 @@ $page_url = admin_url( 'admin.php' );
 				<div class="scos-card">
 					<div class="scos-card__header">
 						<h2 class="scos-card__title"><?php esc_html_e( 'Third-party scripts', 'site-essentials' ); ?></h2>
-						<p class="scos-card__desc"><?php esc_html_e( 'Output in WordPress admin only. Never rendered on the public site.', 'site-essentials' ); ?></p>
+						<p class="scos-card__desc"><?php esc_html_e( 'Injected into the public &lt;head&gt; on every page via wp_head. Use for analytics, chat widgets, or similar third-party tags.', 'site-essentials' ); ?></p>
 					</div>
 					<div class="scos-card__body">
 						<table class="scos-form">

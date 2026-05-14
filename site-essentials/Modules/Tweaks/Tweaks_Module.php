@@ -269,15 +269,17 @@ class Tweaks_Module implements Module_Interface {
                 break;
 
             case 'disable_rss_feeds':
-                add_filter( 'feed_links_show_posts_feed',    '__return_false' );
-                add_filter( 'feed_links_show_comments_feed', '__return_false' );
+                // Also remove head link tags (superset of disable_rss_head_links)
                 remove_action( 'wp_head', 'feed_links',       2 );
                 remove_action( 'wp_head', 'feed_links_extra', 3 );
+                add_filter( 'feed_links_show_posts_feed',    '__return_false' );
+                add_filter( 'feed_links_show_comments_feed', '__return_false' );
+                // 301-redirect feed URLs: singles → post URL, everything else → home
                 add_action( 'template_redirect', function() {
                     if ( is_feed() ) {
-                        global $wp_query;
-                        $wp_query->set_404();
-                        status_header( 404 );
+                        $destination = is_singular() ? get_permalink() : home_url( '/' );
+                        wp_redirect( esc_url_raw( $destination ), 301 );
+                        exit;
                     }
                 }, 1 );
                 break;

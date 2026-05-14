@@ -99,9 +99,13 @@ $groups = [
                 'label'       => __( 'Disable Inbound Embeds', 'site-essentials' ),
                 'description' => __( 'Stops other sites from discovering and embedding <em>your</em> content. Removes the oEmbed discovery <code>&lt;link&gt;</code> tags and the REST API endpoint. Zero impact on outbound embeds (YouTube, etc. still work on your pages).', 'site-essentials' ),
             ],
+            'disable_rss_head_links' => [
+                'label'       => __( 'Remove RSS Feed Link Tags from Head', 'site-essentials' ),
+                'description' => __( 'Removes <code>&lt;link rel="alternate"&gt;</code> RSS discovery tags from <code>&lt;head&gt;</code> on all pages. Reduces crawl budget waste and removes a duplicate-content signal in Google Search Console. The feed URLs themselves (<code>/feed/</code>, <code>/single/feed/</code>) remain active and accessible.', 'site-essentials' ),
+            ],
             'disable_rss_feeds' => [
                 'label'       => __( 'Disable RSS Feeds', 'site-essentials' ),
-                'description' => __( 'Disables all RSS feed generation (post feeds, comment feeds, category feeds) and removes <code>&lt;link rel="alternate"&gt;</code> tags from <code>&lt;head&gt;</code>. Reduces crawl budget waste and prevents duplicate content in Google Search Console. <strong>Note:</strong> Also update <code>robots.txt</code> to remove any feed disallow rules.', 'site-essentials' ),
+                'description' => __( 'Completely disables RSS feed generation (post feeds, comment feeds, category feeds) and removes <code>&lt;link rel="alternate"&gt;</code> tags from <code>&lt;head&gt;</code>. Visiting <code>/feed/</code> redirects to the homepage; visiting a post\'s <code>/feed/</code> redirects to the post URL. <strong>Note:</strong> Once enabled, feed disallow rules can be removed from <code>robots.txt</code>.', 'site-essentials' ),
             ],
             'disable_relational_links' => [
                 'label'       => __( 'Disable Relational Links', 'site-essentials' ),

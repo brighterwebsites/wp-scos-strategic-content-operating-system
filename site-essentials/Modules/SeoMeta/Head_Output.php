@@ -228,8 +228,11 @@ class Head_Output {
 	// ── Description + Canonical ───────────────────────────────────────────────
 
 	/**
-	 * Output <meta name="description"> and <link rel="canonical"> at priority 2.
-	 * Handles both singulars and managed archives.
+	 * Output <meta name="description">, <link rel="canonical">, and Open Graph
+	 * tags at priority 2. Handles both singulars and managed archives.
+	 *
+	 * Note: og:image is handled separately by brighter_inject_og_image_tags()
+	 * (image-optimisation.php, priority 1) which fires before this method.
 	 */
 	public static function output_meta() {
 		if ( is_admin() ) {
@@ -285,6 +288,56 @@ class Head_Output {
 
 		if ( ! empty( $canonical ) ) {
 			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+		}
+
+		// ── Open Graph ───────────────────────────────────────────────────────
+		$og_url       = ! empty( $canonical ) ? $canonical : get_permalink( $pid );
+		$og_title     = get_post_meta( $pid, 'scos_seo_title', true );
+		if ( empty( $og_title ) ) {
+			$og_title = get_the_title( $pid );
+		}
+		$og_locale    = str_replace( '-', '_', get_locale() ) ?: 'en_AU';
+		$og_site_name = get_bloginfo( 'name' );
+
+		// Pages → og:type=website; posts and CPTs → og:type=article
+		$is_article = is_singular() && ! is_page();
+		$og_type    = $is_article ? 'article' : 'website';
+
+		echo '<meta property="og:type" content="' . esc_attr( $og_type ) . '" />' . "\n";
+		echo '<meta property="og:url" content="' . esc_url( $og_url ) . '" />' . "\n";
+		echo '<meta property="og:site_name" content="' . esc_attr( $og_site_name ) . '" />' . "\n";
+		echo '<meta property="og:locale" content="' . esc_attr( $og_locale ) . '" />' . "\n";
+
+		if ( ! empty( $og_title ) ) {
+			echo '<meta property="og:title" content="' . esc_attr( $og_title ) . '" />' . "\n";
+		}
+		if ( ! empty( $desc ) ) {
+			echo '<meta property="og:description" content="' . esc_attr( $desc ) . '" />' . "\n";
+		}
+
+		// ── Article-specific Open Graph ───────────────────────────────────────
+		if ( $is_article ) {
+			$published = (string) get_the_date( 'c', $pid );
+			$modified  = (string) get_the_modified_date( 'c', $pid );
+			$author_id  = (int) get_post_field( 'post_author', $pid );
+			$author_url = get_author_posts_url( $author_id );
+
+			echo '<meta property="article:published_time" content="' . esc_attr( $published ) . '" />' . "\n";
+			echo '<meta property="article:modified_time" content="' . esc_attr( $modified ) . '" />' . "\n";
+
+			if ( ! empty( $author_url ) ) {
+				echo '<meta property="article:author" content="' . esc_url( $author_url ) . '" />' . "\n";
+			}
+
+			// article:section — first ALTC topic assigned to this post
+			$topics = wp_get_post_terms( $pid, 'altc_topic', [ 'fields' => 'names' ] );
+			if ( ! empty( $topics ) && ! is_wp_error( $topics ) ) {
+				echo '<meta property="article:section" content="' . esc_attr( $topics[0] ) . '" />' . "\n";
+			}
+		} else {
+			// Static page: og:updated_time instead of article times
+			$updated = (string) get_the_modified_date( 'c', $pid );
+			echo '<meta property="og:updated_time" content="' . esc_attr( $updated ) . '" />' . "\n";
 		}
 
 		echo "<!-- /SCOS SEO Meta -->\n\n";

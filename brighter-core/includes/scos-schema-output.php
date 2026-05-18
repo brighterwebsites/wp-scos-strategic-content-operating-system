@@ -1158,6 +1158,14 @@ function bw_render_schema_graph() {
     }
     
     // ============================================
+    // MODULE EXTENSIONS — let other modules push items into the @graph.
+    // Used by site-essentials FAQ_Schema_Graph etc.
+    // TODO: migrate scos-schema-output.php to site-essentials Schema module.
+    // ============================================
+
+    $graph = apply_filters( 'scos_schema_graph_items', $graph, $post_id );
+
+    // ============================================
     // OUTPUT
     // ============================================
     

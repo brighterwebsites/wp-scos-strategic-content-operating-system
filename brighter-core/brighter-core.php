@@ -67,12 +67,10 @@ function brighter_get_whitelisted_modules() {
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
-            // bw-faq: keep — provides brighter/faq-selector Gutenberg block +
-            //   REST routes (/faqs, /faqs/search, /faqs/export) used by the block.
-            //   FAQ_Module (site-essentials) overrides the CPT, meta boxes, and
-            //   columns but deliberately leaves the block + REST intact.
-            //   Remove this entry only after the block is ported to FAQ_Module.
-            'bw-faq',
+            // bw-faq REMOVED — FAQ submodule now fully owned by
+            //   site-essentials/Modules/CustomPosts/FAQ/ (FAQ_Module +
+            //   FAQ_Block + FAQ_REST + FAQ_Schema_Graph). Block name
+            //   `brighter/faq-selector` retained for backward compat.
 
             // ── ALTC legacy modules ───────────────────────────────────────────
             // class-altc-taxonomies: keep — registers legacy altc_strategic_lens
@@ -199,8 +197,7 @@ function brighter_load_modules() {
 	'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
 	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
-        // bw-faq: keep — Gutenberg block + REST routes (CPT overridden by FAQ_Module)
-        'bw-faq',
+        // bw-faq removed — see site-essentials/Modules/CustomPosts/FAQ/
         'privacy-policy-style',
         'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
         'post-type-enhancements',       // Add author support to custom post types

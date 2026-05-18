@@ -402,6 +402,7 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::ANALYTICS_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
         ];
 
         if ( in_array( $hook, $scos_ui_hooks, true ) ) {
@@ -421,12 +422,12 @@ class Admin_UI {
         }
 
         // Only load admin.css on other Site Essentials pages
+        // CPT_PAGE_SLUG removed — uses scos-tokens + scos-ui via $scos_ui_hooks above.
         $allowed_hooks = [
             'toplevel_page_' . self::PAGE_SLUG,
             'toplevel_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SEO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::ESSENTIALS_PAGE_SLUG,
-            self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::ANALYTICS_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
@@ -702,22 +703,16 @@ class Admin_UI {
         $cpt_module = Module_Loader::get_module('cpt');
 
         if (!$cpt_module || !is_object($cpt_module)) {
-            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            echo '<div class="wrap scos"><div class="scos-notice scos-notice--warning"><p>';
             esc_html_e('Custom Posts module is not loaded.', 'site-essentials');
             echo '</p></div></div>';
             return;
         }
 
-        if (isset($_GET['updated']) && $_GET['updated'] === 'true') {
-            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved.', 'site-essentials') . '</p></div>';
-        }
+        $active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
 
-        echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__('Recommended Custom Posts & Fields', 'site-essentials') . '</h1>';
-        echo '<div class="site-essentials-content">';
-        echo '<div class="card se-module-settings-card" data-module-id="cpt">';
-        $cpt_module->render_settings();
-        echo '</div></div></div>';
+        // The cpt-page.php view owns the entire `<div class="wrap scos">` wrapper.
+        $cpt_module->render_settings( $active_tab );
     }
 
     /**
@@ -1588,18 +1583,30 @@ class Admin_UI {
             update_option('bw_author_extension_enabled', false);
         }
 
-        // FAQ archive / redirect settings
-        $faq_opts = isset($_POST['scos_faq']) && is_array($_POST['scos_faq']) ? $_POST['scos_faq'] : [];
-        update_option('scos_faq_archive_enabled',  !empty($faq_opts['archive_enabled']));
-        update_option('scos_faq_archive_redirect', isset($faq_opts['archive_redirect']) ? esc_url_raw($faq_opts['archive_redirect']) : '');
-        update_option('scos_faq_topic_redirect',   isset($faq_opts['topic_redirect'])   ? esc_url_raw($faq_opts['topic_redirect'])   : '');
-        // Bump rewrite version so FAQ_Module re-flushes on next load
-        delete_option('scos_faq_rewrite_version');
+        // FAQ archive / redirect settings — only persist these when the FAQ tab
+        // form actually submitted them (the scos_faq[*] inputs only exist on the
+        // FAQ tab). Otherwise saves from other tabs would wipe these options.
+        if ( isset( $_POST['scos_faq'] ) && is_array( $_POST['scos_faq'] ) ) {
+            $faq_opts = $_POST['scos_faq'];
+            update_option('scos_faq_archive_enabled',  !empty($faq_opts['archive_enabled']));
+            update_option('scos_faq_archive_redirect', isset($faq_opts['archive_redirect']) ? esc_url_raw($faq_opts['archive_redirect']) : '');
+            update_option('scos_faq_topic_redirect',   isset($faq_opts['topic_redirect'])   ? esc_url_raw($faq_opts['topic_redirect'])   : '');
+            // Bump rewrite version so FAQ_Module re-flushes on next load
+            delete_option('scos_faq_rewrite_version');
+        }
 
         flush_rewrite_rules();
 
+        // Preserve ?tab= so the user lands back on the tab they submitted from.
+        $submitted_tab = isset( $_POST['_scos_cpt_tab'] ) ? sanitize_key( wp_unslash( $_POST['_scos_cpt_tab'] ) ) : 'settings';
+        $valid_tabs    = [ 'settings', 'faq', 'projects', 'reviews', 'author' ];
+        if ( ! in_array( $submitted_tab, $valid_tabs, true ) ) {
+            $submitted_tab = 'settings';
+        }
+
         $redirect_url = add_query_arg([
             'page'    => self::CPT_PAGE_SLUG,
+            'tab'     => $submitted_tab,
             'updated' => 'true',
         ], admin_url('admin.php'));
 

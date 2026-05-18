@@ -308,6 +308,17 @@ class Cpt_Module implements Module_Interface {
 
     // =========================================================================
     // REVIEWS CPT REGISTRATION
+    // -------------------------------------------------------------------------
+    // TODO: migrate Reviews bw_* keys to scos_review_* / scos_cpt_* — see
+    //       .cursor/rules/meta-key-prefixes.mdc. Legacy keys still in use:
+    //         - Post type:  bw_reviews
+    //         - Taxonomy:   bw_review_platform
+    //         - Meta:       bw_rating, bw_date, bw_date_precision, bw_verify_url,
+    //                       bw_schema_id, bw_success_outcome, bw_customer_detail,
+    //                       bw_is_featured, bw_review_excerpt
+    //         - ACF:        bw_related_project, bw_reviews_related
+    //         - Shortcodes: [bw_review_*]
+    //       Plan: rename to scos_review_* with dual-read fallback, then deprecate.
     // =========================================================================
 
     /**
@@ -1134,7 +1145,10 @@ class Cpt_Module implements Module_Interface {
             wp_die(__('You do not have sufficient permissions.', 'site-essentials'));
         }
 
-        $redirect_base = add_query_arg('page', 'site-essentials-cpt', admin_url('admin.php'));
+        $redirect_base = add_query_arg(
+            [ 'page' => 'site-essentials-cpt', 'tab' => 'reviews' ],
+            admin_url('admin.php')
+        );
 
         if (empty($_FILES['bw_reviews_csv']['tmp_name'])) {
             wp_safe_redirect(add_query_arg([
@@ -1318,13 +1332,22 @@ class Cpt_Module implements Module_Interface {
     /**
      * Render settings section (options page content)
      *
+     * Dispatches into the tabbed cpt-page view. Active tab is read from
+     * the $_GET['tab'] parameter; defaults to 'settings'.
+     *
      * @since 1.0.0
+     * @param string|null $active_tab Optional active tab override.
      * @return void
      */
-    public function render_settings() {
+    public function render_settings( $active_tab = null ) {
         $opts = $this->settings->get_module_setting('cpt', null, []);
         $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
 
-        include __DIR__ . '/views/settings.php';
+        if ( null === $active_tab ) {
+            $active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
+        }
+        $active_tab = sanitize_key( (string) $active_tab );
+
+        include __DIR__ . '/views/cpt-page.php';
     }
 }

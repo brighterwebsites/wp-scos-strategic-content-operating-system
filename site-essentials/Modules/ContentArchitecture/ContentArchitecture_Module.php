@@ -70,6 +70,7 @@ class ContentArchitecture_Module implements Module_Interface {
 		require_once __DIR__ . '/Content_Analysis.php';
 		require_once __DIR__ . '/Admin_Columns.php';
 		require_once __DIR__ . '/Admin_Menu.php';
+		require_once __DIR__ . '/CA_Defaults.php';
 
 		Taxonomies::init();
 		Meta_Fields::init();
@@ -77,6 +78,7 @@ class ContentArchitecture_Module implements Module_Interface {
 		Content_Analysis::init();
 		Admin_Columns::init();
 		Admin_Menu::init();
+		CA_Defaults::init();
 	}
 
 	/**

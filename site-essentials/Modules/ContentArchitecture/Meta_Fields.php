@@ -90,6 +90,23 @@ class Meta_Fields {
 		register_post_meta( '', 'scos_ca_links_to_external',      $int );
 		register_post_meta( '', 'scos_ca_last_analyzed',          $string );
 
+		// ---- Schema tracking (written by Content_Analysis, read-only in UI) ----
+		// Stores a sorted, deduplicated array of schema @type strings detected on
+		// the post — e.g. ['FAQPage', 'HowTo']. Updated every time Content_Analysis
+		// runs. Consumers: admin columns, MCP tools, schema audit reports.
+		register_post_meta(
+			'',
+			'scos_ca_schema_track',
+			[
+				'type'         => 'array',
+				'single'       => true,
+				'show_in_rest' => false,
+				'auth_callback' => function () {
+					return current_user_can( 'edit_posts' );
+				},
+			]
+		);
+
 		// Link detail lists (serialised arrays)
 		register_post_meta(
 			'',

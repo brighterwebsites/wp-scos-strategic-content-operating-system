@@ -184,6 +184,10 @@ class Content_Analysis {
 		update_post_meta( $post_id, 'scos_ca_links_to_internal_list', $links['internal_links'] );
 		update_post_meta( $post_id, 'scos_ca_links_to_external_list', $links['external_links'] );
 		update_post_meta( $post_id, 'scos_ca_last_analyzed',          $post->post_modified );
+
+		// Schema type tracker — detect which schema types this page contributes.
+		$schema_types = self::detect_schema_types( $post_id, $post );
+		update_post_meta( $post_id, 'scos_ca_schema_track', $schema_types );
 	}
 
 	/**
@@ -236,6 +240,95 @@ class Content_Analysis {
 			'h2_count'    => count( $h2_matches[0] ),
 			'image_count' => count( $img_matches[0] ),
 		];
+	}
+
+	/**
+	 * Detect which schema @type values this post contributes to the page graph.
+	 *
+	 * Scans two sources:
+	 *  1. Gutenberg blocks in post_content (e.g. brighter/faq-selector).
+	 *  2. The `bw_custom_schema` post meta (raw JSON-LD string / array).
+	 *
+	 * Returns a deduplicated, sorted array of @type strings such as
+	 * ['FAQPage', 'HowTo', 'Product']. Empty array = no schema detected.
+	 *
+	 * Extensible via the `scos_schema_track_types` filter:
+	 *   apply_filters( 'scos_schema_track_types', array $types, int $post_id, \WP_Post $post )
+	 *
+	 * @since 1.1.0
+	 * @param int      $post_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 * @return string[]
+	 */
+	private static function detect_schema_types( int $post_id, \WP_Post $post ): array {
+		$types = [];
+
+		// ── 1. Gutenberg block scan ───────────────────────────────────────────
+		if ( ! empty( $post->post_content ) && function_exists( 'parse_blocks' ) ) {
+			$blocks = parse_blocks( $post->post_content );
+			self::scan_blocks_for_schema( $blocks, $types );
+		}
+
+		// ── 2. bw_custom_schema post meta ────────────────────────────────────
+		$custom_json = get_post_meta( $post_id, 'bw_custom_schema', true );
+		if ( ! empty( $custom_json ) ) {
+			$decoded = json_decode( $custom_json, true );
+			if ( is_array( $decoded ) ) {
+				// May be a single object or an array of objects.
+				$items = isset( $decoded[0] ) ? $decoded : [ $decoded ];
+				foreach ( $items as $item ) {
+					if ( isset( $item['@type'] ) && is_string( $item['@type'] ) ) {
+						$types[] = $item['@type'];
+					}
+				}
+			}
+		}
+
+		// ── 3. Allow other modules to contribute schema type signals ──────────
+		$types = (array) apply_filters( 'scos_schema_track_types', $types, $post_id, $post );
+
+		// Deduplicate and sort for stable storage.
+		$types = array_values( array_unique( array_filter( $types ) ) );
+		sort( $types );
+
+		return $types;
+	}
+
+	/**
+	 * Recursively walk a parsed block tree and collect schema type strings.
+	 *
+	 * Current detections:
+	 *  - `brighter/faq-selector` with enableSchema !== false → FAQPage
+	 *
+	 * @since 1.1.0
+	 * @param array    $blocks Parsed block array.
+	 * @param string[] $types  Reference — schema types are appended.
+	 * @return void
+	 */
+	private static function scan_blocks_for_schema( array $blocks, array &$types ): void {
+		foreach ( $blocks as $block ) {
+			if ( ! is_array( $block ) ) {
+				continue;
+			}
+
+			$name  = $block['blockName'] ?? '';
+			$attrs = is_array( $block['attrs'] ?? null ) ? $block['attrs'] : [];
+
+			if ( 'brighter/faq-selector' === $name ) {
+				// Block defaults to schema enabled; only skip when explicitly set false.
+				$schema_enabled = array_key_exists( 'enableSchema', $attrs )
+					? (bool) $attrs['enableSchema']
+					: true;
+				if ( $schema_enabled && ! empty( $attrs['selectedFaqs'] ) ) {
+					$types[] = 'FAQPage';
+				}
+			}
+
+			// Recurse into inner blocks (e.g. blocks nested inside Group blocks).
+			if ( ! empty( $block['innerBlocks'] ) && is_array( $block['innerBlocks'] ) ) {
+				self::scan_blocks_for_schema( $block['innerBlocks'], $types );
+			}
+		}
 	}
 
 	/**

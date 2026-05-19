@@ -20,7 +20,28 @@ $faq_total     = isset( $faq_count_obj->publish ) ? (int) $faq_count_obj->publis
 $archive_enabled  = (bool) get_option( 'scos_faq_archive_enabled', false );
 $archive_redirect = (string) get_option( 'scos_faq_archive_redirect', '' );
 $topic_redirect   = (string) get_option( 'scos_faq_topic_redirect', '' );
+
+// SchemaDance compatibility check — `is_plugin_active` lives in wp-admin/includes/plugin.php
+// which is NOT always loaded in mu-plugin context, so we load it here once.
+if ( ! function_exists( 'is_plugin_active' ) ) {
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+}
+$schemadance_active = function_exists( 'is_plugin_active' ) && is_plugin_active( 'schemadance/schemadance.php' );
 ?>
+
+<?php if ( $schemadance_active ) : ?>
+	<div class="scos-notice scos-notice--warning" role="alert">
+		<strong class="scos-notice__title"><?php esc_html_e( 'SchemaDance plugin detected', 'site-essentials' ); ?></strong>
+		<p>
+			<?php esc_html_e( 'Site Essentials already emits a unified FAQPage JSON-LD entry via the site schema graph. The SchemaDance plugin will inject a second, conflicting FAQPage block on the same page. Deactivate SchemaDance to avoid duplicate schema.', 'site-essentials' ); ?>
+		</p>
+		<p>
+			<a href="<?php echo esc_url( admin_url( 'plugins.php?s=schemadance' ) ); ?>" class="scos-btn scos-btn--ghost">
+				<?php esc_html_e( 'Open Plugins page', 'site-essentials' ); ?>
+			</a>
+		</p>
+	</div>
+<?php endif; ?>
 
 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<?php wp_nonce_field( 'site_essentials_cpt', 'site_essentials_cpt_nonce' ); ?>

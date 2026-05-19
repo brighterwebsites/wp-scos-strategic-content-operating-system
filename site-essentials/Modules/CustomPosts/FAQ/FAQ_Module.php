@@ -500,9 +500,12 @@ class FAQ_Module {
 	// =========================================================================
 
 	/**
-	 * [faqs ids="123,456,789" format="accordion" heading="h3" schema="true"]
+	 * [faqs ids="123,456" format="accordion" heading="h3" schema="true"]   manual selection
+	 * [faqs topic="pricing" format="accordion" heading="h3" schema="true"] all FAQs tagged with that scos_topic slug
 	 *
-	 * Delegates to the block render so output and schema behaviour are identical.
+	 * `ids` wins if both are supplied. Delegates to the block render so output and
+	 * schema behaviour are identical to the Gutenberg block and the Breakdance
+	 * `Scos_Faqs` element (both ultimately route through here).
 	 *
 	 * @since 1.0.0
 	 * @param array $atts Shortcode attributes.
@@ -512,6 +515,7 @@ class FAQ_Module {
 		$atts = shortcode_atts(
 			[
 				'ids'     => '',
+				'topic'   => '',
 				'format'  => 'accordion',
 				'heading' => 'h3',
 				'schema'  => 'true',
@@ -521,6 +525,11 @@ class FAQ_Module {
 		);
 
 		$faq_ids = array_filter( array_map( 'intval', explode( ',', (string) $atts['ids'] ) ) );
+
+		// Fall through to topic-based query only when no explicit IDs supplied.
+		if ( empty( $faq_ids ) && '' !== (string) $atts['topic'] ) {
+			$faq_ids = self::get_ids_by_topic( sanitize_title( (string) $atts['topic'] ) );
+		}
 
 		return FAQ_Block::render( [
 			'selectedFaqs'  => array_values( $faq_ids ),
@@ -596,6 +605,42 @@ class FAQ_Module {
 			'orderby'        => 'post__in',
 			'no_found_rows'  => true,
 		] );
+	}
+
+	/**
+	 * Get published FAQ post IDs assigned to a scos_topic term, by term slug.
+	 *
+	 * Ordered by menu_order (page-attributes order), then title — same order
+	 * the editor sees in the FAQ admin list. Returns int[] (not WP_Post[])
+	 * because both callers (shortcode + FAQ_Schema_Graph) only need IDs.
+	 *
+	 * @since 1.1.0
+	 * @param string $topic_slug scos_topic term slug.
+	 * @param int    $limit      Posts per page (-1 for all).
+	 * @return int[]
+	 */
+	public static function get_ids_by_topic( string $topic_slug, int $limit = -1 ): array {
+		if ( '' === $topic_slug || ! taxonomy_exists( 'scos_topic' ) ) {
+			return [];
+		}
+
+		$ids = get_posts( [
+			'post_type'      => self::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => $limit,
+			'fields'         => 'ids',
+			'orderby'        => [ 'menu_order' => 'ASC', 'title' => 'ASC' ],
+			'no_found_rows'  => true,
+			'tax_query'      => [
+				[
+					'taxonomy' => 'scos_topic',
+					'field'    => 'slug',
+					'terms'    => $topic_slug,
+				],
+			],
+		] );
+
+		return array_map( 'intval', (array) $ids );
 	}
 
 	/**

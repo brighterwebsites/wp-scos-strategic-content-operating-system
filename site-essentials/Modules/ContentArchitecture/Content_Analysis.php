@@ -269,7 +269,14 @@ class Content_Analysis {
 			self::scan_blocks_for_schema( $blocks, $types );
 		}
 
-		// ── 2. bw_custom_schema post meta ────────────────────────────────────
+		// ── 2. Breakdance tree scan ──────────────────────────────────────────
+		// Mirrors the Gutenberg detection so BD-rendered pages with a
+		// Scos_Faqs element get FAQPage recorded too. The walker is local
+		// to this method (no shared state with FAQ_Schema_Graph) so this
+		// module stays usable even if the FAQ submodule is off.
+		self::scan_breakdance_for_schema( $post_id, $types );
+
+		// ── 3. bw_custom_schema post meta ────────────────────────────────────
 		$custom_json = get_post_meta( $post_id, 'bw_custom_schema', true );
 		if ( ! empty( $custom_json ) ) {
 			$decoded = json_decode( $custom_json, true );
@@ -284,7 +291,7 @@ class Content_Analysis {
 			}
 		}
 
-		// ── 3. Allow other modules to contribute schema type signals ──────────
+		// ── 4. Allow other modules to contribute schema type signals ──────────
 		$types = (array) apply_filters( 'scos_schema_track_types', $types, $post_id, $post );
 
 		// Deduplicate and sort for stable storage.
@@ -292,6 +299,74 @@ class Content_Analysis {
 		sort( $types );
 
 		return $types;
+	}
+
+	/**
+	 * Scan `_breakdance_data` post meta for known schema-contributing elements.
+	 *
+	 * Currently detects:
+	 *  - Scos_Faqs (BreakdanceCustomElements\ScosFaqs) → FAQPage
+	 *
+	 * Uses a cheap haystack pre-check before decoding the tree so posts that
+	 * don't use the element pay only a string-search cost.
+	 *
+	 * @since 1.2.0
+	 * @param int      $post_id Post ID.
+	 * @param string[] $types   Reference — schema types are appended.
+	 * @return void
+	 */
+	private static function scan_breakdance_for_schema( int $post_id, array &$types ): void {
+		$raw = get_post_meta( $post_id, '_breakdance_data', true );
+		if ( empty( $raw ) ) {
+			return;
+		}
+
+		$haystack = is_string( $raw ) ? $raw : wp_json_encode( $raw );
+		if ( false === strpos( (string) $haystack, 'ScosFaqs' ) ) {
+			return;
+		}
+
+		$data = is_array( $raw ) ? $raw : json_decode( (string) $raw, true );
+		if ( ! is_array( $data ) ) {
+			return;
+		}
+
+		if ( self::bd_tree_has_scos_faqs( $data ) ) {
+			$types[] = 'FAQPage';
+		}
+	}
+
+	/**
+	 * Recursive existence check for a Scos_Faqs element with schema enabled.
+	 *
+	 * Returns true on first match — we don't need to count or collect IDs
+	 * here, just record that the page contributes FAQPage.
+	 *
+	 * @since 1.2.0
+	 * @param array $node Tree fragment.
+	 * @return bool
+	 */
+	private static function bd_tree_has_scos_faqs( array $node ): bool {
+		if ( isset( $node['type'] ) ) {
+			$type = is_string( $node['type'] ) ? $node['type'] : ( is_array( $node['type'] ) ? ( $node['type']['name'] ?? '' ) : '' );
+			if ( 'BreakdanceCustomElements\\ScosFaqs' === $type ) {
+				$content = $node['properties']['content'] ?? [];
+				$schema_enabled = is_array( $content ) && array_key_exists( 'schema_enabled', $content )
+					? (bool) $content['schema_enabled']
+					: true;
+				if ( $schema_enabled ) {
+					return true;
+				}
+			}
+		}
+
+		foreach ( $node as $value ) {
+			if ( is_array( $value ) && self::bd_tree_has_scos_faqs( $value ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

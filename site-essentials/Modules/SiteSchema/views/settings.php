@@ -105,7 +105,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 							</th>
 							<td>
 								<textarea id="scos_site_schema_local_business" name="scos_site_schema_local_business"
-									rows="22" class="scos-input scos-input--mono scos-schema-json"
+									rows="13" class="scos-input scos-input--mono scos-schema-json"
 									placeholder='{"@type": "LocalBusiness", "@id": "<?php echo esc_js( home_url( '/#organization' ) ); ?>", "name": "Your Business", "url": "<?php echo esc_js( home_url( '/' ) ); ?>"}'><?php echo esc_textarea( $local_business ); ?></textarea>
 								<div id="scos_site_schema_local_business-validation" class="scos-schema-validation" aria-live="polite"></div>
 								<p class="description"><?php esc_html_e( 'Leave empty to auto-generate from Business Info fields. Single block: { }. Multiple: [ { }, { } ].', 'site-essentials' ); ?></p>
@@ -140,7 +140,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 							</th>
 							<td>
 								<textarea id="scos_site_schema_success_stories" name="scos_site_schema_success_stories"
-									rows="22" class="scos-input scos-input--mono scos-schema-json"
+									rows="13" class="scos-input scos-input--mono scos-schema-json"
 									placeholder='{"@type": "CreativeWork", "name": "Example Success Story"}'><?php echo esc_textarea( $success_stories ); ?></textarea>
 								<div id="scos_site_schema_success_stories-validation" class="scos-schema-validation" aria-live="polite"></div>
 								<p class="description"><?php esc_html_e( 'Single block: { }. Multiple: [ { }, { } ]. Invalid JSON is stored but not output.', 'site-essentials' ); ?></p>
@@ -186,7 +186,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 							</th>
 							<td>
 								<textarea id="scos_site_schema_product" name="scos_site_schema_product"
-									rows="18" class="scos-input scos-input--mono scos-schema-json"
+									rows="13" class="scos-input scos-input--mono scos-schema-json"
 									placeholder='{"@type": "Product", "name": "Product Name"}'><?php echo esc_textarea( $product ); ?></textarea>
 								<div id="scos_site_schema_product-validation" class="scos-schema-validation" aria-live="polite"></div>
 								<p class="description"><?php esc_html_e( 'Single block: { }. Multiple: [ { }, { } ].', 'site-essentials' ); ?></p>
@@ -232,7 +232,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 							</th>
 							<td>
 								<textarea id="scos_site_schema_service" name="scos_site_schema_service"
-									rows="18" class="scos-input scos-input--mono scos-schema-json"
+									rows="13" class="scos-input scos-input--mono scos-schema-json"
 									placeholder='{"@type": "Service", "name": "Service Name"}'><?php echo esc_textarea( $service ); ?></textarea>
 								<div id="scos_site_schema_service-validation" class="scos-schema-validation" aria-live="polite"></div>
 								<p class="description"><?php esc_html_e( 'Single block: { }. Multiple: [ { }, { } ].', 'site-essentials' ); ?></p>

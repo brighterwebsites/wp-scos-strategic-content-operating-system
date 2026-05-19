@@ -431,9 +431,10 @@ class FAQ_Module {
 		update_post_meta( $post_id, self::META_SCHEMA_ANSWER,        $schema_answer );
 		update_post_meta( $post_id, self::LEGACY_META_SCHEMA_ANSWER, $schema_answer );
 
-		// Schema is controlled at block level, not per-FAQ — keep '1' for back-compat.
-		update_post_meta( $post_id, self::META_ENABLE_SCHEMA,        '1' );
-		update_post_meta( $post_id, self::LEGACY_META_ENABLE_SCHEMA, '1' );
+		// Per-FAQ enable_schema is deprecated — no longer written. Schema is
+		// controlled at the embed point (block `enableSchema`, element
+		// `schema_enabled`). Existing scos_faq_enable_schema / _faq_enable_schema
+		// values are intentionally left in the DB and ignored by readers.
 	}
 
 	// =========================================================================
@@ -544,24 +545,25 @@ class FAQ_Module {
 	// =========================================================================
 
 	/**
-	 * Get the schema answer for an FAQ (stripped of HTML), or false if
-	 * schema is disabled for this FAQ.
+	 * Get the schema answer for an FAQ (stripped of HTML), or false when
+	 * the FAQ post itself cannot be found.
+	 *
+	 * Per-FAQ enable_schema is intentionally NOT checked here — that toggle
+	 * was removed from the editor UI. Schema enable/disable is now
+	 * controlled at the place where the FAQ is embedded:
+	 *  - Gutenberg block: `enableSchema` attribute (see FAQ_Schema_Graph::walk_blocks)
+	 *  - Breakdance element: `schema_enabled` content prop (see walk_bd_tree)
+	 *
+	 * Legacy `_faq_enable_schema = '0'` values left over from the bw-faq.php
+	 * meta box are deliberately ignored — they would otherwise permanently
+	 * exclude an FAQ from schema with no UI to flip them back.
 	 *
 	 * @since 1.0.0
 	 * @param int $faq_id FAQ post ID.
 	 * @return string|false
 	 */
 	public static function get_schema_answer( int $faq_id ) {
-		// Check enable_schema (prefer scos_faq_*, fall back to legacy).
-		$enabled = get_post_meta( $faq_id, self::META_ENABLE_SCHEMA, true );
-		if ( '' === $enabled ) {
-			$enabled = get_post_meta( $faq_id, self::LEGACY_META_ENABLE_SCHEMA, true );
-		}
-		if ( '0' === (string) $enabled ) {
-			return false;
-		}
-
-		// Prefer scos_faq_schema_answer, fall back to legacy.
+		// Prefer scos_faq_schema_answer, fall back to legacy _faq_schema_answer.
 		$schema_answer = (string) get_post_meta( $faq_id, self::META_SCHEMA_ANSWER, true );
 		if ( '' === $schema_answer ) {
 			$schema_answer = (string) get_post_meta( $faq_id, self::LEGACY_META_SCHEMA_ANSWER, true );

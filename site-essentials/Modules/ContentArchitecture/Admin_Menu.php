@@ -12,6 +12,8 @@
  * setting means WP won't add sidebar boxes, but the term management pages work
  * perfectly.
  *
+ * v1.1.0 | 2026-05-19 — SCOS design system applied to Overview; Force Re-analyze All button added.
+ *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
  * @since      1.0.0
@@ -50,6 +52,10 @@ class Admin_Menu {
 		if ( strpos( $hook, 'scos-content-architecture' ) === false ) {
 			return;
 		}
+
+		wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+		wp_enqueue_style( 'scos-ui',     SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+
 		$asset_file = __DIR__ . '/assets/ca-overview.js';
 		wp_enqueue_script(
 			'scos-ca-overview',
@@ -59,8 +65,9 @@ class Admin_Menu {
 			true
 		);
 		wp_localize_script( 'scos-ca-overview', 'scosCA', [
-			'nonce'   => wp_create_nonce( 'scos_analysis' ),
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'      => wp_create_nonce( 'scos_analysis' ),
+			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+			'clearNonce' => wp_create_nonce( 'scos_clear_analysis' ),
 		] );
 	}
 
@@ -164,110 +171,152 @@ class Admin_Menu {
 	 * @return void
 	 */
 	public static function render_overview() {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
+		}
+
 		$clusters      = get_terms( [ 'taxonomy' => 'scos_content_cluster', 'hide_empty' => false ] );
 		$topics        = get_terms( [ 'taxonomy' => 'scos_topic',           'hide_empty' => false ] );
 		$cluster_count = is_wp_error( $clusters ) ? 0 : count( $clusters );
 		$topic_count   = is_wp_error( $topics )   ? 0 : count( $topics );
-		$post_types    = Taxonomies::get_post_types();
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Content Architecture', 'site-essentials' ); ?></h1>
+		<div class="wrap scos">
 
-			<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:20px">
-
-				<div class="card" style="min-width:220px">
-					<h2 class="title"><?php esc_html_e( 'Content Clusters', 'site-essentials' ); ?></h2>
-					<p><?php printf( esc_html__( '%d defined', 'site-essentials' ), $cluster_count ); ?></p>
-					<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_content_cluster' ) ); ?>" class="button">
-						<?php esc_html_e( 'Manage Clusters', 'site-essentials' ); ?>
+			<header class="scos__header">
+				<div>
+					<h1 class="scos__title"><?php esc_html_e( 'Content Architecture', 'site-essentials' ); ?></h1>
+					<p class="scos__subtitle">Site Essentials &rsaquo; Content Architecture</p>
+				</div>
+				<div class="scos__header-actions">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::INTEGRATIONS_SLUG ) ); ?>" class="scos-btn scos-btn--ghost">
+						<?php esc_html_e( 'Integrations', 'site-essentials' ); ?>
 					</a>
 				</div>
+			</header>
 
-				<div class="card" style="min-width:220px">
-					<h2 class="title"><?php esc_html_e( 'Topics', 'site-essentials' ); ?></h2>
-					<p><?php printf( esc_html__( '%d defined', 'site-essentials' ), $topic_count ); ?></p>
-					<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_topic' ) ); ?>" class="button">
-						<?php esc_html_e( 'Manage Topics', 'site-essentials' ); ?>
-					</a>
+			<?php // ── Taxonomy summary cards ──────────────────────────────────── ?>
+			<div style="display:flex;gap:var(--scos-s-4);flex-wrap:wrap;margin-bottom:var(--scos-s-6)">
+
+				<div class="scos-card" style="flex:1;min-width:200px">
+					<div class="scos-card__header scos-card__header--plain">
+						<span class="scos-card__title"><?php esc_html_e( 'Content Clusters', 'site-essentials' ); ?></span>
+					</div>
+					<div class="scos-card__body">
+						<p style="font-size:2rem;font-weight:700;color:var(--scos-accent);margin:0 0 var(--scos-s-3)">
+							<?php echo absint( $cluster_count ); ?>
+						</p>
+						<p style="color:var(--scos-ink-subtle);margin:0 0 var(--scos-s-4)"><?php esc_html_e( 'defined', 'site-essentials' ); ?></p>
+					</div>
+					<div class="scos-card__footer">
+						<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_content_cluster' ) ); ?>" class="scos-btn scos-btn--ghost">
+							<?php esc_html_e( 'Manage Clusters', 'site-essentials' ); ?>
+						</a>
+					</div>
+				</div>
+
+				<div class="scos-card" style="flex:1;min-width:200px">
+					<div class="scos-card__header scos-card__header--plain">
+						<span class="scos-card__title"><?php esc_html_e( 'Topics', 'site-essentials' ); ?></span>
+					</div>
+					<div class="scos-card__body">
+						<p style="font-size:2rem;font-weight:700;color:var(--scos-accent);margin:0 0 var(--scos-s-3)">
+							<?php echo absint( $topic_count ); ?>
+						</p>
+						<p style="color:var(--scos-ink-subtle);margin:0 0 var(--scos-s-4)"><?php esc_html_e( 'defined', 'site-essentials' ); ?></p>
+					</div>
+					<div class="scos-card__footer">
+						<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=scos_topic' ) ); ?>" class="scos-btn scos-btn--ghost">
+							<?php esc_html_e( 'Manage Topics', 'site-essentials' ); ?>
+						</a>
+					</div>
 				</div>
 
 			</div>
 
 			<?php if ( ! empty( $clusters ) && ! is_wp_error( $clusters ) ) : ?>
-				<h2 style="margin-top:30px"><?php esc_html_e( 'Cluster Breakdown', 'site-essentials' ); ?></h2>
-				<table class="widefat striped" style="max-width:700px">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Cluster', 'site-essentials' ); ?></th>
-							<th><?php esc_html_e( 'Posts', 'site-essentials' ); ?></th>
-							<th></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $clusters as $cluster ) : ?>
+			<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+				<div class="scos-card__header">
+					<span class="scos-card__title"><?php esc_html_e( 'Cluster Breakdown', 'site-essentials' ); ?></span>
+				</div>
+				<div class="scos-card__body" style="padding:0">
+					<table class="wp-list-table widefat fixed striped">
+						<thead>
 							<tr>
-								<td><?php echo esc_html( $cluster->name ); ?></td>
-								<td><?php echo esc_html( $cluster->count ); ?></td>
-								<td>
-									<a href="<?php echo esc_url( admin_url( 'edit-tags.php?action=edit&taxonomy=scos_content_cluster&tag_ID=' . $cluster->term_id ) ); ?>">
-										<?php esc_html_e( 'Edit', 'site-essentials' ); ?>
-									</a>
-								</td>
+								<th><?php esc_html_e( 'Cluster', 'site-essentials' ); ?></th>
+								<th style="width:80px;text-align:center"><?php esc_html_e( 'Posts', 'site-essentials' ); ?></th>
+								<th style="width:80px"></th>
 							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							<?php foreach ( $clusters as $cluster ) : ?>
+								<tr>
+									<td><?php echo esc_html( $cluster->name ); ?></td>
+									<td style="text-align:center"><?php echo esc_html( $cluster->count ); ?></td>
+									<td>
+										<a href="<?php echo esc_url( admin_url( 'edit-tags.php?action=edit&taxonomy=scos_content_cluster&tag_ID=' . $cluster->term_id ) ); ?>">
+											<?php esc_html_e( 'Edit', 'site-essentials' ); ?>
+										</a>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+			</div>
 			<?php endif; ?>
 
 			<?php // ── Content Analysis Section ──────────────────────────────── ?>
-			<h2 style="margin-top:36px"><?php esc_html_e( 'Content Analysis', 'site-essentials' ); ?></h2>
-			<p style="color:#555;max-width:600px">
-				<?php esc_html_e( 'Counts word count, H2s, images, and internal/external links for every published post. Runs automatically on save; use the button below to analyse posts that haven\'t been processed yet.', 'site-essentials' ); ?>
-			</p>
-
-			<div id="scos-analysis-status" style="margin-bottom:16px">
-				<table class="widefat striped" style="max-width:760px" id="scos-analysis-table">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Post Type', 'site-essentials' ); ?></th>
-							<th style="text-align:center"><?php esc_html_e( 'Total', 'site-essentials' ); ?></th>
-							<th style="text-align:center"><?php esc_html_e( 'Analysed', 'site-essentials' ); ?></th>
-							<th style="text-align:center"><?php esc_html_e( 'Pending', 'site-essentials' ); ?></th>
-							<th style="text-align:center"><?php esc_html_e( 'Coverage', 'site-essentials' ); ?></th>
-							<th></th>
-						</tr>
-					</thead>
-					<tbody id="scos-analysis-rows">
-						<tr><td colspan="6" style="color:#6b7280;text-align:center;padding:16px">
-							<?php esc_html_e( 'Loading…', 'site-essentials' ); ?>
-						</td></tr>
-					</tbody>
-					<tfoot id="scos-analysis-foot" style="display:none">
-						<tr style="font-weight:600">
-							<td><?php esc_html_e( 'Total', 'site-essentials' ); ?></td>
-							<td id="scos-ft-total"  style="text-align:center">—</td>
-							<td id="scos-ft-done"   style="text-align:center">—</td>
-							<td id="scos-ft-pend"   style="text-align:center">—</td>
-							<td id="scos-ft-bar"    style="text-align:center">—</td>
-							<td></td>
-						</tr>
-					</tfoot>
-				</table>
-			</div>
-
-			<div id="scos-analysis-controls" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-				<button id="scos-run-all" class="button button-primary">
-					▶ <?php esc_html_e( 'Run Analysis (all pending)', 'site-essentials' ); ?>
-				</button>
-				<span id="scos-analysis-msg" style="color:#555;font-size:13px"></span>
-			</div>
-
-			<div id="scos-analysis-progress" style="display:none;margin-top:12px;max-width:400px">
-				<div style="background:#e5e7eb;border-radius:4px;height:10px;overflow:hidden">
-					<div id="scos-analysis-bar" style="background:#2563eb;height:100%;width:0;transition:width .3s"></div>
+			<div class="scos-card">
+				<div class="scos-card__header">
+					<span class="scos-card__title"><?php esc_html_e( 'Content Analysis', 'site-essentials' ); ?></span>
+					<span class="scos-card__desc"><?php esc_html_e( 'Word count, H2s, images, and links per post. Runs on save; use the buttons to backfill or force a full re-analysis.', 'site-essentials' ); ?></span>
 				</div>
-				<div id="scos-analysis-progress-label" style="font-size:12px;color:#6b7280;margin-top:4px"></div>
+				<div class="scos-card__body" style="padding:0">
+					<table class="wp-list-table widefat fixed striped" id="scos-analysis-table">
+						<thead>
+							<tr>
+								<th><?php esc_html_e( 'Post Type', 'site-essentials' ); ?></th>
+								<th style="width:80px;text-align:center"><?php esc_html_e( 'Total', 'site-essentials' ); ?></th>
+								<th style="width:80px;text-align:center"><?php esc_html_e( 'Analysed', 'site-essentials' ); ?></th>
+								<th style="width:80px;text-align:center"><?php esc_html_e( 'Pending', 'site-essentials' ); ?></th>
+								<th style="width:140px;text-align:center"><?php esc_html_e( 'Coverage', 'site-essentials' ); ?></th>
+								<th style="width:120px"></th>
+							</tr>
+						</thead>
+						<tbody id="scos-analysis-rows">
+							<tr><td colspan="6" style="color:var(--scos-ink-subtle);text-align:center;padding:var(--scos-s-5)">
+								<?php esc_html_e( 'Loading…', 'site-essentials' ); ?>
+							</td></tr>
+						</tbody>
+						<tfoot id="scos-analysis-foot" style="display:none">
+							<tr style="font-weight:600">
+								<td><?php esc_html_e( 'Total', 'site-essentials' ); ?></td>
+								<td id="scos-ft-total"  style="text-align:center">—</td>
+								<td id="scos-ft-done"   style="text-align:center">—</td>
+								<td id="scos-ft-pend"   style="text-align:center">—</td>
+								<td id="scos-ft-bar"    style="text-align:center">—</td>
+								<td></td>
+							</tr>
+						</tfoot>
+					</table>
+				</div>
+				<div class="scos-card__footer" style="flex-wrap:wrap;gap:var(--scos-s-3)">
+					<button id="scos-run-all" class="scos-btn scos-btn--primary">
+						&#9654; <?php esc_html_e( 'Run Analysis (pending only)', 'site-essentials' ); ?>
+					</button>
+					<button id="scos-force-all" class="scos-btn scos-btn--ghost" title="<?php esc_attr_e( 'Clears stored analysis and re-runs on all posts — use when Breakdance content was not being read correctly.', 'site-essentials' ); ?>">
+						&#8635; <?php esc_html_e( 'Force Re-analyze All', 'site-essentials' ); ?>
+					</button>
+					<span id="scos-analysis-msg" style="color:var(--scos-ink-subtle);font-size:var(--scos-fs-sm);align-self:center"></span>
+				</div>
+				<div id="scos-analysis-progress" style="display:none;padding:0 var(--scos-s-5) var(--scos-s-5)">
+					<div style="background:var(--scos-border);border-radius:var(--scos-r-sm);height:8px;overflow:hidden">
+						<div id="scos-analysis-bar" style="background:var(--scos-accent);height:100%;width:0;transition:width .3s"></div>
+					</div>
+					<div id="scos-analysis-progress-label" style="font-size:var(--scos-fs-sm);color:var(--scos-ink-subtle);margin-top:var(--scos-s-2)"></div>
+				</div>
 			</div>
+
 		</div>
 		<?php
 	}

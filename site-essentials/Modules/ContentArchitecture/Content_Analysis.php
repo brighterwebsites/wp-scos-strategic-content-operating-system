@@ -15,6 +15,8 @@
  * Runs at save_post priority 25 (after legacy BW_Content_Analysis at 20) so
  * both sets of meta keys are written without conflicting.
  *
+ * v1.5.0 | 2026-05-19 — Added scos_clear_analysis_cache AJAX action for force re-analysis.
+ *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
  * @since      1.0.0
@@ -30,8 +32,9 @@ class Content_Analysis {
 
 	public static function init() {
 		add_action( 'save_post', [ __CLASS__, 'analyze' ], 25, 3 );
-		add_action( 'wp_ajax_scos_run_analysis_batch', [ __CLASS__, 'ajax_run_batch' ] );
-		add_action( 'wp_ajax_scos_analysis_status',    [ __CLASS__, 'ajax_status' ] );
+		add_action( 'wp_ajax_scos_run_analysis_batch',    [ __CLASS__, 'ajax_run_batch' ] );
+		add_action( 'wp_ajax_scos_analysis_status',       [ __CLASS__, 'ajax_status' ] );
+		add_action( 'wp_ajax_scos_clear_analysis_cache',  [ __CLASS__, 'ajax_clear_cache' ] );
 	}
 
 	// ──────────────────────────────────────────────────────────────────────
@@ -80,9 +83,33 @@ class Content_Analysis {
 	}
 
 	/**
+	 * Bulk-delete scos_ca_last_analyzed for all posts so a full re-analysis can run.
+	 *
+	 * Used by the "Force Re-analyze All" button on the CA Overview. Clears the cache
+	 * in one fast DELETE query; the regular batch runner then processes all posts.
+	 *
+	 * @since 1.5.0
+	 */
+	public static function ajax_clear_cache(): void {
+		check_ajax_referer( 'scos_clear_analysis', 'nonce' );
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		global $wpdb;
+		$deleted = $wpdb->delete( $wpdb->postmeta, [ 'meta_key' => 'scos_ca_last_analyzed' ] ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+
+		wp_send_json_success( [ 'deleted' => absint( $deleted ) ] );
+	}
+
+	/**
 	 * Analyze a batch of posts that haven't been analyzed yet.
 	 * Accepts optional $_POST['post_type'] to limit to one type.
 	 * Processes 10 posts per call.
+	 *
+	 * Pass $_POST['force'] = '1' to re-analyze already-analyzed posts (e.g. after
+	 * clearing the cache with scos_clear_analysis_cache). When force is active the
+	 * function processes the next batch ordered by ID regardless of analyzed state.
 	 */
 	public static function ajax_run_batch(): void {
 		check_ajax_referer( 'scos_analysis', 'nonce' );

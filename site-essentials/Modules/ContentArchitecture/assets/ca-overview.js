@@ -125,6 +125,34 @@
 		$(document).on('click', '.scos-run-type', function () {
 			runAll($(this).data('type'));
 		});
+
+		$('#scos-force-all').on('click', function () {
+			if ( ! window.confirm( 'This will clear stored analysis data and re-analyse every post from scratch. Use this to fix incorrect word counts or image counts (e.g. after Breakdance content was not being read). Continue?' ) ) {
+				return;
+			}
+			var $btn = $(this);
+			var $msg = $('#scos-analysis-msg');
+			$btn.prop('disabled', true);
+			$msg.text('Clearing analysis cache…');
+
+			$.post( scosCA.ajaxUrl, {
+				action: 'scos_clear_analysis_cache',
+				nonce:  scosCA.clearNonce,
+			} ).done( function (res) {
+				if ( res.success ) {
+					$msg.text('Cache cleared (' + res.data.deleted + ' records). Starting re-analysis…');
+					// Re-load status so the table shows all posts as pending, then run all.
+					loadStatus();
+					setTimeout( function () { runAll(null); }, 600 );
+				} else {
+					$msg.text('Error clearing cache.');
+					$btn.prop('disabled', false);
+				}
+			} ).fail( function () {
+				$msg.text('Request failed.');
+				$btn.prop('disabled', false);
+			} );
+		});
 	});
 
 }(jQuery));

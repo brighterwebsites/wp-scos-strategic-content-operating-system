@@ -350,9 +350,14 @@ class Content_Analysis {
 		if ( isset( $node['type'] ) ) {
 			$type = is_string( $node['type'] ) ? $node['type'] : ( is_array( $node['type'] ) ? ( $node['type']['name'] ?? '' ) : '' );
 			if ( 'BreakdanceCustomElements\\ScosFaqs' === $type ) {
+				// schema_enabled lives at content.display.schema_enabled —
+				// matches the section nesting in elements/Scos_Faqs/element.php.
 				$content = $node['properties']['content'] ?? [];
-				$schema_enabled = is_array( $content ) && array_key_exists( 'schema_enabled', $content )
-					? (bool) $content['schema_enabled']
+				$display = is_array( $content ) && isset( $content['display'] ) && is_array( $content['display'] )
+					? $content['display']
+					: [];
+				$schema_enabled = array_key_exists( 'schema_enabled', $display )
+					? (bool) $display['schema_enabled']
 					: true;
 				if ( $schema_enabled ) {
 					return true;

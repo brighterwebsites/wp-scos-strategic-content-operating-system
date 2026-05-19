@@ -17,7 +17,7 @@
  * emitted by the block's render callback, so the page has exactly one
  * JSON-LD graph.
  *
- * v1.1 | 2026-05-19
+ * v1.2 | 2026-05-19
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -254,20 +254,27 @@ class FAQ_Schema_Graph {
 				$content = $node['properties']['content'] ?? [];
 				$content = is_array( $content ) ? $content : [];
 
+				// Property paths mirror the section nesting in
+				// elements/Scos_Faqs/element.php:
+				//   content.faq_source.{mode, selected_faqs, topic_slug}
+				//   content.display.{schema_enabled, format, heading}
+				$source  = isset( $content['faq_source'] ) && is_array( $content['faq_source'] ) ? $content['faq_source'] : [];
+				$display = isset( $content['display'] )    && is_array( $content['display'] )    ? $content['display']    : [];
+
 				// Respect the per-element schema toggle (default on).
-				$schema_enabled = array_key_exists( 'schema_enabled', $content )
-					? (bool) $content['schema_enabled']
+				$schema_enabled = array_key_exists( 'schema_enabled', $display )
+					? (bool) $display['schema_enabled']
 					: true;
 				if ( $schema_enabled ) {
-					$mode = isset( $content['mode'] ) ? (string) $content['mode'] : 'selector';
+					$mode = isset( $source['mode'] ) ? (string) $source['mode'] : 'selector';
 
-					if ( 'topic' === $mode && ! empty( $content['topic_slug'] ) ) {
-						$ids = FAQ_Module::get_ids_by_topic( sanitize_title( (string) $content['topic_slug'] ) );
+					if ( 'topic' === $mode && ! empty( $source['topic_slug'] ) ) {
+						$ids = FAQ_Module::get_ids_by_topic( sanitize_title( (string) $source['topic_slug'] ) );
 						foreach ( $ids as $id ) {
 							$collected[] = (int) $id;
 						}
-					} elseif ( ! empty( $content['selected_faqs'] ) && is_array( $content['selected_faqs'] ) ) {
-						foreach ( $content['selected_faqs'] as $item ) {
+					} elseif ( ! empty( $source['selected_faqs'] ) && is_array( $source['selected_faqs'] ) ) {
+						foreach ( $source['selected_faqs'] as $item ) {
 							$collected[] = self::extract_post_id( $item );
 						}
 					}

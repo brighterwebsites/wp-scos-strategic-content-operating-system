@@ -3,7 +3,7 @@
  * Content Analysis - Link Counting & Statistics
  *
  * File: class-content-analysis.php
- * Version: 1.1.0 | 2026-05-19
+ * Version: 1.2.0 | 2026-05-19
  *
  * Responsibilities:
  * - Count internal/external links (excluding header/footer/nav)
@@ -406,42 +406,72 @@ class BW_Content_Analysis {
     }
 
     /**
-     * Recursively walk Breakdance tree and build HTML from node content (headings, text, rich text, etc.)
+     * Recursively walk Breakdance tree and build HTML from node content.
+     *
+     * Handles:
+     *  - Heading    → content.content.tags + text           → <h1>…<h6>
+     *  - RichText   → content.content.text (HTML)           → raw HTML
+     *  - TextLink   → content.content.link.url + text       → <a href>
+     *  - Button     → content.content.link.url              → <a href>
+     *  - Text/Badge → content.content.text (plain)          → <p>
+     *  - Image/Image2 → content.image (no URL at parse time) → <img> placeholder
+     *  - FancyTestimonial → content.content.testimonial/title/name/occupation → <p>
      */
     private static function extract_breakdance_tree_to_html($node) {
         if (!is_array($node)) {
             return '';
         }
 
-        $html = '';
-        $data = isset($node['data']) ? $node['data'] : [];
-        $props = isset($data['properties']) ? $data['properties'] : [];
+        $html    = '';
+        $data    = isset($node['data']) ? $node['data'] : [];
+        $props   = isset($data['properties']) ? $data['properties'] : [];
         $content = isset($props['content']) ? $props['content'] : [];
-        $inner = isset($content['content']) ? $content['content'] : [];
+        $inner   = isset($content['content']) ? $content['content'] : [];
 
-        // Extract text/HTML from known element shapes (one path per node to avoid double output)
-        if (!empty($inner)) {
-            // Heading: content.content.text + content.content.tags (h1, h2, h3)
-            if (isset($inner['tags']) && is_string($inner['text'])) {
-                $tag = preg_match('/^h[1-6]$/i', $inner['tags']) ? strtolower($inner['tags']) : 'h2';
+        // ── Image / Image2 ──────────────────────────────────────────────────
+        // Breakdance stores image config under content.image (URL is resolved at
+        // render time from the media library — not available in raw meta). Output
+        // a placeholder <img> so image_count is correctly incremented.
+        if (!empty($content['image']) && is_array($content['image'])) {
+            $alt  = isset($content['image']['alt']) && is_string($content['image']['alt'])
+                ? $content['image']['alt'] : '';
+            $html .= '<img src="" alt="' . esc_attr($alt) . '">';
+        }
+
+        // ── Text-based content from content.content ─────────────────────────
+        if (!empty($inner) && is_array($inner)) {
+
+            // Heading: content.content.tags (h1–h6) + text
+            if (isset($inner['tags']) && is_string($inner['tags'])
+                && isset($inner['text']) && is_string($inner['text'])) {
+                $tag  = preg_match('/^h[1-6]$/i', $inner['tags']) ? strtolower($inner['tags']) : 'h2';
                 $text = trim($inner['text']);
                 if ($text !== '') {
                     $html .= '<' . $tag . '>' . esc_html($text) . '</' . $tag . '>';
                 }
-            }
-            // RichText: content.content.text is HTML (paragraphs, lists)
-            elseif (isset($inner['text']) && is_string($inner['text']) && strpos($inner['text'], '<') !== false) {
+
+            // RichText: text contains HTML markup
+            } elseif (isset($inner['text']) && is_string($inner['text'])
+                      && strpos($inner['text'], '<') !== false) {
                 $html .= wp_kses_post($inner['text']);
-            }
-            // Plain text: Text, Button, Badge, etc.
-            elseif (isset($inner['text']) && is_string($inner['text'])) {
+
+            // TextLink / Button: has a link URL (with or without display text)
+            } elseif (isset($inner['link']['url']) && is_string($inner['link']['url'])) {
+                $link_text = isset($inner['text']) && is_string($inner['text'])
+                    ? trim(strip_tags($inner['text'])) : '';
+                $anchor = $link_text !== '' ? $link_text : $inner['link']['url'];
+                $html  .= '<a href="' . esc_url($inner['link']['url']) . '">'
+                    . esc_html($anchor) . '</a>';
+
+            // Plain text: Text, Badge, etc.
+            } elseif (isset($inner['text']) && is_string($inner['text'])) {
                 $text = trim(strip_tags($inner['text']));
                 if ($text !== '') {
                     $html .= '<p>' . esc_html($text) . '</p>';
                 }
             }
 
-            // FancyTestimonial: testimonial, title, name, occupation (no 'text' or different shape)
+            // FancyTestimonial fields (run after main paths, can coexist)
             foreach (['testimonial', 'title', 'name', 'occupation'] as $key) {
                 if (isset($inner[$key]) && is_string($inner[$key]) && trim($inner[$key]) !== '') {
                     $html .= '<p>' . esc_html(trim($inner[$key])) . '</p>';

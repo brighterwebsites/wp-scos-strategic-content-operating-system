@@ -482,6 +482,12 @@ class Admin_UI {
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
 
+        // Welcome page — pure display, needs SCOS CSS
+        if ( $hook === 'toplevel_page_' . self::PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
+
     }
 
     /**

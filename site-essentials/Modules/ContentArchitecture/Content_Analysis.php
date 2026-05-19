@@ -15,7 +15,7 @@
  * Runs at save_post priority 25 (after legacy BW_Content_Analysis at 20) so
  * both sets of meta keys are written without conflicting.
  *
- * v1.5.0 | 2026-05-19 — Added scos_clear_analysis_cache AJAX action for force re-analysis.
+ * v1.6.0 | 2026-05-19 — Hook onto updated/added_post_meta for _breakdance_data so analysis always uses fresh BD content.
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
@@ -35,6 +35,13 @@ class Content_Analysis {
 		add_action( 'wp_ajax_scos_run_analysis_batch',    [ __CLASS__, 'ajax_run_batch' ] );
 		add_action( 'wp_ajax_scos_analysis_status',       [ __CLASS__, 'ajax_status' ] );
 		add_action( 'wp_ajax_scos_clear_analysis_cache',  [ __CLASS__, 'ajax_clear_cache' ] );
+
+		// Breakdance Builder saves _breakdance_data via its own REST API — this may fire
+		// before save_post runs (causing analysis to read stale data) or may not trigger
+		// save_post at all. Hook directly onto the meta write so we always re-analyze with
+		// the freshly saved Breakdance content.
+		add_action( 'updated_post_meta', [ __CLASS__, 'on_breakdance_data_saved' ], 10, 3 );
+		add_action( 'added_post_meta',   [ __CLASS__, 'on_breakdance_data_saved' ], 10, 3 );
 	}
 
 	// ──────────────────────────────────────────────────────────────────────
@@ -100,6 +107,36 @@ class Content_Analysis {
 		$deleted = $wpdb->delete( $wpdb->postmeta, [ 'meta_key' => 'scos_ca_last_analyzed' ] ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
 
 		wp_send_json_success( [ 'deleted' => absint( $deleted ) ] );
+	}
+
+	/**
+	 * Re-analyze a post whenever Breakdance writes new builder data.
+	 *
+	 * Breakdance Builder saves `_breakdance_data` via its own REST endpoint. Depending on
+	 * version it may write the meta AFTER `save_post` fires (so the save_post-triggered
+	 * analysis sees stale content) or may not fire `save_post` at all. Hooking here — onto
+	 * the meta write itself — guarantees analysis always uses the freshly committed content.
+	 *
+	 * Works for both `updated_post_meta` (existing pages) and `added_post_meta` (first
+	 * time Breakdance content is ever saved to a page). Fires only for `_breakdance_data`;
+	 * all other meta writes are ignored with an early return.
+	 *
+	 * @since 1.6.0
+	 * @param int    $meta_id  Meta row ID (unused).
+	 * @param int    $post_id  Post being saved.
+	 * @param string $meta_key Meta key just written.
+	 */
+	public static function on_breakdance_data_saved( int $meta_id, int $post_id, string $meta_key ): void {
+		if ( '_breakdance_data' !== $meta_key ) {
+			return;
+		}
+		$post = get_post( $post_id );
+		if ( ! $post || ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) {
+			return;
+		}
+		// Clear the timestamp so the skip-condition in analyze() doesn't block this run.
+		delete_post_meta( $post_id, 'scos_ca_last_analyzed' );
+		self::analyze( $post_id, $post, true );
 	}
 
 	/**

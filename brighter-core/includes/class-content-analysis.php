@@ -3,7 +3,7 @@
  * Content Analysis - Link Counting & Statistics
  *
  * File: class-content-analysis.php
- * Version: 1.0.0
+ * Version: 1.1.0 | 2026-05-19
  *
  * Responsibilities:
  * - Count internal/external links (excluding header/footer/nav)
@@ -20,10 +20,14 @@ class BW_Content_Analysis {
      * Initialize content analysis
      */
     public static function init() {
-        // Re-enabled: Only runs on individual post save, not on admin list
-        // This analyzes one post at a time when saved, not all posts at once
         add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
-        
+
+        // Breakdance Builder writes _breakdance_data via its own REST API, which may
+        // run after save_post fires or may not trigger save_post at all. Hook onto the
+        // meta write so analysis always runs with the freshly committed BD content.
+        add_action('updated_post_meta', [__CLASS__, 'on_breakdance_data_saved'], 10, 3);
+        add_action('added_post_meta',   [__CLASS__, 'on_breakdance_data_saved'], 10, 3);
+
         // Track post views on frontend
         add_action('wp_head', [__CLASS__, 'track_post_views']);
         
@@ -453,6 +457,29 @@ class BW_Content_Analysis {
         }
 
         return $html;
+    }
+
+    /**
+     * Re-analyze a post whenever Breakdance writes new builder data.
+     *
+     * Mirrors the same hook in Content_Analysis.php (CA module). Both must be updated
+     * together so bw_* and scos_ca_* keys stay in sync after a Breakdance builder save.
+     *
+     * @param int    $meta_id  Unused.
+     * @param int    $post_id  Post being saved.
+     * @param string $meta_key Meta key just written.
+     */
+    public static function on_breakdance_data_saved($meta_id, $post_id, $meta_key) {
+        if ('_breakdance_data' !== $meta_key) {
+            return;
+        }
+        $post = get_post($post_id);
+        if (!$post || !in_array($post->post_type, bw_cs_post_types(), true)) {
+            return;
+        }
+        // Clear the timestamp so the skip-condition doesn't block this run.
+        delete_post_meta($post_id, '_bw_last_analyzed');
+        self::analyze_content($post_id, $post, true);
     }
 
     /**

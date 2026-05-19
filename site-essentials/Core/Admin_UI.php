@@ -476,6 +476,12 @@ class Admin_UI {
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
 
+        // Settings page needs admin.js (module toggle AJAX, import/export, cache clear) + SCOS CSS
+        if ( $hook === self::PAGE_SLUG . '_page_' . self::SETTINGS_PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
+
     }
 
     /**
@@ -1143,7 +1149,7 @@ class Admin_UI {
             return;
         }
 
-        echo '<div class="site-essentials-modules">';
+        echo '<div class="scos-modules">';
 
         foreach ($available_modules as $module_id => $class_name) {
             $is_enabled = $this->settings->is_module_enabled($module_id);

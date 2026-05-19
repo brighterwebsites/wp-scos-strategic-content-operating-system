@@ -325,6 +325,7 @@
   border-radius: var(--scos-r-md);
   transition: border-color .12s, box-shadow .12s;
 }
+textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); line-height: 1.5; }
 .scos-textarea { height: auto; min-height: 120px; padding: var(--scos-s-2) var(--scos-s-3); font-family: var(--scos-font-mono); font-size: var(--scos-fs-md); line-height: 1.5; }
 .scos-input:focus,
 .scos-select:focus,

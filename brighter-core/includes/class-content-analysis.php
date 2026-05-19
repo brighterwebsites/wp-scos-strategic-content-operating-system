@@ -3,7 +3,7 @@
  * Content Analysis - Link Counting & Statistics
  *
  * File: class-content-analysis.php
- * Version: 1.2.0 | 2026-05-19
+ * Version: 1.3.0 | 2026-05-19
  *
  * Responsibilities:
  * - Count internal/external links (excluding header/footer/nav)
@@ -408,81 +408,189 @@ class BW_Content_Analysis {
     /**
      * Recursively walk Breakdance tree and build HTML from node content.
      *
-     * Handles:
-     *  - Heading    → content.content.tags + text           → <h1>…<h6>
-     *  - RichText   → content.content.text (HTML)           → raw HTML
-     *  - TextLink   → content.content.link.url + text       → <a href>
-     *  - Button     → content.content.link.url              → <a href>
-     *  - Text/Badge → content.content.text (plain)          → <p>
-     *  - Image/Image2 → content.image (no URL at parse time) → <img> placeholder
-     *  - FancyTestimonial → content.content.testimonial/title/name/occupation → <p>
+     * Generic content scanner — does NOT enumerate element types.
+     * Instead it walks properties.content recursively and emits HTML
+     * based on key-name patterns. This means new or custom elements
+     * (Icon List, Accordion, Slider, Gallery, custom Scos* blocks, etc.)
+     * are all handled automatically without per-element code.
+     *
+     * Emits:
+     *   <h1>–<h6>  when text + tags (h1–h6) are siblings
+     *   raw HTML    when a text value contains markup (RichText)
+     *   <a href>    when a link/button_link/anchor key holds a URL object
+     *               (text+link combos are merged to avoid double-counting)
+     *   <img>       when image/img/thumbnail/images/gallery key holds an
+     *               image object (URL resolved at render time; placeholder used)
+     *   <p>         for any other meaningful plain-text string
+     *
+     * Skips: properties.design, properties.meta, properties.settings,
+     *        all layout/style sub-keys, and enum-like strings (all
+     *        lowercase-with-underscores, e.g. "media_library", "dark").
+     *
+     * Limitation: dynamically-loaded content (Post Repeater, Query Loop)
+     * has no static text in the tree and cannot be counted here.
      */
     private static function extract_breakdance_tree_to_html($node) {
         if (!is_array($node)) {
             return '';
         }
 
-        $html    = '';
-        $data    = isset($node['data']) ? $node['data'] : [];
-        $props   = isset($data['properties']) ? $data['properties'] : [];
+        $props   = isset($node['data']['properties']) ? $node['data']['properties'] : [];
         $content = isset($props['content']) ? $props['content'] : [];
-        $inner   = isset($content['content']) ? $content['content'] : [];
 
-        // ── Image / Image2 ──────────────────────────────────────────────────
-        // Breakdance stores image config under content.image (URL is resolved at
-        // render time from the media library — not available in raw meta). Output
-        // a placeholder <img> so image_count is correctly incremented.
-        if (!empty($content['image']) && is_array($content['image'])) {
-            $alt  = isset($content['image']['alt']) && is_string($content['image']['alt'])
-                ? $content['image']['alt'] : '';
-            $html .= '<img src="" alt="' . esc_attr($alt) . '">';
+        $html = '';
+        if (!empty($content) && is_array($content)) {
+            $html .= self::scan_content_props($content);
         }
 
-        // ── Text-based content from content.content ─────────────────────────
-        if (!empty($inner) && is_array($inner)) {
-
-            // Heading: content.content.tags (h1–h6) + text
-            if (isset($inner['tags']) && is_string($inner['tags'])
-                && isset($inner['text']) && is_string($inner['text'])) {
-                $tag  = preg_match('/^h[1-6]$/i', $inner['tags']) ? strtolower($inner['tags']) : 'h2';
-                $text = trim($inner['text']);
-                if ($text !== '') {
-                    $html .= '<' . $tag . '>' . esc_html($text) . '</' . $tag . '>';
-                }
-
-            // RichText: text contains HTML markup
-            } elseif (isset($inner['text']) && is_string($inner['text'])
-                      && strpos($inner['text'], '<') !== false) {
-                $html .= wp_kses_post($inner['text']);
-
-            // TextLink / Button: has a link URL (with or without display text)
-            } elseif (isset($inner['link']['url']) && is_string($inner['link']['url'])) {
-                $link_text = isset($inner['text']) && is_string($inner['text'])
-                    ? trim(strip_tags($inner['text'])) : '';
-                $anchor = $link_text !== '' ? $link_text : $inner['link']['url'];
-                $html  .= '<a href="' . esc_url($inner['link']['url']) . '">'
-                    . esc_html($anchor) . '</a>';
-
-            // Plain text: Text, Badge, etc.
-            } elseif (isset($inner['text']) && is_string($inner['text'])) {
-                $text = trim(strip_tags($inner['text']));
-                if ($text !== '') {
-                    $html .= '<p>' . esc_html($text) . '</p>';
-                }
-            }
-
-            // FancyTestimonial fields (run after main paths, can coexist)
-            foreach (['testimonial', 'title', 'name', 'occupation'] as $key) {
-                if (isset($inner[$key]) && is_string($inner[$key]) && trim($inner[$key]) !== '') {
-                    $html .= '<p>' . esc_html(trim($inner[$key])) . '</p>';
-                }
-            }
-        }
-
-        // Recurse into children
         if (!empty($node['children']) && is_array($node['children'])) {
             foreach ($node['children'] as $child) {
                 $html .= self::extract_breakdance_tree_to_html($child);
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Recursively scan a Breakdance content-properties array and return HTML.
+     *
+     * Called from extract_breakdance_tree_to_html() with properties.content.
+     * Also calls itself for nested objects (accordion items, slider slides, etc.).
+     *
+     * @param array  $data       The current properties sub-tree to scan.
+     * @param string $parent_key The key name of the parent array (context hint).
+     * @return string HTML fragment.
+     */
+    private static function scan_content_props(array $data, string $parent_key = ''): string {
+        $html      = '';
+        $skip_keys = [];
+
+        // Keys that are purely layout/style — never contain readable content.
+        static $style_keys = [
+            'design', 'meta', 'settings', 'style', 'styles', 'typography',
+            'spacing', 'padding', 'margin', 'border', 'background', 'shadow',
+            'color', 'layout', 'layout_v2', 'imageDimensions', 'lazy_load',
+            'preset', 'theme', 'size', 'alignment', 'position', 'visibility',
+            'animation', 'transition', 'responsive', 'breakpoints',
+        ];
+
+        // Keys whose string value names a link target or image source type
+        // (e.g. "from" = "media_library").  Not visible content.
+        static $image_source_keys = ['from', 'id', 'lazy_load', 'alt', 'type'];
+
+        // ── Pre-pass: detect text+link combos at this array level ───────────
+        // When a link key and a text key are siblings, merge them into one
+        // <a href>text</a> so the text is not double-counted.
+        $link_url = '';
+        foreach (['link', 'button_link', 'cta_link', 'cta', 'anchor', 'url_link'] as $lk) {
+            if (isset($data[$lk]['url']) && is_string($data[$lk]['url'])) {
+                $candidate = trim($data[$lk]['url']);
+                if ($candidate !== '' && (strpos($candidate, 'http') === 0 || $candidate[0] === '/')) {
+                    $link_url     = $candidate;
+                    $skip_keys[]  = $lk;
+                    break;
+                }
+            }
+        }
+
+        if ($link_url !== '') {
+            // Gather the best sibling display text, in priority order.
+            $display_text = '';
+            foreach (['text', 'label', 'title', 'caption'] as $tk) {
+                if (isset($data[$tk]) && is_string($data[$tk])) {
+                    $t = trim(strip_tags($data[$tk]));
+                    if ($t !== '') {
+                        $display_text = $t;
+                        $skip_keys[]  = $tk;
+                        break;
+                    }
+                }
+            }
+            $anchor = $display_text !== '' ? $display_text : parse_url($link_url, PHP_URL_HOST);
+            $html  .= '<a href="' . esc_url($link_url) . '">' . esc_html((string) $anchor) . '</a>';
+        }
+
+        // ── Main pass ────────────────────────────────────────────────────────
+        foreach ($data as $key => $value) {
+            $key_str = (string) $key;
+
+            if (in_array($key_str, $skip_keys, true)) {
+                continue;
+            }
+
+            // ── Skip pure style/layout keys ──────────────────────────────────
+            if (in_array($key_str, $style_keys, true)) {
+                continue;
+            }
+
+            // ── Image / gallery keys ─────────────────────────────────────────
+            // Single image: { from, id, url/src, alt, lazy_load }
+            // Gallery/images: array of image objects
+            if (in_array($key_str, ['image', 'img', 'thumbnail', 'photo', 'images', 'gallery', 'slides_images'], true)
+                && is_array($value)) {
+
+                // Single image object
+                if (isset($value['from']) || isset($value['id']) || isset($value['url']) || isset($value['src'])) {
+                    $src = isset($value['url']) ? $value['url'] : (isset($value['src']) ? $value['src'] : '');
+                    $alt = isset($value['alt']) && is_string($value['alt']) ? $value['alt'] : '';
+                    $html .= '<img src="' . esc_attr($src) . '" alt="' . esc_attr($alt) . '">';
+                } else {
+                    // Array of image objects (Gallery, Slider background images, etc.)
+                    foreach ($value as $img_item) {
+                        if (!is_array($img_item)) continue;
+                        if (isset($img_item['from']) || isset($img_item['id']) || isset($img_item['url']) || isset($img_item['src'])) {
+                            $src = isset($img_item['url']) ? $img_item['url'] : (isset($img_item['src']) ? $img_item['src'] : '');
+                            $alt = isset($img_item['alt']) && is_string($img_item['alt']) ? $img_item['alt'] : '';
+                            $html .= '<img src="' . esc_attr($src) . '" alt="' . esc_attr($alt) . '">';
+                        }
+                    }
+                }
+                continue; // image sub-keys are config, not readable content
+            }
+
+            // ── Standalone link key (no sibling text — handled in pre-pass already) ─
+            if (in_array($key_str, ['link', 'button_link', 'cta_link', 'cta', 'anchor', 'url_link'], true)) {
+                continue; // already handled or no valid URL
+            }
+
+            // ── Text string ──────────────────────────────────────────────────
+            if (is_string($value) && in_array($key_str, [
+                'text', 'title', 'heading', 'label', 'caption',
+                'description', 'content', 'testimonial', 'name',
+                'occupation', 'summary', 'excerpt', 'body',
+            ], true)) {
+                $trimmed = trim($value);
+                if ($trimmed === '') continue;
+
+                // Skip enum-like values: all-lowercase with underscores/dashes, short.
+                // e.g. "media_library", "dark", "from_media_library", "horizontal"
+                if (preg_match('/^[a-z][a-z0-9_\-]*$/', $trimmed) && strlen($trimmed) < 30) {
+                    continue;
+                }
+
+                // Heading: text key + sibling 'tags' key holding h1–h6
+                if ($key_str === 'text'
+                    && isset($data['tags']) && is_string($data['tags'])
+                    && preg_match('/^h[1-6]$/i', $data['tags'])) {
+                    $tag   = strtolower($data['tags']);
+                    $clean = trim(strip_tags($trimmed));
+                    if ($clean !== '') {
+                        $html .= '<' . $tag . '>' . esc_html($clean) . '</' . $tag . '>';
+                    }
+                // Rich HTML (RichText, Accordion content, etc.)
+                } elseif (strpos($trimmed, '<') !== false) {
+                    $html .= wp_kses_post($trimmed);
+                // Plain text
+                } else {
+                    $html .= '<p>' . esc_html($trimmed) . '</p>';
+                }
+                continue;
+            }
+
+            // ── Recurse into nested arrays (items[], slides[], panels[], etc.) ─
+            if (is_array($value)) {
+                $html .= self::scan_content_props($value, $key_str);
             }
         }
 

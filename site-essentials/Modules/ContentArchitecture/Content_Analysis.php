@@ -376,50 +376,72 @@ class Content_Analysis {
 	/**
 	 * Recursive existence check for a Scos_Faqs element with schema enabled.
 	 *
-	 * Node shape (from `tree_json_string` -> root):
-	 *   $node['data']['type']                  → element class name
-	 *   $node['data']['properties']['content'] → our props
-	 *   $node['children']                      → nested nodes
+	 * Mirrors the resilient walker in FAQ_Schema_Graph::walk_bd_tree(): we
+	 * recurse into every nested array (not just `$node['children']`) and
+	 * accept both fully-qualified and short class-name `type` values, plus
+	 * both `data.properties.content` and `properties.content` shapes.
 	 *
-	 * Returns true on first match — we don't need to count or collect IDs
-	 * here, just record that the page contributes FAQPage.
+	 * Returns true on first matched element with schema_enabled — we don't
+	 * need to count or collect IDs here, just record that the page
+	 * contributes FAQPage.
 	 *
-	 * @since 1.2.0
+	 * @since 1.4.0
 	 * @param array $node Tree fragment.
 	 * @return bool
 	 */
 	private static function bd_tree_has_scos_faqs( array $node ): bool {
-		$data = isset( $node['data'] ) && is_array( $node['data'] ) ? $node['data'] : $node;
+		$type = self::resolve_node_type( $node );
 
-		$type = '';
-		if ( isset( $data['type'] ) ) {
-			$type = is_string( $data['type'] )
-				? $data['type']
-				: ( is_array( $data['type'] ) ? (string) ( $data['type']['name'] ?? '' ) : '' );
-		}
-
-		if ( 'BreakdanceCustomElements\\ScosFaqs' === $type ) {
-			$properties = isset( $data['properties'] ) && is_array( $data['properties'] ) ? $data['properties'] : [];
-			$content    = isset( $properties['content'] ) && is_array( $properties['content'] ) ? $properties['content'] : [];
-			$display    = isset( $content['display'] ) && is_array( $content['display'] ) ? $content['display'] : [];
+		if ( 'BreakdanceCustomElements\\ScosFaqs' === $type || 'ScosFaqs' === $type ) {
+			$properties = [];
+			if ( isset( $node['data']['properties'] ) && is_array( $node['data']['properties'] ) ) {
+				$properties = $node['data']['properties'];
+			} elseif ( isset( $node['properties'] ) && is_array( $node['properties'] ) ) {
+				$properties = $node['properties'];
+			}
+			$content = isset( $properties['content'] ) && is_array( $properties['content'] ) ? $properties['content'] : [];
+			$display = isset( $content['display'] )   && is_array( $content['display'] )   ? $content['display']   : [];
 
 			$schema_enabled = array_key_exists( 'schema_enabled', $display )
 				? (bool) $display['schema_enabled']
-				: true;
+				: ( array_key_exists( 'schema_enabled', $content ) ? (bool) $content['schema_enabled'] : true );
 			if ( $schema_enabled ) {
 				return true;
 			}
 		}
 
-		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
-			foreach ( $node['children'] as $child ) {
-				if ( is_array( $child ) && self::bd_tree_has_scos_faqs( $child ) ) {
-					return true;
-				}
+		// Recurse into every nested array — tolerates unexpected wrappers.
+		foreach ( $node as $value ) {
+			if ( is_array( $value ) && self::bd_tree_has_scos_faqs( $value ) ) {
+				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * Resolve `type` from a BD node, regardless of nesting depth or shape.
+	 *
+	 * @since 1.4.0
+	 * @param array $node
+	 * @return string
+	 */
+	private static function resolve_node_type( array $node ): string {
+		if ( isset( $node['data']['type'] ) ) {
+			$t = $node['data']['type'];
+		} elseif ( isset( $node['type'] ) ) {
+			$t = $node['type'];
+		} else {
+			return '';
+		}
+		if ( is_string( $t ) ) {
+			return $t;
+		}
+		if ( is_array( $t ) && isset( $t['name'] ) && is_string( $t['name'] ) ) {
+			return $t['name'];
+		}
+		return '';
 	}
 
 	/**

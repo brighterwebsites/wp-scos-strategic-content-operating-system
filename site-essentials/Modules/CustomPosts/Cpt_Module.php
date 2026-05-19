@@ -883,7 +883,12 @@ class Cpt_Module implements Module_Interface {
         add_shortcode('bw_review_customer_detail', [$this, 'shortcode_review_customer_detail']);
         add_shortcode('bw_review_excerpt',         [$this, 'shortcode_review_excerpt']);
         add_shortcode('bw_review_featured',        [$this, 'shortcode_review_featured']);
-        
+
+        // Review card — full rendered card, used by SCOS Review Card BDE element + direct shortcode
+        require_once __DIR__ . '/Review_Card_Renderer.php';
+        $renderer = new Review_Card_Renderer();
+        add_shortcode('bw_review_card', [$renderer, 'shortcode']);
+
         // Statistics shortcodes
         add_shortcode('bw_review_count',           [$this, 'shortcode_review_count']);
         add_shortcode('bw_review_average',         [$this, 'shortcode_review_average']);

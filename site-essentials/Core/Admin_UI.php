@@ -469,6 +469,13 @@ class Admin_UI {
             wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
         }
 
+        // SEO page needs both admin.js (clear-cache AJAX) and the SCOS design system
+        if ( $hook === self::PAGE_SLUG . '_page_' . self::SEO_PAGE_SLUG
+            || $hook === 'toplevel_page_' . self::SEO_PAGE_SLUG ) {
+            wp_enqueue_style( 'scos-tokens', SITE_ESSENTIALS_URL . 'assets/css/tokens.css', [], SITE_ESSENTIALS_VERSION );
+            wp_enqueue_style( 'scos-ui', SITE_ESSENTIALS_URL . 'assets/css/scos-ui.css', [ 'scos-tokens' ], SITE_ESSENTIALS_VERSION );
+        }
+
     }
 
     /**

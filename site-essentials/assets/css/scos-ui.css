@@ -212,6 +212,8 @@
 .scos-badge--basic      { background: var(--scos-tier-basic); }
 .scos-badge--pro        { background: var(--scos-tier-pro); }
 .scos-badge--enterprise { background: var(--scos-tier-enterprise); }
+.scos-badge--success { background: var(--scos-success-soft); color: var(--scos-success); }
+.scos-badge--danger  { background: var(--scos-danger-soft);  color: var(--scos-danger); }
 .scos-badge--soft {
   color: var(--scos-ink-muted);
   background: var(--scos-surface-muted);
@@ -309,6 +311,13 @@
   margin: var(--scos-s-2) 0 0;
   font-size: var(--scos-fs-md);
   color: var(--scos-ink-subtle);
+}
+.scos-form__slug {
+  font-family: var(--scos-font-mono);
+  font-size: 11px;
+  color: var(--scos-ink-subtle);
+  font-weight: 400;
+  margin-top: 2px;
 }
 .scos-input,
 .scos-select,

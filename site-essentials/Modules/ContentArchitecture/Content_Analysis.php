@@ -317,6 +317,9 @@ class Content_Analysis {
 	 */
 	private static function scan_breakdance_for_schema( int $post_id, array &$types ): void {
 		$raw = get_post_meta( $post_id, '_breakdance_data', true );
+		if ( empty( $raw ) || ! is_string( $raw ) ) {
+			$raw = get_post_meta( $post_id, 'breakdance_data', true );
+		}
 		if ( empty( $raw ) ) {
 			return;
 		}
@@ -326,18 +329,57 @@ class Content_Analysis {
 			return;
 		}
 
-		$data = is_array( $raw ) ? $raw : json_decode( (string) $raw, true );
-		if ( ! is_array( $data ) ) {
+		$tree = self::decode_bd_tree( $raw );
+		if ( null === $tree ) {
 			return;
 		}
 
-		if ( self::bd_tree_has_scos_faqs( $data ) ) {
+		if ( self::bd_tree_has_scos_faqs( $tree ) ) {
 			$types[] = 'FAQPage';
 		}
 	}
 
 	/**
+	 * Unwrap `_breakdance_data` to the root node of the tree.
+	 *
+	 * Same parse pattern as BW_Content_Analysis::parse_breakdance_structure()
+	 * and FAQ_Schema_Graph::decode_bd_tree(): outer JSON has a
+	 * `tree_json_string` field that's itself a JSON string, decoded to give
+	 * a tree with `root` at the top.
+	 *
+	 * @since 1.3.0
+	 * @param mixed $raw Raw meta value (string or pre-decoded array).
+	 * @return array|null Root node, or null when the data can't be parsed.
+	 */
+	private static function decode_bd_tree( $raw ) {
+		$outer = is_array( $raw ) ? $raw : json_decode( (string) $raw, true );
+		if ( ! is_array( $outer ) ) {
+			return null;
+		}
+
+		if ( isset( $outer['tree_json_string'] ) && is_string( $outer['tree_json_string'] ) ) {
+			$tree = json_decode( $outer['tree_json_string'], true );
+		} else {
+			$tree = $outer;
+		}
+		if ( ! is_array( $tree ) ) {
+			return null;
+		}
+
+		if ( isset( $tree['root'] ) && is_array( $tree['root'] ) ) {
+			return $tree['root'];
+		}
+
+		return $tree;
+	}
+
+	/**
 	 * Recursive existence check for a Scos_Faqs element with schema enabled.
+	 *
+	 * Node shape (from `tree_json_string` -> root):
+	 *   $node['data']['type']                  → element class name
+	 *   $node['data']['properties']['content'] → our props
+	 *   $node['children']                      → nested nodes
 	 *
 	 * Returns true on first match — we don't need to count or collect IDs
 	 * here, just record that the page contributes FAQPage.
@@ -347,27 +389,33 @@ class Content_Analysis {
 	 * @return bool
 	 */
 	private static function bd_tree_has_scos_faqs( array $node ): bool {
-		if ( isset( $node['type'] ) ) {
-			$type = is_string( $node['type'] ) ? $node['type'] : ( is_array( $node['type'] ) ? ( $node['type']['name'] ?? '' ) : '' );
-			if ( 'BreakdanceCustomElements\\ScosFaqs' === $type ) {
-				// schema_enabled lives at content.display.schema_enabled —
-				// matches the section nesting in elements/Scos_Faqs/element.php.
-				$content = $node['properties']['content'] ?? [];
-				$display = is_array( $content ) && isset( $content['display'] ) && is_array( $content['display'] )
-					? $content['display']
-					: [];
-				$schema_enabled = array_key_exists( 'schema_enabled', $display )
-					? (bool) $display['schema_enabled']
-					: true;
-				if ( $schema_enabled ) {
-					return true;
-				}
+		$data = isset( $node['data'] ) && is_array( $node['data'] ) ? $node['data'] : $node;
+
+		$type = '';
+		if ( isset( $data['type'] ) ) {
+			$type = is_string( $data['type'] )
+				? $data['type']
+				: ( is_array( $data['type'] ) ? (string) ( $data['type']['name'] ?? '' ) : '' );
+		}
+
+		if ( 'BreakdanceCustomElements\\ScosFaqs' === $type ) {
+			$properties = isset( $data['properties'] ) && is_array( $data['properties'] ) ? $data['properties'] : [];
+			$content    = isset( $properties['content'] ) && is_array( $properties['content'] ) ? $properties['content'] : [];
+			$display    = isset( $content['display'] ) && is_array( $content['display'] ) ? $content['display'] : [];
+
+			$schema_enabled = array_key_exists( 'schema_enabled', $display )
+				? (bool) $display['schema_enabled']
+				: true;
+			if ( $schema_enabled ) {
+				return true;
 			}
 		}
 
-		foreach ( $node as $value ) {
-			if ( is_array( $value ) && self::bd_tree_has_scos_faqs( $value ) ) {
-				return true;
+		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
+			foreach ( $node['children'] as $child ) {
+				if ( is_array( $child ) && self::bd_tree_has_scos_faqs( $child ) ) {
+					return true;
+				}
 			}
 		}
 

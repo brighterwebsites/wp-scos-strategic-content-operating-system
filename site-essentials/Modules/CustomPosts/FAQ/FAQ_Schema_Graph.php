@@ -17,7 +17,7 @@
  * emitted by the block's render callback, so the page has exactly one
  * JSON-LD graph.
  *
- * v1.2 | 2026-05-19
+ * v1.3 | 2026-05-19
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -191,13 +191,31 @@ class FAQ_Schema_Graph {
 	// =========================================================================
 
 	/**
-	 * Read `_breakdance_data` post meta and collect FAQ IDs from every
-	 * Scos_Faqs element. Supports both "selector" mode (manual picks) and
-	 * "topic" mode (resolved via FAQ_Module::get_ids_by_topic).
+	 * Read Breakdance post meta and collect FAQ IDs from every Scos_Faqs
+	 * element on the page. Supports both selector and topic modes.
 	 *
-	 * Returns an empty array on any decode error, missing meta, or when
-	 * Breakdance is not present on the post — these are all "no FAQs from
-	 * Breakdance" outcomes, not errors.
+	 * The Breakdance tree is stored under one of two meta keys:
+	 *   `_breakdance_data` (current convention)
+	 *   `breakdance_data`  (older convention, kept as fallback — same shape
+	 *                       BW_Content_Analysis::get_breakdance_content uses)
+	 *
+	 * The stored value is a JSON string with this shape:
+	 *   { "tree_json_string": "...JSON-encoded tree...", "...": "..." }
+	 *
+	 * `tree_json_string` is itself a JSON string and needs a second decode.
+	 * After that you get { "root": { "data": {...}, "children": [...] } }.
+	 *
+	 * Each node is shaped:
+	 *   {
+	 *     "data": {
+	 *       "type": "BreakdanceCustomElements\\ScosFaqs",
+	 *       "properties": { "content": {...}, "design": {...} }
+	 *     },
+	 *     "children": [ ...nested nodes... ]
+	 *   }
+	 *
+	 * Returns an empty array on any decode error or missing meta — these
+	 * are "no FAQs from BD" outcomes, not errors.
 	 *
 	 * @since 1.1.0
 	 * @param int $post_id Post ID.
@@ -205,41 +223,80 @@ class FAQ_Schema_Graph {
 	 */
 	private static function collect_faq_ids_from_breakdance( int $post_id ): array {
 		$raw = get_post_meta( $post_id, '_breakdance_data', true );
+		if ( empty( $raw ) || ! is_string( $raw ) ) {
+			$raw = get_post_meta( $post_id, 'breakdance_data', true );
+		}
 		if ( empty( $raw ) ) {
 			return [];
 		}
 
-		// Cheap pre-check: skip the full walk on posts that don't even
-		// mention the element class.
+		// Cheap pre-check before any JSON decoding — skip BD-less posts fast.
 		$haystack = is_string( $raw ) ? $raw : wp_json_encode( $raw );
 		if ( false === strpos( (string) $haystack, 'ScosFaqs' ) ) {
 			return [];
 		}
 
-		// Breakdance may store the data as a JSON-encoded string OR an
-		// already-decoded array, depending on filter order. Handle both.
-		$data = is_array( $raw ) ? $raw : json_decode( (string) $raw, true );
-		if ( ! is_array( $data ) ) {
+		$tree = self::decode_bd_tree( $raw );
+		if ( null === $tree ) {
 			return [];
 		}
 
 		$collected = [];
-		self::walk_bd_tree( $data, $collected );
+		self::walk_bd_tree( $tree, $collected );
 
 		return array_values( array_unique( array_map( 'intval', $collected ) ) );
+	}
+
+	/**
+	 * Unwrap `_breakdance_data` to the root node of the tree.
+	 *
+	 * Mirrors the parse pattern used by
+	 * BW_Content_Analysis::parse_breakdance_structure() in brighter-core.
+	 *
+	 * @since 1.3.0
+	 * @param mixed $raw Raw meta value (string or pre-decoded array).
+	 * @return array|null Root node, or null when the data can't be parsed.
+	 */
+	private static function decode_bd_tree( $raw ) {
+		$outer = is_array( $raw ) ? $raw : json_decode( (string) $raw, true );
+		if ( ! is_array( $outer ) ) {
+			return null;
+		}
+
+		// Standard wrapper: outer JSON has `tree_json_string` containing
+		// the actual tree as a second JSON string.
+		if ( isset( $outer['tree_json_string'] ) && is_string( $outer['tree_json_string'] ) ) {
+			$tree = json_decode( $outer['tree_json_string'], true );
+		} else {
+			// Fallback: some older BD versions / contexts store the tree
+			// directly without the wrapper.
+			$tree = $outer;
+		}
+		if ( ! is_array( $tree ) ) {
+			return null;
+		}
+
+		// Standard shape has `root` holding the tree root.
+		if ( isset( $tree['root'] ) && is_array( $tree['root'] ) ) {
+			return $tree['root'];
+		}
+
+		// Fallback: tree might already be a root-shaped node.
+		return $tree;
 	}
 
 	/**
 	 * Recursively walk a Breakdance node array, collecting FAQ IDs from any
 	 * Scos_Faqs element we find.
 	 *
-	 * The Breakdance tree shape varies between versions but always has:
-	 *  - a `type` field on element nodes (string or array)
-	 *  - a `properties` field with `content` sub-object
-	 *  - a `children` array for nested elements
+	 * Element data lives under `$node['data']`:
+	 *   $node['data']['type']                  → "BreakdanceCustomElements\\ScosFaqs"
+	 *   $node['data']['properties']['content'] → our props
 	 *
-	 * We also walk every other array value defensively, so the walker still
-	 * works if BD changes the wrapper shape.
+	 * Children for recursion live under `$node['children']`.
+	 *
+	 * We also check the flat shape ($node['type'], $node['properties']) as a
+	 * defensive fallback in case BD ever inlines element data on the node.
 	 *
 	 * @since 1.1.0
 	 * @param array $node      Current tree fragment.
@@ -247,58 +304,53 @@ class FAQ_Schema_Graph {
 	 * @return void
 	 */
 	private static function walk_bd_tree( array $node, array &$collected ): void {
-		// Element node — check the type and harvest if it's ours.
-		if ( isset( $node['type'] ) ) {
-			$type = is_string( $node['type'] ) ? $node['type'] : ( is_array( $node['type'] ) ? ( $node['type']['name'] ?? '' ) : '' );
-			if ( self::BD_ELEMENT_TYPE === $type ) {
-				$content = $node['properties']['content'] ?? [];
-				$content = is_array( $content ) ? $content : [];
+		// Element data normally sits under `data`; fall back to the node
+		// itself if BD ever changes the shape.
+		$data = isset( $node['data'] ) && is_array( $node['data'] ) ? $node['data'] : $node;
 
-				// Property paths mirror the section nesting in
-				// elements/Scos_Faqs/element.php:
-				//   content.faq_source.{mode, selected_faqs, topic_slug}
-				//   content.display.{schema_enabled, format, heading}
-				$source  = isset( $content['faq_source'] ) && is_array( $content['faq_source'] ) ? $content['faq_source'] : [];
-				$display = isset( $content['display'] )    && is_array( $content['display'] )    ? $content['display']    : [];
+		$type = '';
+		if ( isset( $data['type'] ) ) {
+			$type = is_string( $data['type'] )
+				? $data['type']
+				: ( is_array( $data['type'] ) ? (string) ( $data['type']['name'] ?? '' ) : '' );
+		}
 
-				// Respect the per-element schema toggle (default on).
-				$schema_enabled = array_key_exists( 'schema_enabled', $display )
-					? (bool) $display['schema_enabled']
-					: true;
-				if ( $schema_enabled ) {
-					$mode = isset( $source['mode'] ) ? (string) $source['mode'] : 'selector';
+		if ( self::BD_ELEMENT_TYPE === $type ) {
+			$properties = isset( $data['properties'] ) && is_array( $data['properties'] ) ? $data['properties'] : [];
+			$content    = isset( $properties['content'] ) && is_array( $properties['content'] ) ? $properties['content'] : [];
 
-					if ( 'topic' === $mode && ! empty( $source['topic_slug'] ) ) {
-						$ids = FAQ_Module::get_ids_by_topic( sanitize_title( (string) $source['topic_slug'] ) );
-						foreach ( $ids as $id ) {
-							$collected[] = (int) $id;
-						}
-					} elseif ( ! empty( $source['selected_faqs'] ) && is_array( $source['selected_faqs'] ) ) {
-						foreach ( $source['selected_faqs'] as $item ) {
-							$collected[] = self::extract_post_id( $item );
-						}
+			// Property paths mirror the section nesting in
+			// elements/Scos_Faqs/element.php:
+			//   content.faq_source.{mode, selected_faqs, topic_slug}
+			//   content.display.{schema_enabled, format, heading}
+			$source  = isset( $content['faq_source'] ) && is_array( $content['faq_source'] ) ? $content['faq_source'] : [];
+			$display = isset( $content['display'] )    && is_array( $content['display'] )    ? $content['display']    : [];
+
+			$schema_enabled = array_key_exists( 'schema_enabled', $display )
+				? (bool) $display['schema_enabled']
+				: true;
+			if ( $schema_enabled ) {
+				$mode = isset( $source['mode'] ) ? (string) $source['mode'] : 'selector';
+
+				if ( 'topic' === $mode && ! empty( $source['topic_slug'] ) ) {
+					$ids = FAQ_Module::get_ids_by_topic( sanitize_title( (string) $source['topic_slug'] ) );
+					foreach ( $ids as $id ) {
+						$collected[] = (int) $id;
+					}
+				} elseif ( ! empty( $source['selected_faqs'] ) && is_array( $source['selected_faqs'] ) ) {
+					foreach ( $source['selected_faqs'] as $item ) {
+						$collected[] = self::extract_post_id( $item );
 					}
 				}
 			}
 		}
 
-		// Recurse into known child containers first (cheap, common case).
+		// Standard recursion: children array.
 		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
 			foreach ( $node['children'] as $child ) {
 				if ( is_array( $child ) ) {
 					self::walk_bd_tree( $child, $collected );
 				}
-			}
-		}
-
-		// Defensive recurse into every other array value so we still find
-		// Scos_Faqs if BD wraps the tree in something unexpected.
-		foreach ( $node as $key => $value ) {
-			if ( 'children' === $key || 'type' === $key || 'properties' === $key ) {
-				continue;
-			}
-			if ( is_array( $value ) ) {
-				self::walk_bd_tree( $value, $collected );
 			}
 		}
 	}

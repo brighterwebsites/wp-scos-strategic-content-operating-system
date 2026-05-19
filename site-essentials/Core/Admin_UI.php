@@ -403,6 +403,7 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::SMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::SITE_SCHEMA_PAGE_SLUG,
         ];
 
         if ( in_array( $hook, $scos_ui_hooks, true ) ) {
@@ -1060,12 +1061,9 @@ class Admin_UI {
             return;
         }
 
-        echo '<div class="wrap site-essentials-wrap">';
-        echo '<h1>' . esc_html__( 'Site Schema', 'site-essentials' ) . '</h1>';
-        echo '<div class="site-essentials-content">';
-        echo '<div class="card se-module-settings-card" data-module-id="site_schema">';
+        echo '<div class="wrap scos">';
         $schema_module->render_settings();
-        echo '</div></div></div>';
+        echo '</div>';
     }
 
     /**

@@ -12,6 +12,7 @@
  * setting means WP won't add sidebar boxes, but the term management pages work
  * perfectly.
  *
+ * v1.2.0 | 2026-05-21 — SCOS design system applied to Integrations page (structure unchanged).
  * v1.1.0 | 2026-05-19 — SCOS design system applied to Overview; Force Re-analyze All button added.
  *
  * @package    SiteEssentials
@@ -49,7 +50,9 @@ class Admin_Menu {
 	}
 
 	public static function enqueue_assets( string $hook ): void {
-		if ( strpos( $hook, 'scos-content-architecture' ) === false ) {
+		// Overview + Integrations submenus (hook contains menu slug or integrations slug).
+		if ( strpos( $hook, 'scos-content-architecture' ) === false
+			&& strpos( $hook, self::INTEGRATIONS_SLUG ) === false ) {
 			return;
 		}
 
@@ -341,7 +344,7 @@ class Admin_Menu {
 	 */
 	public static function render_integrations(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
+			wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
 		}
 
 		$saved = isset( $_GET['scos_ca_int_saved'] );
@@ -352,106 +355,142 @@ class Admin_Menu {
 		$altc_id   = self::get_car_option( 'scos_car_airtable_altc_id',  'bw_airtable_altc_table_id' );
 		$topics_id = self::get_car_option( 'scos_car_airtable_topics_id','bw_airtable_topics_table_id' );
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Content Architecture — Integrations', 'site-essentials' ); ?></h1>
+		<div class="wrap scos">
+
+			<header class="scos__header">
+				<div>
+					<h1 class="scos__title"><?php esc_html_e( 'Integrations', 'site-essentials' ); ?></h1>
+					<p class="scos__subtitle">Site Essentials &rsaquo; Content Architecture &rsaquo; Integrations</p>
+				</div>
+				<div class="scos__header-actions">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::OVERVIEW_SLUG ) ); ?>" class="scos-btn scos-btn--ghost">
+						<?php esc_html_e( 'Overview', 'site-essentials' ); ?>
+					</a>
+					<button type="submit" form="scos-ca-int-form" class="scos-btn scos-btn--primary">
+						<?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+					</button>
+				</div>
+			</header>
 
 			<?php if ( $saved ) : ?>
-				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'site-essentials' ); ?></p></div>
+				<div class="scos-notice scos-notice--success">
+					<p><?php esc_html_e( 'Settings saved.', 'site-essentials' ); ?></p>
+				</div>
 			<?php endif; ?>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'scos_ca_integrations_save', 'scos_ca_int_nonce' ); ?>
-				<input type="hidden" name="action" value="scos_save_ca_integrations">
+			<div class="scos-card">
+				<div class="scos-card__header">
+					<span class="scos-card__title"><?php esc_html_e( 'Airtable CAR Sync', 'site-essentials' ); ?></span>
+					<span class="scos-card__desc"><?php esc_html_e( 'Sync Content Architecture Records (Clusters, Topics, Content) to Airtable. Settings are stored under scos_car_* option keys. Recommended sync order: 1) ALTC Clusters → 2) Topics → 3) Content.', 'site-essentials' ); ?></span>
+				</div>
 
-				<h2><?php esc_html_e( 'Airtable CAR Sync', 'site-essentials' ); ?></h2>
-				<p class="description" style="margin-bottom:18px;max-width:700px;">
-					<?php esc_html_e( 'Sync Content Architecture Records (Clusters, Topics, Content) to Airtable. Settings are stored under scos_car_* option keys. Recommended sync order: 1) ALTC Clusters → 2) Topics → 3) Content.', 'site-essentials' ); ?>
-				</p>
+				<form id="scos-ca-int-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<?php wp_nonce_field( 'scos_ca_integrations_save', 'scos_ca_int_nonce' ); ?>
+					<input type="hidden" name="action" value="scos_save_ca_integrations">
 
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="scos_car_airtable_token"><?php esc_html_e( 'API Token', 'site-essentials' ); ?></label>
-						</th>
-						<td>
-							<input type="text" id="scos_car_airtable_token" name="scos_car_airtable_token"
-								value="<?php echo esc_attr( $token ); ?>"
-								class="regular-text code" style="width:100%;max-width:560px;"
-								placeholder="Bearer pat..." autocomplete="off" />
-							<p class="description">
-								<?php esc_html_e( 'Your Airtable Personal Access Token.', 'site-essentials' ); ?>
-								<a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">
-									<?php esc_html_e( 'Airtable → Developer → Personal Access Tokens', 'site-essentials' ); ?>
-								</a>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="scos_car_airtable_base_id"><?php esc_html_e( 'Base ID', 'site-essentials' ); ?></label>
-						</th>
-						<td>
-							<input type="text" id="scos_car_airtable_base_id" name="scos_car_airtable_base_id"
-								value="<?php echo esc_attr( $base_id ); ?>"
-								class="regular-text code" style="width:100%;max-width:560px;"
-								placeholder="appOqcQR79umbJJGP" />
-							<p class="description">
-								<?php esc_html_e( 'Found in the Airtable API docs URL (appXXXXXXXXXXXXXX).', 'site-essentials' ); ?>
-								<a href="https://airtable.com/api" target="_blank" rel="noopener"><?php esc_html_e( 'Open API docs →', 'site-essentials' ); ?></a>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="scos_car_airtable_table_id"><?php esc_html_e( 'Content Table ID', 'site-essentials' ); ?></label>
-						</th>
-						<td>
-							<input type="text" id="scos_car_airtable_table_id" name="scos_car_airtable_table_id"
-								value="<?php echo esc_attr( $table_id ); ?>"
-								class="regular-text code" style="width:100%;max-width:560px;"
-								placeholder="tblXXXXXXXXXXXXXX" />
-							<p class="description"><?php esc_html_e( 'Main content/posts table. Use Table ID from API docs (more stable than name).', 'site-essentials' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="scos_car_airtable_altc_id"><?php esc_html_e( 'ALTC Clusters Table ID', 'site-essentials' ); ?></label>
-						</th>
-						<td>
-							<input type="text" id="scos_car_airtable_altc_id" name="scos_car_airtable_altc_id"
-								value="<?php echo esc_attr( $altc_id ); ?>"
-								class="regular-text code" style="width:100%;max-width:560px;"
-								placeholder="tblXXXXXXXXXXXXXX" />
-							<p class="description"><?php esc_html_e( 'Strategic Lens / ALTC clusters table. Terms sync on save; stores Airtable record ID in term meta for linked records.', 'site-essentials' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="scos_car_airtable_topics_id"><?php esc_html_e( 'Topics Table ID', 'site-essentials' ); ?></label>
-						</th>
-						<td>
-							<input type="text" id="scos_car_airtable_topics_id" name="scos_car_airtable_topics_id"
-								value="<?php echo esc_attr( $topics_id ); ?>"
-								class="regular-text code" style="width:100%;max-width:560px;"
-								placeholder="tblXXXXXXXXXXXXXX" />
-							<p class="description"><?php esc_html_e( 'Topics table. Terms sync on save; stores Airtable record ID in term meta for linked records in Content.', 'site-essentials' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Bulk Sync', 'site-essentials' ); ?></th>
-						<td>
-							<p class="description" style="margin-bottom:8px;"><?php esc_html_e( 'Sync all data to Airtable in the correct order: ALTC Clusters → Topics → Content (phase 1: static) → Content (phase 2: links).', 'site-essentials' ); ?></p>
-							<button type="button" id="scos-airtable-seed-bulk" class="button button-secondary">
-								<?php esc_html_e( 'Seed Airtable — Sync All', 'site-essentials' ); ?>
-							</button>
-							<span id="scos-airtable-seed-status" style="margin-left:12px;font-family:monospace;font-size:12px;color:#555;"></span>
-							<?php wp_nonce_field( 'bw_airtable_seed_bulk', 'bw_airtable_seed_nonce', false ); ?>
-						</td>
-					</tr>
-				</table>
+					<div class="scos-card__body">
+						<table class="scos-form">
+							<tbody>
+								<tr>
+									<th>
+										<label for="scos_car_airtable_token"><?php esc_html_e( 'API Token', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">scos_car_airtable_token</div>
+									</th>
+									<td>
+										<input type="text" id="scos_car_airtable_token" name="scos_car_airtable_token"
+											value="<?php echo esc_attr( $token ); ?>"
+											class="scos-input scos-input--mono"
+											placeholder="Bearer pat..." autocomplete="off" />
+										<p class="description">
+											<?php esc_html_e( 'Your Airtable Personal Access Token.', 'site-essentials' ); ?>
+											<a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">
+												<?php esc_html_e( 'Airtable → Developer → Personal Access Tokens', 'site-essentials' ); ?>
+											</a>
+										</p>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<label for="scos_car_airtable_base_id"><?php esc_html_e( 'Base ID', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">scos_car_airtable_base_id</div>
+									</th>
+									<td>
+										<input type="text" id="scos_car_airtable_base_id" name="scos_car_airtable_base_id"
+											value="<?php echo esc_attr( $base_id ); ?>"
+											class="scos-input scos-input--mono"
+											placeholder="appOqcQR79umbJJGP" />
+										<p class="description">
+											<?php esc_html_e( 'Found in the Airtable API docs URL (appXXXXXXXXXXXXXX).', 'site-essentials' ); ?>
+											<a href="https://airtable.com/api" target="_blank" rel="noopener"><?php esc_html_e( 'Open API docs →', 'site-essentials' ); ?></a>
+										</p>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<label for="scos_car_airtable_table_id"><?php esc_html_e( 'Content Table ID', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">scos_car_airtable_table_id</div>
+									</th>
+									<td>
+										<input type="text" id="scos_car_airtable_table_id" name="scos_car_airtable_table_id"
+											value="<?php echo esc_attr( $table_id ); ?>"
+											class="scos-input scos-input--mono"
+											placeholder="tblXXXXXXXXXXXXXX" />
+										<p class="description"><?php esc_html_e( 'Main content/posts table. Use Table ID from API docs (more stable than name).', 'site-essentials' ); ?></p>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<label for="scos_car_airtable_altc_id"><?php esc_html_e( 'ALTC Clusters Table ID', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">scos_car_airtable_altc_id</div>
+									</th>
+									<td>
+										<input type="text" id="scos_car_airtable_altc_id" name="scos_car_airtable_altc_id"
+											value="<?php echo esc_attr( $altc_id ); ?>"
+											class="scos-input scos-input--mono"
+											placeholder="tblXXXXXXXXXXXXXX" />
+										<p class="description"><?php esc_html_e( 'Strategic Lens / ALTC clusters table. Terms sync on save; stores Airtable record ID in term meta for linked records.', 'site-essentials' ); ?></p>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<label for="scos_car_airtable_topics_id"><?php esc_html_e( 'Topics Table ID', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">scos_car_airtable_topics_id</div>
+									</th>
+									<td>
+										<input type="text" id="scos_car_airtable_topics_id" name="scos_car_airtable_topics_id"
+											value="<?php echo esc_attr( $topics_id ); ?>"
+											class="scos-input scos-input--mono"
+											placeholder="tblXXXXXXXXXXXXXX" />
+										<p class="description"><?php esc_html_e( 'Topics table. Terms sync on save; stores Airtable record ID in term meta for linked records in Content.', 'site-essentials' ); ?></p>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<?php esc_html_e( 'Bulk Sync', 'site-essentials' ); ?>
+									</th>
+									<td>
+										<p class="description"><?php esc_html_e( 'Sync all data to Airtable in the correct order: ALTC Clusters → Topics → Content (phase 1: static) → Content (phase 2: links).', 'site-essentials' ); ?></p>
+										<div style="display:flex;align-items:center;flex-wrap:wrap;gap:var(--scos-s-3);margin-top:var(--scos-s-2)">
+											<button type="button" id="scos-airtable-seed-bulk" class="scos-btn scos-btn--ghost">
+												<?php esc_html_e( 'Seed Airtable — Sync All', 'site-essentials' ); ?>
+											</button>
+											<span id="scos-airtable-seed-status" class="scos-form__slug"></span>
+										</div>
+										<?php wp_nonce_field( 'bw_airtable_seed_bulk', 'bw_airtable_seed_nonce', false ); ?>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
 
-				<?php submit_button( __( 'Save Settings', 'site-essentials' ) ); ?>
-			</form>
+					<div class="scos-card__footer">
+						<button type="submit" class="scos-btn scos-btn--primary">
+							<?php esc_html_e( 'Save Settings', 'site-essentials' ); ?>
+						</button>
+					</div>
+				</form>
+			</div>
+
 		</div>
 		<script>
 		jQuery(document).ready(function($){

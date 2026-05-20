@@ -5,12 +5,18 @@
  * Migrates legacy brighter-core (bw_* / altc_* / _seopress_*) fields to
  * the new site-essentials scos_* meta keys and taxonomies.
  *
- * Place in the mu-plugins root. REMOVE THIS FILE once migration is complete.
+ * ARCHIVED — do not deploy. See archive/ARCHIVE.txt and scos-migration.php stub at repo root.
  *
  * @package BrighterWebsites
  */
 
 defined( 'ABSPATH' ) || exit;
+
+// Deprecated — reference only. Do not copy to mu-plugins. Emergency re-run: define
+// SCOS_MIGRATION_FORCE_LEGACY as true before requiring this file.
+if ( ! defined( 'SCOS_MIGRATION_FORCE_LEGACY' ) || ! SCOS_MIGRATION_FORCE_LEGACY ) {
+	return;
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Boot

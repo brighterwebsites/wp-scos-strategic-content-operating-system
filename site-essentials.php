@@ -239,6 +239,7 @@ add_action(
 	static function () {
 		\SiteEssentials\Modules\SeoMeta\Redirections::register_misc_http_filters();
 		\SiteEssentials\Modules\SeoMeta\Breakdance_Editor_Guard::init();
+		\SiteEssentials\Core\Migration_Deprecated::init();
 	},
 	6
 );

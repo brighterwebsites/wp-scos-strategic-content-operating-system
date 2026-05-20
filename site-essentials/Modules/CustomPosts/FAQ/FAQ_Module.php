@@ -15,11 +15,12 @@
  *                 scos_faq_topic_redirect, scos_faq_rewrite_version
  *   Block:        brighter/faq-selector (name retained for backward
  *                 compatibility with existing post_content references)
+ *   Breakdance:    bd_brighter_elements_faq_post_type → POST_TYPE (faq)
  *   REST routes:  site-essentials/v1/faqs       (editor only — current_user_can edit_posts)
  *                 brighter-core/v1/faqs         (token-auth, owned by brighter-core API
  *                                                — still used by external GPT/MCP/Postly)
  *
- * v1.0 | 2026-05-19
+ * v1.1 | 2026-05-21
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -91,6 +92,9 @@ class FAQ_Module {
 		// ── Shortcode ─────────────────────────────────────────────────────────
 		add_shortcode( 'faqs', [ self::class, 'shortcode' ] );
 
+		// Breakdance Brighter Elements FAQ block — post type slug for FAQ queries.
+		add_filter( 'bd_brighter_elements_faq_post_type', [ self::class, 'breakdance_faq_post_type' ] );
+
 		if ( is_admin() ) {
 			add_action( 'add_meta_boxes',                 [ self::class, 'register_meta_boxes' ], 20 );
 			add_action( 'save_post_faq',                  [ self::class, 'save_meta' ],          20 );
@@ -107,6 +111,16 @@ class FAQ_Module {
 
 		require_once __DIR__ . '/FAQ_Schema_Graph.php';
 		FAQ_Schema_Graph::register();
+	}
+
+	/**
+	 * Post type slug for Breakdance Brighter Elements FAQ custom block.
+	 *
+	 * @since 1.1.0
+	 * @return string
+	 */
+	public static function breakdance_faq_post_type(): string {
+		return self::POST_TYPE;
 	}
 
 	// =========================================================================

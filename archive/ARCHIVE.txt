@@ -1,10 +1,13 @@
-SCOS Field Migration (legacy)
------------------------------
-File: scos-migration.php
+SCOS Field Migration (retired)
+------------------------------
+Files: archive/scos-migration.php (full script, reference only)
+       scos-migration.php at repo root (deprecated stub — deploys with MU package)
 
-One-time mu-plugin to migrate bw_* / altc_* / _seopress_* data to scos_* keys.
-Not loaded automatically. To run on a site, copy scos-migration.php from this
-folder to wp-content/mu-plugins/ (next to site-essentials.php), use Tools →
-SCOS Migration in wp-admin, then remove the copy from mu-plugins.
+All client sites are migrated. The Tools → SCOS Migration screen is retired:
+- site-essentials/Core/Migration_Deprecated.php removes the menu and blocks POSTs
+- Root scos-migration.php is a no-op stub (replaces the old standalone mu-plugin)
 
-Do not commit live migration results; this copy is for reference and rare re-runs.
+Emergency re-run only: copy archive/scos-migration.php and define
+SCOS_MIGRATION_FORCE_LEGACY true before it loads (not supported in production).
+
+Remove scos-migration.php from mu-plugins on each server when convenient.

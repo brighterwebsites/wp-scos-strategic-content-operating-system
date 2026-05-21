@@ -20,7 +20,12 @@ for ( $i = 1; $i <= 6; $i++ ) {
 	$title = get_option( "se_support_tool_{$i}_title", '' );
 	$url   = get_option( "se_support_tool_{$i}_url", '' );
 	if ( $title && $url ) {
-		$tools[] = [ 'title' => $title, 'url' => $url ];
+		$tools[] = [
+			'title'       => $title,
+			'url'         => $url,
+			'description' => get_option( "se_support_tool_{$i}_description", '' ),
+			'highlight'   => (bool) get_option( "se_support_tool_{$i}_highlight", 0 ),
+		];
 	}
 }
 
@@ -30,7 +35,12 @@ for ( $i = 1; $i <= 4; $i++ ) {
 	$title = get_option( "se_support_ai_{$i}_title", '' );
 	$url   = get_option( "se_support_ai_{$i}_url", '' );
 	if ( $title && $url ) {
-		$ai_tools[] = [ 'title' => $title, 'url' => $url ];
+		$ai_tools[] = [
+			'title'       => $title,
+			'url'         => $url,
+			'description' => get_option( "se_support_ai_{$i}_description", '' ),
+			'highlight'   => (bool) get_option( "se_support_ai_{$i}_highlight", 0 ),
+		];
 	}
 }
 
@@ -70,8 +80,11 @@ $agency_url   = get_option( 'se_agency_url', '' );
 		<a href="<?php echo esc_url( $tool['url'] ); ?>"
 		   target="_blank"
 		   rel="noopener noreferrer"
-		   class="scos-support__tile">
-			<?php echo esc_html( $tool['title'] ); ?>
+		   class="scos-support__tile<?php echo ! empty( $tool['highlight'] ) ? ' scos-support__tile--highlight' : ''; ?>">
+			<span class="scos-support__tile-title"><?php echo esc_html( $tool['title'] ); ?></span>
+			<?php if ( ! empty( $tool['description'] ) ) : ?>
+				<span class="scos-support__tile-desc"><?php echo esc_html( $tool['description'] ); ?></span>
+			<?php endif; ?>
 		</a>
 		<?php endforeach; ?>
 	</div>
@@ -85,8 +98,11 @@ $agency_url   = get_option( 'se_agency_url', '' );
 		<a href="<?php echo esc_url( $tool['url'] ); ?>"
 		   target="_blank"
 		   rel="noopener noreferrer"
-		   class="scos-support__tile">
-			<?php echo esc_html( $tool['title'] ); ?>
+		   class="scos-support__tile<?php echo ! empty( $tool['highlight'] ) ? ' scos-support__tile--highlight' : ''; ?>">
+			<span class="scos-support__tile-title"><?php echo esc_html( $tool['title'] ); ?></span>
+			<?php if ( ! empty( $tool['description'] ) ) : ?>
+				<span class="scos-support__tile-desc"><?php echo esc_html( $tool['description'] ); ?></span>
+			<?php endif; ?>
 		</a>
 		<?php endforeach; ?>
 	</div>

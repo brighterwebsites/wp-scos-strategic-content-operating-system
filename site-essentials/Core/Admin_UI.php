@@ -635,11 +635,15 @@ class Admin_UI {
             for ( $i = 1; $i <= 6; $i++ ) {
                 update_option( "se_support_tool_{$i}_title", sanitize_text_field( wp_unslash( $_POST["se_support_tool_{$i}_title"] ?? '' ) ) );
                 update_option( "se_support_tool_{$i}_url",   esc_url_raw( wp_unslash( $_POST["se_support_tool_{$i}_url"] ?? '' ) ) );
+                update_option( "se_support_tool_{$i}_description", sanitize_textarea_field( wp_unslash( $_POST["se_support_tool_{$i}_description"] ?? '' ) ) );
+                update_option( "se_support_tool_{$i}_highlight", isset( $_POST["se_support_tool_{$i}_highlight"] ) ? 1 : 0 );
             }
             // AI tool links — 4 slots
             for ( $i = 1; $i <= 4; $i++ ) {
                 update_option( "se_support_ai_{$i}_title", sanitize_text_field( wp_unslash( $_POST["se_support_ai_{$i}_title"] ?? '' ) ) );
                 update_option( "se_support_ai_{$i}_url",   esc_url_raw( wp_unslash( $_POST["se_support_ai_{$i}_url"] ?? '' ) ) );
+                update_option( "se_support_ai_{$i}_description", sanitize_textarea_field( wp_unslash( $_POST["se_support_ai_{$i}_description"] ?? '' ) ) );
+                update_option( "se_support_ai_{$i}_highlight", isset( $_POST["se_support_ai_{$i}_highlight"] ) ? 1 : 0 );
             }
             // Third-party scripts — stored verbatim (manage_options only); sanitize_textarea_field
             // would strip <script> tags, so we use wp_unslash + trim for code fields.

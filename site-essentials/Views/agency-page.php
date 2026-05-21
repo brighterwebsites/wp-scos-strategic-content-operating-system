@@ -323,32 +323,58 @@ $page_url = admin_url( 'admin.php' );
 						];
 						for ( $i = 1; $i <= 6; $i++ ) :
 						?>
-						<div class="scos-metabox__row scos-metabox__row--inline">
-							<div>
-								<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_title">
-									<?php /* translators: %d slot number */ ?>
-									<?php echo esc_html( sprintf( __( 'Tool %d — Title', 'site-essentials' ), $i ) ); ?>
-								</label>
-								<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_title</div>
-								<input type="text"
-									id="se_support_tool_<?php echo esc_attr( $i ); ?>_title"
-									name="se_support_tool_<?php echo esc_attr( $i ); ?>_title"
-									class="scos-input"
-									value="<?php echo esc_attr( get_option( "se_support_tool_{$i}_title", '' ) ); ?>"
-									placeholder="<?php echo esc_attr( $tool_placeholders[ $i ]['title'] ); ?>" />
+						<div class="scos-support-slot">
+							<div class="scos-metabox__row scos-metabox__row--inline">
+								<div>
+									<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_title">
+										<?php /* translators: %d slot number */ ?>
+										<?php echo esc_html( sprintf( __( 'Tool %d — Title', 'site-essentials' ), $i ) ); ?>
+									</label>
+									<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_title</div>
+									<input type="text"
+										id="se_support_tool_<?php echo esc_attr( $i ); ?>_title"
+										name="se_support_tool_<?php echo esc_attr( $i ); ?>_title"
+										class="scos-input"
+										value="<?php echo esc_attr( get_option( "se_support_tool_{$i}_title", '' ) ); ?>"
+										placeholder="<?php echo esc_attr( $tool_placeholders[ $i ]['title'] ); ?>" />
+								</div>
+								<div>
+									<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_url">
+										<?php echo esc_html( sprintf( __( 'Tool %d — URL', 'site-essentials' ), $i ) ); ?>
+									</label>
+									<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_url</div>
+									<input type="url"
+										id="se_support_tool_<?php echo esc_attr( $i ); ?>_url"
+										name="se_support_tool_<?php echo esc_attr( $i ); ?>_url"
+										class="scos-input"
+										value="<?php echo esc_url( get_option( "se_support_tool_{$i}_url", '' ) ); ?>"
+										placeholder="<?php echo esc_attr( $tool_placeholders[ $i ]['url'] ); ?>" />
+								</div>
 							</div>
-							<div>
-								<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_url">
-									<?php echo esc_html( sprintf( __( 'Tool %d — URL', 'site-essentials' ), $i ) ); ?>
+							<div class="scos-metabox__row">
+								<label for="se_support_tool_<?php echo esc_attr( $i ); ?>_description">
+									<?php echo esc_html( sprintf( __( 'Tool %d — Description', 'site-essentials' ), $i ) ); ?>
 								</label>
-								<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_url</div>
-								<input type="url"
-									id="se_support_tool_<?php echo esc_attr( $i ); ?>_url"
-									name="se_support_tool_<?php echo esc_attr( $i ); ?>_url"
-									class="scos-input"
-									value="<?php echo esc_url( get_option( "se_support_tool_{$i}_url", '' ) ); ?>"
-									placeholder="<?php echo esc_attr( $tool_placeholders[ $i ]['url'] ); ?>" />
+								<div class="scos-form__slug">se_support_tool_<?php echo esc_attr( $i ); ?>_description</div>
+								<p class="scos-metabox__hint"><?php esc_html_e( 'Shown below the card heading on the Support page.', 'site-essentials' ); ?></p>
+								<textarea
+									id="se_support_tool_<?php echo esc_attr( $i ); ?>_description"
+									name="se_support_tool_<?php echo esc_attr( $i ); ?>_description"
+									class="scos-textarea"
+									rows="2"><?php echo esc_textarea( get_option( "se_support_tool_{$i}_description", '' ) ); ?></textarea>
 							</div>
+							<label class="scos-checkbox-row">
+								<input type="checkbox"
+									id="se_support_tool_<?php echo esc_attr( $i ); ?>_highlight"
+									name="se_support_tool_<?php echo esc_attr( $i ); ?>_highlight"
+									value="1"
+									<?php checked( get_option( "se_support_tool_{$i}_highlight", 0 ), 1 ); ?> />
+								<span>
+									<?php esc_html_e( 'Highlight', 'site-essentials' ); ?>
+									<span class="scos-form__slug" style="display:inline;margin-left:var(--scos-s-2)">se_support_tool_<?php echo esc_attr( $i ); ?>_highlight</span>
+								</span>
+							</label>
+							<p class="scos-metabox__hint"><?php esc_html_e( 'Adds a purple accent border on the Support page card.', 'site-essentials' ); ?></p>
 						</div>
 						<?php endfor; ?>
 					</div>
@@ -370,31 +396,57 @@ $page_url = admin_url( 'admin.php' );
 						];
 						for ( $i = 1; $i <= 4; $i++ ) :
 						?>
-						<div class="scos-metabox__row scos-metabox__row--inline">
-							<div>
-								<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_title">
-									<?php echo esc_html( sprintf( __( 'AI tool %d — Title', 'site-essentials' ), $i ) ); ?>
-								</label>
-								<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_title</div>
-								<input type="text"
-									id="se_support_ai_<?php echo esc_attr( $i ); ?>_title"
-									name="se_support_ai_<?php echo esc_attr( $i ); ?>_title"
-									class="scos-input"
-									value="<?php echo esc_attr( get_option( "se_support_ai_{$i}_title", '' ) ); ?>"
-									placeholder="<?php echo esc_attr( $ai_placeholders[ $i ] ); ?>" />
+						<div class="scos-support-slot">
+							<div class="scos-metabox__row scos-metabox__row--inline">
+								<div>
+									<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_title">
+										<?php echo esc_html( sprintf( __( 'AI tool %d — Title', 'site-essentials' ), $i ) ); ?>
+									</label>
+									<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_title</div>
+									<input type="text"
+										id="se_support_ai_<?php echo esc_attr( $i ); ?>_title"
+										name="se_support_ai_<?php echo esc_attr( $i ); ?>_title"
+										class="scos-input"
+										value="<?php echo esc_attr( get_option( "se_support_ai_{$i}_title", '' ) ); ?>"
+										placeholder="<?php echo esc_attr( $ai_placeholders[ $i ] ); ?>" />
+								</div>
+								<div>
+									<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_url">
+										<?php echo esc_html( sprintf( __( 'AI tool %d — URL', 'site-essentials' ), $i ) ); ?>
+									</label>
+									<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_url</div>
+									<input type="url"
+										id="se_support_ai_<?php echo esc_attr( $i ); ?>_url"
+										name="se_support_ai_<?php echo esc_attr( $i ); ?>_url"
+										class="scos-input"
+										value="<?php echo esc_url( get_option( "se_support_ai_{$i}_url", '' ) ); ?>"
+										placeholder="https://" />
+								</div>
 							</div>
-							<div>
-								<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_url">
-									<?php echo esc_html( sprintf( __( 'AI tool %d — URL', 'site-essentials' ), $i ) ); ?>
+							<div class="scos-metabox__row">
+								<label for="se_support_ai_<?php echo esc_attr( $i ); ?>_description">
+									<?php echo esc_html( sprintf( __( 'AI tool %d — Description', 'site-essentials' ), $i ) ); ?>
 								</label>
-								<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_url</div>
-								<input type="url"
-									id="se_support_ai_<?php echo esc_attr( $i ); ?>_url"
-									name="se_support_ai_<?php echo esc_attr( $i ); ?>_url"
-									class="scos-input"
-									value="<?php echo esc_url( get_option( "se_support_ai_{$i}_url", '' ) ); ?>"
-									placeholder="https://" />
+								<div class="scos-form__slug">se_support_ai_<?php echo esc_attr( $i ); ?>_description</div>
+								<p class="scos-metabox__hint"><?php esc_html_e( 'Shown below the card heading on the Support page.', 'site-essentials' ); ?></p>
+								<textarea
+									id="se_support_ai_<?php echo esc_attr( $i ); ?>_description"
+									name="se_support_ai_<?php echo esc_attr( $i ); ?>_description"
+									class="scos-textarea"
+									rows="2"><?php echo esc_textarea( get_option( "se_support_ai_{$i}_description", '' ) ); ?></textarea>
 							</div>
+							<label class="scos-checkbox-row">
+								<input type="checkbox"
+									id="se_support_ai_<?php echo esc_attr( $i ); ?>_highlight"
+									name="se_support_ai_<?php echo esc_attr( $i ); ?>_highlight"
+									value="1"
+									<?php checked( get_option( "se_support_ai_{$i}_highlight", 0 ), 1 ); ?> />
+								<span>
+									<?php esc_html_e( 'Highlight', 'site-essentials' ); ?>
+									<span class="scos-form__slug" style="display:inline;margin-left:var(--scos-s-2)">se_support_ai_<?php echo esc_attr( $i ); ?>_highlight</span>
+								</span>
+							</label>
+							<p class="scos-metabox__hint"><?php esc_html_e( 'Adds a purple accent border on the Support page card.', 'site-essentials' ); ?></p>
 						</div>
 						<?php endfor; ?>
 					</div>

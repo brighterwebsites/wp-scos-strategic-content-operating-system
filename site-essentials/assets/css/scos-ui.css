@@ -458,6 +458,17 @@ textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); li
   margin: 0 0 var(--scos-s-2);
 }
 
+.scos-support-slot {
+  padding-bottom: var(--scos-s-4);
+  margin-bottom: var(--scos-s-4);
+  border-bottom: 1px solid var(--scos-divider);
+}
+.scos-support-slot:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
 .scos-support__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -473,13 +484,37 @@ textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); li
   color: inherit;
   display: flex;
   flex-direction: column;
-  gap: var(--scos-s-3);
+  gap: var(--scos-s-2);
   transition: border-color .12s, transform .12s, box-shadow .12s;
+}
+.scos-support__tile-title {
+  font-size: var(--scos-fs-lg);
+  font-weight: 600;
+  color: var(--scos-ink);
+  line-height: 1.35;
+}
+.scos-support__tile-desc {
+  font-size: var(--scos-fs-md);
+  color: var(--scos-ink-subtle);
+  line-height: 1.5;
+}
+.scos-support__tile--highlight {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--scos-surface), var(--scos-surface)) padding-box,
+    linear-gradient(135deg, var(--scos-accent) 0%, #6d28d9 100%) border-box;
+  box-shadow: var(--scos-shadow-sm);
+}
+.scos-support__tile--highlight:hover {
+  box-shadow: var(--scos-shadow-md);
 }
 .scos-support__tile:hover {
   border-color: var(--scos-accent-border);
   transform: translateY(-1px);
   box-shadow: var(--scos-shadow-md);
+}
+.scos-support__tile--highlight:hover {
+  border-color: transparent;
 }
 .scos-support__tile-icon {
   width: 36px; height: 36px;

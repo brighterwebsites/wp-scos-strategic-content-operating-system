@@ -17,7 +17,7 @@
  *
  * @package    BrighterCore
  * @subpackage Schema
- * @version    1.0.0
+ * @version    1.1 | 2026-05-22
  * @since      1.0.0
  */
 
@@ -790,11 +790,6 @@ function bw_render_schema_graph() {
         // Add reading time if available (ISO 8601 duration format)
         if ($reading_time > 0) {
             $article["timeRequired"] = "PT{$reading_time}M"; // e.g., PT7M
-            $article["additionalProperty"] = [
-                "@type" => "PropertyValue",
-                "name" => "reading_time_minutes",
-                "value" => $reading_time
-            ];
         }
         
         // Add optional fields if available
@@ -919,11 +914,6 @@ function bw_render_schema_graph() {
         // Add reading time if available
         if ($reading_time > 0) {
             $news_article["timeRequired"] = "PT{$reading_time}M";
-            $news_article["additionalProperty"] = [
-                "@type" => "PropertyValue",
-                "name" => "reading_time_minutes",
-                "value" => $reading_time
-            ];
         }
         
         // Add optional fields

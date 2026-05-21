@@ -23,6 +23,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
+ * @version    1.1 | 2026-05-22
  * @since      1.0.0
  */
 
@@ -344,9 +345,9 @@ class Head_Output {
 	}
 
 	/**
-	 * Output archive description, canonical, and OG image.
+	 * Output meta description, canonical, and full Open Graph block for archives.
 	 *
-	 * @param string $slug Archive slug.
+	 * @param string $slug Archive slug (from archive_slug()).
 	 */
 	private static function output_archive_meta( string $slug ): void {
 		$settings = Archive_Settings::get( $slug );
@@ -355,21 +356,61 @@ class Head_Output {
 		echo "\n<!-- SCOS SEO Meta (archive) -->\n";
 
 		// ── Meta description ─────────────────────────────────────────────────
+		$desc = '';
 		if ( ! empty( $settings['description'] ) ) {
 			$desc = Archive_Settings::parse_tokens( $settings['description'], $slug, $paged );
-			if ( '' !== $desc ) {
-				echo '<meta name="description" content="' . esc_attr( $desc ) . '" />' . "\n";
-			}
+		}
+		if ( '' !== $desc ) {
+			echo '<meta name="description" content="' . esc_attr( $desc ) . '" />' . "\n";
 		}
 
 		// ── Canonical ────────────────────────────────────────────────────────
-		$base_url = self::archive_base_url( $slug );
+		$base_url  = self::archive_base_url( $slug );
+		$canonical = '';
 
 		if ( ! empty( $base_url ) ) {
 			$canonical = ( $settings['canonical_paged'] && $paged > 1 )
 				? get_pagenum_link( $paged )
 				: $base_url;
 			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+		}
+
+		// ── Open Graph ───────────────────────────────────────────────────────
+		$og_locale    = str_replace( '-', '_', (string) get_locale() ) ?: 'en_AU';
+		$og_site_name = get_bloginfo( 'name' );
+
+		// og:url — canonical if set, else base, else current request URL
+		if ( ! empty( $canonical ) ) {
+			$og_url = $canonical;
+		} elseif ( ! empty( $base_url ) ) {
+			$og_url = $base_url;
+		} elseif ( is_search() ) {
+			$og_url = get_search_link( get_search_query() );
+		} else {
+			$og_url = home_url( '/' );
+		}
+
+		// og:title — from settings (with tokens), else clean fallback (no site suffix)
+		$og_title = ! empty( $settings['title'] )
+			? Archive_Settings::parse_tokens( $settings['title'], $slug, $paged )
+			: self::archive_og_title_fallback( $slug );
+
+		echo '<meta property="og:type" content="website" />' . "\n";
+		echo '<meta property="og:url" content="' . esc_url( $og_url ) . '" />' . "\n";
+		echo '<meta property="og:site_name" content="' . esc_attr( $og_site_name ) . '" />' . "\n";
+		echo '<meta property="og:locale" content="' . esc_attr( $og_locale ) . '" />' . "\n";
+
+		if ( ! empty( $og_title ) ) {
+			echo '<meta property="og:title" content="' . esc_attr( $og_title ) . '" />' . "\n";
+		}
+		if ( '' !== $desc ) {
+			echo '<meta property="og:description" content="' . esc_attr( $desc ) . '" />' . "\n";
+		}
+
+		// og:updated_time — most recently modified post in this archive context
+		$updated_time = self::archive_last_modified( $slug );
+		if ( ! empty( $updated_time ) ) {
+			echo '<meta property="og:updated_time" content="' . esc_attr( $updated_time ) . '" />' . "\n";
 		}
 
 		// ── OG image ─────────────────────────────────────────────────────────
@@ -389,6 +430,122 @@ class Head_Output {
 		}
 
 		echo "<!-- /SCOS SEO Meta (archive) -->\n\n";
+	}
+
+	/**
+	 * Return a clean OG title for archive contexts — no site-name suffix.
+	 *
+	 * @param  string $slug Archive slug.
+	 * @return string
+	 */
+	private static function archive_og_title_fallback( string $slug ): string {
+		switch ( $slug ) {
+			case 'post':
+				$blog_page_id = (int) get_option( 'page_for_posts' );
+				return $blog_page_id ? get_the_title( $blog_page_id ) : __( 'Blog', 'site-essentials' );
+
+			case 'author':
+				$obj = get_queried_object();
+				return ( $obj instanceof \WP_User ) ? $obj->display_name : '';
+
+			case 'date':
+				if ( is_year() ) {
+					return (string) get_query_var( 'year' );
+				}
+				if ( is_month() ) {
+					return (string) get_the_date( 'F Y' );
+				}
+				if ( is_day() ) {
+					return (string) get_the_date( 'F j, Y' );
+				}
+				return '';
+
+			case 'search':
+				/* translators: %s: search query string */
+				return sprintf( __( 'Search results for: %s', 'site-essentials' ), get_search_query() );
+
+			case '404':
+				return __( 'Page not found', 'site-essentials' );
+
+			default:
+				// Taxonomy term archive
+				if ( taxonomy_exists( $slug ) ) {
+					$term = get_queried_object();
+					return ( $term instanceof \WP_Term ) ? $term->name : '';
+				}
+				// CPT archive
+				$label = post_type_archive_title( '', false );
+				return is_string( $label ) ? $label : '';
+		}
+	}
+
+	/**
+	 * Return the ISO 8601 date of the most recently modified post in the current
+	 * archive context — used for og:updated_time.
+	 *
+	 * Returns empty string for contexts where a date is not meaningful (search, 404,
+	 * date archives) or when no published posts are found.
+	 *
+	 * @param  string $slug Archive slug.
+	 * @return string ISO 8601 date, or ''.
+	 */
+	private static function archive_last_modified( string $slug ): string {
+		global $wpdb;
+
+		switch ( $slug ) {
+			case 'post':
+				$date = $wpdb->get_var(
+					"SELECT post_modified_gmt FROM {$wpdb->posts}
+					WHERE post_type = 'post' AND post_status = 'publish'
+					ORDER BY post_modified_gmt DESC LIMIT 1"
+				);
+				break;
+
+			case 'author':
+				$author_id = (int) get_queried_object_id();
+				if ( ! $author_id ) {
+					return '';
+				}
+				$date = $wpdb->get_var( $wpdb->prepare(
+					"SELECT post_modified_gmt FROM {$wpdb->posts}
+					WHERE post_type = 'post' AND post_status = 'publish' AND post_author = %d
+					ORDER BY post_modified_gmt DESC LIMIT 1",
+					$author_id
+				) );
+				break;
+
+			case 'search':
+			case '404':
+			case 'date':
+				return '';
+
+			default:
+				if ( taxonomy_exists( $slug ) ) {
+					$term = get_queried_object();
+					if ( ! ( $term instanceof \WP_Term ) ) {
+						return '';
+					}
+					$date = $wpdb->get_var( $wpdb->prepare(
+						"SELECT p.post_modified_gmt
+						FROM {$wpdb->posts} p
+						INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
+						INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+						WHERE tt.term_id = %d AND p.post_status = 'publish'
+						ORDER BY p.post_modified_gmt DESC LIMIT 1",
+						$term->term_id
+					) );
+				} else {
+					// CPT archive
+					$date = $wpdb->get_var( $wpdb->prepare(
+						"SELECT post_modified_gmt FROM {$wpdb->posts}
+						WHERE post_type = %s AND post_status = 'publish'
+						ORDER BY post_modified_gmt DESC LIMIT 1",
+						$slug
+					) );
+				}
+		}
+
+		return ( ! empty( $date ) ) ? mysql2date( 'c', $date, false ) : '';
 	}
 
 	// ── Rel prev / next ───────────────────────────────────────────────────────

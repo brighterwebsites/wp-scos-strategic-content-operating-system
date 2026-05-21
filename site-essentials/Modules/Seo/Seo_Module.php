@@ -7,7 +7,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.0.0
+ * @version    1.1 | 2026-05-22
  * @since      1.0.0
  */
 
@@ -398,7 +398,8 @@ class Seo_Module implements Module_Interface {
         $post_type_obj = get_post_type_object($post_type);
         if ($post_type_obj && $post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
             $archive_url = get_post_type_archive_link($post_type);
-            if ($archive_url) {
+            // WooCommerce (and similar) use a Page as the archive URL — already in sitemap-page.xml
+            if ($archive_url && ! $this->archive_url_is_existing_page($archive_url)) {
                 $last_modified = $this->get_post_type_last_modified($post_type);
 
                 $xml .= "\t<url>\n";
@@ -511,6 +512,22 @@ class Seo_Module implements Module_Interface {
         $xml .= "\t</url>\n";
 
         return $xml;
+    }
+
+    /**
+     * Whether a CPT archive URL resolves to an existing Page post.
+     *
+     * WooCommerce shop (and similar plugins) assign a WordPress Page as the
+     * post type archive. That page already appears in sitemap-page.xml.
+     *
+     * @since  1.1.0
+     * @param  string $archive_url Post type archive URL.
+     * @return bool
+     */
+    private function archive_url_is_existing_page($archive_url) {
+        $page_id = url_to_postid($archive_url);
+
+        return $page_id > 0 && get_post_type($page_id) === 'page';
     }
 
     /**

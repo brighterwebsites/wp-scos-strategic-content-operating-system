@@ -393,7 +393,7 @@ textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); li
 /* ── Support landing ────────────────────────────────────────── */
 .scos-support__hero {
   background: linear-gradient(135deg, var(--scos-accent) 0%, #6d28d9 100%);
-  color: #fff;
+  /* Do NOT set color here — title/sub have explicit white; notices need dark text */
   padding: var(--scos-s-10) var(--scos-s-8);
   border-radius: var(--scos-r-lg);
   margin: 0 0 var(--scos-s-6);
@@ -438,15 +438,26 @@ textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); li
 }
 .scos-support__hero .scos-btn { background: #fff; color: var(--scos-accent); border-color: #fff; }
 .scos-support__hero .scos-btn:hover { background: rgba(255,255,255,.92); color: var(--scos-accent-hover); }
-/* WP admin notices injected as hero children — stack below the title row */
+/* WP admin notices injected as hero children — stack below the title row with dark text */
 .scos-support__hero > .notice,
 .scos-support__hero > .updated,
-.scos-support__hero > #message {
+.scos-support__hero > #message,
+.scos-support__hero > [class*="notice"] {
   display: block;
   width: 100%;
   max-width: 100%;
   margin: 0;
   flex: 0 0 100%;
+  /* Reset colour so all child text/links read correctly against the white notice bg */
+  background: #fff;
+  color: #1d2327;
+  border-radius: var(--scos-r-md);
+  box-shadow: none;
+}
+.scos-support__hero > .notice *,
+.scos-support__hero > .updated *,
+.scos-support__hero > [class*="notice"] * {
+  color: inherit;
 }
 /* Notices above the hero inside .wrap.scos */
 .wrap.scos > .notice,

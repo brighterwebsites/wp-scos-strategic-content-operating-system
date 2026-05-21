@@ -43,19 +43,23 @@ $agency_url   = get_option( 'se_agency_url', '' );
 ?>
 <div class="wrap scos">
 
-	<?php /* ── Hero ─────────────────────────────────────────────── */ ?>
+	<?php /* ── Hero: client site name (primary, left) + agency label (secondary, right) ── */ ?>
 	<div class="scos-support__hero">
-		<?php if ( $logo_url ) : ?>
-			<img src="<?php echo esc_url( $logo_url ); ?>"
-				alt="<?php echo esc_attr( $agency_name ); ?>"
-				class="scos-support__logo" />
-		<?php endif; ?>
-		<h1 class="scos-support__hero-title">
-			<?php echo esc_html( $agency_name ); ?> <?php esc_html_e( 'Support', 'site-essentials' ); ?>
-		</h1>
-		<p class="scos-support__hero-sub">
-			<?php echo esc_html( get_bloginfo( 'name' ) ); ?>
-		</p>
+		<div class="scos-support__hero-row">
+			<div class="scos-support__hero-brand">
+				<?php if ( $logo_url ) : ?>
+					<img src="<?php echo esc_url( $logo_url ); ?>"
+						alt="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>"
+						class="scos-support__logo" />
+				<?php endif; ?>
+				<h1 class="scos-support__hero-title">
+					<?php echo esc_html( get_bloginfo( 'name' ) ); ?>
+				</h1>
+			</div>
+			<p class="scos-support__hero-sub">
+				<?php echo esc_html( $agency_name ); ?> <?php esc_html_e( 'Support', 'site-essentials' ); ?>
+			</p>
+		</div>
 	</div>
 
 	<?php /* ── Support tools ─────────────────────────────────────── */ ?>

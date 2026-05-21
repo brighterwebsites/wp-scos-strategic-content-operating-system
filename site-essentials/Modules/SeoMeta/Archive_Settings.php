@@ -41,6 +41,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
+ * @version    1.1 | 2026-05-22
  * @since      1.1.0
  */
 
@@ -353,8 +354,8 @@ class Archive_Settings {
 
 			// Base fields (all archive types)
 			$data = [
-				'title'            => sanitize_text_field( $raw['title'] ?? '' ),
-				'description'      => sanitize_textarea_field( $raw['description'] ?? '' ),
+				'title'            => self::sanitize_template_field( $raw['title'] ?? '' ),
+				'description'      => self::sanitize_template_field( $raw['description'] ?? '', true ),
 				'breadcrumb_title' => sanitize_text_field( $raw['breadcrumb_title'] ?? '' ),
 				'robots'           => self::sanitize_checkboxes(
 					$raw['robots'] ?? [],
@@ -420,6 +421,35 @@ class Archive_Settings {
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
+
+	/**
+	 * Sanitise a template field that may contain %token% placeholders.
+	 *
+	 * WordPress's sanitize_text_field() and sanitize_textarea_field() both strip
+	 * any substring matching %[a-f0-9]{2} as a percent-encoded sequence. This
+	 * destroys tokens like %description% (%de is a valid hex pair) while leaving
+	 * %title% intact (t is not hex). We strip HTML tags and trim instead, which
+	 * is safe because all output is escaped at render time via esc_attr/esc_html.
+	 *
+	 * @param  string $val       Raw value.
+	 * @param  bool   $multiline Preserve newlines (true for textarea fields).
+	 * @return string
+	 */
+	private static function sanitize_template_field( string $val, bool $multiline = false ): string {
+		// Check for and normalize invalid UTF-8
+		$val = wp_check_invalid_utf8( $val );
+
+		// Strip all HTML/PHP tags
+		$val = wp_strip_all_tags( $val );
+
+		if ( $multiline ) {
+			// Normalize line endings, collapse runs of 3+ newlines to 2
+			$val = str_replace( [ "\r\n", "\r" ], "\n", $val );
+			$val = preg_replace( '/\n{3,}/', "\n\n", $val ) ?? $val;
+		}
+
+		return trim( $val );
+	}
 
 	/**
 	 * Sanitise a checkbox array, keeping only values from the allowed list.

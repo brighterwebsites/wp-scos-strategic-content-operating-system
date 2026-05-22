@@ -6,6 +6,9 @@
  *  - Progress tag toggle (checkbox <-> visual badge)
  *  - Next Step select colour update
  *  - Quick-add term (AJAX: scos_ca_add_term)
+ *  - FAQ intent goal picker: search, select, clear, Add FAQ modal
+ *
+ * v1.1 | 2026-05-22 — FAQ intent goal picker added.
  */
 /* global scosCA, jQuery */
 (function ($) {
@@ -161,5 +164,220 @@
 			qa.$save.prop('disabled', false).text(scosCA.i18n.add);
 		});
 	});
+
+	// ─── FAQ Intent Goal Picker ──────────────────────────────────────────────
+
+	if ( scosCA.faqModuleActive ) {
+
+		var faqSearchTimer = null;
+
+		// ── Helpers ─────────────────────────────────────────────────────────
+
+		function faqPanelHtml(faq) {
+			var incomplete = faq.incomplete
+				? '<div class="scos-ca-intent-faq-incomplete">' +
+					scosCA.i18n.faqIncomplete +
+					'<a href="' + faq.edit_url + '" target="_blank" rel="noopener">' +
+					scosCA.i18n.faqEditLink + '</a></div>'
+				: '';
+			var topic = faq.topic
+				? '<span class="scos-ca-intent-faq-topic">' + $('<span>').text(faq.topic).html() + '</span>'
+				: '';
+			return '<div class="scos-ca-intent-faq-panel" id="scos-intent-faq-panel">' +
+				'<div class="scos-ca-intent-faq-question">' + $('<span>').text(faq.title).html() + topic + '</div>' +
+				'<div class="scos-ca-intent-faq-actions">' +
+					'<a href="' + faq.edit_url + '" target="_blank" rel="noopener" class="scos-ca-intent-faq-edit">' +
+					scosCA.i18n.faqEditLink + '</a>' +
+					'<button type="button" class="scos-ca-intent-faq-clear button-link">' + scosCA.i18n.faqClear + '</button>' +
+				'</div>' +
+				incomplete +
+				'</div>';
+		}
+
+		function faqResultItemHtml(faq) {
+			var badge = faq.incomplete
+				? '<span class="scos-ca-intent-faq-badge scos-ca-intent-faq-badge--warn">' + scosCA.i18n.faqNeedsAnswer + '</span>'
+				: '';
+			var draft = 'draft' === faq.status
+				? '<span class="scos-ca-intent-faq-badge scos-ca-intent-faq-badge--draft">' + scosCA.i18n.faqDraft + '</span>'
+				: '';
+			var topic = faq.topic
+				? '<span class="scos-ca-intent-faq-topic">' + $('<span>').text(faq.topic).html() + '</span>'
+				: '';
+			return '<li class="scos-ca-intent-faq-result" data-id="' + faq.id + '" data-title="' + $('<span>').text(faq.title).html() + '">' +
+				$('<span>').text(faq.title).html() + topic + draft + badge +
+				'</li>';
+		}
+
+		function showPicker() {
+			$('#scos-intent-faq-panel').remove();
+			var $wrap = $('#scos-intent-goal-wrap');
+			if ( !$wrap.find('#scos-intent-faq-picker').length ) {
+				$wrap.prepend(
+					'<div class="scos-ca-intent-faq-picker" id="scos-intent-faq-picker">' +
+					'<div class="scos-ca-intent-faq-search-row">' +
+					'<input type="text" id="scos-intent-faq-search" class="scos-ca-intent-faq-search" placeholder="' + scosCA.i18n.faqSearch + '" autocomplete="off">' +
+					'<button type="button" class="button scos-ca-intent-faq-add-btn" id="scos-intent-faq-add-btn">' + scosCA.i18n.faqAddNew + '</button>' +
+					'</div>' +
+					'<ul class="scos-ca-intent-faq-results" id="scos-intent-faq-results" hidden></ul>' +
+					'</div>'
+				);
+			}
+		}
+
+		function hidePicker() {
+			$('#scos-intent-faq-picker').remove();
+		}
+
+		function selectFaq(faq) {
+			$('#scos_ca_intent_goal_faq_id').val(faq.id);
+			$('#scos_ca_intent_goal_pending_faq_title').val('');
+			hidePicker();
+			$('#scos-intent-faq-panel').remove();
+			$('#scos-intent-goal-wrap').prepend(faqPanelHtml(faq));
+		}
+
+		// ── Search ──────────────────────────────────────────────────────────
+
+		$(document).on('input', '#scos-intent-faq-search', function () {
+			var q = $.trim($(this).val());
+			var $results = $('#scos-intent-faq-results');
+			clearTimeout(faqSearchTimer);
+
+			if (q.length < 2) {
+				$results.attr('hidden', 'hidden').empty();
+				return;
+			}
+
+			faqSearchTimer = setTimeout(function () {
+				$.ajax({
+					url:      scosCA.restUrl + '/search',
+					method:   'GET',
+					data:     { q: q, context: 'intent_goal' },
+					beforeSend: function (xhr) {
+						xhr.setRequestHeader('X-WP-Nonce', scosCA.restNonce);
+					},
+					success: function (faqs) {
+						$results.empty();
+						if (faqs.length) {
+							$.each(faqs, function (i, faq) {
+								$results.append(faqResultItemHtml(faq));
+							});
+							$results.removeAttr('hidden');
+						} else {
+							$results.attr('hidden', 'hidden');
+						}
+					},
+				});
+			}, 280);
+		});
+
+		$(document).on('click', '.scos-ca-intent-faq-result', function () {
+			var id    = parseInt($(this).data('id'), 10);
+			var title = $(this).data('title');
+			var topic = $(this).find('.scos-ca-intent-faq-topic').text();
+			var incomplete = $(this).find('.scos-ca-intent-faq-badge--warn').length > 0;
+			var status     = $(this).find('.scos-ca-intent-faq-badge--draft').length > 0 ? 'draft' : 'publish';
+
+			selectFaq({
+				id:         id,
+				title:      title,
+				topic:      topic,
+				status:     status,
+				incomplete: incomplete,
+				edit_url:   '', // edit link not available in search result; panel will just omit it
+			});
+		});
+
+		// ── Clear linked FAQ ────────────────────────────────────────────────
+
+		$(document).on('click', '.scos-ca-intent-faq-clear', function () {
+			$('#scos_ca_intent_goal_faq_id').val('0');
+			$('#scos_ca_intent_goal_pending_faq_title').val('');
+			$('#scos-intent-faq-panel').remove();
+			showPicker();
+		});
+
+		// ── Add FAQ button → open modal ──────────────────────────────────────
+
+		$(document).on('click', '#scos-intent-faq-add-btn', function () {
+			$('#scos-intent-faq-modal').removeAttr('hidden');
+			$('#scos-intent-faq-new-title').val('').focus();
+			$('#scos-intent-faq-modal-status').attr('hidden', 'hidden').text('');
+		});
+
+		$(document).on('click', '#scos-intent-faq-modal-cancel', function () {
+			$('#scos-intent-faq-modal').attr('hidden', 'hidden');
+		});
+
+		// ── Add now (REST POST) ──────────────────────────────────────────────
+
+		$(document).on('click', '#scos-intent-faq-create-now', function () {
+			var title = $.trim($('#scos-intent-faq-new-title').val());
+			if (!title) {
+				$('#scos-intent-faq-new-title').focus();
+				return;
+			}
+
+			var useTopic  = $('#scos-intent-faq-use-topic').is(':checked');
+			var topicId   = useTopic ? parseInt($('#scos_ca_topic').val(), 10) || 0 : 0;
+			var postId    = parseInt($('input#post_ID').val(), 10) || 0;
+			var $btn      = $(this);
+			var $status   = $('#scos-intent-faq-modal-status');
+
+			$btn.prop('disabled', true).text(scosCA.i18n.faqCreating);
+			$status.removeAttr('hidden').text(scosCA.i18n.faqCreating);
+
+			$.ajax({
+				url:         scosCA.restUrl,
+				method:      'POST',
+				contentType: 'application/json',
+				data:        JSON.stringify({ title: title, topic_id: topicId, source_post_id: postId }),
+				beforeSend:  function (xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', scosCA.restNonce);
+				},
+				success: function (faq) {
+					$('#scos-intent-faq-modal').attr('hidden', 'hidden');
+					selectFaq(faq);
+					$status.removeAttr('hidden').text(scosCA.i18n.faqCreated);
+				},
+				error: function (xhr) {
+					var msg = xhr.responseJSON && xhr.responseJSON.message
+						? xhr.responseJSON.message
+						: scosCA.i18n.errorFailed;
+					$status.removeAttr('hidden').text(msg);
+				},
+			}).always(function () {
+				$btn.prop('disabled', false).text(scosCA.i18n.faqAddNow);
+			});
+		});
+
+		// ── Create on save ───────────────────────────────────────────────────
+
+		$(document).on('click', '#scos-intent-faq-create-on-save', function () {
+			var title = $.trim($('#scos-intent-faq-new-title').val());
+			if (!title) {
+				$('#scos-intent-faq-new-title').focus();
+				return;
+			}
+
+			$('#scos_ca_intent_goal_pending_faq_title').val(title);
+			$('#scos_ca_intent_goal_faq_id').val('0');
+			$('#scos-intent-faq-modal').attr('hidden', 'hidden');
+			hidePicker();
+
+			// Show a pending notice in place of the picker.
+			$('#scos-intent-faq-panel').remove();
+			$('#scos-intent-goal-wrap').prepend(
+				'<div class="scos-ca-intent-faq-panel scos-ca-intent-faq-panel--pending" id="scos-intent-faq-panel">' +
+				'<div class="scos-ca-intent-faq-question">' + $('<span>').text(title).html() +
+				'<span class="scos-ca-intent-faq-badge scos-ca-intent-faq-badge--draft">Pending save</span></div>' +
+				'<div class="scos-ca-intent-faq-actions">' +
+				'<button type="button" class="scos-ca-intent-faq-clear button-link">' + scosCA.i18n.faqClear + '</button>' +
+				'</div></div>'
+			);
+		});
+
+	} // end if faqModuleActive
 
 }(jQuery));

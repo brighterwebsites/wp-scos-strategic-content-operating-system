@@ -12,6 +12,8 @@
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
  * @since      1.0.0
+ *
+ * v1.1 | 2026-05-22 — scos_ca_intent_goal column now shows linked FAQ title + incomplete badge.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -247,15 +249,36 @@ class Admin_Columns {
 				break;
 
 			case 'scos_ca_intent_goal':
-				$goal = get_post_meta( $post_id, 'scos_ca_intent_goal', true );
-				if ( $goal ) {
-					printf(
-						'<span class="scos-col-text" title="%s">%s</span>',
-						esc_attr( $goal ),
-						esc_html( wp_trim_words( $goal, 8, '…' ) )
-					);
+				$faq_id = Intent_Goal_Resolver::get_faq_id( $post_id );
+				if ( $faq_id > 0 ) {
+					$summary = Intent_Goal_Resolver::get_faq_summary( $faq_id );
+					if ( $summary ) {
+						$label = wp_trim_words( $summary['title'], 8, '…' );
+						printf(
+							'<a href="%s" title="%s" class="scos-col-link">%s</a>',
+							esc_url( $summary['edit_url'] ),
+							esc_attr( $summary['title'] ),
+							esc_html( $label )
+						);
+						if ( $summary['incomplete'] ) {
+							echo ' <span class="scos-col-badge" style="color:#92400e;background:#fef3c7">'
+								. esc_html__( 'Needs answer', 'site-essentials' )
+								. '</span>';
+						}
+					} else {
+						echo '<span class="scos-col-empty">—</span>';
+					}
 				} else {
-					echo '<span class="scos-col-empty">—</span>';
+					$goal = Intent_Goal_Resolver::resolve_question( $post_id );
+					if ( $goal ) {
+						printf(
+							'<span class="scos-col-text" title="%s">%s</span>',
+							esc_attr( $goal ),
+							esc_html( wp_trim_words( $goal, 8, '…' ) )
+						);
+					} else {
+						echo '<span class="scos-col-empty">—</span>';
+					}
 				}
 				break;
 

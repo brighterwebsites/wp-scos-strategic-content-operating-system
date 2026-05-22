@@ -13,6 +13,8 @@
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
  * @since      1.0.0
+ *
+ * v1.1 | 2026-05-22 — Added scos_ca_intent_goal_faq_id integer meta key.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -57,12 +59,13 @@ class Meta_Fields {
 		];
 
 		// ---- Strategy fields ----
-		register_post_meta( '', 'scos_ca_pillar_page_id',     $int );
-		register_post_meta( '', 'scos_ca_service_pathway_id', $int );
-		register_post_meta( '', 'scos_ca_intent',             $string );
-		register_post_meta( '', 'scos_ca_purpose',            $string );
-		register_post_meta( '', 'scos_ca_maturity',           $string );
-		register_post_meta( '', 'scos_ca_intent_goal',        $textarea );
+		register_post_meta( '', 'scos_ca_pillar_page_id',        $int );
+		register_post_meta( '', 'scos_ca_service_pathway_id',    $int );
+		register_post_meta( '', 'scos_ca_intent_goal_faq_id',    $int );
+		register_post_meta( '', 'scos_ca_intent',                $string );
+		register_post_meta( '', 'scos_ca_purpose',               $string );
+		register_post_meta( '', 'scos_ca_maturity',              $string );
+		register_post_meta( '', 'scos_ca_intent_goal',           $textarea );
 
 		// ---- Workflow fields ----
 		register_post_meta( '', 'scos_ca_index_status',            $string );

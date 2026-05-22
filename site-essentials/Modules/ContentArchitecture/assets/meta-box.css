@@ -316,6 +316,207 @@
 	flex: 1;
 }
 
+/* ── FAQ Intent Goal Picker ─────────────────────────────────────────────── */
+
+/* Search row */
+.scos-ca-intent-faq-picker {
+	margin-bottom: 6px;
+}
+.scos-ca-intent-faq-search-row {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+.scos-ca-intent-faq-search {
+	flex: 1;
+	height: 30px;
+	padding: 0 8px;
+	border: 1px solid #8c8f94;
+	border-radius: 3px;
+	font-size: 13px;
+}
+
+/* Results dropdown */
+.scos-ca-intent-faq-results {
+	margin: 4px 0 0;
+	padding: 0;
+	list-style: none;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	background: #fff;
+	max-height: 200px;
+	overflow-y: auto;
+}
+.scos-ca-intent-faq-results[hidden] {
+	display: none;
+}
+.scos-ca-intent-faq-result {
+	padding: 6px 10px;
+	cursor: pointer;
+	font-size: 13px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.scos-ca-intent-faq-result:hover {
+	background: #f0f0f1;
+}
+
+/* Topic chip */
+.scos-ca-intent-faq-topic {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 10px;
+	background: #e0e7ff;
+	color: #3730a3;
+	font-size: 11px;
+	line-height: 1.5;
+	margin-left: 4px;
+}
+
+/* Status badges */
+.scos-ca-intent-faq-badge {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 10px;
+	font-size: 11px;
+	line-height: 1.5;
+	margin-left: 4px;
+}
+.scos-ca-intent-faq-badge--warn {
+	background: #fef3c7;
+	color: #92400e;
+}
+.scos-ca-intent-faq-badge--draft {
+	background: #f3f4f6;
+	color: #374151;
+}
+
+/* Linked FAQ panel */
+.scos-ca-intent-faq-panel {
+	background: #f9fafb;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 8px 10px;
+	margin-bottom: 6px;
+}
+.scos-ca-intent-faq-panel--pending {
+	border-color: #c3d4e8;
+	background: #eef5fc;
+}
+.scos-ca-intent-faq-question {
+	font-size: 13px;
+	font-weight: 500;
+	color: #1d2327;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 4px;
+}
+.scos-ca-intent-faq-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+}
+.scos-ca-intent-faq-edit {
+	color: #2271b1;
+}
+.scos-ca-intent-faq-clear {
+	color: #a00;
+}
+
+/* Incomplete notice */
+.scos-ca-intent-faq-incomplete {
+	margin-top: 6px;
+	padding: 5px 8px;
+	background: #fef9c3;
+	border: 1px solid #fde68a;
+	border-radius: 3px;
+	font-size: 12px;
+	color: #92400e;
+}
+.scos-ca-intent-faq-incomplete a {
+	color: #92400e;
+	font-weight: 600;
+}
+
+/* Legacy freetext (collapsed) */
+.scos-ca-intent-goal-legacy {
+	margin-top: 6px;
+}
+.scos-ca-intent-goal-legacy summary {
+	font-size: 12px;
+	color: #646970;
+	cursor: pointer;
+}
+.scos-ca-intent-goal-legacy textarea {
+	width: 100%;
+	margin-top: 4px;
+}
+
+/* Modal overlay */
+.scos-ca-intent-faq-modal[hidden] {
+	display: none;
+}
+.scos-ca-intent-faq-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100060;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0,0,0,0.55);
+}
+.scos-ca-intent-faq-modal-inner {
+	background: #fff;
+	border-radius: 4px;
+	padding: 24px 28px;
+	width: 480px;
+	max-width: 95vw;
+	box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.scos-ca-intent-faq-modal-title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+}
+.scos-ca-intent-faq-new-title {
+	width: 100%;
+	height: 36px;
+	padding: 0 10px;
+	border: 1px solid #8c8f94;
+	border-radius: 3px;
+	font-size: 13px;
+}
+.scos-ca-intent-faq-use-topic {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: #3c434a;
+	cursor: pointer;
+}
+.scos-ca-intent-faq-modal-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.scos-ca-intent-faq-modal-status {
+	font-size: 12px;
+	color: #646970;
+	margin: 0;
+}
+.scos-ca-intent-faq-modal-status[hidden] {
+	display: none;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 782px) {
 	.scos-ca-field-row,

@@ -20,7 +20,7 @@
  *                 brighter-core/v1/faqs         (token-auth, owned by brighter-core API
  *                                                — still used by external GPT/MCP/Postly)
  *
- * v1.1 | 2026-05-21
+ * v1.2 | 2026-05-22 — Added "Used as intent goal" admin column (count + links).
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -100,6 +100,7 @@ class FAQ_Module {
 			add_action( 'save_post_faq',                  [ self::class, 'save_meta' ],          20 );
 			add_filter( 'manage_faq_posts_columns',       [ self::class, 'admin_columns' ] );
 			add_action( 'manage_faq_posts_custom_column', [ self::class, 'admin_column_content' ], 10, 2 );
+			add_action( 'edit_form_after_title',          [ self::class, 'maybe_show_intent_goal_notice' ] );
 		}
 
 		// ── Sub-components ────────────────────────────────────────────────────
@@ -342,6 +343,54 @@ class FAQ_Module {
 	}
 
 	/**
+	 * Show a notice above the FAQ editor when the FAQ is used as an intent goal
+	 * on one or more pages and is still incomplete.
+	 *
+	 * @since 1.2.0
+	 * @param \WP_Post $post Current post.
+	 * @return void
+	 */
+	public static function maybe_show_intent_goal_notice( \WP_Post $post ): void {
+		if ( self::POST_TYPE !== $post->post_type ) {
+			return;
+		}
+
+		if ( ! class_exists( \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::class ) ) {
+			return;
+		}
+
+		$incomplete = \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::is_faq_incomplete( $post->ID );
+		if ( ! $incomplete ) {
+			return;
+		}
+
+		$page_ids = \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::get_pages_using_faq( $post->ID );
+		if ( empty( $page_ids ) ) {
+			return;
+		}
+
+		$count = count( $page_ids );
+		printf(
+			'<div class="notice notice-warning inline" style="margin:10px 0 0;padding:8px 12px;">' .
+			'<p><strong>%s</strong> %s</p>' .
+			'</div>',
+			esc_html__( 'Search Intent Goal:', 'site-essentials' ),
+			esc_html(
+				sprintf(
+					/* translators: %d = number of pages using this FAQ as intent goal */
+					_n(
+						'This FAQ is used as the search intent goal on %d page and still needs an answer or content.',
+						'This FAQ is used as the search intent goal on %d pages and still needs an answer or content.',
+						$count,
+						'site-essentials'
+					),
+					$count
+				)
+			)
+		);
+	}
+
+	/**
 	 * Render the FAQ Schema Answer meta box.
 	 *
 	 * @since 1.0.0
@@ -467,8 +516,9 @@ class FAQ_Module {
 		foreach ( $columns as $key => $value ) {
 			$new[ $key ] = $value;
 			if ( 'title' === $key ) {
-				$new['scos_faq_topic']  = __( 'Primary Topic', 'site-essentials' );
-				$new['scos_faq_parent'] = __( 'Parent', 'site-essentials' );
+				$new['scos_faq_topic']           = __( 'Primary Topic', 'site-essentials' );
+				$new['scos_faq_parent']          = __( 'Parent', 'site-essentials' );
+				$new['scos_faq_intent_goal_used'] = __( 'Intent Goal', 'site-essentials' );
 			}
 		}
 		return $new;
@@ -506,6 +556,55 @@ class FAQ_Module {
 				}
 			} else {
 				echo '<span style="color:#999">—</span>';
+			}
+		}
+
+		if ( 'scos_faq_intent_goal_used' === $column ) {
+			// Only attempt reverse lookup when the resolver class is available.
+			if ( ! class_exists( \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::class ) ) {
+				echo '<span style="color:#999">—</span>';
+				return;
+			}
+
+			$page_ids = \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::get_pages_using_faq( $post_id );
+			$count    = count( $page_ids );
+
+			if ( 0 === $count ) {
+				echo '<span style="color:#999">—</span>';
+				return;
+			}
+
+			// Link to the posts list filtered by the meta key.
+			$filter_url = add_query_arg(
+				[
+					'post_type'                   => 'any',
+					'meta_key'                    => 'scos_ca_intent_goal_faq_id',
+					'meta_value'                  => $post_id,
+					'filter_action'               => 'Filter',
+				],
+				admin_url( 'edit.php' )
+			);
+
+			$incomplete = \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::is_faq_incomplete( $post_id );
+
+			printf(
+				'<a href="%s" title="%s">%d %s</a>',
+				esc_url( $filter_url ),
+				esc_attr(
+					sprintf(
+						/* translators: %d = number of pages */
+						_n( 'Used as intent goal by %d page', 'Used as intent goal by %d pages', $count, 'site-essentials' ),
+						$count
+					)
+				),
+				absint( $count ),
+				esc_html( _n( 'page', 'pages', $count, 'site-essentials' ) )
+			);
+
+			if ( $incomplete ) {
+				echo ' <span style="display:inline-block;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:11px;">'
+					. esc_html__( 'Needs answer', 'site-essentials' )
+					. '</span>';
 			}
 		}
 	}

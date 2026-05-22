@@ -15,6 +15,9 @@
  *
  * @package BrighterCore
  * @subpackage Analytics
+ *
+ * v1.1 | 2026-05-22 — search-intent now resolved via Intent_Goal_Resolver when available,
+ *                      so FAQ-linked posts output the FAQ title rather than the raw meta value.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -160,13 +163,25 @@ add_action( 'wp_head', function () {
 	];
 
 	// ── Assemble CAR ─────────────────────────────────────────────────────────
+	// ── Search intent resolution ─────────────────────────────────────────────
+	// Use Intent_Goal_Resolver when available (site-essentials CA module active).
+	// Falls back to the existing $val() pattern (scos_ca_intent_goal → bw_search_intent).
+	if ( class_exists( 'SiteEssentials\\Modules\\ContentArchitecture\\Intent_Goal_Resolver' ) ) {
+		$search_intent = SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::resolve_question( $post_id );
+		if ( '' === $search_intent ) {
+			$search_intent = 'not_set';
+		}
+	} else {
+		$search_intent = $val( 'scos_ca_intent_goal', 'bw_search_intent' );
+	}
+
 	$scos = [
 		'car' => [
 			'cluster'         => $cluster_name,
 			'topic'           => $topic_name,
 			'maturity'        => $val( 'scos_ca_maturity',    'bw_cont_maturity' ),
 			'intent'          => $val( 'scos_ca_intent',      'bw_intent' ),
-			'search-intent'   => $val( 'scos_ca_intent_goal', 'bw_search_intent' ),
+			'search-intent'   => $search_intent,
 			'purpose'         => $val( 'scos_ca_purpose',     'bw_purpose' ),
 			'pillar'          => $pillar,
 			'service_pathway' => $service_pathway,

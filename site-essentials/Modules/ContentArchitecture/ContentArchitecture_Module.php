@@ -9,8 +9,10 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
- * @version    1.0.0
+ * @version    1.1.0
  * @since      1.0.0
+ *
+ * v1.1 | 2026-05-22 — Load Intent_Goal_Resolver.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -66,6 +68,7 @@ class ContentArchitecture_Module implements Module_Interface {
 		// require_once makes load order clear).
 		require_once __DIR__ . '/Taxonomies.php';
 		require_once __DIR__ . '/Meta_Fields.php';
+		require_once __DIR__ . '/Intent_Goal_Resolver.php';
 		require_once __DIR__ . '/Meta_Box.php';
 		require_once __DIR__ . '/Content_Analysis.php';
 		require_once __DIR__ . '/Admin_Columns.php';

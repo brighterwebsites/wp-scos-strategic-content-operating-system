@@ -3,15 +3,18 @@
  * Content Architecture meta box — 3-tab UI view.
  *
  * Variables available from Meta_Box::render():
- *   $post                  WP_Post
- *   $current_cluster       int   term_id or 0
- *   $current_topic         int   term_id or 0
- *   $clusters              WP_Term[]
- *   $topics                WP_Term[]
- *   $pillar_pages          WP_Post[]
- *   $service_pathway_pages WP_Post[]
- *   $fields                array  strategy + workflow post meta
- *   $analysis              array  content analysis read-only data
+ *   $post                    WP_Post
+ *   $current_cluster         int   term_id or 0
+ *   $current_topic           int   term_id or 0
+ *   $clusters                WP_Term[]
+ *   $topics                  WP_Term[]
+ *   $pillar_pages            WP_Post[]
+ *   $service_pathway_pages   WP_Post[]
+ *   $fields                  array  strategy + workflow post meta
+ *                              (includes 'intent_goal_faq_id')
+ *   $analysis                array  content analysis read-only data
+ *   $intent_goal_faq_summary array|null  from Intent_Goal_Resolver::get_faq_summary()
+ *   $faq_module_active       bool  true when SCOS_FAQ_ACTIVE is defined
  *
  * @package SiteEssentials
  */
@@ -215,11 +218,115 @@ $purpose_type_labels = [
 			</div>
 
 			<!-- Search Intent Goal -->
-			<div class="scos-ca-field">
-				<label for="scos_ca_intent_goal"><?php esc_html_e( 'Search Intent Goal', 'site-essentials' ); ?></label>
-				<textarea name="scos_ca_intent_goal" id="scos_ca_intent_goal" rows="2"
-					placeholder="<?php esc_attr_e( 'e.g. "How to choose a stable builder"', 'site-essentials' ); ?>"><?php echo esc_textarea( $fields['intent_goal'] ); ?></textarea>
-				<p class="scos-ca-help"><?php esc_html_e( 'What is the primary search intent satisfied by this content?', 'site-essentials' ); ?></p>
+			<div class="scos-ca-field scos-ca-field--full" id="scos-intent-goal-wrap">
+				<label><?php esc_html_e( 'Search Intent Goal', 'site-essentials' ); ?></label>
+
+				<?php if ( ! empty( $faq_module_active ) ) : ?>
+
+					<!-- Hidden field carries the linked FAQ ID on form submit -->
+					<input type="hidden"
+						name="scos_ca_intent_goal_faq_id"
+						id="scos_ca_intent_goal_faq_id"
+						value="<?php echo esc_attr( $fields['intent_goal_faq_id'] ); ?>">
+
+					<!-- Pending stub title (on-save create path) -->
+					<input type="hidden"
+						name="scos_ca_intent_goal_pending_faq_title"
+						id="scos_ca_intent_goal_pending_faq_title"
+						value="">
+
+					<?php if ( $intent_goal_faq_summary ) : ?>
+						<!-- ── Linked FAQ panel ── -->
+						<div class="scos-ca-intent-faq-panel" id="scos-intent-faq-panel">
+							<div class="scos-ca-intent-faq-question">
+								<?php echo esc_html( $intent_goal_faq_summary['title'] ); ?>
+								<?php if ( ! empty( $intent_goal_faq_summary['topic'] ) ) : ?>
+									<span class="scos-ca-intent-faq-topic"><?php echo esc_html( $intent_goal_faq_summary['topic'] ); ?></span>
+								<?php endif; ?>
+							</div>
+							<div class="scos-ca-intent-faq-actions">
+								<a href="<?php echo esc_url( $intent_goal_faq_summary['edit_url'] ); ?>"
+									target="_blank" rel="noopener" class="scos-ca-intent-faq-edit">
+									<?php esc_html_e( 'Edit FAQ ↗', 'site-essentials' ); ?>
+								</a>
+								<button type="button" class="scos-ca-intent-faq-clear button-link">
+									<?php esc_html_e( '✕ Remove', 'site-essentials' ); ?>
+								</button>
+							</div>
+							<?php if ( $intent_goal_faq_summary['incomplete'] ) : ?>
+								<div class="scos-ca-intent-faq-incomplete">
+									<?php esc_html_e( 'This FAQ needs an answer — ', 'site-essentials' ); ?>
+									<a href="<?php echo esc_url( $intent_goal_faq_summary['edit_url'] ); ?>"
+										target="_blank" rel="noopener">
+										<?php esc_html_e( 'edit FAQ ↗', 'site-essentials' ); ?>
+									</a>
+								</div>
+							<?php endif; ?>
+						</div><!-- /faq-panel -->
+
+					<?php else : ?>
+						<!-- ── Picker (no FAQ linked yet) ── -->
+						<div class="scos-ca-intent-faq-picker" id="scos-intent-faq-picker">
+							<div class="scos-ca-intent-faq-search-row">
+								<input type="text"
+									id="scos-intent-faq-search"
+									class="scos-ca-intent-faq-search"
+									placeholder="<?php esc_attr_e( 'Search FAQs…', 'site-essentials' ); ?>"
+									autocomplete="off">
+								<button type="button" class="button scos-ca-intent-faq-add-btn" id="scos-intent-faq-add-btn">
+									<?php esc_html_e( '+ Add FAQ', 'site-essentials' ); ?>
+								</button>
+							</div>
+							<ul class="scos-ca-intent-faq-results" id="scos-intent-faq-results" hidden></ul>
+						</div><!-- /picker -->
+
+					<?php endif; // intent_goal_faq_summary ?>
+
+					<!-- ── Add FAQ modal ── -->
+					<div class="scos-ca-intent-faq-modal" id="scos-intent-faq-modal" hidden role="dialog"
+						aria-modal="true" aria-labelledby="scos-intent-faq-modal-title">
+						<div class="scos-ca-intent-faq-modal-inner">
+							<h3 class="scos-ca-intent-faq-modal-title" id="scos-intent-faq-modal-title">
+								<?php esc_html_e( 'Add Search Intent Goal FAQ', 'site-essentials' ); ?>
+							</h3>
+							<label for="scos-intent-faq-new-title"><?php esc_html_e( 'Question / FAQ title', 'site-essentials' ); ?></label>
+							<input type="text" id="scos-intent-faq-new-title" class="scos-ca-intent-faq-new-title"
+								placeholder="<?php esc_attr_e( 'e.g. How do I choose a stable builder?', 'site-essentials' ); ?>">
+							<label class="scos-ca-intent-faq-use-topic">
+								<input type="checkbox" id="scos-intent-faq-use-topic" checked>
+								<?php esc_html_e( 'Assign page topic to new FAQ', 'site-essentials' ); ?>
+							</label>
+							<div class="scos-ca-intent-faq-modal-actions">
+								<button type="button" class="button button-primary" id="scos-intent-faq-create-now">
+									<?php esc_html_e( 'Add FAQ now', 'site-essentials' ); ?>
+								</button>
+								<button type="button" class="button" id="scos-intent-faq-create-on-save">
+									<?php esc_html_e( 'Create when saving post', 'site-essentials' ); ?>
+								</button>
+								<button type="button" class="button-link scos-ca-intent-faq-modal-cancel" id="scos-intent-faq-modal-cancel">
+									<?php esc_html_e( 'Cancel', 'site-essentials' ); ?>
+								</button>
+							</div>
+							<p class="scos-ca-intent-faq-modal-status" id="scos-intent-faq-modal-status" hidden></p>
+						</div>
+					</div><!-- /modal -->
+
+				<?php else : ?>
+					<!-- FAQ module not active — plain freetext only -->
+					<textarea name="scos_ca_intent_goal" id="scos_ca_intent_goal" rows="2"
+						placeholder="<?php esc_attr_e( 'e.g. "How to choose a stable builder"', 'site-essentials' ); ?>"><?php echo esc_textarea( $fields['intent_goal'] ); ?></textarea>
+				<?php endif; // faq_module_active ?>
+
+				<?php if ( ! empty( $faq_module_active ) && 0 === $fields['intent_goal_faq_id'] ) : ?>
+					<!-- Legacy freetext (collapsed when no FAQ linked) -->
+					<details class="scos-ca-intent-goal-legacy">
+						<summary><?php esc_html_e( 'Free-text goal (legacy)', 'site-essentials' ); ?></summary>
+						<textarea name="scos_ca_intent_goal" id="scos_ca_intent_goal" rows="2"
+							placeholder="<?php esc_attr_e( 'e.g. "How to choose a stable builder"', 'site-essentials' ); ?>"><?php echo esc_textarea( $fields['intent_goal'] ); ?></textarea>
+					</details>
+				<?php endif; ?>
+
+				<p class="scos-ca-help"><?php esc_html_e( 'The primary question this content answers. Link an FAQ to make it machine-readable and trackable.', 'site-essentials' ); ?></p>
 			</div>
 
 		</div>

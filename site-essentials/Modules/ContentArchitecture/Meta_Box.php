@@ -13,6 +13,9 @@
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
  * @since      1.0.0
+ *
+ * v1.1 | 2026-05-22 — FAQ intent goal picker: load/save scos_ca_intent_goal_faq_id,
+ *                      pending stub creation on save, enriched JS data.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -97,6 +100,7 @@ class Meta_Box {
 		$fields = [
 			'pillar_page_id'         => (int) get_post_meta( $post->ID, 'scos_ca_pillar_page_id', true ),
 			'service_pathway_id'     => (int) get_post_meta( $post->ID, 'scos_ca_service_pathway_id', true ),
+			'intent_goal_faq_id'     => Intent_Goal_Resolver::get_faq_id( $post->ID ),
 			'intent'                 => (string) get_post_meta( $post->ID, 'scos_ca_intent', true ),
 			'purpose'                => (string) get_post_meta( $post->ID, 'scos_ca_purpose', true ),
 			'maturity'               => (string) get_post_meta( $post->ID, 'scos_ca_maturity', true ),
@@ -105,6 +109,15 @@ class Meta_Box {
 			'optimization_progress'  => (array)  get_post_meta( $post->ID, 'scos_ca_optimization_progress', true ),
 			'next_step'              => (string) get_post_meta( $post->ID, 'scos_ca_next_step', true ),
 		];
+
+		// ---- FAQ intent goal summary (for linked-FAQ panel in view) ----
+		$intent_goal_faq_summary = null;
+		if ( $fields['intent_goal_faq_id'] > 0 ) {
+			$intent_goal_faq_summary = Intent_Goal_Resolver::get_faq_summary( $fields['intent_goal_faq_id'] );
+		}
+
+		// ---- FAQ module active? (gates picker vs freetext-only display) ----
+		$faq_module_active = defined( 'SCOS_FAQ_ACTIVE' );
 
 		// ---- Analysis data (read-only) ----
 		$analysis = [
@@ -236,9 +249,40 @@ class Meta_Box {
 			}
 		}
 
-		// ---- Textarea ----
+		// ---- Intent goal: FAQ link + pending stub creation ----
+		// Step 1: if a pending stub title is present, create the FAQ now and use its ID.
+		$pending_faq_title = isset( $_POST['scos_ca_intent_goal_pending_faq_title'] )
+			? sanitize_text_field( wp_unslash( $_POST['scos_ca_intent_goal_pending_faq_title'] ) )
+			: '';
+
+		if ( '' !== $pending_faq_title ) {
+			$topic_id = absint( $_POST['scos_ca_topic'] ?? 0 );
+			$new_faq  = Intent_Goal_Resolver::create_stub_faq( $pending_faq_title, $topic_id, $post_id );
+			if ( ! is_wp_error( $new_faq ) ) {
+				update_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', $new_faq );
+			}
+		} else {
+			// Step 2: save an explicitly submitted FAQ ID (picker selection or cleared).
+			if ( isset( $_POST['scos_ca_intent_goal_faq_id'] ) ) {
+				$faq_id = absint( $_POST['scos_ca_intent_goal_faq_id'] );
+				if ( $faq_id > 0 ) {
+					// Validate that the post exists and is an faq CPT.
+					$faq_post = get_post( $faq_id );
+					if ( $faq_post && 'faq' === $faq_post->post_type ) {
+						update_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', $faq_id );
+					}
+				} else {
+					delete_post_meta( $post_id, 'scos_ca_intent_goal_faq_id' );
+				}
+			}
+		}
+
+		// ---- Textarea: freetext goal (only saved when no FAQ ID is linked) ----
 		if ( isset( $_POST['scos_ca_intent_goal'] ) ) {
-			update_post_meta( $post_id, 'scos_ca_intent_goal', sanitize_textarea_field( $_POST['scos_ca_intent_goal'] ) );
+			$linked_faq = (int) get_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', true );
+			if ( 0 === $linked_faq ) {
+				update_post_meta( $post_id, 'scos_ca_intent_goal', sanitize_textarea_field( wp_unslash( $_POST['scos_ca_intent_goal'] ) ) );
+			}
 		}
 
 		// ---- Integer: pillar page + service pathway ----
@@ -303,13 +347,31 @@ class Meta_Box {
 		);
 
 		wp_localize_script( 'scos-ca-meta-box', 'scosCA', [
-			'nonce'   => wp_create_nonce( 'scos_ca_add_term' ),
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'i18n'    => [
-				'adding'      => __( 'Adding…', 'site-essentials' ),
-				'add'         => __( 'Add', 'site-essentials' ),
-				'errorEmpty'  => __( 'Please enter a name.', 'site-essentials' ),
-				'errorFailed' => __( 'Could not add term. Please try again.', 'site-essentials' ),
+			'nonce'        => wp_create_nonce( 'scos_ca_add_term' ),
+			'ajaxurl'      => admin_url( 'admin-ajax.php' ),
+			'restUrl'      => rest_url( 'site-essentials/v1/faqs' ),
+			'restNonce'    => wp_create_nonce( 'wp_rest' ),
+			'faqModuleActive' => defined( 'SCOS_FAQ_ACTIVE' ) ? true : false,
+			'i18n'         => [
+				'adding'         => __( 'Adding…', 'site-essentials' ),
+				'add'            => __( 'Add', 'site-essentials' ),
+				'errorEmpty'     => __( 'Please enter a name.', 'site-essentials' ),
+				'errorFailed'    => __( 'Could not add term. Please try again.', 'site-essentials' ),
+				'faqSearch'      => __( 'Search FAQs…', 'site-essentials' ),
+				'faqAddNew'      => __( '+ Add FAQ', 'site-essentials' ),
+				'faqModalTitle'  => __( 'Add Search Intent Goal FAQ', 'site-essentials' ),
+				'faqQuestion'    => __( 'Question / FAQ title', 'site-essentials' ),
+				'faqUseTopic'    => __( 'Assign page topic to new FAQ', 'site-essentials' ),
+				'faqAddNow'      => __( 'Add FAQ now', 'site-essentials' ),
+				'faqAddOnSave'   => __( 'Create when saving post', 'site-essentials' ),
+				'faqCancel'      => __( 'Cancel', 'site-essentials' ),
+				'faqCreating'    => __( 'Creating…', 'site-essentials' ),
+				'faqCreated'     => __( 'FAQ created as draft — add an answer.', 'site-essentials' ),
+				'faqIncomplete'  => __( 'This FAQ needs an answer — ', 'site-essentials' ),
+				'faqEditLink'    => __( 'edit FAQ ↗', 'site-essentials' ),
+				'faqClear'       => __( '✕ Remove', 'site-essentials' ),
+				'faqDraft'       => __( 'Draft', 'site-essentials' ),
+				'faqNeedsAnswer' => __( 'Needs answer', 'site-essentials' ),
 			],
 		] );
 	}

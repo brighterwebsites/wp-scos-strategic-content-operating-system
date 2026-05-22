@@ -645,6 +645,12 @@ class Admin_UI {
                 update_option( "se_support_ai_{$i}_description", sanitize_textarea_field( wp_unslash( $_POST["se_support_ai_{$i}_description"] ?? '' ) ) );
                 update_option( "se_support_ai_{$i}_highlight", isset( $_POST["se_support_ai_{$i}_highlight"] ) ? 1 : 0 );
             }
+            // Site notification banner (free text, shown at top of Support page)
+            $valid_notif_types = [ '', 'info', 'warning', 'urgent' ];
+            $notif_type = sanitize_key( wp_unslash( $_POST['se_support_notification_type'] ?? '' ) );
+            update_option( 'se_support_notification',      sanitize_textarea_field( wp_unslash( $_POST['se_support_notification'] ?? '' ) ) );
+            update_option( 'se_support_notification_type', in_array( $notif_type, $valid_notif_types, true ) ? $notif_type : 'warning' );
+
             // Third-party scripts — stored verbatim (manage_options only); sanitize_textarea_field
             // would strip <script> tags, so we use wp_unslash + trim for code fields.
             update_option( 'se_support_script_commenter', trim( wp_unslash( $_POST['se_support_script_commenter'] ?? '' ) ) );

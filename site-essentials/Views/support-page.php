@@ -72,6 +72,23 @@ $agency_url   = get_option( 'se_agency_url', '' );
 		</div>
 	</div>
 
+	<?php /* ── Site notification banner ─────────────────────────── */ ?>
+	<?php
+	$notif_msg  = get_option( 'se_support_notification', '' );
+	$notif_type = get_option( 'se_support_notification_type', 'warning' );
+	$notif_icons = [
+		'info'    => '&#9432;',
+		'warning' => '&#9888;',
+		'urgent'  => '&#128308;',
+	];
+	$notif_icon = $notif_icons[ $notif_type ] ?? '&#9888;';
+	if ( $notif_msg ) : ?>
+	<div class="scos-support__notification scos-support__notification--<?php echo esc_attr( $notif_type ); ?>" role="alert">
+		<span class="scos-support__notification-icon"><?php echo $notif_icon; // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+		<p class="scos-support__notification-msg"><?php echo esc_html( $notif_msg ); ?></p>
+	</div>
+	<?php endif; ?>
+
 	<?php /* ── Support tools ─────────────────────────────────────── */ ?>
 	<?php if ( ! empty( $tools ) ) : ?>
 	<p class="scos__section-label"><?php esc_html_e( 'Manuals &amp; references', 'site-essentials' ); ?></p>

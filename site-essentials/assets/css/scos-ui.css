@@ -469,6 +469,43 @@ textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); li
   margin: 0 0 var(--scos-s-2);
 }
 
+/* ── Support page notification banner ───────────────────────── */
+.scos-support__notification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--scos-s-3);
+  padding: var(--scos-s-4) var(--scos-s-5);
+  border-radius: var(--scos-r-lg);
+  border-left: 4px solid transparent;
+  margin: 0 0 var(--scos-s-5);
+  font-size: var(--scos-fs-md);
+  line-height: 1.55;
+}
+.scos-support__notification--info {
+  background: var(--scos-info-soft, #eff6ff);
+  border-left-color: var(--scos-info, #3b82f6);
+  color: #1e40af;
+}
+.scos-support__notification--warning {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+  color: #92400e;
+}
+.scos-support__notification--urgent {
+  background: var(--scos-danger-soft);
+  border-left-color: var(--scos-danger);
+  color: #991b1b;
+}
+.scos-support__notification-icon {
+  font-size: 1.2em;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+.scos-support__notification-msg {
+  margin: 0;
+  font-weight: 500;
+}
+
 .scos-support-slot {
   padding-bottom: var(--scos-s-4);
   margin-bottom: var(--scos-s-4);

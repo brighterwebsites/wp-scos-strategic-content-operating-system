@@ -305,6 +305,55 @@ $page_url = admin_url( 'admin.php' );
 
 		<?php elseif ( 'support-settings' === $active_tab ) : // SCOS-SUPPORT-PASS2 — replaced empty state with working form ?>
 
+				<?php /* ── Card 0 — Site notification ───────────────────────── */ ?>
+				<div class="scos-card">
+					<div class="scos-card__header">
+						<h2 class="scos-card__title"><?php esc_html_e( 'Site notification', 'site-essentials' ); ?></h2>
+						<p class="scos-card__desc"><?php esc_html_e( 'Shown as a banner above the Support page content. Use for time-sensitive messages — maintenance windows, update holds, known issues, etc. Leave message empty to hide.', 'site-essentials' ); ?></p>
+					</div>
+					<div class="scos-card__body">
+						<table class="scos-form">
+							<tbody>
+								<tr>
+									<th>
+										<label for="se_support_notification_type"><?php esc_html_e( 'Type', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">se_support_notification_type</div>
+									</th>
+									<td>
+										<?php
+										$saved_notif_type = get_option( 'se_support_notification_type', 'warning' );
+										$notif_types = [
+											'info'    => __( 'ℹ Info (blue)', 'site-essentials' ),
+											'warning' => __( '⚠ Warning (yellow)', 'site-essentials' ),
+											'urgent'  => __( '🔴 Urgent (red)', 'site-essentials' ),
+										];
+										?>
+										<select id="se_support_notification_type" name="se_support_notification_type" class="scos-select">
+											<?php foreach ( $notif_types as $val => $label ) : ?>
+												<option value="<?php echo esc_attr( $val ); ?>"<?php selected( $saved_notif_type, $val ); ?>>
+													<?php echo esc_html( $label ); ?>
+												</option>
+											<?php endforeach; ?>
+										</select>
+									</td>
+								</tr>
+								<tr>
+									<th>
+										<label for="se_support_notification"><?php esc_html_e( 'Message', 'site-essentials' ); ?></label>
+										<div class="scos-form__slug">se_support_notification</div>
+										<p class="scos-metabox__hint"><?php esc_html_e( 'Plain text. Leave empty to hide the banner entirely.', 'site-essentials' ); ?></p>
+									</th>
+									<td>
+										<textarea id="se_support_notification" name="se_support_notification"
+											class="scos-textarea" rows="3"
+											placeholder="<?php esc_attr_e( 'e.g. WordPress 7.0 has just been released. We will update your site once compatibility testing is complete — please hold off updating until you hear from us.', 'site-essentials' ); ?>"><?php echo esc_textarea( get_option( 'se_support_notification', '' ) ); ?></textarea>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+
 				<?php /* ── Card 1 — Support tools ─────────────────────────── */ ?>
 				<div class="scos-card">
 					<div class="scos-card__header">

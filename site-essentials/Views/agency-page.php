@@ -21,6 +21,9 @@ $page_url = admin_url( 'admin.php' );
 		<?php if ( 'support-settings' === $active_tab ) : // SCOS-SUPPORT-PASS2 — switch nonce/trigger for support-settings tab ?>
 			<?php wp_nonce_field( 'se_support_save', 'se_support_nonce' ); ?>
 			<input type="hidden" name="se_support_save" value="1" />
+		<?php elseif ( 'onboarding' === $active_tab ) : // Client Onboarding — separate nonce/trigger ?>
+			<?php wp_nonce_field( 'se_onboarding_save', 'se_onboarding_nonce' ); ?>
+			<input type="hidden" name="se_onboarding_save" value="1" />
 		<?php else : ?>
 			<?php wp_nonce_field( 'se_agency_save', 'se_agency_nonce' ); ?>
 			<input type="hidden" name="se_agency_save" value="1" />
@@ -33,7 +36,7 @@ $page_url = admin_url( 'admin.php' );
 				<p class="scos__subtitle"><?php esc_html_e( 'Site Essentials › Agency', 'site-essentials' ); ?></p>
 			</div>
 			<div class="scos__header-actions">
-				<?php if ( 'support-settings' !== $active_tab ) : ?>
+				<?php if ( 'support-settings' !== $active_tab && 'onboarding' !== $active_tab ) : ?>
 				<button type="submit" class="scos-btn scos-btn--primary">
 					<?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
 				</button>
@@ -59,6 +62,10 @@ $page_url = admin_url( 'admin.php' );
 			<a href="<?php echo esc_url( add_query_arg( [ 'page' => Admin_UI::AGENCY_PAGE_SLUG, 'tab' => 'access' ], $page_url ) ); ?>"
 			   class="scos__tab <?php echo 'access' === $active_tab ? 'scos__tab--active' : ''; ?>">
 				<?php esc_html_e( 'Access', 'site-essentials' ); ?>
+			</a>
+			<a href="<?php echo esc_url( add_query_arg( [ 'page' => Admin_UI::AGENCY_PAGE_SLUG, 'tab' => 'onboarding' ], $page_url ) ); ?>"
+			   class="scos__tab <?php echo 'onboarding' === $active_tab ? 'scos__tab--active' : ''; ?>">
+				<?php esc_html_e( 'Onboarding', 'site-essentials' ); ?>
 			</a>
 		</nav>
 
@@ -541,6 +548,10 @@ $page_url = admin_url( 'admin.php' );
 						</button>
 					</div>
 				</div>
+
+		<?php elseif ( 'onboarding' === $active_tab ) : ?>
+
+			<?php include SITE_ESSENTIALS_PATH . 'Views/agency-onboarding-tab.php'; ?>
 
 		<?php elseif ( 'access' === $active_tab ) : ?>
 

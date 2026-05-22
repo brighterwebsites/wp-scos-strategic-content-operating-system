@@ -571,7 +571,7 @@ class Admin_UI {
         }
 
         $active_tab  = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'agency-settings';
-        $valid_tabs  = [ 'agency-settings', 'support-settings', 'access' ];
+        $valid_tabs  = [ 'agency-settings', 'support-settings', 'access', 'onboarding' ];
         if ( ! in_array( $active_tab, $valid_tabs, true ) ) {
             $active_tab = 'agency-settings';
         }
@@ -623,6 +623,87 @@ class Admin_UI {
                     admin_url( 'admin.php' )
                 )
             );
+            exit;
+        }
+
+        // Client Onboarding tab — separate nonce, handles save / preview / send_test / send_live
+        if (
+            isset( $_POST['se_onboarding_save'], $_POST['se_onboarding_nonce'] ) &&
+            wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['se_onboarding_nonce'] ) ), 'se_onboarding_save' )
+        ) {
+            $action = isset( $_POST['se_onboarding_action'] ) ? sanitize_key( wp_unslash( $_POST['se_onboarding_action'] ) ) : '';
+
+            // Always persist edits to template/expiry on any submit so users don't lose work
+            // when they click Preview/Test before Save. Subject + body + expiry are saved on
+            // every submit; Preview/Test/Send then operate on the just-saved values.
+            if ( isset( $_POST['se_onboarding_subject_template'] ) ) {
+                update_option(
+                    \SiteEssentials\Modules\ClientOnboarding\Onboarding_Email_Sender::OPT_SUBJECT,
+                    sanitize_text_field( wp_unslash( $_POST['se_onboarding_subject_template'] ) )
+                );
+            }
+            if ( isset( $_POST['se_onboarding_html_template'] ) ) {
+                // Email HTML allows full markup — admin-stored, manage_options gated.
+                // Use wp_kses_post for a sensible HTML allow-list rather than dropping <html>/<body>.
+                $raw = wp_unslash( $_POST['se_onboarding_html_template'] );
+                update_option(
+                    \SiteEssentials\Modules\ClientOnboarding\Onboarding_Email_Sender::OPT_BODY,
+                    is_string( $raw ) ? $raw : ''
+                );
+            }
+            if ( isset( $_POST['se_onboarding_password_link_expiry_days'] ) ) {
+                $days = absint( $_POST['se_onboarding_password_link_expiry_days'] );
+                if ( $days < 1 ) { $days = \SiteEssentials\Modules\ClientOnboarding\Onboarding_Email_Sender::DEFAULT_EXPIRY_DAYS; }
+                if ( $days > 30 ) { $days = 30; }
+                update_option(
+                    \SiteEssentials\Modules\ClientOnboarding\Onboarding_Email_Sender::OPT_EXPIRY_DAYS,
+                    $days
+                );
+            }
+
+            $user_id_post = isset( $_POST['se_onboarding_user_id'] ) ? absint( $_POST['se_onboarding_user_id'] ) : 0;
+
+            $redirect_args = [ 'page' => self::AGENCY_PAGE_SLUG, 'tab' => 'onboarding' ];
+
+            if ( 'save' === $action ) {
+                $redirect_args['se_onboarding_result'] = 'saved';
+            } elseif ( 'preview' === $action ) {
+                $redirect_args['se_onboarding_result'] = 'preview';
+                if ( $user_id_post ) {
+                    $redirect_args['se_onboarding_uid'] = $user_id_post;
+                }
+            } elseif ( 'send_test' === $action || 'send_live' === $action ) {
+                $context = ( 'send_test' === $action ) ? 'test' : 'live';
+
+                // For send_test we still need a user to template from. Default to current admin if none picked.
+                $target_uid = $user_id_post ?: get_current_user_id();
+
+                // For send_live we hard-require a picked user
+                if ( 'live' === $context && ! $user_id_post ) {
+                    $redirect_args['se_onboarding_result'] = 'error';
+                    $redirect_args['se_onboarding_msg']    = rawurlencode( __( 'Pick a user to send the onboarding email to.', 'site-essentials' ) );
+                } else {
+                    $sender = new \SiteEssentials\Modules\ClientOnboarding\Onboarding_Email_Sender();
+                    $result = $sender->send( $target_uid, $context );
+
+                    if ( is_wp_error( $result ) ) {
+                        $redirect_args['se_onboarding_result'] = 'error';
+                        $redirect_args['se_onboarding_msg']    = rawurlencode( $result->get_error_message() );
+                    } else {
+                        $recipient_user = get_user_by( 'id', $target_uid );
+                        $shown_to       = ( 'test' === $context )
+                            ? wp_get_current_user()->user_email
+                            : ( $recipient_user ? $recipient_user->user_email : '' );
+
+                        $redirect_args['se_onboarding_result'] = ( 'test' === $context ) ? 'sent_test' : 'sent_live';
+                        $redirect_args['se_onboarding_to']     = rawurlencode( $shown_to );
+                    }
+                }
+            } else {
+                $redirect_args['se_onboarding_result'] = 'saved';
+            }
+
+            wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
             exit;
         }
 

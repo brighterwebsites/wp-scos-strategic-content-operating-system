@@ -320,3 +320,18 @@ add_action(
     },
     15
 );
+
+/**
+ * Client Onboarding — extends password_reset_expiration to the configured
+ * window (default 7 days) for the agency-led onboarding flow. UI lives at
+ * Agency → Onboarding (Views/agency-onboarding-tab.php).
+ *
+ * @since 1.0.0
+ */
+add_action(
+    'init',
+    static function () {
+        ( new \SiteEssentials\Modules\ClientOnboarding\ClientOnboarding_Module() )->boot();
+    },
+    15
+);

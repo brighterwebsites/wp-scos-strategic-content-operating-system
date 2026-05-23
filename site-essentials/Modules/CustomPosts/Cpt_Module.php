@@ -201,6 +201,11 @@ class Cpt_Module implements Module_Interface {
                 add_action('created_' . self::TAXONOMY_REVIEW_PLATFORM, [$this, 'save_platform_taxonomy_logo']);
                 add_action('edited_'  . self::TAXONOMY_REVIEW_PLATFORM, [$this, 'save_platform_taxonomy_logo']);
                 add_action('admin_enqueue_scripts', [$this, 'enqueue_platform_taxonomy_scripts']);
+
+                // SVG upload support (scoped to admin — upload AJAX runs in admin context)
+                add_filter('upload_mimes',               [$this, 'allow_platform_svg_upload']);
+                add_filter('wp_check_filetype_and_ext',  [$this, 'fix_svg_filetype_check'], 10, 5);
+                add_filter('wp_handle_upload_prefilter', [$this, 'sanitize_svg_upload']);
             }
 
             // ACF relationship field — fires after ACF is fully loaded
@@ -510,7 +515,7 @@ class Cpt_Module implements Module_Interface {
             <input type="hidden" name="bw_platform_logo_id" value="">
             <button type="button" class="button bw-platform-logo-select"><?php esc_html_e('Select Logo', 'site-essentials'); ?></button>
             <button type="button" class="button bw-platform-logo-remove" style="display:none"><?php esc_html_e('Remove', 'site-essentials'); ?></button>
-            <p class="description"><?php esc_html_e('SVG recommended for best quality across all screen sizes.', 'site-essentials'); ?></p>
+            <p class="description"><?php esc_html_e('Accepted formats: SVG (recommended), PNG, WebP.', 'site-essentials'); ?></p>
         </div>
         <?php
     }
@@ -538,7 +543,7 @@ class Cpt_Module implements Module_Interface {
                 <input type="hidden" name="bw_platform_logo_id" value="<?php echo esc_attr($logo_id ?: ''); ?>">
                 <button type="button" class="button bw-platform-logo-select"><?php esc_html_e('Select Logo', 'site-essentials'); ?></button>
                 <button type="button" class="button bw-platform-logo-remove"<?php echo $logo_id ? '' : ' style="display:none"'; ?>><?php esc_html_e('Remove', 'site-essentials'); ?></button>
-                <p class="description"><?php esc_html_e('SVG recommended for best quality across all screen sizes.', 'site-essentials'); ?></p>
+                <p class="description"><?php esc_html_e('Accepted formats: SVG (recommended), PNG, WebP.', 'site-essentials'); ?></p>
             </td>
         </tr>
         <?php
@@ -564,7 +569,11 @@ class Cpt_Module implements Module_Interface {
             return;
         }
         if (!empty($_POST['bw_platform_logo_id'])) {
-            update_term_meta($term_id, 'bw_platform_logo_id', absint($_POST['bw_platform_logo_id']));
+            $logo_id       = absint($_POST['bw_platform_logo_id']);
+            $allowed_mimes = ['image/svg+xml', 'image/png', 'image/webp'];
+            if (in_array(get_post_mime_type($logo_id), $allowed_mimes, true)) {
+                update_term_meta($term_id, 'bw_platform_logo_id', $logo_id);
+            }
         } else {
             delete_term_meta($term_id, 'bw_platform_logo_id');
         }
@@ -588,7 +597,7 @@ class Cpt_Module implements Module_Interface {
             title: 'Select Platform Logo',
             button: { text: 'Use this logo' },
             multiple: false,
-            library: { type: 'image' }
+            library: { type: ['image/svg+xml', 'image/png', 'image/webp'] }
         });
         frame.on('select', function(){
             var att = frame.state().get('selection').first().toJSON();
@@ -608,6 +617,80 @@ class Cpt_Module implements Module_Interface {
     });
 })(jQuery);
 JS;
+    }
+
+    // =========================================================================
+    // SVG UPLOAD SUPPORT
+    // =========================================================================
+
+    /**
+     * Whitelist SVG MIME type for users who can upload files.
+     *
+     * @since 1.2.0
+     * @param array $mimes Allowed MIME types keyed by extension.
+     * @return array
+     */
+    public function allow_platform_svg_upload($mimes) {
+        if (current_user_can('upload_files')) {
+            $mimes['svg']  = 'image/svg+xml';
+            $mimes['svgz'] = 'image/svg+xml';
+        }
+        return $mimes;
+    }
+
+    /**
+     * Ensure WordPress recognises SVG files when checking filetype vs. extension.
+     *
+     * WP 4.7.1+ verifies content matches extension; SVG (XML) can fail that check.
+     *
+     * @since 1.2.0
+     * @param array       $data      Values for the extension, MIME type, and proper file name.
+     * @param string      $file      Full path to the file.
+     * @param string      $filename  The name of the file.
+     * @param array       $mimes     Array of allowed MIME types.
+     * @param string|bool $real_mime The actual MIME type or false if unknown (WP 5.1+).
+     * @return array
+     */
+    public function fix_svg_filetype_check($data, $file, $filename, $mimes, $real_mime = false) {
+        if (!empty($data['ext']) && !empty($data['type'])) {
+            return $data;
+        }
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if ($ext === 'svg' || $ext === 'svgz') {
+            $data['ext']             = $ext;
+            $data['type']            = 'image/svg+xml';
+            $data['proper_filename'] = $filename;
+        }
+        return $data;
+    }
+
+    /**
+     * Sanitize SVG files on upload by stripping scripts and event handlers.
+     *
+     * Removes <script> elements, on* event attributes, and javascript: URIs
+     * before the file is written to the uploads directory.
+     *
+     * @since 1.2.0
+     * @param array $file Upload data array from $_FILES.
+     * @return array
+     */
+    public function sanitize_svg_upload($file) {
+        if (($file['type'] ?? '') !== 'image/svg+xml') {
+            return $file;
+        }
+        $content = file_get_contents($file['tmp_name']);
+        if ($content === false) {
+            $file['error'] = __('Could not read the uploaded SVG file.', 'site-essentials');
+            return $file;
+        }
+        // Strip <script> blocks
+        $content = preg_replace('/<script[\s\S]*?<\/script>/i', '', $content);
+        // Strip on* event attributes (e.g. onload="...", onclick='...')
+        $content = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\')/i', '', $content);
+        // Strip javascript: URIs in href / xlink:href
+        $content = preg_replace('/\s+(?:xlink:)?href\s*=\s*(?:"javascript:[^"]*"|\'javascript:[^\']*\')/i', '', $content);
+        file_put_contents($file['tmp_name'], $content);
+        return $file;
     }
 
     // =========================================================================

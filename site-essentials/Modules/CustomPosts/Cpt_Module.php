@@ -194,6 +194,13 @@ class Cpt_Module implements Module_Interface {
                 add_filter('enter_title_here', [$this, 'reviews_title_placeholder'], 10, 2);
                 add_filter('manage_bw_reviews_posts_columns', [$this, 'reviews_admin_columns']);
                 add_action('manage_bw_reviews_posts_custom_column', [$this, 'reviews_admin_column_content'], 10, 2);
+
+                // Platform taxonomy logo field
+                add_action(self::TAXONOMY_REVIEW_PLATFORM . '_add_form_fields',  [$this, 'platform_taxonomy_add_form_fields']);
+                add_action(self::TAXONOMY_REVIEW_PLATFORM . '_edit_form_fields', [$this, 'platform_taxonomy_edit_form_fields']);
+                add_action('created_' . self::TAXONOMY_REVIEW_PLATFORM, [$this, 'save_platform_taxonomy_logo']);
+                add_action('edited_'  . self::TAXONOMY_REVIEW_PLATFORM, [$this, 'save_platform_taxonomy_logo']);
+                add_action('admin_enqueue_scripts', [$this, 'enqueue_platform_taxonomy_scripts']);
             }
 
             // ACF relationship field — fires after ACF is fully loaded
@@ -463,6 +470,144 @@ class Cpt_Module implements Module_Interface {
                 ]);
             }
         }
+    }
+
+    // =========================================================================
+    // REVIEW PLATFORM TAXONOMY — LOGO FIELD
+    // =========================================================================
+
+    /**
+     * Enqueue the WP media uploader on the platform taxonomy admin screens.
+     *
+     * @since 1.2.0
+     * @param string $hook Current admin page hook.
+     * @return void
+     */
+    public function enqueue_platform_taxonomy_scripts($hook) {
+        if (!in_array($hook, ['edit-tags.php', 'term.php'], true)) {
+            return;
+        }
+        $screen = get_current_screen();
+        if (!$screen || $screen->taxonomy !== self::TAXONOMY_REVIEW_PLATFORM) {
+            return;
+        }
+        wp_enqueue_media();
+        wp_add_inline_script('jquery', $this->platform_taxonomy_media_js());
+    }
+
+    /**
+     * Render logo field on the "Add New Platform" form.
+     *
+     * @since 1.2.0
+     * @return void
+     */
+    public function platform_taxonomy_add_form_fields() {
+        wp_nonce_field('bw_platform_logo_save', 'bw_platform_logo_nonce');
+        ?>
+        <div class="form-field bw-platform-logo-wrap">
+            <label><?php esc_html_e('Platform Logo', 'site-essentials'); ?></label>
+            <div class="bw-platform-logo-preview"></div>
+            <input type="hidden" name="bw_platform_logo_id" value="">
+            <button type="button" class="button bw-platform-logo-select"><?php esc_html_e('Select Logo', 'site-essentials'); ?></button>
+            <button type="button" class="button bw-platform-logo-remove" style="display:none"><?php esc_html_e('Remove', 'site-essentials'); ?></button>
+            <p class="description"><?php esc_html_e('SVG recommended for best quality across all screen sizes.', 'site-essentials'); ?></p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render logo field on the "Edit Platform" form.
+     *
+     * @since 1.2.0
+     * @param \WP_Term $term Current term object.
+     * @return void
+     */
+    public function platform_taxonomy_edit_form_fields($term) {
+        $logo_id   = absint(get_term_meta($term->term_id, 'bw_platform_logo_id', true));
+        $image_url = $logo_id ? wp_get_attachment_url($logo_id) : '';
+        wp_nonce_field('bw_platform_logo_save', 'bw_platform_logo_nonce');
+        ?>
+        <tr class="form-field bw-platform-logo-wrap">
+            <th scope="row"><label><?php esc_html_e('Platform Logo', 'site-essentials'); ?></label></th>
+            <td>
+                <div class="bw-platform-logo-preview">
+                    <?php if ($image_url) : ?>
+                        <img src="<?php echo esc_url($image_url); ?>" style="max-width:120px;max-height:60px;display:block;margin-bottom:8px;">
+                    <?php endif; ?>
+                </div>
+                <input type="hidden" name="bw_platform_logo_id" value="<?php echo esc_attr($logo_id ?: ''); ?>">
+                <button type="button" class="button bw-platform-logo-select"><?php esc_html_e('Select Logo', 'site-essentials'); ?></button>
+                <button type="button" class="button bw-platform-logo-remove"<?php echo $logo_id ? '' : ' style="display:none"'; ?>><?php esc_html_e('Remove', 'site-essentials'); ?></button>
+                <p class="description"><?php esc_html_e('SVG recommended for best quality across all screen sizes.', 'site-essentials'); ?></p>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * Save the platform logo attachment ID to term meta.
+     *
+     * Fires on both created_{taxonomy} and edited_{taxonomy}.
+     *
+     * @since 1.2.0
+     * @param int $term_id Term ID.
+     * @return void
+     */
+    public function save_platform_taxonomy_logo($term_id) {
+        if (
+            !isset($_POST['bw_platform_logo_nonce']) ||
+            !wp_verify_nonce(sanitize_key(wp_unslash($_POST['bw_platform_logo_nonce'])), 'bw_platform_logo_save')
+        ) {
+            return;
+        }
+        if (!current_user_can('manage_categories')) {
+            return;
+        }
+        if (!empty($_POST['bw_platform_logo_id'])) {
+            update_term_meta($term_id, 'bw_platform_logo_id', absint($_POST['bw_platform_logo_id']));
+        } else {
+            delete_term_meta($term_id, 'bw_platform_logo_id');
+        }
+    }
+
+    /**
+     * Inline JS for the platform logo media uploader.
+     *
+     * @since 1.2.0
+     * @return string
+     */
+    private function platform_taxonomy_media_js() {
+        return <<<'JS'
+(function($){
+    var frame;
+    $(document).on('click', '.bw-platform-logo-select', function(e){
+        e.preventDefault();
+        var $wrap = $(this).closest('.bw-platform-logo-wrap');
+        if (frame) { frame.open(); return; }
+        frame = wp.media({
+            title: 'Select Platform Logo',
+            button: { text: 'Use this logo' },
+            multiple: false,
+            library: { type: 'image' }
+        });
+        frame.on('select', function(){
+            var att = frame.state().get('selection').first().toJSON();
+            var src = (att.sizes && att.sizes.thumbnail) ? att.sizes.thumbnail.url : att.url;
+            $wrap.find('[name="bw_platform_logo_id"]').val(att.id);
+            $wrap.find('.bw-platform-logo-preview').html('<img src="' + src + '" style="max-width:120px;max-height:60px;display:block;margin-bottom:8px;">');
+            $wrap.find('.bw-platform-logo-remove').show();
+        });
+        frame.open();
+    });
+    $(document).on('click', '.bw-platform-logo-remove', function(e){
+        e.preventDefault();
+        var $wrap = $(this).closest('.bw-platform-logo-wrap');
+        $wrap.find('[name="bw_platform_logo_id"]').val('');
+        $wrap.find('.bw-platform-logo-preview').html('');
+        $(this).hide();
+    });
+})(jQuery);
+JS;
     }
 
     // =========================================================================

@@ -121,7 +121,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_version() {
-        return '1.1.0';
+        return '1.2.0';
     }
 
     /**
@@ -131,14 +131,19 @@ class Cpt_Module implements Module_Interface {
      * @return array
      */
     private function get_default_options() {
+        // All features opt-in: only explicit saves turn options on (avoids "Loaded" when toggle appears off).
         return [
-            'customer_success_stories'  => true,
-            'include_categories'        => false,
-            'include_tags'              => false,
-            'archive_slug'              => 'projects',
-            'enable_faq'                => false,       // Placeholder for Module 8 integration
-            'enable_author_extension'   => false,       // Module 15: Author Extension
-            'enable_reviews'            => false,       // Reviews SSOT CPT
+            'customer_success_stories'       => false,
+            'include_categories'             => false,
+            'include_tags'                   => false,
+            'archive_slug'                   => 'projects',
+            'enable_faq'                     => false,
+            'enable_author_extension'        => false,
+            'enable_reviews'                 => false,
+            // General (default WP posts) — UI on CPT page, not a module card.
+            'post_link_mode'                 => 'default', // default | custom_prefix | category_prefix
+            'general_post_slug_prefix'       => '',
+            'general_remove_category_base'   => false,
         ];
     }
 
@@ -151,8 +156,12 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function init() {
-        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
-        $opts = wp_parse_args($opts, $this->get_default_options());
+        if ( ! defined( 'SCOS_CPT_ACTIVE' ) ) {
+            define( 'SCOS_CPT_ACTIVE', true );
+        }
+
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
 
         // ─── Projects CPT ────────────────────────────────────────────────────
         if (!empty($opts['customer_success_stories'])) {
@@ -185,6 +194,18 @@ class Cpt_Module implements Module_Interface {
                 add_filter('enter_title_here', [$this, 'reviews_title_placeholder'], 10, 2);
                 add_filter('manage_bw_reviews_posts_columns', [$this, 'reviews_admin_columns']);
                 add_action('manage_bw_reviews_posts_custom_column', [$this, 'reviews_admin_column_content'], 10, 2);
+
+                // Platform taxonomy logo field
+                add_action(self::TAXONOMY_REVIEW_PLATFORM . '_add_form_fields',  [$this, 'platform_taxonomy_add_form_fields']);
+                add_action(self::TAXONOMY_REVIEW_PLATFORM . '_edit_form_fields', [$this, 'platform_taxonomy_edit_form_fields']);
+                add_action('created_' . self::TAXONOMY_REVIEW_PLATFORM, [$this, 'save_platform_taxonomy_logo']);
+                add_action('edited_'  . self::TAXONOMY_REVIEW_PLATFORM, [$this, 'save_platform_taxonomy_logo']);
+                add_action('admin_enqueue_scripts', [$this, 'enqueue_platform_taxonomy_scripts']);
+
+                // SVG upload support (scoped to admin — upload AJAX runs in admin context)
+                add_filter('upload_mimes',               [$this, 'allow_platform_svg_upload']);
+                add_filter('wp_check_filetype_and_ext',  [$this, 'fix_svg_filetype_check'], 10, 5);
+                add_filter('wp_handle_upload_prefilter', [$this, 'sanitize_svg_upload']);
             }
 
             // ACF relationship field — fires after ACF is fully loaded
@@ -200,6 +221,16 @@ class Cpt_Module implements Module_Interface {
         } else {
             update_option('bw_author_extension_enabled', false);
         }
+
+        // ─── FAQ System ────────────────────────────────────────────────────────
+        if (!empty($opts['enable_faq'])) {
+            require_once __DIR__ . '/FAQ/FAQ_Module.php';
+            \SiteEssentials\Modules\CustomPosts\FAQ\FAQ_Module::init();
+        }
+
+        // ─── General: default post permalinks & category base (optional) ───────
+        require_once __DIR__ . '/General_Post_Permalink_Settings.php';
+        General_Post_Permalink_Settings::bootstrap( $opts );
     }
 
     // =========================================================================
@@ -218,8 +249,11 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function register_projects_cpt() {
-        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
-        $opts = wp_parse_args($opts, $this->get_default_options());
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
+        if (empty($opts['customer_success_stories'])) {
+            return;
+        }
         $archive_slug = !empty($opts['archive_slug']) ? sanitize_title($opts['archive_slug']) : 'projects';
 
         // Derive human-readable display name from the slug (Fix 1 + Fix 2)
@@ -286,6 +320,17 @@ class Cpt_Module implements Module_Interface {
 
     // =========================================================================
     // REVIEWS CPT REGISTRATION
+    // -------------------------------------------------------------------------
+    // TODO: migrate Reviews bw_* keys to scos_review_* / scos_cpt_* — see
+    //       .cursor/rules/meta-key-prefixes.mdc. Legacy keys still in use:
+    //         - Post type:  bw_reviews
+    //         - Taxonomy:   bw_review_platform
+    //         - Meta:       bw_rating, bw_date, bw_date_precision, bw_verify_url,
+    //                       bw_schema_id, bw_success_outcome, bw_customer_detail,
+    //                       bw_is_featured, bw_review_excerpt
+    //         - ACF:        bw_related_project, bw_reviews_related
+    //         - Shortcodes: [bw_review_*]
+    //       Plan: rename to scos_review_* with dual-read fallback, then deprecate.
     // =========================================================================
 
     /**
@@ -308,6 +353,11 @@ class Cpt_Module implements Module_Interface {
      * @return void
      */
     public function register_reviews_cpt() {
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
+        if (empty($opts['enable_reviews'])) {
+            return;
+        }
         $labels = [
             'name'               => _x('Reviews', 'post type general name', 'site-essentials'),
             'singular_name'      => _x('Review', 'post type singular name', 'site-essentials'),
@@ -425,6 +475,222 @@ class Cpt_Module implements Module_Interface {
                 ]);
             }
         }
+    }
+
+    // =========================================================================
+    // REVIEW PLATFORM TAXONOMY — LOGO FIELD
+    // =========================================================================
+
+    /**
+     * Enqueue the WP media uploader on the platform taxonomy admin screens.
+     *
+     * @since 1.2.0
+     * @param string $hook Current admin page hook.
+     * @return void
+     */
+    public function enqueue_platform_taxonomy_scripts($hook) {
+        if (!in_array($hook, ['edit-tags.php', 'term.php'], true)) {
+            return;
+        }
+        $screen = get_current_screen();
+        if (!$screen || $screen->taxonomy !== self::TAXONOMY_REVIEW_PLATFORM) {
+            return;
+        }
+        wp_enqueue_media();
+        wp_add_inline_script('jquery', $this->platform_taxonomy_media_js());
+    }
+
+    /**
+     * Render logo field on the "Add New Platform" form.
+     *
+     * @since 1.2.0
+     * @return void
+     */
+    public function platform_taxonomy_add_form_fields() {
+        wp_nonce_field('bw_platform_logo_save', 'bw_platform_logo_nonce');
+        ?>
+        <div class="form-field bw-platform-logo-wrap">
+            <label><?php esc_html_e('Platform Logo', 'site-essentials'); ?></label>
+            <div class="bw-platform-logo-preview"></div>
+            <input type="hidden" name="bw_platform_logo_id" value="">
+            <button type="button" class="button bw-platform-logo-select"><?php esc_html_e('Select Logo', 'site-essentials'); ?></button>
+            <button type="button" class="button bw-platform-logo-remove" style="display:none"><?php esc_html_e('Remove', 'site-essentials'); ?></button>
+            <p class="description"><?php esc_html_e('Accepted formats: SVG (recommended), PNG, WebP.', 'site-essentials'); ?></p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render logo field on the "Edit Platform" form.
+     *
+     * @since 1.2.0
+     * @param \WP_Term $term Current term object.
+     * @return void
+     */
+    public function platform_taxonomy_edit_form_fields($term) {
+        $logo_id   = absint(get_term_meta($term->term_id, 'bw_platform_logo_id', true));
+        $image_url = $logo_id ? wp_get_attachment_url($logo_id) : '';
+        wp_nonce_field('bw_platform_logo_save', 'bw_platform_logo_nonce');
+        ?>
+        <tr class="form-field bw-platform-logo-wrap">
+            <th scope="row"><label><?php esc_html_e('Platform Logo', 'site-essentials'); ?></label></th>
+            <td>
+                <div class="bw-platform-logo-preview">
+                    <?php if ($image_url) : ?>
+                        <img src="<?php echo esc_url($image_url); ?>" style="max-width:120px;max-height:60px;display:block;margin-bottom:8px;">
+                    <?php endif; ?>
+                </div>
+                <input type="hidden" name="bw_platform_logo_id" value="<?php echo esc_attr($logo_id ?: ''); ?>">
+                <button type="button" class="button bw-platform-logo-select"><?php esc_html_e('Select Logo', 'site-essentials'); ?></button>
+                <button type="button" class="button bw-platform-logo-remove"<?php echo $logo_id ? '' : ' style="display:none"'; ?>><?php esc_html_e('Remove', 'site-essentials'); ?></button>
+                <p class="description"><?php esc_html_e('Accepted formats: SVG (recommended), PNG, WebP.', 'site-essentials'); ?></p>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * Save the platform logo attachment ID to term meta.
+     *
+     * Fires on both created_{taxonomy} and edited_{taxonomy}.
+     *
+     * @since 1.2.0
+     * @param int $term_id Term ID.
+     * @return void
+     */
+    public function save_platform_taxonomy_logo($term_id) {
+        if (
+            !isset($_POST['bw_platform_logo_nonce']) ||
+            !wp_verify_nonce(sanitize_key(wp_unslash($_POST['bw_platform_logo_nonce'])), 'bw_platform_logo_save')
+        ) {
+            return;
+        }
+        if (!current_user_can('manage_categories')) {
+            return;
+        }
+        if (!empty($_POST['bw_platform_logo_id'])) {
+            $logo_id       = absint($_POST['bw_platform_logo_id']);
+            $allowed_mimes = ['image/svg+xml', 'image/png', 'image/webp'];
+            if (in_array(get_post_mime_type($logo_id), $allowed_mimes, true)) {
+                update_term_meta($term_id, 'bw_platform_logo_id', $logo_id);
+            }
+        } else {
+            delete_term_meta($term_id, 'bw_platform_logo_id');
+        }
+    }
+
+    /**
+     * Inline JS for the platform logo media uploader.
+     *
+     * @since 1.2.0
+     * @return string
+     */
+    private function platform_taxonomy_media_js() {
+        return <<<'JS'
+(function($){
+    var frame;
+    $(document).on('click', '.bw-platform-logo-select', function(e){
+        e.preventDefault();
+        var $wrap = $(this).closest('.bw-platform-logo-wrap');
+        if (frame) { frame.open(); return; }
+        frame = wp.media({
+            title: 'Select Platform Logo',
+            button: { text: 'Use this logo' },
+            multiple: false,
+            library: { type: ['image/svg+xml', 'image/png', 'image/webp'] }
+        });
+        frame.on('select', function(){
+            var att = frame.state().get('selection').first().toJSON();
+            var src = (att.sizes && att.sizes.thumbnail) ? att.sizes.thumbnail.url : att.url;
+            $wrap.find('[name="bw_platform_logo_id"]').val(att.id);
+            $wrap.find('.bw-platform-logo-preview').html('<img src="' + src + '" style="max-width:120px;max-height:60px;display:block;margin-bottom:8px;">');
+            $wrap.find('.bw-platform-logo-remove').show();
+        });
+        frame.open();
+    });
+    $(document).on('click', '.bw-platform-logo-remove', function(e){
+        e.preventDefault();
+        var $wrap = $(this).closest('.bw-platform-logo-wrap');
+        $wrap.find('[name="bw_platform_logo_id"]').val('');
+        $wrap.find('.bw-platform-logo-preview').html('');
+        $(this).hide();
+    });
+})(jQuery);
+JS;
+    }
+
+    // =========================================================================
+    // SVG UPLOAD SUPPORT
+    // =========================================================================
+
+    /**
+     * Whitelist SVG MIME type for users who can upload files.
+     *
+     * @since 1.2.0
+     * @param array $mimes Allowed MIME types keyed by extension.
+     * @return array
+     */
+    public function allow_platform_svg_upload($mimes) {
+        if (current_user_can('upload_files')) {
+            $mimes['svg']  = 'image/svg+xml';
+            $mimes['svgz'] = 'image/svg+xml';
+        }
+        return $mimes;
+    }
+
+    /**
+     * Ensure WordPress recognises SVG files when checking filetype vs. extension.
+     *
+     * WP 4.7.1+ verifies content matches extension; SVG (XML) can fail that check.
+     *
+     * @since 1.2.0
+     * @param array       $data      Values for the extension, MIME type, and proper file name.
+     * @param string      $file      Full path to the file.
+     * @param string      $filename  The name of the file.
+     * @param array       $mimes     Array of allowed MIME types.
+     * @param string|bool $real_mime The actual MIME type or false if unknown (WP 5.1+).
+     * @return array
+     */
+    public function fix_svg_filetype_check($data, $file, $filename, $mimes, $real_mime = false) {
+        if (!empty($data['ext']) && !empty($data['type'])) {
+            return $data;
+        }
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if ($ext === 'svg' || $ext === 'svgz') {
+            $data['ext']             = $ext;
+            $data['type']            = 'image/svg+xml';
+            $data['proper_filename'] = $filename;
+        }
+        return $data;
+    }
+
+    /**
+     * Sanitize SVG files on upload by stripping scripts and event handlers.
+     *
+     * Removes <script> elements, on* event attributes, and javascript: URIs
+     * before the file is written to the uploads directory.
+     *
+     * @since 1.2.0
+     * @param array $file Upload data array from $_FILES.
+     * @return array
+     */
+    public function sanitize_svg_upload($file) {
+        if (($file['type'] ?? '') !== 'image/svg+xml') {
+            return $file;
+        }
+        $content = file_get_contents($file['tmp_name']);
+        if ($content === false) {
+            $file['error'] = __('Could not read the uploaded SVG file.', 'site-essentials');
+            return $file;
+        }
+        // Strip <script> blocks
+        $content = preg_replace('/<script[\s\S]*?<\/script>/i', '', $content);
+        // Strip on* event attributes (e.g. onload="...", onclick='...')
+        $content = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\')/i', '', $content);
+        // Strip javascript: URIs in href / xlink:href
+        $content = preg_replace('/\s+(?:xlink:)?href\s*=\s*(?:"javascript:[^"]*"|\'javascript:[^\']*\')/i', '', $content);
+        file_put_contents($file['tmp_name'], $content);
+        return $file;
     }
 
     // =========================================================================
@@ -845,7 +1111,12 @@ class Cpt_Module implements Module_Interface {
         add_shortcode('bw_review_customer_detail', [$this, 'shortcode_review_customer_detail']);
         add_shortcode('bw_review_excerpt',         [$this, 'shortcode_review_excerpt']);
         add_shortcode('bw_review_featured',        [$this, 'shortcode_review_featured']);
-        
+
+        // Review card — full rendered card, used by SCOS Review Card BDE element + direct shortcode
+        require_once __DIR__ . '/Review_Card_Renderer.php';
+        $renderer = new Review_Card_Renderer();
+        add_shortcode('bw_review_card', [$renderer, 'shortcode']);
+
         // Statistics shortcodes
         add_shortcode('bw_review_count',           [$this, 'shortcode_review_count']);
         add_shortcode('bw_review_average',         [$this, 'shortcode_review_average']);
@@ -1107,7 +1378,10 @@ class Cpt_Module implements Module_Interface {
             wp_die(__('You do not have sufficient permissions.', 'site-essentials'));
         }
 
-        $redirect_base = add_query_arg('page', 'site-essentials-cpt', admin_url('admin.php'));
+        $redirect_base = add_query_arg(
+            [ 'page' => 'site-essentials-cpt', 'tab' => 'reviews' ],
+            admin_url('admin.php')
+        );
 
         if (empty($_FILES['bw_reviews_csv']['tmp_name'])) {
             wp_safe_redirect(add_query_arg([
@@ -1291,13 +1565,22 @@ class Cpt_Module implements Module_Interface {
     /**
      * Render settings section (options page content)
      *
+     * Dispatches into the tabbed cpt-page view. Active tab is read from
+     * the $_GET['tab'] parameter; defaults to 'settings'.
+     *
      * @since 1.0.0
+     * @param string|null $active_tab Optional active tab override.
      * @return void
      */
-    public function render_settings() {
-        $opts = $this->settings->get_module_setting('cpt', null, $this->get_default_options());
-        $opts = wp_parse_args($opts, $this->get_default_options());
+    public function render_settings( $active_tab = null ) {
+        $opts = $this->settings->get_module_setting('cpt', null, []);
+        $opts = wp_parse_args(is_array($opts) ? $opts : [], $this->get_default_options());
 
-        include __DIR__ . '/views/settings.php';
+        if ( null === $active_tab ) {
+            $active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
+        }
+        $active_tab = sanitize_key( (string) $active_tab );
+
+        include __DIR__ . '/views/cpt-page.php';
     }
 }

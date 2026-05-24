@@ -25,6 +25,11 @@ class BW_Breadcrumbs_Meta {
      * Add breadcrumbs meta box to posts and pages
      */
     public function add_meta_box() {
+        // Suppressed when SEO Meta / SA handle fields, or Site Essentials is present (avoid legacy duplicate).
+        if ( defined( 'SCOS_SEO_ACTIVE' ) || defined( 'SCOS_SA_ACTIVE' ) || defined( 'SITE_ESSENTIALS_VERSION' ) ) {
+            return;
+        }
+
         $post_types = array('post', 'page', 'folio', 'projects');
 
         foreach ($post_types as $post_type) {

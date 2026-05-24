@@ -1,12 +1,13 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.3.0
+ * Version: 4.3.1
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.3.1 - REMOVE: bw-schema-admin (Support → Schema / brighter-schema); use Site Essentials → Schema.
  * 4.3.0 - FEATURE: Added ALTC (Authority-Led Topic Clusters) content optimization tracking system
  *         - New taxonomies: altc_strategic_lens, altc_topic
  *         - New post meta: bw_primary_altc_id, bw_primary_topic_id, bw_cont_maturity
@@ -29,7 +30,7 @@ if (!defined('ABSPATH')) exit;
 //error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.3.0');
+define('BRIGHTER_CORE_VERSION', '4.3.1');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
@@ -41,6 +42,7 @@ function brighter_get_whitelisted_modules() {
 
     if ($whitelist === null) {
         $whitelist = [
+            'scos-support-options',
             'brighter-business-info',
             'brighter-support',
             'brighter-frontend',
@@ -61,26 +63,36 @@ function brighter_get_whitelisted_modules() {
             'bw-content-strategy',
             'bw-ga4-seeder',
             'bw-ga4-seed-admin',
-            'bw-schema-admin',              // Schema admin interface (Local Business Schema settings)
+            // bw-schema-admin removed — site-wide schema UI is Site Essentials > Schema (SiteSchema_Module).
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
             'bw-support-cache-dashbrd',
-            'bw-faq',
-            // ALTC modules
+            // bw-faq REMOVED — FAQ submodule now fully owned by
+            //   site-essentials/Modules/CustomPosts/FAQ/ (FAQ_Module +
+            //   FAQ_Block + FAQ_REST + FAQ_Schema_Graph). Block name
+            //   `brighter/faq-selector` retained for backward compat.
+
+            // ── ALTC legacy modules ───────────────────────────────────────────
+            // class-altc-taxonomies: keep — registers legacy altc_strategic_lens
+            //   and altc_topic slugs so existing DB term relationships stay valid
+            //   until data is fully migrated to scos_content_cluster / scos_topic.
             'class-altc-taxonomies',
-            'class-altc-meta-boxes',
-            'class-altc-admin-columns',
-            'class-altc-admin-pages',
-            'class-altc-ga4-integration',
-            'class-altc-migration',
-            // Content Analysis
+            // Deleted (all replaced by site-essentials ContentArchitecture module):
+            //   class-altc-meta-boxes, class-altc-admin-columns, class-altc-admin-pages,
+            //   class-altc-ga4-integration, class-altc-migration, migrate-tldr-field,
+            //   class-tldr-meta-box
+
+            // ── Content Analysis ─────────────────────────────────────────────
+            // class-content-analysis: keep — BW_Content_Analysis class and save_post
+            //   hooks still write bw_* stats that scos CA module reads via
+            //   BW_Content_Analysis::get_aggregated_content().
             'class-content-analysis',
             'class-content-analysis-seeder',
             'class-content-stats-page',
             'class-column-toggles',
             'class-field-tooltips',
-            'migrate-tldr-field', // One-time migration (ACF → bw_tldr)
-            'class-tldr-meta-box', // TLDR field meta box (admin only)
+            // 'migrate-tldr-field', // ONE-TIME MIGRATION — ACF → bw_tldr already complete; safe to disable
+            // 'class-tldr-meta-box', // REPLACED — SCOS_SEO_ACTIVE guard makes this a no-op; SeoMeta Meta_Box.php provides TLDR field
             'reading-time-shortcode', // Reading time shortcode (frontend + backend)
             'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
             'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
@@ -167,6 +179,7 @@ function brighter_load_module($module) {
 function brighter_load_modules() {
     // Define which modules to load
     $modules = [
+        'scos-support-options',
         'brighter-business-info',
         'brighter-frontend',
         'brighter-og-meta',             // Open Graph & Meta Tags
@@ -178,35 +191,30 @@ function brighter_load_modules() {
         'image-optimisation',
         'bw-custposts',
         'brighter-tweaks',
-        'bw-schema-admin',
-
 	'bw-content-strategy',
  	'bw-ga4-seeder',
  	'bw-ga4-seed-admin',
 	'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
 	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
-        'bw-faq',
+        // bw-faq removed — see site-essentials/Modules/CustomPosts/FAQ/
         'privacy-policy-style',
         'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
         'post-type-enhancements',       // Add author support to custom post types
-        
-        // ALTC modules
+
+        // ── ALTC legacy taxonomies ────────────────────────────────────────────
+        // Keep: legacy altc_strategic_lens and altc_topic slugs preserve existing
+        //       DB term relationships until data fully migrated to scos_* equivalents.
         'class-altc-taxonomies',
-        'class-altc-meta-boxes',
-        'class-altc-admin-columns',
-        'class-altc-admin-pages',
-        'class-altc-ga4-integration',
-        'class-altc-migration',
-        // Content Analysis modules
+
+        // ── Content Analysis ──────────────────────────────────────────────────
+        // Keep: BW_Content_Analysis class still used by site-essentials CA module
         'class-content-analysis',
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-tldr-field', // One-time migration (admin only)
-        'class-tldr-meta-box', // TLDR field meta box (admin only)
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
-        'tldr-shortcode', // TLDR summary shortcode (frontend + backend)
-        'breadcrumb-shortcode', // Breadcrumb shortcode (matches schema breadcrumbs)
+        'tldr-shortcode',         // TLDR summary shortcode (frontend + backend)
+        'breadcrumb-shortcode',   // Breadcrumb shortcode (matches schema breadcrumbs)
     ];
 
     // Admin-only modules (backend only, not frontend)
@@ -216,18 +224,12 @@ function brighter_load_modules() {
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
        	'bw-ga4-seed-admin',
-        // NOTE: bw-schema-admin must be in main modules list (not admin-only) to work properly
-        // ALTC admin modules
-        'class-altc-meta-boxes',
-        'class-altc-admin-columns',
-        'class-altc-admin-pages',
-        'class-altc-migration',
+        // Legacy bw-schema-admin (Support > Schema) removed; use Site Essentials > Schema.
         // Content Analysis (admin-only)
         'class-content-analysis-seeder',
         'class-content-stats-page',
-        'migrate-tldr-field', // One-time migration (admin only)
-        'class-tldr-meta-box', // TLDR field meta box (admin only)
-       // 'brighter-tweaks',
+        // Deleted: class-altc-meta-boxes, class-altc-admin-columns, class-altc-admin-pages,
+        //          class-altc-migration, migrate-tldr-field, class-tldr-meta-box
     ];
     
     // Load all modules - admin-only modules are safe to load on frontend

@@ -124,11 +124,6 @@ class BW_Social_Webhook_Trigger {
             return;
         }
 
-        // DEBUG: Log webhook details
-        error_log('=== BW SOCIAL WEBHOOK DEBUG START ===');
-        error_log('Webhook URL: ' . $webhook_url);
-        error_log('Payload: ' . json_encode($payload, JSON_PRETTY_PRINT));
-        
         // Send async request (don't wait for response)
         $response = wp_remote_post($webhook_url, array(
             'body' => json_encode($payload),
@@ -140,20 +135,9 @@ class BW_Social_Webhook_Trigger {
             'sslverify' => true
         ));
 
-        // DEBUG: Log response
         if (is_wp_error($response)) {
-            error_log('Webhook ERROR: ' . $response->get_error_message());
-        } else {
-            error_log('Webhook sent successfully (non-blocking)');
+            error_log('BW Social Amplification: Webhook error for post ' . $payload['post_id'] . ' — ' . $response->get_error_message());
         }
-        error_log('=== BW SOCIAL WEBHOOK DEBUG END ===');
-
-        // Log for debugging
-        error_log(sprintf(
-            'BW Social Amplification: Webhook triggered for %s (ID: %d)',
-            $payload['post_title'],
-            $payload['post_id']
-        ));
     }
 
     /**
@@ -166,19 +150,16 @@ class BW_Social_Webhook_Trigger {
     public function manual_trigger($post_id) {
         $post = get_post($post_id);
         if (!$post) {
-            error_log("BW Social Amplification: Manual trigger failed - post $post_id not found");
             return false;
         }
 
         // Don't trigger for revisions or autosaves
         if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
-            error_log("BW Social Amplification: Manual trigger skipped - revision or autosave");
             return false;
         }
 
         // Only trigger for published posts
         if ($post->post_status !== 'publish') {
-            error_log("BW Social Amplification: Manual trigger failed - post not published (status: {$post->post_status})");
             return false;
         }
 
@@ -218,14 +199,6 @@ class BW_Social_Webhook_Trigger {
 
         // Send webhook (bypasses enabled check)
         $this->send_webhook($payload);
-        
-        error_log(sprintf(
-            'BW Social Amplification: MANUAL trigger sent for "%s" (ID: %d, Type: %s)',
-            $payload['post_title'],
-            $payload['post_id'],
-            $payload['post_type']
-        ));
-        
         return true;
     }
 

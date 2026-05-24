@@ -58,7 +58,7 @@ body.admin-bar a.skip-link.screen-reader-text {
 
 .page-slug-privacy-policy .terms-tocs > li a {
     text-decoration: none;
-    font-family: "Noto Sans", sans-serif;
+    font-family: var(--bde-body-font-family) !important;
     font-weight: 500;
 }
 
@@ -68,22 +68,24 @@ body.admin-bar a.skip-link.screen-reader-text {
 .page-slug-privacy-policy li {
     list-style-type: none;
     line-height: 1.5;
-    font-family: "Noto Sans", sans-serif !important;
-    color: #2b2b2b;
+    font-family: var(--bde-body-font-family) !important;
+    font-size: calc(.9 * var(--bde-base-font-size));
+    color: var(--bde-body-text-color) !important;
 }
 
 .page-slug-privacy-policy li { 
     padding-bottom: 10px; 
 }
 
-.page-slug-privacy-policy h2, 
-.page-slug-privacy-policy h3, 
+.page-slug-privacy-policy h2 {font-size: calc(var(--bde-h2-font-size) * .5) !important;}
+.page-slug-privacy-policy h3 {font-size: calc(var(--bde-h3-font-size) * .5) !important;}
+.page-slug-privacy-policy h4 {font-size: calc(var(--bde-h4-font-size) * .5) !important;}
+
+.page-slug-privacy-policy h2,
+.page-slug-privacy-policy h3,
 .page-slug-privacy-policy h4 {
-    font-size: 1.1em !important;
     margin: 10px 0;
-    line-height: 1;
-    font-weight: 500;
-    font-family: "Noto Sans", sans-serif !important;
+    font-family: var(--bde-body-font-family) !important;
 }
 
 .page-slug-privacy-policy .c01 { padding-left: 20px; }
@@ -97,18 +99,15 @@ body.admin-bar a.skip-link.screen-reader-text {
  * ============================================ */
 
 .tldr-summary {
-    background: #f8f9fa;
-    border-left: 4px solid var(--bde-brand-primary-color);
     padding: 1.5rem;
     margin: 0;
-    border-radius: 4px;
 }
 
 .tldr-summary .tldr-heading {
     margin-top: 0;
     margin-bottom: 1rem;
-    font-size: 1em;
-    color: #303030;
+    font-size: calc(var(--bde-base-font-size) * .9) !important;
+    color: var(--bde-body-text-color) !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -146,7 +145,7 @@ body.admin-bar a.skip-link.screen-reader-text {
     cursor: pointer;
     font-weight: 600;
     font-size: 1.1em;
-    background: #f9f9f9;
+    background: var(--bde-background-color) !important;
     border-radius: 4px;
     user-select: none;
 }
@@ -235,10 +234,8 @@ ul.bw-breadcrumbs {
 .bw-breadcrumbs li,
 .bw-breadcrumbs li a {
     color: var(--bde-body-text-color);
-    font-size: 18px;
     text-decoration-line: none;
     text-transform: uppercase;
-    font-weight: 900;
     line-height: 1;
     letter-spacing: 1px;
     margin-bottom: 5px;
@@ -265,9 +262,26 @@ ul.bw-breadcrumbs {
     );
 }
 
+/* Overflow fade — light page background (darker gradient at right edge) */
+.bw-breadcrumbs-light-bg .bw-breadcrumbs-wrap.is-overflowing::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0, 0, 0, 0.15) 50%,
+        rgba(0, 0, 0, 0.35) 100%
+    );
+}
+
 @media (max-width: 675px) {
     .bw-breadcrumbs li,
     .bw-breadcrumbs li a {
-        font-size: 14px;
+        font-size: calc(var(--bde-base-font-size) * .8) !important;
     }
 }

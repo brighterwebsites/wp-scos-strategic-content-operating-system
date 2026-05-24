@@ -55,12 +55,29 @@ add_action('wp_footer', function() {
             }
         </style>
          <div class="gs-admin-bar-links">
-            <a href="https://brighterwebsites.com.au/support" target="_blank" rel="noopener">💬 Support</a>
+            <?php
+            $support_href = 'https://brighterwebsites.com.au/support';
+            if ( function_exists( 'scos_se_agency_get' ) ) {
+                $base = rtrim( (string) scos_se_agency_get( 'url' ), '/' );
+                if ( $base !== '' ) {
+                    $support_href = preg_match( '#/support$#i', $base ) ? $base : trailingslashit( $base ) . 'support';
+                }
+            }
+            ?>
+            <a href="<?php echo esc_url( $support_href ); ?>" target="_blank" rel="noopener">💬 Support</a>
             <a href="<?php echo esc_url(admin_url('edit.php')); ?>">📊 Dashboard</a>
 
-<a href="#" class="gs-purge-cache">🔄 Purge Cache</a>
-            <?php if ($post && $post->ID): ?>
-                <a href="<?php echo esc_url(get_edit_post_link($post->ID)); ?>">✏️ Edit This Page</a>
+            <?php if ($post && $post->ID):
+                $post_id         = $post->ID;
+                $wp_edit_url     = admin_url( 'post.php?post=' . $post_id . '&action=edit' );
+                $seo_url         = $wp_edit_url . '#scos_seo_meta';
+                $bd_data         = get_post_meta( $post_id, '_breakdance_data', true );
+                $edit_page_url   = ! empty( $bd_data )
+                    ? home_url( '/?breakdance=builder&id=' . $post_id )
+                    : $wp_edit_url;
+            ?>
+                <a href="<?php echo esc_url( $seo_url ); ?>">🔍 Edit SEO</a>
+                <a href="<?php echo esc_url( $edit_page_url ); ?>">✏️ Edit Page</a>
             <?php endif; ?>
         </div>
         <?php
@@ -71,22 +88,41 @@ add_action('wp_footer', function() {
  * Redirect all users to Brighter Support page on login
  * Compatible with WPGhost redirect override
  */
+// SCOS-SUPPORT-PASS2 — login redirect wired to Agency Access tab options
 add_filter( 'login_redirect', 'bw_redirect_to_support_page', 100, 3 );
 function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
     // Only redirect on successful login (user object exists)
-    if ( isset( $user->ID ) ) {
-        // Set a transient to show the notice (expires in 60 seconds)
-        set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
-        
-        // Redirect to Brighter Support page
-        return admin_url( 'admin.php?page=brighter_support&tab=support' );
+    if ( ! isset( $user->ID ) || ! isset( $user->roles ) ) {
+        return $redirect_to;
     }
-    
+
+    // Set a transient to show the notice (expires in 60 seconds)
+    set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
+
+    // SCOS-SUPPORT-PASS2 — removed hardcoded redirect, now controlled via Agency > Access tab
+    $fallback = admin_url( 'admin.php?page=site-essentials-support' ); // SCOS-SUPPORT-PASS2 — updated fallback from brighter_support to site-essentials-support
+    $roles    = (array) $user->roles;
+
+    if ( in_array( 'administrator', $roles, true ) ) { // SCOS-SUPPORT-PASS2 — administrator redirect
+        $url = get_option( 'se_agency_login_redirect_admin', '' );
+        return $url ? admin_url( ltrim( $url, '/' ) ) : $fallback;
+    }
+
+    if ( in_array( 'shop_manager', $roles, true ) ) { // SCOS-SUPPORT-PASS2 — shop_manager redirect
+        $url = get_option( 'se_agency_login_redirect_shop_manager', '' );
+        return $url ? admin_url( ltrim( $url, '/' ) ) : $fallback;
+    }
+
+    if ( in_array( 'editor', $roles, true ) ) { // SCOS-SUPPORT-PASS2 — editor redirect
+        $url = get_option( 'se_agency_login_redirect_editor', '' );
+        return $url ? admin_url( ltrim( $url, '/' ) ) : $fallback;
+    }
+
     return $redirect_to;
 }
 
 /**
- * Display backup reminder notice after login redirect
+ * Display backup reminder notice after login redirect should move this to agency settings
  */
 add_action( 'admin_notices', 'bw_backup_reminder_notice' );
 function bw_backup_reminder_notice() {

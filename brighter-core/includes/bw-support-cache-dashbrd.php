@@ -37,8 +37,11 @@ function brighter_check_rate_limit($action, $limit = 10, $period = MINUTE_IN_SEC
 
 /**
  * Add Cache Test submenu - SECURITY HARDENED
+ * Only shown when site-essentials is not installed. When SE is active this
+ * will eventually live under Site Essentials > Settings > Debug.
  */
 add_action('admin_menu', function() {
+    if ( defined( 'SITE_ESSENTIALS_VERSION' ) ) { return; }
     add_submenu_page(
         'brighter_support',
         'Cache Test',

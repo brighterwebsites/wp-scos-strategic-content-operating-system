@@ -191,7 +191,7 @@ class Brighter_Ntfy_Downtime_Monitor {
             'title' => '⚠️ Site Health Alert',
             'priority' => 'high',
             'tags' => ['warning', 'health'],
-            'click' => admin_url('admin.php?page=brighter_support&tab=monitoring'),
+            'click' => admin_url('admin.php?page=brighter_support&tab=support'),
         ]);
         
         if (!is_wp_error($result)) {

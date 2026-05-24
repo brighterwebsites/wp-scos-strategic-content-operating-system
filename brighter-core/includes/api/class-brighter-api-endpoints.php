@@ -355,9 +355,26 @@ class Brighter_API_Endpoints {
                 $url = preg_replace('#^https?://[^/]+#', '', $url);
                 // Ensure leading slash
                 $url = '/' . ltrim($url, '/');
-                
-                // Try to get post ID from URL
-                $post_id = url_to_postid($url);
+
+                // Homepage: url_to_postid('/') always returns 0; resolve via WP front-page setting.
+                if ($url === '/') {
+                    $front_page_id = (int) get_option('page_on_front');
+                    if ($front_page_id > 0 && get_option('show_on_front') === 'page') {
+                        $post_id = $front_page_id;
+                    } else {
+                        // Blog posts index or no static front page — not a single post/page.
+                        return new WP_Error(
+                            'not_found',
+                            'Homepage is not a static page. Provide a specific page URL or post_id.',
+                            array('status' => 404)
+                        );
+                    }
+                }
+
+                if (!$post_id) {
+                    // Try to get post ID from URL
+                    $post_id = url_to_postid($url);
+                }
                 
                 if (!$post_id) {
                     // Try parsing as slug

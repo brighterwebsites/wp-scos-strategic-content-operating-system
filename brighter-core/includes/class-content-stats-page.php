@@ -3,7 +3,7 @@
  * Content Statistics Dashboard Page
  *
  * File: class-content-stats-page.php
- * Version: 1.0.0
+ * Version: 1.1.0 | 2026-05-19
  *
  * Responsibilities:
  * - Display content analysis statistics in dedicated admin page
@@ -13,6 +13,9 @@
  */
 
 if (!defined('ABSPATH')) exit;
+
+// Suppressed when the Content Architecture module is active — content stats will live at scos-content-stats-{post_type}.
+if ( defined( 'SCOS_CA_ACTIVE' ) ) { return; }
 
 class BW_Content_Stats_Page {
 
@@ -115,6 +118,15 @@ class BW_Content_Stats_Page {
         $total_posts = wp_count_posts($post_type === 'all' ? 'post' : $post_type);
         $pending_analysis = self::get_pending_count();
 
+        // Build a safe "analyze now" URL that redirects back to this stats page.
+        $post_type_param = ($post_type !== 'all' && $post_type !== 'post')
+            ? 'post_type=' . $post_type . '&'
+            : '';
+        $analyze_url = wp_nonce_url(
+            admin_url( 'edit.php?' . $post_type_param . 'page=' . $current_page . '&bw_analyze_now=1' ),
+            'bw_analyze_now'
+        );
+
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Content Statistics', 'brighterwebsites'); ?></h1>
@@ -131,7 +143,7 @@ class BW_Content_Stats_Page {
                 </div>
                 <?php if ($pending_analysis > 0): ?>
                 <div class="bw-stat-card" style="flex: 1; min-width: 200px; padding: 20px; background: #fff; border-left: 4px solid #16a34a; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <a href="<?php echo esc_url(wp_nonce_url(admin_url('edit.php?page=bw-content-stats&bw_analyze_now=1'), 'bw_analyze_now')); ?>"
+                    <a href="<?php echo esc_url( $analyze_url ); ?>"
                        class="button button-primary" style="margin-top: 5px;">
                         Analyze 5 Posts Now
                     </a>
@@ -196,12 +208,19 @@ class BW_Content_Stats_Page {
                     <?php if ($query->have_posts()): ?>
                         <?php while ($query->have_posts()): $query->the_post();
                             $post_id = get_the_ID();
-                            $word_count = get_post_meta($post_id, 'bw_word_count', true);
-                            $images = get_post_meta($post_id, 'bw_image_count', true);
-                            $h2s = get_post_meta($post_id, 'bw_h2_count', true);
-                            $int_links = get_post_meta($post_id, 'bw_internal_link_count', true);
-                            $ext_links = get_post_meta($post_id, 'bw_external_link_count', true);
-                            $last_analyzed = get_post_meta($post_id, '_bw_last_analyzed', true);
+                            // Prefer scos_ca_* (CA module) keys; fall back to legacy bw_* where missing.
+                            $word_count = get_post_meta($post_id, 'scos_ca_word_count', true)
+                                ?: get_post_meta($post_id, 'bw_word_count', true);
+                            $images = get_post_meta($post_id, 'scos_ca_image_count', true)
+                                ?: get_post_meta($post_id, 'bw_image_count', true);
+                            $h2s = get_post_meta($post_id, 'scos_ca_h2_count', true)
+                                ?: get_post_meta($post_id, 'bw_h2_count', true);
+                            $int_links = get_post_meta($post_id, 'scos_ca_links_to_internal', true)
+                                ?: get_post_meta($post_id, 'bw_internal_link_count', true);
+                            $ext_links = get_post_meta($post_id, 'scos_ca_links_to_external', true)
+                                ?: get_post_meta($post_id, 'bw_external_link_count', true);
+                            $last_analyzed = get_post_meta($post_id, 'scos_ca_last_analyzed', true)
+                                ?: get_post_meta($post_id, '_bw_last_analyzed', true);
                             $needs_analysis = empty($last_analyzed);
                         ?>
                         <tr <?php if ($needs_analysis) echo 'style="background: #fff8e1;"'; ?>>
@@ -296,7 +315,8 @@ class BW_Content_Stats_Page {
     }
 
     /**
-     * Get count of analyzed posts
+     * Get count of analyzed posts.
+     * Counts posts with either scos_ca_last_analyzed (CA module) or _bw_last_analyzed (legacy).
      */
     private static function get_analyzed_count() {
         global $wpdb;
@@ -308,14 +328,15 @@ class BW_Content_Stats_Page {
                 INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
                 WHERE p.post_type IN ($placeholders)
                 AND p.post_status IN ('publish', 'draft', 'pending', 'private')
-                AND pm.meta_key = '_bw_last_analyzed'
+                AND pm.meta_key IN ('scos_ca_last_analyzed', '_bw_last_analyzed')
                 AND pm.meta_value != ''";
 
         return absint($wpdb->get_var($wpdb->prepare($sql, ...$post_types)));
     }
 
     /**
-     * Get count of posts pending analysis
+     * Get count of posts pending analysis.
+     * Only counts posts that have neither scos_ca_last_analyzed nor _bw_last_analyzed.
      */
     private static function get_pending_count() {
         global $wpdb;
@@ -324,10 +345,14 @@ class BW_Content_Stats_Page {
 
         $sql = "SELECT COUNT(DISTINCT p.ID)
                 FROM {$wpdb->posts} p
-                LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_bw_last_analyzed'
                 WHERE p.post_type IN ($placeholders)
                 AND p.post_status IN ('publish', 'draft', 'pending', 'private')
-                AND (pm.post_id IS NULL OR pm.meta_value = '')";
+                AND p.ID NOT IN (
+                    SELECT DISTINCT pm.post_id
+                    FROM {$wpdb->postmeta} pm
+                    WHERE pm.meta_key IN ('scos_ca_last_analyzed', '_bw_last_analyzed')
+                    AND pm.meta_value != ''
+                )";
 
         return absint($wpdb->get_var($wpdb->prepare($sql, ...$post_types)));
     }

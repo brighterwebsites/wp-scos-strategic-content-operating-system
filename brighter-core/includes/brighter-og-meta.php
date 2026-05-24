@@ -31,12 +31,14 @@ if (!defined('ABSPATH')) exit;
  */
 add_action('wp_head', 'brighter_output_og_meta_tags', 2);
 function brighter_output_og_meta_tags() {
+    // Suppressed when the SeoMeta module is active — Head_Output.php handles all OG/meta tags.
+    if ( defined( 'SCOS_SEO_ACTIVE' ) ) { return; }
     if (is_admin() || is_feed() || (defined('REST_REQUEST') && REST_REQUEST)) {
         return;
     }
 
     // Get business info
-    $business_name = get_option('bw_business_name', get_bloginfo('name'));
+    $business_name = function_exists( 'brighter_get_option' ) ? ( brighter_get_option( 'business_name' ) ?: get_bloginfo( 'name' ) ) : get_option( 'bw_business_name', get_bloginfo( 'name' ) );
     $site_name = get_bloginfo('name');
     
     // Determine locale (default to en_AU, can be extended)
@@ -52,8 +54,7 @@ function brighter_output_og_meta_tags() {
     // =========================================
     // OG: URL, Site Name, Locale
     // =========================================
-    echo "\n<!-- Open Graph Meta Tags -->\n";
-    echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
+     echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
     echo '<meta property="og:site_name" content="' . esc_attr($business_name) . '">' . "\n";
     echo '<meta property="og:locale" content="' . esc_attr($og_locale) . '">' . "\n";
     
@@ -125,9 +126,7 @@ function brighter_output_og_meta_tags() {
     // =========================================
     // Twitter Card
     // =========================================
-    echo "\n<!-- Twitter Card Meta Tags -->\n";
-    echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
-    echo "<!-- /Open Graph Meta Tags -->\n\n";
+     echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
 }
 
 /**
@@ -140,8 +139,14 @@ function brighter_get_og_title() {
     // Singular posts/pages
     if (is_singular()) {
         global $post;
-        
-        // Try SEOPress meta
+
+        // scos_seo_title first (our metabox)
+        $scos_title = get_post_meta($post->ID, 'scos_seo_title', true);
+        if (!empty($scos_title)) {
+            return $scos_title;
+        }
+
+        // Fallback: SEOPress meta (populated by our dual-write on save)
         $seopress_title = get_post_meta($post->ID, '_seopress_titles_title', true);
         if (!empty($seopress_title)) {
             return $seopress_title;
@@ -180,8 +185,14 @@ function brighter_get_og_description() {
     // Singular posts/pages
     if (is_singular()) {
         global $post;
-        
-        // Try SEOPress meta
+
+        // scos_seo_description first (our metabox)
+        $scos_desc = get_post_meta($post->ID, 'scos_seo_description', true);
+        if (!empty($scos_desc)) {
+            return $scos_desc;
+        }
+
+        // Fallback: SEOPress meta
         $seopress_desc = get_post_meta($post->ID, '_seopress_titles_desc', true);
         if (!empty($seopress_desc)) {
             return $seopress_desc;

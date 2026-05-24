@@ -2,15 +2,12 @@
 /**
  * SEO Module
  *
- * Provides comprehensive SEO features:
- * - XML Sitemap generation
- * - Image sitemaps
- * - Sitemap index
- * - Google Search Console integration (future)
+ * Unified SEO: XML/HTML sitemaps, per-page meta (via SeoMeta bootstrap), archive SEO,
+ * robots.txt / LLMs.txt, image SEO, redirections, and related admin UI.
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.0.0
+ * @version    1.1 | 2026-05-22
  * @since      1.0.0
  */
 
@@ -67,7 +64,7 @@ class Seo_Module implements Module_Interface {
      * @return string
      */
     public static function get_name() {
-        return __('SEO & Sitemaps', 'site-essentials');
+        return __('SEO Module', 'site-essentials');
     }
 
     /**
@@ -77,7 +74,7 @@ class Seo_Module implements Module_Interface {
      * @return string
      */
     public static function get_description() {
-        return __('XML sitemap generation, image sitemaps, and SEO optimization. Replacement for SEOPress sitemap issues.', 'site-essentials');
+        return __('XML/HTML sitemaps, per-page SEO meta (title, description, robots, TLDR), archive SEO, advanced (robots.txt, LLMs.txt), image SEO, and redirections.', 'site-essentials');
     }
 
     /**
@@ -119,6 +116,10 @@ class Seo_Module implements Module_Interface {
      * @return void
      */
     public function init() {
+        if ( ! defined( 'SCOS_SEO_ACTIVE' ) ) {
+            define( 'SCOS_SEO_ACTIVE', true );
+        }
+
         // Note: WordPress core sitemaps are disabled in main plugin file (site-essentials.php)
         // to ensure the filter runs early enough before WP core registers sitemaps
 
@@ -150,6 +151,9 @@ class Seo_Module implements Module_Interface {
             require_once __DIR__ . '/Schema_Meta_Box.php';
             Schema_Meta_Box::init();
         }
+
+        // Former "SEO Meta" module: meta box, head output, archive SEO UI, image SEO, virtual files, redirections.
+        \SiteEssentials\Modules\SeoMeta\SeoMeta_Module::bootstrap_features();
     }
 
     /**
@@ -394,7 +398,8 @@ class Seo_Module implements Module_Interface {
         $post_type_obj = get_post_type_object($post_type);
         if ($post_type_obj && $post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
             $archive_url = get_post_type_archive_link($post_type);
-            if ($archive_url) {
+            // WooCommerce (and similar) use a Page as the archive URL — already in sitemap-page.xml
+            if ($archive_url && ! $this->archive_url_is_existing_page($archive_url)) {
                 $last_modified = $this->get_post_type_last_modified($post_type);
 
                 $xml .= "\t<url>\n";
@@ -507,6 +512,22 @@ class Seo_Module implements Module_Interface {
         $xml .= "\t</url>\n";
 
         return $xml;
+    }
+
+    /**
+     * Whether a CPT archive URL resolves to an existing Page post.
+     *
+     * WooCommerce shop (and similar plugins) assign a WordPress Page as the
+     * post type archive. That page already appears in sitemap-page.xml.
+     *
+     * @since  1.1.0
+     * @param  string $archive_url Post type archive URL.
+     * @return bool
+     */
+    private function archive_url_is_existing_page($archive_url) {
+        $page_id = url_to_postid($archive_url);
+
+        return $page_id > 0 && get_post_type($page_id) === 'page';
     }
 
     /**

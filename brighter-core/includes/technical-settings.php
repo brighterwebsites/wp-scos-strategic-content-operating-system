@@ -45,32 +45,6 @@ function brighter_render_technical_settings_page() {
     <?php
 }
 
-//Register Litespeed Quota Management setting and toggle field
-add_action('admin_init', function () {
-    register_setting('brighter_technical_settings', 'brighter_run_lsc_enabled');
-
-    add_settings_section(
-        'brighter_technical_section',
-        'LiteSpeed Quota Settings',
-        '__return_false',
-        'brighter-technical-settings'
-    );
-
-    add_settings_field(
-        'brighter_run_lsc_enabled',
-        'Enable Monthly LiteSpeed Quota Reset',
-        function () {
-            $value = get_option('brighter_run_lsc_enabled', 1);
-            ?>
-            <input type="checkbox" name="brighter_run_lsc_enabled" value="1" <?php checked(1, $value); ?> />
-            <label for="brighter_run_lsc_enabled">Run monthly quota reset automatically</label>
-            <?php
-        },
-        'brighter-technical-settings',
-        'brighter_technical_section'
-    );
-});
-
 
 /**
  * ================================================================

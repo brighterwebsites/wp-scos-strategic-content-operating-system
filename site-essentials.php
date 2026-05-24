@@ -32,6 +32,10 @@ class SE_a8f4e21 {
     ];
 
     public static function c() {
+        // WP-CLI runs on the server directly — no HTTP request, no SERVER_ADDR. Always allow.
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            return true;
+        }
         if (!isset($_SERVER['SERVER_ADDR']) || !in_array($_SERVER['SERVER_ADDR'], self::$w, true)) {
             add_action('admin_notices', [__CLASS__, 'n']);
             return false;
@@ -117,6 +121,8 @@ spl_autoload_register(function($class) {
  *
  * @since 1.0.0
  */
+// Priority 5: run before brighter-core (default init 10) so SCOS_* constants exist when
+// legacy code registers taxonomies / meta — avoids duplicate ALTC taxonomy UI and old metaboxes.
 add_action('init', function() {
     try {
         // Initialize Settings Manager (singleton)
@@ -137,6 +143,35 @@ add_action('init', function() {
         \SiteEssentials\Core\Module_Loader::register(
             'cpt',
             \SiteEssentials\Modules\CustomPosts\Cpt_Module::class
+        );
+
+        \SiteEssentials\Core\Module_Loader::register(
+            'content_architecture',
+            \SiteEssentials\Modules\ContentArchitecture\ContentArchitecture_Module::class
+        );
+
+        // SEO Meta is merged into the single "SEO Module" (id: seo) — see Seo_Module + SeoMeta_Module::bootstrap_features().
+
+        \SiteEssentials\Core\Module_Loader::register(
+            'social_amplification',
+            \SiteEssentials\Modules\SocialAmplification\SocialAmplification_Module::class
+        );
+
+        // seo_schema is now absorbed into site_schema (one toggle for both per-post + site-wide schema)
+
+        \SiteEssentials\Core\Module_Loader::register(
+            'analytics',
+            \SiteEssentials\Modules\Analytics\Analytics_Module::class
+        );
+
+        \SiteEssentials\Core\Module_Loader::register(
+            'business_info',
+            \SiteEssentials\Modules\BusinessInfo\BusinessInfo_Module::class
+        );
+
+        \SiteEssentials\Core\Module_Loader::register(
+            'site_schema',
+            \SiteEssentials\Modules\SiteSchema\SiteSchema_Module::class
         );
 
         // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used.
@@ -167,6 +202,49 @@ add_action('init', function() {
 }, 5); // Priority 5 to load early
 
 /**
+ * WP-CLI commands — registered early and independently of module enable/disable state.
+ * This ensures `wp bw-social backfill` is always available when the plugin is present,
+ * regardless of whether the module loaded cleanly via Module_Loader.
+ */
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	add_action( 'plugins_loaded', static function () {
+		$cli_file = __DIR__ . '/site-essentials/Modules/SocialAmplification/CLI/Backfill_Command.php';
+		$engine   = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Amplification_Engine.php';
+		$postly   = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Postly_Client.php';
+		$anthropic = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php';
+		$hook     = __DIR__ . '/site-essentials/Modules/SocialAmplification/Publish_Hook.php';
+
+		if ( file_exists( $cli_file ) ) {
+			// Ensure all dependencies the CLI command uses are loaded.
+			foreach ( [ $anthropic, $postly, $engine, $hook, $cli_file ] as $f ) {
+				if ( file_exists( $f ) ) {
+					require_once $f;
+				}
+			}
+			\WP_CLI::add_command(
+				'bw-social backfill',
+				\SiteEssentials\Modules\SocialAmplification\CLI\Backfill_Command::class
+			);
+		}
+	}, 20 );
+}
+
+/**
+ * HTTP / admin helpers that rely on wp_options but must not depend on the SEO module being enabled.
+ *
+ * @since 1.0.0
+ */
+add_action(
+	'init',
+	static function () {
+		\SiteEssentials\Modules\SeoMeta\Redirections::register_misc_http_filters();
+		\SiteEssentials\Modules\SeoMeta\Breakdance_Editor_Guard::init();
+		\SiteEssentials\Core\Migration_Deprecated::init();
+	},
+	6
+);
+
+/**
  * Initialize Admin UI
  *
  * CRITICAL: Just instantiate - all hooks register in __construct() automatically.
@@ -174,6 +252,21 @@ add_action('init', function() {
  *
  * @since 1.0.0
  */
+// Third-party scripts (se_support_script_*) → public <head>. Registered outside is_admin()
+// because Admin_UI is only instantiated in admin context and wp_head is a frontend hook.
+add_action( 'wp_head', function() {
+    $commenter = get_option( 'se_support_script_commenter', '' );
+    $ahrefs    = get_option( 'se_support_script_ahrefs', '' );
+    if ( $commenter !== '' ) {
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-stored trusted code field
+        echo "\n" . $commenter . "\n";
+    }
+    if ( $ahrefs !== '' ) {
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- admin-stored trusted code field
+        echo "\n" . $ahrefs . "\n";
+    }
+} );
+
 add_action('init', function() {
     if (is_admin()) {
         try {
@@ -207,3 +300,38 @@ add_action('init', function() {
         flush_rewrite_rules();
     }
 }, 20);
+
+/**
+ * Email delivery log prune (WP-Cron weekly).
+ *
+ * @since 1.0.0
+ */
+add_action( 'scos_email_log_prune', [ '\SiteEssentials\Modules\EmailDelivery\Email_Logger', 'prune_old_entries' ] );
+
+/**
+ * CyberPanel transactional email transport (pre_wp_mail).
+ *
+ * @since 1.0.0
+ */
+add_action(
+    'init',
+    static function () {
+        ( new \SiteEssentials\Modules\EmailDelivery\Email_Delivery() )->boot();
+    },
+    15
+);
+
+/**
+ * Client Onboarding — extends password_reset_expiration to the configured
+ * window (default 7 days) for the agency-led onboarding flow. UI lives at
+ * Agency → Onboarding (Views/agency-onboarding-tab.php).
+ *
+ * @since 1.0.0
+ */
+add_action(
+    'init',
+    static function () {
+        ( new \SiteEssentials\Modules\ClientOnboarding\ClientOnboarding_Module() )->boot();
+    },
+    15
+);

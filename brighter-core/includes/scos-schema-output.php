@@ -17,11 +17,85 @@
  *
  * @package    BrighterCore
  * @subpackage Schema
- * @version    1.0.0
+ * @version    1.1 | 2026-05-22
  * @since      1.0.0
  */
 
 if (!defined('ABSPATH')) exit;
+
+/**
+ * Auto-build a LocalBusiness schema array from scos_biz_* Business Info fields.
+ * Called when scos_site_schema_local_business is empty and business_name is set.
+ *
+ * @return array|null Schema array or null if insufficient data.
+ */
+if ( ! function_exists( 'scos_schema_build_local_business' ) ) {
+function scos_schema_build_local_business() {
+    if ( ! function_exists( 'brighter_get_option' ) ) { return null; }
+
+    $name = brighter_get_option( 'business_name' );
+    if ( ! $name ) { return null; }
+
+    $org_type = brighter_get_option( 'organisation_type' ) ?: 'LocalBusiness';
+    if ( $org_type === 'Local Business' ) $org_type = 'LocalBusiness';
+
+    $schema = [
+        '@context' => 'https://schema.org',
+        '@type'    => $org_type,
+        '@id'      => home_url( '/#' . strtolower( $org_type ) ),
+        'name'     => $name,
+        'url'      => home_url( '/' ),
+    ];
+
+    $desc  = brighter_get_option( 'service_description' );
+    $phone = brighter_get_option( 'phone_number' );
+    $email = brighter_get_option( 'email' );
+    $price = brighter_get_option( 'price_tier' );
+    $img   = brighter_get_option( 'business_image' );
+    $logo  = brighter_get_option( 'business_logo' );
+    $found = brighter_get_option( 'founding_date' );
+
+    if ( $desc )  $schema['description']  = $desc;
+    if ( $phone ) $schema['telephone']    = $phone;
+    if ( $email ) $schema['email']        = $email;
+    if ( $price ) $schema['priceRange']   = $price;
+    if ( $img )   $schema['image']        = $img;
+    if ( $logo )  $schema['logo']         = $logo;
+    if ( $found ) $schema['foundingDate'] = $found;
+
+    // Address
+    $addr_parts = array_filter( [
+        'streetAddress'   => brighter_get_option( 'address' ),
+        'addressLocality' => brighter_get_option( 'city' ),
+        'addressRegion'   => brighter_get_option( 'state' ),
+        'postalCode'      => brighter_get_option( 'postcode' ),
+        'addressCountry'  => brighter_get_option( 'country' ),
+    ] );
+    if ( $addr_parts ) {
+        $schema['address'] = array_merge( [ '@type' => 'PostalAddress' ], $addr_parts );
+    }
+
+    // Geo
+    $lat  = brighter_get_option( 'lat' );
+    $long = brighter_get_option( 'long' );
+    if ( $lat && $long ) {
+        $schema['geo'] = [ '@type' => 'GeoCoordinates', 'latitude' => $lat, 'longitude' => $long ];
+    }
+
+    // sameAs
+    $same_as_keys = [
+        'social_link_facebook', 'social_link_twitter', 'social_link_instagram',
+        'social_link_youtube', 'social_link_linkedin', 'social_link_pinterest',
+        'knowledge_panel_share',
+    ];
+    $same_as = array_filter( array_map( 'brighter_get_option', $same_as_keys ) );
+    if ( $same_as ) {
+        $schema['sameAs'] = array_values( $same_as );
+    }
+
+    return $schema;
+}
+}
 
 /**
  * Output schema on template_redirect (after WP knows what page we're on)
@@ -166,10 +240,38 @@ function bw_schema_get_post_thumbnail_url($post_id) {
 }
 
 /**
+ * Whether an option name may be read via %%_cmeta_options_<name>%% schema placeholders.
+ * Restricted to known-safe prefixes; extend with {@see 'bw_schema_options_placeholder_key_allowed'}.
+ *
+ * @param string $option_key Option name (no table prefix).
+ * @return bool
+ */
+function bw_schema_options_placeholder_key_allowed($option_key) {
+    $option_key = (string) $option_key;
+    if ($option_key === '' || strlen($option_key) > 191) {
+        return false;
+    }
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $option_key)) {
+        return false;
+    }
+    $prefixes = (array) apply_filters(
+        'bw_schema_options_placeholder_allowed_prefixes',
+        ['se_', 'scos_', 'site_essentials_']
+    );
+    foreach ($prefixes as $pfx) {
+        $pfx = (string) $pfx;
+        if ($pfx !== '' && strpos($option_key, $pfx) === 0) {
+            return (bool) apply_filters('bw_schema_options_placeholder_key_allowed', true, $option_key);
+        }
+    }
+    return (bool) apply_filters('bw_schema_options_placeholder_key_allowed', false, $option_key);
+}
+
+/**
  * Resolve a single schema variable for a given post/context.
  * Used by bw_schema_replace_variables. Variable names are case-sensitive.
  *
- * @param string $name   Variable name without %%, e.g. post_title, _cmeta_my_key, _acf_my_field
+ * @param string $name   Variable name without %%, e.g. post_title, _cmeta_my_key, _cmeta_options_se_my_key, _acf_my_field
  * @param int    $post_id Post ID (0 for site-only context, e.g. Local Business)
  * @return string|int|float|array|null Resolved value; arrays allowed for ACF (Stage 3 repeaters)
  */
@@ -185,6 +287,22 @@ function bw_schema_resolve_variable($name, $post_id) {
     }
     if ($name === 'site_url') {
         return home_url('/');
+    }
+
+    // Custom options: %%_cmeta_options_option_key%% → get_option( 'option_key' ). Must run before _cmeta_ (post meta) and before post-only gate.
+    if (strpos($name, '_cmeta_options_') === 0) {
+        $option_key = substr($name, strlen('_cmeta_options_'));
+        if ($option_key === '' || !bw_schema_options_placeholder_key_allowed($option_key)) {
+            return '';
+        }
+        $val = get_option($option_key, null);
+        if ($val === null) {
+            return '';
+        }
+        if (is_array($val) || is_object($val)) {
+            return $val;
+        }
+        return $val === '' ? '' : (string) $val;
     }
 
     // Post-level (require valid post)
@@ -385,8 +503,18 @@ function bw_render_schema_graph() {
         ]
     ];
     
-    // LocalBusiness - Loaded from admin options (Site Essentials > SEO > Schema)
-    $local_business_schema = get_option('bw_local_business_schema', '');
+    // LocalBusiness — read from scos_site_schema_* (new) with bw_* fallback (legacy)
+    // Auto-generate from Business Info fields when both stores are empty
+    $local_business_schema = get_option( 'scos_site_schema_local_business', '' );
+    if ( $local_business_schema === '' ) {
+        $local_business_schema = get_option( 'bw_local_business_schema', '' );
+    }
+    if ( $local_business_schema === '' && function_exists( 'brighter_get_option' ) && brighter_get_option( 'business_name' ) ) {
+        $biz_auto = scos_schema_build_local_business();
+        if ( $biz_auto ) {
+            $local_business_schema = wp_json_encode( $biz_auto );
+        }
+    }
     if (!empty($local_business_schema)) {
         $decoded = json_decode(bw_schema_normalize_json_placeholders($local_business_schema), true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
@@ -662,11 +790,6 @@ function bw_render_schema_graph() {
         // Add reading time if available (ISO 8601 duration format)
         if ($reading_time > 0) {
             $article["timeRequired"] = "PT{$reading_time}M"; // e.g., PT7M
-            $article["additionalProperty"] = [
-                "@type" => "PropertyValue",
-                "name" => "reading_time_minutes",
-                "value" => $reading_time
-            ];
         }
         
         // Add optional fields if available
@@ -791,11 +914,6 @@ function bw_render_schema_graph() {
         // Add reading time if available
         if ($reading_time > 0) {
             $news_article["timeRequired"] = "PT{$reading_time}M";
-            $news_article["additionalProperty"] = [
-                "@type" => "PropertyValue",
-                "name" => "reading_time_minutes",
-                "value" => $reading_time
-            ];
         }
         
         // Add optional fields
@@ -848,7 +966,7 @@ function bw_render_schema_graph() {
     
     // Success Stories — on single project (CPT) only (CreativeWork removed; use Success Stories tab)
     if (is_singular('projects') && $post_id) {
-        $success_stories_schema = get_option('bw_success_stories_schema', '');
+        $success_stories_schema = get_option( 'scos_site_schema_success_stories', '' ) ?: get_option( 'bw_success_stories_schema', '' );
         if (!empty($success_stories_schema)) {
             $decoded = json_decode(bw_schema_normalize_json_placeholders($success_stories_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
@@ -865,8 +983,8 @@ function bw_render_schema_graph() {
     // Product — on single post or page when its ID is in the list
     $singular_id = bw_schema_get_singular_id();
     if ($singular_id) {
-        $product_post_ids = get_option('bw_product_post_ids', '');
-        $product_schema = get_option('bw_product_schema', '');
+        $product_post_ids = get_option( 'scos_site_schema_product_ids', '' ) ?: get_option( 'bw_product_post_ids', '' );
+        $product_schema   = get_option( 'scos_site_schema_product', '' ) ?: get_option( 'bw_product_schema', '' );
         $ids = bw_schema_parse_post_id_list($product_post_ids);
         $ids = apply_filters('bw_schema_product_post_ids', $ids, $singular_id);
         $include_product = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_product', false, $singular_id);
@@ -885,8 +1003,8 @@ function bw_render_schema_graph() {
     
     // Service — on single post or page when its ID is in the list
     if ($singular_id) {
-        $service_post_ids = get_option('bw_service_post_ids', '');
-        $service_schema = get_option('bw_service_schema', '');
+        $service_post_ids = get_option( 'scos_site_schema_service_ids', '' ) ?: get_option( 'bw_service_post_ids', '' );
+        $service_schema   = get_option( 'scos_site_schema_service', '' ) ?: get_option( 'bw_service_schema', '' );
         $ids = bw_schema_parse_post_id_list($service_post_ids);
         $ids = apply_filters('bw_schema_service_post_ids', $ids, $singular_id);
         $include_service = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_service', false, $singular_id);
@@ -1029,6 +1147,14 @@ function bw_render_schema_graph() {
         }
     }
     
+    // ============================================
+    // MODULE EXTENSIONS — let other modules push items into the @graph.
+    // Used by site-essentials FAQ_Schema_Graph etc.
+    // TODO: migrate scos-schema-output.php to site-essentials Schema module.
+    // ============================================
+
+    $graph = apply_filters( 'scos_schema_graph_items', $graph, $post_id );
+
     // ============================================
     // OUTPUT
     // ============================================

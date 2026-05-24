@@ -64,9 +64,12 @@ class Schema_Meta_Box {
      * @since 1.0.0
      * @return void
      */
-    public function register_meta_box() {
-        // Get all public post types NOW (when CPTs are registered)
-        $this->post_types = get_post_types(['public' => true], 'names');
+	public function register_meta_box() {
+		// Suppressed when new SeoSchema module is active
+		if ( defined( 'SCOS_SCHEMA_ACTIVE' ) ) { return; }
+
+		// Get all public post types NOW (when CPTs are registered)
+		$this->post_types = get_post_types(['public' => true], 'names');
         
         // Remove attachment (media) - doesn't need schema
         unset($this->post_types['attachment']);

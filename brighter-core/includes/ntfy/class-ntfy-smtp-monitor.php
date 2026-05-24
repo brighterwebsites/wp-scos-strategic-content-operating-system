@@ -59,7 +59,7 @@ class Brighter_Ntfy_SMTP_Monitor {
             'title' => '📧 Email Failure Alert',
             'priority' => 'urgent',
             'tags' => ['email', 'warning'],
-            'click' => admin_url('admin.php?page=brighter_support&tab=monitoring'),
+            'click' => admin_url('admin.php?page=brighter_support&tab=support'),
         ]);
         
         // Update rate limit

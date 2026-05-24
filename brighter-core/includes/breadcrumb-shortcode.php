@@ -16,10 +16,52 @@
  * 
  * @package    BrighterCore
  * @subpackage Breadcrumbs
- * @version    1.0.0
+ * @version    1.1.0
  */
 
 if (!defined('ABSPATH')) exit;
+
+/**
+ * Posts index crumb: Settings → Reading “Posts page”, or post type archive link + fallback label.
+ *
+ * @return array{name:string,url:string,current:bool}
+ */
+function bw_get_posts_archive_crumb_item() {
+    $posts_page_id = (int) get_option('page_for_posts');
+    if ($posts_page_id > 0) {
+        $title = get_the_title($posts_page_id);
+        if ($title === '' || $title === false) {
+            $title = __('Posts', 'brighterwebsites');
+        }
+        $url = get_permalink($posts_page_id);
+        if (!$url) {
+            $url = get_post_type_archive_link('post') ?: home_url('/');
+        }
+        return [
+            'name' => $title,
+            'url' => $url,
+            'current' => false,
+        ];
+    }
+    $archive = get_post_type_archive_link('post');
+    $post_obj = get_post_type_object('post');
+    $name = ($post_obj && !empty($post_obj->labels->name)) ? $post_obj->labels->name : __('Blog', 'brighterwebsites');
+    return [
+        'name' => $name,
+        'url' => $archive ?: home_url('/'),
+        'current' => false,
+    ];
+}
+
+/**
+ * Apply extensions (e.g. Site Essentials permalink segments).
+ *
+ * @param array $items Breadcrumb rows.
+ * @return array
+ */
+function bw_apply_breadcrumb_items_filter($items) {
+    return apply_filters('bw_breadcrumb_items', is_array($items) ? $items : []);
+}
 
 /**
  * Build breadcrumb array (shared logic with schema)
@@ -40,17 +82,15 @@ function bw_get_breadcrumb_items() {
     // FRONT PAGE - just Home
     if (is_front_page()) {
         $breadcrumbs[0]['current'] = true;
-        return $breadcrumbs;
+        return bw_apply_breadcrumb_items_filter($breadcrumbs);
     }
     
     // BLOG ARCHIVE (is_home() = true for blog posts page)
     if (is_home()) {
-        $breadcrumbs[] = [
-            'name' => 'Blog',
-            'url' => get_post_type_archive_link('post') ?: home_url('/blog/'),
-            'current' => true
-        ];
-        return $breadcrumbs;
+        $crumb = bw_get_posts_archive_crumb_item();
+        $crumb['current'] = true;
+        $breadcrumbs[] = $crumb;
+        return bw_apply_breadcrumb_items_filter($breadcrumbs);
     }
     
     // OTHER ARCHIVES (categories, tags, CPT archives, date archives)
@@ -65,7 +105,7 @@ function bw_get_breadcrumb_items() {
                 'current' => true
             ];
         }
-        return $breadcrumbs;
+        return bw_apply_breadcrumb_items_filter($breadcrumbs);
     }
     
     // SINGLES (posts, pages, CPTs)
@@ -74,11 +114,7 @@ function bw_get_breadcrumb_items() {
         
         // Add post type archive for posts
         if ($post_type === 'post') {
-            $breadcrumbs[] = [
-                'name' => 'Blog',
-                'url' => get_post_type_archive_link('post') ?: home_url('/blog/'),
-                'current' => false
-            ];
+            $breadcrumbs[] = bw_get_posts_archive_crumb_item();
         }
         
         // Add CPT archive for custom post types (not pages)
@@ -117,8 +153,8 @@ function bw_get_breadcrumb_items() {
             'current' => true
         ];
     }
-    
-    return $breadcrumbs;
+
+    return bw_apply_breadcrumb_items_filter($breadcrumbs);
 }
 
 /**

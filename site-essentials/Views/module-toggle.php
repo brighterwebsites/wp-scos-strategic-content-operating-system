@@ -1,12 +1,14 @@
 <?php
 /**
- * Module Toggle Template
+ * Module Toggle Card
  *
- * Individual module toggle card.
+ * v1.1 | 2026-05-19
+ *
+ * SCOS design system: scos-module, scos-toggle, scos-badge.
+ * No functional changes — data-module-id, AJAX toggle checkbox unchanged.
  *
  * @package    SiteEssentials
  * @subpackage Views
- * @version    1.0.0
  *
  * Variables available:
  * @var string $module_id    Module ID
@@ -19,64 +21,71 @@
  * @var bool   $has_failed   Did module fail to load
  */
 
-// Exit if accessed directly
-if (!defined('ABSPATH')) {
-    exit;
+defined( 'ABSPATH' ) || exit;
+
+$card_class = 'scos-module' . ( $is_enabled ? ' scos-module--on' : '' );
+
+if ( 'pro' === $tier ) {
+	$badge_class = 'scos-badge--pro';
+} elseif ( 'agency' === $tier || 'enterprise' === $tier ) {
+	$badge_class = 'scos-badge--enterprise';
+} else {
+	$badge_class = 'scos-badge--basic';
 }
 
-$tier_class = 'tier-' . esc_attr($tier);
-$status_class = $is_enabled ? 'enabled' : 'disabled';
-if ($has_failed) {
-    $status_class .= ' failed';
+if ( $has_failed ) {
+	$status_class = 'scos-module__status--error';
+	$status_icon  = '✗';
+	$status_label = __( 'Failed to load', 'site-essentials' );
+} elseif ( $is_loaded ) {
+	$status_class = 'scos-module__status--on';
+	$status_icon  = '✓';
+	$status_label = __( 'Loaded', 'site-essentials' );
+} elseif ( $is_enabled ) {
+	$status_class = 'scos-module__status--off';
+	$status_icon  = '○';
+	$status_label = __( 'Enabled (loads on next page load)', 'site-essentials' );
+} else {
+	$status_class = 'scos-module__status--off';
+	$status_icon  = '';
+	$status_label = __( 'Toggle on to load', 'site-essentials' );
 }
 ?>
 
-<div class="se-module-card <?php echo esc_attr($tier_class . ' ' . $status_class); ?>"
-     data-module-id="<?php echo esc_attr($module_id); ?>">
+<div class="<?php echo esc_attr( $card_class ); ?>"
+     data-module-id="<?php echo esc_attr( $module_id ); ?>">
 
-    <div class="se-module-header">
-        <div class="se-module-title">
-            <h3><?php echo esc_html($name); ?></h3>
-            <span class="se-module-tier tier-<?php echo esc_attr($tier); ?>">
-                <?php echo esc_html(ucfirst($tier)); ?>
-            </span>
-        </div>
+	<div class="scos-module__head">
+		<span class="scos-module__title">
+			<?php echo esc_html( $name ); ?>
+		</span>
+		<label class="scos-toggle" title="<?php echo $is_enabled ? esc_attr__( 'Disable module', 'site-essentials' ) : esc_attr__( 'Enable module', 'site-essentials' ); ?>">
+			<input type="checkbox"
+			       class="se-module-toggle"
+			       data-module-id="<?php echo esc_attr( $module_id ); ?>"
+			       <?php checked( $is_enabled ); ?>>
+			<span class="scos-toggle__track"></span>
+		</label>
+	</div>
 
-        <label class="se-toggle">
-            <input type="checkbox"
-                   class="se-module-toggle"
-                   data-module-id="<?php echo esc_attr($module_id); ?>"
-                   <?php checked($is_enabled); ?>>
-            <span class="se-toggle-slider"></span>
-        </label>
-    </div>
+	<div class="scos-module__meta">
+		<span class="scos-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( strtoupper( $tier ) ); ?></span>
+		<?php if ( ! empty( $dependencies ) ) : ?>
+			<span class="scos-badge scos-badge--soft" style="font-size:11px">
+				<?php echo esc_html( implode( ', ', $dependencies ) ); ?>
+			</span>
+		<?php endif; ?>
+	</div>
 
-    <div class="se-module-body">
-        <?php if (!empty($dependencies)): ?>
-            <p class="se-module-dependencies">
-                <strong><?php esc_html_e('Dependencies:', 'site-essentials'); ?></strong>
-                <?php echo esc_html(implode(', ', $dependencies)); ?>
-            </p>
-        <?php endif; ?>
+	<hr class="scos-module__divider">
 
-        <div class="se-module-status">
-            <?php if ($has_failed): ?>
-                <span class="status-indicator failed">
-                    ✗ <?php esc_html_e('Failed to load', 'site-essentials'); ?>
-                </span>
-            <?php elseif ($is_loaded): ?>
-                <span class="status-indicator loaded">
-                    ✓ <?php esc_html_e('Loaded', 'site-essentials'); ?>
-                </span>
-            <?php elseif ($is_enabled): ?>
-                <span class="status-indicator enabled">
-                    ○ <?php esc_html_e('Enabled (will load on next page load)', 'site-essentials'); ?>
-                </span>
-            <?php else: ?>
-                <span class="status-indicator disabled">
-                    ⊗ <?php esc_html_e('Toggle On to Load', 'site-essentials'); ?>
-                </span>
-            <?php endif; ?>
-        </div>
-    </div>
+	<div class="scos-module__foot">
+		<span class="scos-module__status <?php echo esc_attr( $status_class ); ?>">
+			<?php if ( $status_icon ) : ?>
+				<span aria-hidden="true"><?php echo esc_html( $status_icon ); ?></span>
+			<?php endif; ?>
+			<?php echo esc_html( $status_label ); ?>
+		</span>
+	</div>
+
 </div>

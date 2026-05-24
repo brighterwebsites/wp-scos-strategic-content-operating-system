@@ -20,7 +20,9 @@ class BW_ALTC_Taxonomies {
      * Initialize the taxonomies
      */
     public static function init() {
-        add_action('init', [__CLASS__, 'register_taxonomies']);
+        // Priority 20: run after Site Essentials loads enabled modules at init:5
+        // (defines SCOS_CA_ACTIVE) so show_ui/meta_box_cb reflect the new CA module.
+        add_action('init', [__CLASS__, 'register_taxonomies'], 20);
         add_action('init', [__CLASS__, 'register_post_meta']);
         add_action('init', [__CLASS__, 'register_term_meta']);
         
@@ -66,6 +68,11 @@ class BW_ALTC_Taxonomies {
     public static function register_taxonomies() {
         $post_types = self::get_supported_post_types();
 
+        // Keep legacy taxonomies registered for DB/query compat, but hide admin UI when
+        // Content Architecture is active OR Site Essentials is present (legacy sidebars
+        // are redundant; enable the CA module to edit cluster/topic via Content Architecture).
+        $ui_active = ! defined( 'SCOS_CA_ACTIVE' ) && ! defined( 'SITE_ESSENTIALS_VERSION' );
+
         // Register ALTC Strategic Lens taxonomy
         register_taxonomy('altc_strategic_lens', $post_types, [
             'labels' => [
@@ -83,12 +90,12 @@ class BW_ALTC_Taxonomies {
             ],
             'hierarchical'      => true,
             'public'            => false,
-            'show_ui'           => true,
+            'show_ui'           => $ui_active,
             'show_admin_column' => false,
-            'show_in_nav_menus' => true,
-            'show_in_rest'      => true,
+            'show_in_nav_menus' => $ui_active,
+            'show_in_rest'      => $ui_active,
             'show_tagcloud'     => false,
-            'meta_box_cb'       => false, // Hide default meta box, use custom one
+            'meta_box_cb'       => false, // Managed by custom meta box, not default WP box.
             'capabilities'      => [
                 'manage_terms' => 'manage_categories',
                 'edit_terms'   => 'manage_categories',
@@ -114,12 +121,12 @@ class BW_ALTC_Taxonomies {
             ],
             'hierarchical'      => true,
             'public'            => false,
-            'show_ui'           => true,
+            'show_ui'           => $ui_active,
             'show_admin_column' => false,
             'show_in_nav_menus' => false,
-            'show_in_rest'      => true,
+            'show_in_rest'      => $ui_active,
             'show_tagcloud'     => false,
-            'meta_box_cb'       => false, // Hide default meta box, use custom one
+            'meta_box_cb'       => false, // Managed by custom meta box, not default WP box.
             'capabilities'      => [
                 'manage_terms' => 'manage_categories',
                 'edit_terms'   => 'manage_categories',

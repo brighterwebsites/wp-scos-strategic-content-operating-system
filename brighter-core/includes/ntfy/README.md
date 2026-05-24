@@ -21,7 +21,7 @@
 5. **Form Monitor** 🟡 OPT-IN - Breakdance, CF7, Gravity Forms support
 
 ### ⏳ Stubbed Monitors (Phase 3)
-6. **WP Cron Monitor** 🟡 TODO - Needs missed event detection logic
+6. **WP Cron Monitor** 🟡 OPT-IN / TODO - Off by default; needs missed event detection logic (`check_missed_events()`). Set `NTFY_MONITOR_CRON` true only when testing the stub.
 
 ---
 
@@ -43,8 +43,8 @@ define('NTFY_TOPIC_PREFIX', 'bw-agency');
 define('NTFY_MONITOR_SMTP', true);      // Email failures (RECOMMENDED)
 define('NTFY_MONITOR_ROBOTS', true);    // robots.txt checks (RECOMMENDED)
 define('NTFY_MONITOR_SITEMAP', true);   // Sitemap checks (RECOMMENDED)
-define('NTFY_MONITOR_DOWNTIME', false); // Site health (TODO)
-define('NTFY_MONITOR_CRON', false);     // WP Cron (TODO)
+define('NTFY_MONITOR_DOWNTIME', true);  // Site health (~5 min checks)
+define('NTFY_MONITOR_CRON', false);     // WP Cron stub (OPT-IN until implemented)
 define('NTFY_MONITOR_FORMS', false);    // Form submissions (OPT-IN)
 ```
 
@@ -137,8 +137,8 @@ Enable with `NTFY_MONITOR_FORMS` and submit a form
 - **Sitemap Monitor** - Daily cron check, validates XML content type
 - **Form Monitor** - Supports Breakdance, CF7, Gravity Forms
 
-### 🟡 Needs Implementation
-- **WP Cron Monitor** - Stubbed, needs missed event detection logic
+### 🟡 Needs Implementation (opt-in)
+- **WP Cron Monitor** - Stubbed, off unless `NTFY_MONITOR_CRON` is true; needs missed event detection logic
 
 ---
 

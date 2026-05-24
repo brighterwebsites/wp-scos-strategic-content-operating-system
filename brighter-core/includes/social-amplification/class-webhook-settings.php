@@ -34,6 +34,8 @@ class BW_Social_Webhook_Settings {
      * Add settings page
      */
     public function add_settings_page() {
+        // Suppressed when site-essentials Social Amplification module is active.
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) { return; }
         add_submenu_page(
             'brighter_support',
             __('Social Amplification', 'brighterwebsites'),

@@ -285,9 +285,9 @@ class BW_Social_Amplification_API {
         }
 
         $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
-        $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: '';
-        $intent = get_post_meta($post_id, 'bw_intent', true) ?: '';
-        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        $purpose = get_post_meta($post_id, 'scos_ca_purpose', true) ?: get_post_meta($post_id, 'bw_purpose', true) ?: '';
+        $intent  = get_post_meta($post_id, 'scos_ca_intent',  true) ?: get_post_meta($post_id, 'bw_intent',  true) ?: '';
+        $tldr    = get_post_meta($post_id, 'bw_tldr', true);
         if (empty($tldr)) {
             $tldr = get_the_excerpt($post_id) ?: '';
         }

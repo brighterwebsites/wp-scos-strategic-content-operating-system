@@ -1,0 +1,169 @@
+/* =========================================================================
+   SCOS — Schema Meta Box
+   ========================================================================= */
+
+.scos-schema-wrap {
+	margin: -6px -12px -12px;
+}
+
+/* ---- Toolbar ---- */
+.scos-schema-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 10px 14px 8px;
+	border-bottom: 1px solid #e0e0e0;
+	background: #fafafa;
+	flex-wrap: wrap;
+}
+
+.scos-schema-label {
+	font-weight: 600;
+	font-size: 12px;
+	color: #1d2327;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.scos-schema-badge {
+	display: inline-block;
+	padding: 1px 7px;
+	border-radius: 10px;
+	font-size: 10px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	background: #e8f0fe;
+	color: #1a56db;
+	border: 1px solid #bfcfe9;
+}
+
+.scos-schema-badge--phase1 {
+	background: #fff8e6;
+	color: #b45309;
+	border-color: #fbd279;
+}
+
+.scos-schema-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.scos-schema-btn--clear {
+	color: #a00;
+	font-size: 12px;
+	padding: 0 4px;
+	text-decoration: none;
+}
+
+.scos-schema-btn--clear:hover { color: #600; text-decoration: underline; }
+
+/* ---- Status bar ---- */
+.scos-schema-status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	font-size: 12px;
+	border-bottom: 1px solid transparent;
+}
+
+.scos-schema-status.is-valid {
+	background: #f0fdf4;
+	border-color: #bbf7d0;
+	color: #166534;
+}
+
+.scos-schema-status.is-invalid {
+	background: #fff7f7;
+	border-color: #fecdd3;
+	color: #9f1239;
+}
+
+.scos-schema-status .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+}
+
+/* ---- Textarea ---- */
+.scos-schema-textarea {
+	display: block;
+	width: 100%;
+	font-family: "Courier New", Courier, monospace;
+	font-size: 12px;
+	line-height: 1.6;
+	border: none;
+	border-bottom: 1px solid #e0e0e0;
+	border-radius: 0;
+	resize: vertical;
+	box-sizing: border-box;
+	padding: 12px 14px;
+	color: #1d2327;
+	background: #fff;
+	outline: none;
+	transition: background .15s;
+}
+
+.scos-schema-textarea:focus {
+	background: #fffef8;
+	box-shadow: none;
+}
+
+.scos-schema-textarea.has-error {
+	background: #fff7f7;
+}
+
+.scos-schema-textarea.is-valid {
+	background: #f8fff9;
+}
+
+/* ---- Help text ---- */
+.scos-schema-help {
+	margin: 8px 14px 10px;
+	font-size: 11px;
+	color: #646970;
+}
+
+/* ---- Summary pills ---- */
+.scos-schema-summary {
+	padding: 8px 14px 12px;
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.scos-schema-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 10px;
+	border-radius: 12px;
+	font-size: 11px;
+	font-weight: 500;
+}
+
+.scos-schema-pill .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+.scos-schema-pill--valid {
+	background: #dcfce7;
+	color: #15803d;
+}
+
+.scos-schema-pill--invalid {
+	background: #fee2e2;
+	color: #b91c1c;
+}
+
+.scos-schema-pill--type {
+	background: #ede9fe;
+	color: #6d28d9;
+}

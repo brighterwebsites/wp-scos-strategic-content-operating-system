@@ -1,247 +1,214 @@
 <?php
 /**
  * SCOS Content Architecture Record (CAR) Injection
- * 
- * Version: 1.0.0
- * 
- * Purpose:
- * - Defines semantic intent and topical authority mapping
- * - Consolidates data from bw-content-strategy.php + class-altc-ga4-integration.php
- * - Creates machine-readable content architecture for AI agents
- * - Provides backwards-compatible data structure for GA4 tracking
- * 
- * Responsibilities:
- * - Inject SCOS CAR data into <head> as window.brighterSCOS
- * - Defines semantic intent and topical authority mapping
- * - Used by GA4 tracking scripts and AI agents
- * - Loads on all page types (singular, archive, home)
- * 
- * Data Structure:
- * - car: Content Architecture Record (ALTC, strategy, metrics)
- * - pillar: Pillar relationship data
- * - tracking: GA4 configuration
- * - meta: Post metadata
- * 
+ *
+ * Outputs window.brighterSCOS into <head> on every page.
+ * Reads from new scos_ca_* meta keys / scos_* taxonomies first,
+ * falling back to legacy bw_* keys for posts not yet migrated.
+ *
+ * Structure:
+ *   car     — semantic intent, topical authority, metrics
+ *   meta    — post ID, type, version, timestamp
+ *
+ * The legacy `tracking` block has been removed — GA4 config is managed
+ * entirely by the GA4 scripts and does not belong in the CAR.
+ *
  * @package BrighterCore
  * @subpackage Analytics
+ *
+ * v1.1 | 2026-05-22 — search-intent now resolved via Intent_Goal_Resolver when available,
+ *                      so FAQ-linked posts output the FAQ title rather than the raw meta value.
  */
 
-if (!defined('ABSPATH')) exit;
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /**
- * Inject SCOS CAR into <head>
- * Priority 5 = loads before GA4 tracking scripts
+ * Inject SCOS CAR into <head>.
+ * Priority 5 — loads before GA4 tracking scripts (priority 99).
  */
-add_action('wp_head', function() {
-    // Get post ID - works on singular pages, homepage (if static page), and archives
-    $post_id = null;
-    if (is_singular()) {
-        $post_id = get_the_ID();
-    } elseif (is_front_page()) {
-        // Homepage - check if it's a static page or blog posts
-        $front_page_id = get_option('page_on_front');
-        if ($front_page_id) {
-            // Static page set as homepage
-            $post_id = $front_page_id;
-        }
-        // If no static page, homepage shows latest posts - will use minimal data below
-    }
-    
-    // If no post ID available (archive pages, blog home showing latest posts, etc.), use minimal data
-    if (!$post_id) {
-        // Provide minimal SCOS data for non-singular pages
-        $ga4_id = get_option('brighter_ga4_measurement_id', '');
-        ?>
-        <!-- SCOS CAR - Minimal for archive/home pages -->
-        <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
-        // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
-        window.brighterSCOS = {
-            car: {
-                cluster: 'not_set',
-                topic: 'not_set',
-                maturity: 'not_set',
-                intent: 'not_set',
-                'search-intent': 'not_set',
-                purpose: 'not_set',
-                pillar: null,
-                service_pathway: null
-            },
-            tracking: {
-                ga4_id: <?php echo json_encode($ga4_id); ?>,
-                consent_given: false
-            },
-            meta: {
-                post_id: 0,
-                post_type: '<?php echo get_post_type() ?: 'archive'; ?>',
-                scos_version: '<?php echo defined('BRIGHTER_CORE_VERSION') ? BRIGHTER_CORE_VERSION : '1.0.0'; ?>',
-                car_generated: '<?php echo current_time('c'); ?>'
-            }
-        };
-        
-        </script>
-        <?php
-        return;
-    }
-    
-    // Continue with full SCOS data for singular pages
-    
-    // ============================================
-    // GATHER ALTC FRAMEWORK DATA
-    // ============================================
-    
-    $altc_id = get_post_meta($post_id, 'bw_primary_altc_id', true);
-    $altc_name = 'not_set';
-    
-    if ($altc_id) {
-        $altc_term = get_term($altc_id, 'altc_strategic_lens');
-        if ($altc_term && !is_wp_error($altc_term)) {
-            $altc_name = $altc_term->name;
-        }
-    }
-    
-    // Fallback: Try to get first assigned ALTC term if no primary set
-    if ($altc_name === 'not_set') {
-        $altc_terms = wp_get_post_terms($post_id, 'altc_strategic_lens', ['fields' => 'names']);
-        if (!empty($altc_terms) && !is_wp_error($altc_terms)) {
-            $altc_name = $altc_terms[0];
-        }
-    }
-    
-    $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
-    $topic_name = 'not_set';
-    
-    if ($topic_id) {
-        $topic_term = get_term($topic_id, 'altc_topic');
-        if ($topic_term && !is_wp_error($topic_term)) {
-            $topic_name = $topic_term->name;
-        }
-    }
-    
-    // Fallback: Try to get first assigned topic term if no primary set
-    if ($topic_name === 'not_set') {
-        $topic_terms = wp_get_post_terms($post_id, 'altc_topic', ['fields' => 'names']);
-        if (!empty($topic_terms) && !is_wp_error($topic_terms)) {
-            $topic_name = $topic_terms[0];
-        }
-    }
-    
-    // Fallback: Try old bw_page_topic meta field
-    if ($topic_name === 'not_set') {
-        $old_topic = get_post_meta($post_id, 'bw_page_topic', true);
-        if (!empty($old_topic)) {
-            $topic_name = $old_topic;
-        }
-    }
-    
-    // ============================================
-    // GATHER CONTENT STRATEGY DATA
-    // ============================================
-    
-    $intent = get_post_meta($post_id, 'bw_intent', true) ?: 'not_set';
-    $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: 'not_set';
-    $maturity = get_post_meta($post_id, 'bw_cont_maturity', true) ?: 'not_set';
-    $search_intent = get_post_meta($post_id, 'bw_search_intent', true) ?: 'not_set';
-    
-    // ============================================
-    // GATHER PILLAR RELATIONSHIP
-    // ============================================
-    
-    $pillar_id = get_post_meta($post_id, 'bw_pillar_page_id', true);
-    $pillar = null;
-    $pillar_name = 'not_set';
-    $pillar_type = 'none';
-    
-    if ($pillar_id) {
-        $pillar_purpose = get_post_meta($pillar_id, 'bw_purpose', true);
-        $pillar_name = get_the_title($pillar_id);
-        $pillar_type = ($pillar_purpose === 'service-page') ? 'service' : 'pillar';
-        
-        $pillar = [
-            'id' => (int) $pillar_id,
-            'title' => $pillar_name,
-            'type' => $pillar_type
-        ];
-    }
-    
-    // Service Pathway (similar to Pillar but for service/product pathways)
-    $service_pathway_id = get_post_meta($post_id, 'bw_service_pathway_id', true);
-    $service_pathway = null;
-    $service_pathway_name = 'none';
-    
-    if ($service_pathway_id) {
-        $service_pathway_name = get_the_title($service_pathway_id);
-        $service_pathway = [
-            'id' => (int) $service_pathway_id,
-            'title' => $service_pathway_name
-        ];
-    }
-    
-    
-    // ============================================
-    // GATHER CONTENT METRICS (Internal use only)
-    // ============================================
-    
-    $metrics = [
-        'word_count' => (int) get_post_meta($post_id, 'bw_word_count', true),
-        'reading_time' => (int) get_post_meta($post_id, 'bw_reading_time', true),
-        'internal_links' => (int) get_post_meta($post_id, 'bw_internal_link_count', true),
-        'external_links' => (int) get_post_meta($post_id, 'bw_external_link_count', true),
-        'last_updated' => get_the_modified_date('Y-m-d', $post_id)
-    ];
-    
-    // ============================================
-    // BUILD SCOS CAR STRUCTURE
-    // ============================================
-    
-    $scos = [
-        'car' => [
-            // ALTC Framework
-            'cluster' => $altc_name,
-            'topic' => $topic_name,
-            'maturity' => $maturity,
-            
-            // Content Strategy
-            'intent' => $intent,
-            'search-intent' => $search_intent,
-            'purpose' => $purpose,
-            
-            // Relationships
-            'pillar' => $pillar,
-            'service_pathway' => $service_pathway,
-            
-            // Metrics (internal only - not sent to GA4)
-            'metrics' => $metrics
-        ],
-        
-        // GA4 tracking config
-        'tracking' => [
-            'ga4_id' => get_option('brighter_ga4_measurement_id', ''),
-            'consent_given' => false  // Updated by consent handler JS
-        ],
-        
-        // Metadata
-        'meta' => [
-            'post_id' => $post_id,
-            'post_type' => get_post_type($post_id),
-            'scos_version' => defined('BRIGHTER_CORE_VERSION') ? BRIGHTER_CORE_VERSION : '1.0.0',
-            'car_generated' => current_time('c')  // ISO 8601 format
-        ]
-    ];
-    
-    // ============================================
-    // OUTPUT JAVASCRIPT
-    // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
-    // Used by: GA4 tracking scripts, content strategy tools, AI agents
-    // ============================================
-    ?>
-    <!-- SCOS CAR - Full data for singular pages -->
-    <script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">
-    // SCOS Content Architecture Record (CAR) - Defines semantic intent and topical authority mapping.
-    window.brighterSCOS = <?php echo json_encode($scos, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT); ?>;
-    
-    // Note: window.brighterGA4 is created by brighter-ga4-tracking.php (runs on ALL pages)
-    // We don't create it here to avoid conflicts and ensure skipTracking property is preserved
-    </script>
-    <?php
-}, 5); // Priority 5 = loads before GA4 tracking (priority 99)
+add_action( 'wp_head', function () {
 
+	// Only output CAR when Content Architecture module is active.
+	// This constant is defined at init priority 5 by ContentArchitecture_Module.
+	if ( ! defined( 'SCOS_CA_ACTIVE' ) ) { return; }
+
+	// ── Resolve post ID ──────────────────────────────────────────────────────
+	$post_id = null;
+	if ( is_singular() ) {
+		$post_id = get_the_ID();
+	} elseif ( is_front_page() ) {
+		$front_page_id = (int) get_option( 'page_on_front' );
+		if ( $front_page_id ) {
+			$post_id = $front_page_id;
+		}
+	}
+
+	// ── Minimal CAR for archives / blog home ─────────────────────────────────
+	if ( ! $post_id ) {
+		$scos = [
+			'car'  => [
+				'cluster'       => 'not_set',
+				'topic'         => 'not_set',
+				'maturity'      => 'not_set',
+				'intent'        => 'not_set',
+				'search-intent' => 'not_set',
+				'purpose'       => 'not_set',
+				'pillar'        => null,
+				'service_pathway' => null,
+			],
+			'meta' => [
+				'post_id'       => 0,
+				'post_type'     => get_post_type() ?: 'archive',
+				'scos_version'  => defined( 'SCOS_VERSION' ) ? SCOS_VERSION : '4.4.0',
+				'car_generated' => current_time( 'c' ),
+			],
+		];
+		scos_output_car( $scos );
+		return;
+	}
+
+	// ── Helper: scos_ key first, bw_ key fallback ────────────────────────────
+	$val = function ( $scos_key, $legacy_key = null ) use ( $post_id ) {
+		$v = get_post_meta( $post_id, $scos_key, true );
+		if ( $v !== '' && $v !== null && $v !== false ) {
+			return $v;
+		}
+		if ( $legacy_key ) {
+			$v = get_post_meta( $post_id, $legacy_key, true );
+			return ( $v !== '' && $v !== null && $v !== false ) ? $v : 'not_set';
+		}
+		return 'not_set';
+	};
+
+	// ── Cluster (scos_content_cluster taxonomy → legacy altc_strategic_lens) ─
+	$cluster_name = 'not_set';
+	$cluster_terms = wp_get_post_terms( $post_id, 'scos_content_cluster', [ 'fields' => 'names' ] );
+	if ( ! is_wp_error( $cluster_terms ) && ! empty( $cluster_terms ) ) {
+		$cluster_name = $cluster_terms[0];
+	} else {
+		// Legacy fallback
+		$legacy_altc_id = get_post_meta( $post_id, 'bw_primary_altc_id', true );
+		if ( $legacy_altc_id ) {
+			$t = get_term( $legacy_altc_id, 'altc_strategic_lens' );
+			if ( $t && ! is_wp_error( $t ) ) { $cluster_name = $t->name; }
+		}
+		if ( $cluster_name === 'not_set' ) {
+			$legacy_terms = wp_get_post_terms( $post_id, 'altc_strategic_lens', [ 'fields' => 'names' ] );
+			if ( ! is_wp_error( $legacy_terms ) && ! empty( $legacy_terms ) ) {
+				$cluster_name = $legacy_terms[0];
+			}
+		}
+	}
+
+	// ── Topic (scos_topic taxonomy → legacy altc_topic) ──────────────────────
+	$topic_name = 'not_set';
+	$topic_terms = wp_get_post_terms( $post_id, 'scos_topic', [ 'fields' => 'names' ] );
+	if ( ! is_wp_error( $topic_terms ) && ! empty( $topic_terms ) ) {
+		$topic_name = $topic_terms[0];
+	} else {
+		$legacy_topic_id = get_post_meta( $post_id, 'bw_primary_topic_id', true );
+		if ( $legacy_topic_id ) {
+			$t = get_term( $legacy_topic_id, 'altc_topic' );
+			if ( $t && ! is_wp_error( $t ) ) { $topic_name = $t->name; }
+		}
+		if ( $topic_name === 'not_set' ) {
+			$legacy_terms = wp_get_post_terms( $post_id, 'altc_topic', [ 'fields' => 'names' ] );
+			if ( ! is_wp_error( $legacy_terms ) && ! empty( $legacy_terms ) ) {
+				$topic_name = $legacy_terms[0];
+			}
+		}
+		// Final fallback: old free-text field
+		if ( $topic_name === 'not_set' ) {
+			$old = get_post_meta( $post_id, 'bw_page_topic', true );
+			if ( $old ) { $topic_name = $old; }
+		}
+	}
+
+	// ── Pillar relationship ───────────────────────────────────────────────────
+	$pillar    = null;
+	$pillar_id = (int) get_post_meta( $post_id, 'scos_ca_pillar_page_id', true )
+	          ?: (int) get_post_meta( $post_id, 'bw_pillar_page_id', true );
+	if ( $pillar_id > 0 ) {
+		$pillar_purpose = get_post_meta( $pillar_id, 'scos_ca_purpose', true )
+		               ?: get_post_meta( $pillar_id, 'bw_purpose', true );
+		$pillar = [
+			'id'    => $pillar_id,
+			'title' => get_the_title( $pillar_id ),
+			'type'  => ( $pillar_purpose === 'service-page' ) ? 'service' : 'pillar',
+		];
+	}
+
+	// ── Service pathway ───────────────────────────────────────────────────────
+	$service_pathway    = null;
+	$service_pathway_id = (int) get_post_meta( $post_id, 'scos_ca_service_pathway_id', true )
+	                   ?: (int) get_post_meta( $post_id, 'bw_service_pathway_id', true );
+	if ( $service_pathway_id > 0 ) {
+		$service_pathway = [
+			'id'    => $service_pathway_id,
+			'title' => get_the_title( $service_pathway_id ),
+		];
+	}
+
+	// ── Content metrics ───────────────────────────────────────────────────────
+	$metrics = [
+		'word_count'     => (int) ( get_post_meta( $post_id, 'scos_ca_word_count', true )
+		                         ?: get_post_meta( $post_id, 'bw_word_count', true ) ),
+		'reading_time'   => (int) ( get_post_meta( $post_id, 'scos_ca_reading_time', true )
+		                         ?: get_post_meta( $post_id, 'bw_reading_time', true ) ),
+		'internal_links' => (int) ( get_post_meta( $post_id, 'scos_ca_links_to_internal', true )
+		                         ?: get_post_meta( $post_id, 'bw_internal_link_count', true ) ),
+		'external_links' => (int) ( get_post_meta( $post_id, 'scos_ca_links_to_external', true )
+		                         ?: get_post_meta( $post_id, 'bw_external_link_count', true ) ),
+		'last_updated'   => get_the_modified_date( 'Y-m-d', $post_id ),
+	];
+
+	// ── Assemble CAR ─────────────────────────────────────────────────────────
+	// ── Search intent resolution ─────────────────────────────────────────────
+	// Use Intent_Goal_Resolver when available (site-essentials CA module active).
+	// Falls back to the existing $val() pattern (scos_ca_intent_goal → bw_search_intent).
+	if ( class_exists( 'SiteEssentials\\Modules\\ContentArchitecture\\Intent_Goal_Resolver' ) ) {
+		$search_intent = SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::resolve_question( $post_id );
+		if ( '' === $search_intent ) {
+			$search_intent = 'not_set';
+		}
+	} else {
+		$search_intent = $val( 'scos_ca_intent_goal', 'bw_search_intent' );
+	}
+
+	$scos = [
+		'car' => [
+			'cluster'         => $cluster_name,
+			'topic'           => $topic_name,
+			'maturity'        => $val( 'scos_ca_maturity',    'bw_cont_maturity' ),
+			'intent'          => $val( 'scos_ca_intent',      'bw_intent' ),
+			'search-intent'   => $search_intent,
+			'purpose'         => $val( 'scos_ca_purpose',     'bw_purpose' ),
+			'pillar'          => $pillar,
+			'service_pathway' => $service_pathway,
+			'metrics'         => $metrics,
+		],
+		'meta' => [
+			'post_id'       => $post_id,
+			'post_type'     => get_post_type( $post_id ),
+			'scos_version'  => defined( 'SCOS_VERSION' ) ? SCOS_VERSION : '4.4.0',
+			'car_generated' => current_time( 'c' ),
+		],
+	];
+
+	scos_output_car( $scos );
+
+}, 5 );
+
+/**
+ * Output the window.brighterSCOS script tag.
+ *
+ * @param array $scos Data structure to JSON-encode.
+ */
+if ( ! function_exists( 'scos_output_car' ) ) :
+function scos_output_car( array $scos ) {
+	echo "\n" . '<script data-no-optimize="1" data-cfasync="false" data-litespeed-no-optimize="1">' . "\n";
+	echo '// SCOS Content Architecture Record — semantic intent and topical authority mapping.' . "\n";
+	echo 'window.scosCAR = ' . wp_json_encode( $scos, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT ) . ';' . "\n";
+	echo '</script>' . "\n";
+}
+endif;

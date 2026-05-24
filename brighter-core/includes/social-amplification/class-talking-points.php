@@ -28,6 +28,9 @@ class BW_Talking_Points {
      * Register talking points custom post type
      */
     public function register_post_type() {
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            return;
+        }
         $labels = array(
             'name'                  => __('Talking Points', 'brighterwebsites'),
             'singular_name'         => __('Talking Point', 'brighterwebsites'),
@@ -63,6 +66,8 @@ class BW_Talking_Points {
      * Add admin menu items manually
      */
     public function add_admin_menus() {
+        // Suppressed when site-essentials Social Amplification module is active.
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) { return; }
         // Add Talking Points submenu
         add_submenu_page(
             'brighter_support',
@@ -86,6 +91,9 @@ class BW_Talking_Points {
      * Register content type taxonomy
      */
     public function register_taxonomy() {
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            return;
+        }
         $labels = array(
             'name'              => __('Content Types', 'brighterwebsites'),
             'singular_name'     => __('Content Type', 'brighterwebsites'),
@@ -115,6 +123,9 @@ class BW_Talking_Points {
      * Add meta boxes for talking point fields
      */
     public function add_meta_boxes() {
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            return;
+        }
         add_meta_box(
             'bw_talking_point_details',
             __('Talking Point Details', 'brighterwebsites'),
@@ -179,6 +190,9 @@ class BW_Talking_Points {
      * Save meta box data
      */
     public function save_meta_boxes($post_id, $post) {
+        if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+            return;
+        }
         // Verify nonce
         if (!isset($_POST['bw_talking_point_nonce']) || !wp_verify_nonce($_POST['bw_talking_point_nonce'], 'bw_talking_point_meta')) {
             return;
@@ -223,8 +237,9 @@ class BW_Talking_Points {
      * @return array Talking points with metadata
      */
     public function get_talking_points_by_content_type($content_type = '') {
+        $post_type = ( defined( 'SCOS_SA_ACTIVE' ) ) ? 'scos_social_framing' : 'bw_talking_point';
         $args = array(
-            'post_type'      => 'bw_talking_point',
+            'post_type'      => $post_type,
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'orderby'        => 'menu_order title',
@@ -249,14 +264,26 @@ class BW_Talking_Points {
                 $query->the_post();
                 $post_id = get_the_ID();
 
+                $ctx = get_post_meta( $post_id, '_bw_tp_context', true );
+                $ex  = get_post_meta( $post_id, '_bw_tp_example', true );
+                $cta = get_post_meta( $post_id, '_bw_tp_cta_example', true );
+                $wmn = get_post_meta( $post_id, '_bw_tp_word_count_min', true );
+                $wmx = get_post_meta( $post_id, '_bw_tp_word_count_max', true );
+                if ( defined( 'SCOS_SA_ACTIVE' ) ) {
+                    $ctx = get_post_meta( $post_id, 'scos_sma_pf_context', true ) ?: $ctx;
+                    $ex  = get_post_meta( $post_id, 'scos_sma_pf_example', true ) ?: $ex;
+                    $cta = get_post_meta( $post_id, 'scos_sma_pf_cta', true ) ?: $cta;
+                    $wmn = get_post_meta( $post_id, 'scos_sma_pf_words_min', true ) ?: $wmn;
+                    $wmx = get_post_meta( $post_id, 'scos_sma_pf_words_max', true ) ?: $wmx;
+                }
                 $talking_points[] = array(
                     'id'             => $post_id,
                     'name'           => get_the_title(),
-                    'context'        => get_post_meta($post_id, '_bw_tp_context', true),
-                    'example'        => get_post_meta($post_id, '_bw_tp_example', true),
-                    'cta_example'    => get_post_meta($post_id, '_bw_tp_cta_example', true),
-                    'word_count_min' => get_post_meta($post_id, '_bw_tp_word_count_min', true) ?: 50,
-                    'word_count_max' => get_post_meta($post_id, '_bw_tp_word_count_max', true) ?: 130,
+                    'context'        => $ctx,
+                    'example'        => $ex,
+                    'cta_example'    => $cta,
+                    'word_count_min' => $wmn ? (int) $wmn : 50,
+                    'word_count_max' => $wmx ? (int) $wmx : 130,
                     'content_types'  => wp_get_post_terms($post_id, 'bw_content_type', array('fields' => 'slugs'))
                 );
             }

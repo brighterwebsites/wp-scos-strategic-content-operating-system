@@ -38,4 +38,3 @@ add_filter('body_class', function($classes) {
 add_action('wp_body_open', function () {
     echo '<a class="skip-link screen-reader-text" href="#main-content">Skip to main content</a>';
 });
-

@@ -10,7 +10,7 @@
  * Meta_Box, Admin_Columns, REST, CAR injection, and WP-CLI/MCP
  * all read from one place.
  *
- * v1.0 | 2026-05-22
+ * v1.1 | 2026-05-25 — create_stub_faq now sets scos_faq_is_intent_goal on the new FAQ.
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
@@ -174,6 +174,9 @@ class Intent_Goal_Resolver {
 		if ( $topic_term_id > 0 && taxonomy_exists( 'scos_topic' ) ) {
 			wp_set_post_terms( $faq_id, [ $topic_term_id ], 'scos_topic' );
 		}
+
+		// Mark the new FAQ as an intent goal immediately — it was created for this purpose.
+		update_post_meta( $faq_id, 'scos_faq_is_intent_goal', '1' );
 
 		return $faq_id;
 	}

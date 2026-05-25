@@ -16,7 +16,7 @@
  * 
  * @package    BrighterCore
  * @subpackage Breadcrumbs
- * @version    1.1.0
+ * @version    1.2 | 2026-05-25
  */
 
 if (!defined('ABSPATH')) exit;
@@ -143,8 +143,8 @@ function bw_get_breadcrumb_items() {
             }
         }
         
-        // Current page - check for breadcrumb override (matches schema)
-        $breadcrumb_override = get_post_meta($post_id, 'bw_breadcrumb_schema', true);
+        // Current page - check for breadcrumb override (SCOS SEO field)
+        $breadcrumb_override = get_post_meta($post_id, 'scos_seo_breadcrumb_title', true);
         $current_name = !empty($breadcrumb_override) ? $breadcrumb_override : get_the_title();
         
         $breadcrumbs[] = [

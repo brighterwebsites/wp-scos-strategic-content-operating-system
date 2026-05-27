@@ -1552,6 +1552,8 @@ class Admin_UI {
             'disable_dashicons_frontend'      => isset( $enabled_tweaks['disable_dashicons_frontend'] ),
             // Admin UX/UI
             'allow_editors_form_submissions'  => isset( $enabled_tweaks['allow_editors_form_submissions'] ),
+            // Agentic
+            'hide_honeypot_from_agents'       => isset( $enabled_tweaks['hide_honeypot_from_agents'] ),
             // Legacy key — kept so previously saved data isn't lost
             'disable_embeds'                  => isset( $enabled_tweaks['disable_embeds'] ),
         ];

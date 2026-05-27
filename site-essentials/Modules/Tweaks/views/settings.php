@@ -1,10 +1,11 @@
 <?php
+// v1.3 | 2026-05-27
 /**
  * Tweaks Module Settings View
  *
  * @package    SiteEssentials
  * @subpackage Modules\Tweaks
- * @version    1.2.0
+ * @version    1.3.0
  *
  * Variables available:
  * @var array $tweaks Current tweak settings
@@ -128,6 +129,16 @@ $groups = [
             'allow_editors_form_submissions' => [
                 'label'       => __( 'Allow Editors to View Form Submissions', 'site-essentials' ),
                 'description' => __( 'Grants users with the <code>edit_posts</code> capability (Editors and above) access to Breakdance form submission data. By default, only Admins can view submissions.', 'site-essentials' ),
+            ],
+        ],
+    ],
+    'agentic_tweaks' => [
+        'label'     => __( 'Agentic Tweaks', 'site-essentials' ),
+        'guide_url' => '',
+        'tweaks'    => [
+            'hide_honeypot_from_agents' => [
+                'label'       => __( 'Hide Honeypot Field from WebMCP Agents', 'site-essentials' ),
+                'description' => __( 'Injects a <code>toolparamdescription="Leave this field empty"</code> attribute into Breakdance honeypot inputs on every front-end page. WebMCP agents read this attribute and skip the field, preventing them from accidentally triggering spam protection when filling out legitimate forms via MCP.', 'site-essentials' ),
             ],
         ],
     ],

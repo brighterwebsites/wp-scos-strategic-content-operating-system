@@ -685,7 +685,7 @@ class Tweaks_Module implements Module_Interface {
     }
 
     /**
-     * Injects toolparamdescription into every honeypot <input> in the page HTML.
+     * Injects toolparamdescription into every honeypot <input> (type="hpinput") in the page HTML.
      *
      * @since  1.1.0
      * @param  string $html Full page HTML.
@@ -693,7 +693,7 @@ class Tweaks_Module implements Module_Interface {
      */
     public function rewrite_honeypot_for_agents( $html ) {
         return preg_replace(
-            '/(<input[^>]*name="fields\[hpname\]"[^>]*?)(\/?>)/',
+            '/(<input\b[^>]*\btype="hpinput"\b[^>]*?)(\/?>)/i',
             '$1 toolparamdescription="Leave this field empty"$2',
             $html
         );

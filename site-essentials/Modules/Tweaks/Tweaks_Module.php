@@ -1,5 +1,5 @@
 <?php
-// v1.1 | 2026-05-27
+// v1.2 | 2026-05-28
 /**
  * WordPress Tweaks Module
  *
@@ -693,7 +693,7 @@ class Tweaks_Module implements Module_Interface {
      */
     public function rewrite_honeypot_for_agents( $html ) {
         return preg_replace(
-            '/(<input\b[^>]*\btype="hpinput"\b[^>]*?)(\/?>)/i',
+            '/(<input\b[^>]*\btype="hpinput"[^>]*?)(\/?>)/i',
             '$1 toolparamdescription="Leave this field empty"$2',
             $html
         );

@@ -1,5 +1,5 @@
 <?php
-// v1.0 | 2026-05-19
+// v1.1 | 2026-06-01
 
 /**
  * Review Card Renderer
@@ -184,7 +184,7 @@ class Review_Card_Renderer {
         $has_project = $d['project_id'] && ( $show['project_image'] || $show['project_name'] );
         $has_project_image = $has_project && $show['project_image'] && $d['project_thumb_id'];
         ?>
-        <article class="<?php echo esc_attr( $classes ); ?>" itemscope itemtype="https://schema.org/Review">
+        <div class="<?php echo esc_attr( $classes ); ?>" itemscope itemtype="https://schema.org/Review">
 
             <?php if ( $has_project_image ) : ?>
             <div class="bde-review-card__media">
@@ -279,7 +279,7 @@ class Review_Card_Renderer {
                 </footer>
             </div>
 
-        </article>
+        </div>
         <?php
     }
 

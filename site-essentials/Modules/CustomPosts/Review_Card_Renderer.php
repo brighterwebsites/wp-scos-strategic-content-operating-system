@@ -1,5 +1,5 @@
 <?php
-// v1.3 | 2026-06-01
+// v1.4 | 2026-06-01
 
 /**
  * Review Card Renderer
@@ -49,6 +49,9 @@ class Review_Card_Renderer {
             'show_project_image'  => '1',
             'show_project_name'   => '1',
             'show_project_link'   => '1',
+            // Schema
+            'show_item_reviewed'  => '1',
+            'item_reviewed_type'  => 'Service',
         ], $atts, 'bw_review_card' );
 
         $post_id = ! empty( $atts['id'] ) ? absint( $atts['id'] ) : get_the_ID();
@@ -78,6 +81,9 @@ class Review_Card_Renderer {
             : 'stacked';
 
         $show = $this->parse_show_flags( $atts );
+        $show['item_reviewed_type'] = in_array( $atts['item_reviewed_type'] ?? 'Service', [ 'Service', 'Product' ], true )
+            ? $atts['item_reviewed_type']
+            : 'Service';
 
         // Gather all data up front — one meta read per field
         $data = $this->get_review_data( $post_id, $post );
@@ -163,6 +169,7 @@ class Review_Card_Renderer {
             'rating', 'excerpt', 'full_text', 'outcome',
             'name', 'detail', 'date', 'platform',
             'verify', 'featured', 'platform_icon', 'project_image', 'project_name', 'project_link',
+            'item_reviewed',
         ];
         $show = [];
         foreach ( $keys as $key ) {
@@ -187,6 +194,13 @@ class Review_Card_Renderer {
         $has_project_image = $has_project && $show['project_image'] && $d['project_thumb_id'];
         ?>
         <div class="<?php echo esc_attr( $classes ); ?>" itemscope itemtype="https://schema.org/Review">
+
+            <?php if ( $show['item_reviewed'] ) : ?>
+            <div itemprop="itemReviewed" itemscope itemtype="https://schema.org/<?php echo esc_attr( $show['item_reviewed_type'] ); ?>" style="display:none;">
+                <span itemprop="name"><?php echo esc_html( get_the_title() ); ?></span>
+                <link itemprop="url" href="<?php echo esc_url( get_permalink() ); ?>" />
+            </div>
+            <?php endif; ?>
 
             <?php if ( $has_project_image ) : ?>
             <div class="bde-review-card__media">

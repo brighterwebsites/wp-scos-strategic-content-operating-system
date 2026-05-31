@@ -1,5 +1,5 @@
 <?php
-// v1.2 | 2026-06-01
+// v1.3 | 2026-06-01
 
 /**
  * Review Card Renderer
@@ -45,6 +45,7 @@ class Review_Card_Renderer {
             'show_platform'       => '1',
             'show_verify'         => '1',
             'show_featured'       => '0',
+            'show_platform_icon'  => '1',
             'show_project_image'  => '1',
             'show_project_name'   => '1',
             'show_project_link'   => '1',
@@ -128,6 +129,7 @@ class Review_Card_Renderer {
             'is_featured'      => get_post_meta( $post_id, 'bw_is_featured', true ) === '1',
             'platform_name'    => $platform_obj ? $platform_obj->name : '',
             'platform_slug'    => $platform_obj ? $platform_obj->slug : '',
+            'platform_logo_id' => $platform_obj ? absint( get_term_meta( $platform_obj->term_id, 'bw_platform_logo_id', true ) ) : 0,
             'project_id'       => $project_id,
             'project_title'    => $project_id ? get_the_title( $project_id ) : '',
             'project_url'      => $project_id ? get_permalink( $project_id ) : '',
@@ -160,7 +162,7 @@ class Review_Card_Renderer {
         $keys = [
             'rating', 'excerpt', 'full_text', 'outcome',
             'name', 'detail', 'date', 'platform',
-            'verify', 'featured', 'project_image', 'project_name', 'project_link',
+            'verify', 'featured', 'platform_icon', 'project_image', 'project_name', 'project_link',
         ];
         $show = [];
         foreach ( $keys as $key ) {
@@ -206,6 +208,21 @@ class Review_Card_Renderer {
 
                 <?php if ( $show['featured'] && $d['is_featured'] ) : ?>
                 <span class="bde-review-card__featured-badge"><?php esc_html_e( 'Featured', 'site-essentials' ); ?></span>
+                <?php endif; ?>
+
+                <?php if ( $show['platform_icon'] && $d['platform_logo_id'] ) : ?>
+                <div class="bde-review-card__platform-icon">
+                    <?php echo wp_get_attachment_image(
+                        $d['platform_logo_id'],
+                        'full',
+                        false,
+                        [
+                            'class'   => 'bde-review-card__platform-icon-img',
+                            'loading' => 'lazy',
+                            'alt'     => esc_attr( $d['platform_name'] ),
+                        ]
+                    ); ?>
+                </div>
                 <?php endif; ?>
 
                 <?php if ( $show['rating'] && $d['rating'] ) : ?>

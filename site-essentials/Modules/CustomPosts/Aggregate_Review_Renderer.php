@@ -1,5 +1,5 @@
 <?php
-// v1.0 | 2026-06-01
+// v1.1 | 2026-06-01
 
 /**
  * Aggregate Review Renderer
@@ -151,9 +151,7 @@ class Aggregate_Review_Renderer {
     private function render_card( array $d, string $layout, array $show ): void {
         $class = 'bde-aggregate-review bde-aggregate-review--layout-' . esc_attr( $layout );
         ?>
-        <div class="<?php echo esc_attr( $class ); ?>" itemscope itemtype="https://schema.org/AggregateRating">
-            <meta itemprop="worstRating" content="1">
-            <meta itemprop="bestRating" content="5">
+        <div class="<?php echo esc_attr( $class ); ?>">
             <?php
             switch ( $layout ) {
                 case 'simple':
@@ -174,9 +172,9 @@ class Aggregate_Review_Renderer {
 
     private function render_layout_simple( array $d ): void {
         ?>
-        <span itemprop="ratingValue" class="bde-aggregate-review__score"><?php echo esc_html( $d['average'] ); ?></span>
+        <span class="bde-aggregate-review__score"><?php echo esc_html( $d['average'] ); ?></span>
         <span class="bde-aggregate-review__from">From</span>
-        <span itemprop="reviewCount" class="bde-aggregate-review__count"><?php echo absint( $d['count'] ); ?></span>
+        <span class="bde-aggregate-review__count"><?php echo absint( $d['count'] ); ?></span>
         <span class="bde-aggregate-review__label">Reviews</span>
         <?php
     }
@@ -194,10 +192,7 @@ class Aggregate_Review_Renderer {
         <?php if ( $show['stars'] ) : ?>
         <div class="bde-aggregate-review__stars"
              role="img"
-             aria-label="<?php echo esc_attr( $d['average'] . ' out of 5' ); ?>"
-             itemprop="ratingValue"
-             content="<?php echo esc_attr( $d['average'] ); ?>">
-            <meta itemprop="reviewCount" content="<?php echo absint( $d['count'] ); ?>">
+             aria-label="<?php echo esc_attr( $d['average'] . ' out of 5' ); ?>">
             <div class="bde-aggregate-review__stars-inner">
                 <?php echo $this->render_stars( (int) round( $d['average_raw'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
             </div>
@@ -221,9 +216,7 @@ class Aggregate_Review_Renderer {
             <?php if ( $show['stars'] ) : ?>
             <div class="bde-aggregate-review__stars"
                  role="img"
-                 aria-label="<?php echo esc_attr( $d['average'] . ' out of 5' ); ?>"
-                 itemprop="ratingValue"
-                 content="<?php echo esc_attr( $d['average'] ); ?>">
+                 aria-label="<?php echo esc_attr( $d['average'] . ' out of 5' ); ?>">
                 <div class="bde-aggregate-review__stars-inner">
                     <?php echo $this->render_stars( (int) round( $d['average_raw'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                 </div>
@@ -240,13 +233,11 @@ class Aggregate_Review_Renderer {
         <a class="bde-aggregate-review__link"
            href="<?php echo esc_url( $d['reviews_url'] ); ?>"
            target="_blank"
-           rel="noopener noreferrer"
-           itemprop="reviewCount"
-           content="<?php echo absint( $d['count'] ); ?>">
+           rel="noopener noreferrer">
             <?php echo $link_text; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — components individually escaped above ?>
         </a>
         <?php else : ?>
-        <span class="bde-aggregate-review__link" itemprop="reviewCount" content="<?php echo absint( $d['count'] ); ?>">
+        <span class="bde-aggregate-review__link">
             <?php echo $link_text; // phpcs:ignore ?>
         </span>
         <?php endif; ?>

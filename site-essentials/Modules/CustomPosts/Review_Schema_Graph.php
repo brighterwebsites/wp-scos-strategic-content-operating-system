@@ -1,26 +1,29 @@
 <?php
-// v1.0 | 2026-06-01
+// v1.1 | 2026-06-01
 
 /**
  * Review schema token resolver.
  *
- * Registers the %%_scos_review_cards_json%% token via the
- * `bw_schema_resolve_variable` filter exposed by
- * brighter-core/includes/scos-schema-output.php.
+ * Registers two review-related tokens via the `bw_schema_resolve_variable`
+ * filter exposed by brighter-core/includes/scos-schema-output.php.
  *
- * At resolve time the class walks the Breakdance element tree for the current
- * post, collects every ScosReviewCard element configured in "specific" mode,
- * fetches the associated bw_reviews data, and returns a PHP array of
- * schema.org Review objects.
+ * %%_scos_review_cards_json%%
+ *   Walks the Breakdance element tree for the current post, collects every
+ *   ScosReviewCard element configured in "specific" mode, fetches the
+ *   associated bw_reviews data, and returns a PHP array of schema.org
+ *   Review objects. Usage:
+ *     { "@type": "Service", "review": "%%_scos_review_cards_json%%" }
+ *   Only "specific" mode elements contribute (loop-mode cards don't hold an
+ *   explicit post ID and cannot be resolved at schema-output time).
  *
- * Because bw_schema_replace_variables() replaces a whole-value token with
- * whatever the resolver returns (including arrays — same behaviour as
- * %%post_thumbnail%%), the token can be used directly in per-post JSON-LD:
+ * %%_scos_aggregate_rating_json%%
+ *   Queries all published bw_reviews posts, calculates the count and average
+ *   rating across ALL platforms, and returns a single schema.org
+ *   AggregateRating object. Usage:
+ *     { "@type": "Service", "aggregateRating": "%%_scos_aggregate_rating_json%%" }
  *
- *   { "@type": "Service", "review": "%%_scos_review_cards_json%%" }
- *
- * Only "specific" mode elements contribute reviews (loop-mode elements don't
- * hold an explicit post ID so cannot be safely resolved at schema-output time).
+ * Both tokens replace a whole-value string with a PHP array — the token engine
+ * (bw_schema_replace_variables) already handles this, same as %%post_thumbnail%%.
  *
  * Mirrors the pattern established by FAQ_Schema_Graph.
  *
@@ -50,9 +53,14 @@ class Review_Schema_Graph {
 	const BD_ELEMENT_TYPE_SHORT = 'ScosReviewCard';
 
 	/**
-	 * Token name (without %% delimiters) this resolver handles.
+	 * Token name for the per-page Review array.
 	 */
-	const TOKEN_NAME = '_scos_review_cards_json';
+	const TOKEN_REVIEWS = '_scos_review_cards_json';
+
+	/**
+	 * Token name for the site-wide AggregateRating object.
+	 */
+	const TOKEN_AGGREGATE = '_scos_aggregate_rating_json';
 
 	/**
 	 * Register the token resolver filter.
@@ -64,20 +72,23 @@ class Review_Schema_Graph {
 	}
 
 	/**
-	 * Resolve %%_scos_review_cards_json%% to a PHP array of Review objects.
+	 * Route token resolution for both review tokens.
 	 *
 	 * Hooked onto `bw_schema_resolve_variable`.
 	 *
-	 * @param mixed  $value   Current resolved value (pass-through for other tokens).
+	 * @param mixed  $value   Current resolved value (pass-through for unhandled tokens).
 	 * @param string $name    Token name without %% delimiters.
 	 * @param int    $post_id Current page post ID.
 	 * @return mixed
 	 */
 	public static function resolve_token( $value, string $name, int $post_id ) {
-		if ( self::TOKEN_NAME !== $name ) {
-			return $value;
+		if ( self::TOKEN_REVIEWS === $name ) {
+			return self::get_review_array( $post_id );
 		}
-		return self::get_review_array( $post_id );
+		if ( self::TOKEN_AGGREGATE === $name ) {
+			return self::get_aggregate_rating();
+		}
+		return $value;
 	}
 
 	/**
@@ -311,6 +322,53 @@ class Review_Schema_Graph {
 	// =========================================================================
 	// Schema object builder
 	// =========================================================================
+
+	/**
+	 * Build a schema.org AggregateRating object from all published bw_reviews.
+	 *
+	 * Aggregates across ALL platforms. Returns null when there are no published
+	 * reviews with a numeric rating (avoids emitting a zero-count aggregate).
+	 *
+	 * Public so it can be called directly from WP-CLI / MCP tools.
+	 *
+	 * @return array|null
+	 */
+	public static function get_aggregate_rating(): ?array {
+		$query = new \WP_Query( [
+			'post_type'              => 'bw_reviews',
+			'post_status'            => 'publish',
+			'posts_per_page'         => -1,
+			'fields'                 => 'ids',
+			'no_found_rows'          => true,
+			'update_post_meta_cache' => true,
+			'update_post_term_cache' => false,
+		] );
+
+		$total = 0.0;
+		$count = 0;
+
+		foreach ( $query->posts as $post_id ) {
+			$rating = get_post_meta( (int) $post_id, 'bw_rating', true );
+			if ( '' !== $rating && is_numeric( $rating ) ) {
+				$total += (float) $rating;
+				$count++;
+			}
+		}
+
+		if ( $count === 0 ) {
+			return null;
+		}
+
+		$average = round( $total / $count, 1 );
+
+		return [
+			'@type'       => 'AggregateRating',
+			'ratingValue' => number_format( $average, 1 ),
+			'bestRating'  => '5',
+			'worstRating' => '1',
+			'reviewCount' => $count,
+		];
+	}
 
 	/**
 	 * Build a schema.org Review object for a single bw_reviews post.

@@ -1120,6 +1120,11 @@ JS;
         // Statistics shortcodes
         add_shortcode('bw_review_count',           [$this, 'shortcode_review_count']);
         add_shortcode('bw_review_average',         [$this, 'shortcode_review_average']);
+
+        // Aggregate review widget — combined stats + logo + stars, used by SCOS Aggregate Review BDE element
+        require_once __DIR__ . '/Aggregate_Review_Renderer.php';
+        $aggregate_renderer = new Aggregate_Review_Renderer();
+        add_shortcode('bw_aggregate_review', [$aggregate_renderer, 'shortcode']);
     }
 
     /**

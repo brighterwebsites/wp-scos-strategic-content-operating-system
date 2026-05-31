@@ -1,5 +1,5 @@
 <?php
-// v1.1 | 2026-06-01
+// v1.2 | 2026-06-01
 
 /**
  * Review Card Renderer
@@ -230,7 +230,7 @@ class Review_Card_Renderer {
                 <p class="bde-review-card__outcome"><?php echo esc_html( $d['outcome'] ); ?></p>
                 <?php endif; ?>
 
-                <footer class="bde-review-card__footer">
+                <div class="bde-review-card__footer">
                     <div class="bde-review-card__author" itemprop="author" itemscope itemtype="https://schema.org/Person">
                         <?php if ( $show['name'] && $d['customer_name'] ) : ?>
                         <strong class="bde-review-card__name" itemprop="name"><?php echo esc_html( $d['customer_name'] ); ?></strong>
@@ -276,10 +276,10 @@ class Review_Card_Renderer {
                     </div>
                     <?php endif; ?>
 
-                </footer>
-            </div>
+                </div><!-- /.bde-review-card__footer -->
+            </div><!-- /.bde-review-card__content -->
 
-        </div>
+        </div><!-- /.bde-review-card -->
         <?php
     }
 

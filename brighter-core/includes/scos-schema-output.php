@@ -17,7 +17,7 @@
  *
  * @package    BrighterCore
  * @subpackage Schema
- * @version    1.1 | 2026-05-22
+ * @version    1.2 | 2026-06-01
  * @since      1.0.0
  */
 
@@ -172,10 +172,6 @@ function bw_schema_get_singular_id() {
     if (!$id || !get_post_status($id)) {
         return 0;
     }
-    $type = get_post_type($id);
-    if (!in_array($type, ['post', 'page'], true)) {
-        return 0;
-    }
     return $id;
 }
 
@@ -287,6 +283,11 @@ function bw_schema_resolve_variable($name, $post_id) {
     }
     if ($name === 'site_url') {
         return home_url('/');
+    }
+
+    // Dynamic date: %%date_year_ahead%% → ISO date one year from today (useful for priceValidUntil)
+    if ($name === 'date_year_ahead') {
+        return date('Y-m-d', strtotime('+1 year'));
     }
 
     // Custom options: %%_cmeta_options_option_key%% → get_option( 'option_key' ). Must run before _cmeta_ (post meta) and before post-only gate.
@@ -980,7 +981,7 @@ function bw_render_schema_graph() {
         }
     }
     
-    // Product — on single post or page when its ID is in the list
+    // Product — on single post/page when its ID is in the list, OR on all WooCommerce products when auto-apply is enabled
     $singular_id = bw_schema_get_singular_id();
     if ($singular_id) {
         $product_post_ids = get_option( 'scos_site_schema_product_ids', '' ) ?: get_option( 'bw_product_post_ids', '' );
@@ -988,6 +989,12 @@ function bw_render_schema_graph() {
         $ids = bw_schema_parse_post_id_list($product_post_ids);
         $ids = apply_filters('bw_schema_product_post_ids', $ids, $singular_id);
         $include_product = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_product', false, $singular_id);
+
+        // WooCommerce: auto-apply the Product template to all product pages when checkbox is on
+        if ( !$include_product && is_singular('product') && get_option('scos_site_schema_woo_product_auto') ) {
+            $include_product = true;
+        }
+
         if ($include_product && $product_schema !== '') {
             $decoded = json_decode(bw_schema_normalize_json_placeholders($product_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {

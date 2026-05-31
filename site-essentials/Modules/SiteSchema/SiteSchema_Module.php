@@ -120,6 +120,11 @@ class SiteSchema_Module implements Module_Interface {
 			'sanitize_callback' => [ __CLASS__, 'sanitize_post_ids' ],
 			'default'           => '',
 		] );
+		register_setting( 'scos_site_schema_group', 'scos_site_schema_woo_product_auto', [
+			'type'              => 'string',
+			'sanitize_callback' => function( $v ) { return $v === '1' ? '1' : ''; },
+			'default'           => '',
+		] );
 		register_setting( 'scos_site_schema_group', 'scos_site_schema_service_ids', [
 			'type'              => 'string',
 			'sanitize_callback' => [ __CLASS__, 'sanitize_post_ids' ],
@@ -161,6 +166,7 @@ class SiteSchema_Module implements Module_Interface {
 		if ( isset( $_POST['scos_site_schema_product_ids'] ) ) {
 			update_option( 'scos_site_schema_product_ids', self::sanitize_post_ids( wp_unslash( $_POST['scos_site_schema_product_ids'] ) ) );
 		}
+		update_option( 'scos_site_schema_woo_product_auto', isset( $_POST['scos_site_schema_woo_product_auto'] ) ? '1' : '' );
 		if ( isset( $_POST['scos_site_schema_service_ids'] ) ) {
 			update_option( 'scos_site_schema_service_ids', self::sanitize_post_ids( wp_unslash( $_POST['scos_site_schema_service_ids'] ) ) );
 		}

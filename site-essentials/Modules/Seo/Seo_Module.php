@@ -7,7 +7,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.2 | 2026-06-04
+ * @version    1.3 | 2026-06-04
  * @since      1.0.0
  */
 
@@ -470,14 +470,13 @@ class Seo_Module implements Module_Interface {
             return [];
         }
 
-        // PERFORMANCE OPTIMIZATION: Batch-load all noindex meta for all posts at once
-        // This reduces N queries (where N = number of posts) down to 4 queries total
+        // Batch-load all relevant meta in one pass (noindex, canonical, sitemap overrides).
         $post_ids = wp_list_pluck($posts, 'ID');
         $this->preload_noindex_meta($post_ids);
 
-        // Filter out noindex posts
+        // Filter out noindex posts and non-self-canonical posts.
         return array_filter($posts, function($post) {
-            return !$this->is_noindex($post->ID);
+            return !$this->is_noindex($post->ID) && !$this->is_non_self_canonical($post->ID);
         });
     }
 
@@ -844,6 +843,39 @@ class Seo_Module implements Module_Interface {
         }
 
         return false;
+    }
+
+    /**
+     * Check if a post has a non-self-referencing canonical and no sitemap override.
+     *
+     * A non-self canonical means the page explicitly declares another URL as its
+     * canonical — including it in the sitemap directly contradicts that signal.
+     * The only exception: the user has checked "Include in XML sitemap anyway"
+     * (scos_seo_sitemap_noindex_override, which covers both noindex and non-self-canonical).
+     *
+     * @since  1.2.0
+     * @param  int $post_id
+     * @return bool True if the post should be excluded.
+     */
+    private function is_non_self_canonical( int $post_id ): bool {
+        // Allow override — same flag covers both noindex and non-self-canonical.
+        $override = get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true );
+        if ( '1' === (string) $override ) {
+            return false;
+        }
+
+        $canonical = get_post_meta( $post_id, 'scos_seo_canonical', true );
+        if ( empty( $canonical ) ) {
+            $canonical = get_post_meta( $post_id, '_seopress_robots_canonical', true );
+        }
+
+        if ( empty( $canonical ) ) {
+            return false;
+        }
+
+        // Compare without trailing slashes so minor URL format differences don't trigger.
+        $self = get_permalink( $post_id );
+        return rtrim( $canonical, '/' ) !== rtrim( $self, '/' );
     }
 
     /**

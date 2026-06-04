@@ -23,7 +23,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.2 | 2026-06-04
+ * @version    1.3 | 2026-06-04
  * @since      1.0.0
  */
 
@@ -416,7 +416,17 @@ class Head_Output {
 		}
 
 		// ── OG image ─────────────────────────────────────────────────────────
+		// On author archives, check per-author user meta first, fall back to archive default.
 		$og_image_id = (int) $settings['og_image_id'];
+		if ( 'author' === $slug && is_author() ) {
+			$queried_author = get_queried_object();
+			if ( $queried_author instanceof \WP_User ) {
+				$per_author_id = (int) get_user_meta( $queried_author->ID, Author_SEO::META_KEY, true );
+				if ( $per_author_id > 0 ) {
+					$og_image_id = $per_author_id;
+				}
+			}
+		}
 		if ( $og_image_id > 0 ) {
 			$img = wp_get_attachment_image_src( $og_image_id, 'full' );
 			if ( $img ) {

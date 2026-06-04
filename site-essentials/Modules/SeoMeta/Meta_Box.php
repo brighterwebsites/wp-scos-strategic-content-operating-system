@@ -110,7 +110,9 @@ class Meta_Box {
 			}
 		}
 
-		$sitemap_exclude = (array) get_post_meta( $post->ID, 'scos_seo_sitemap_exclude', true );
+		$sitemap_exclude          = (array) get_post_meta( $post->ID, 'scos_seo_sitemap_exclude', true );
+		$sitemap_noindex_override = (bool) get_post_meta( $post->ID, 'scos_seo_sitemap_noindex_override', true );
+		$sitemap_noindex_auto     = (bool) get_post_meta( $post->ID, 'scos_seo_sitemap_noindex_auto', true );
 
 		$freeze_date        = (bool) get_post_meta( $post->ID, 'scos_seo_freeze_og_date', true );
 		$global_freeze_date = (bool) get_option( 'scos_seo_freeze_modified_date', false );
@@ -207,6 +209,29 @@ class Meta_Box {
 		} else {
 			$exclude = [];
 		}
+
+		// ---- Noindex ↔ sitemap auto-sync ----
+		// If noindex is set and the "include despite noindex" override is not checked,
+		// silently add 'xml' to sitemap_exclude and record that we auto-set it.
+		// If noindex is cleared and we previously auto-set the xml exclusion, remove it.
+		$noindex_now      = in_array( 'noindex', $robots, true );
+		$sitemap_override = ! empty( $_POST['scos_seo_sitemap_noindex_override'] );
+		$was_auto_set     = (bool) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto', true );
+
+		if ( $noindex_now && ! $sitemap_override ) {
+			if ( ! in_array( 'xml', $exclude, true ) ) {
+				$exclude[] = 'xml';
+			}
+			update_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto', '1' );
+		} else {
+			// noindex cleared OR override checked — undo the auto-exclusion if we set it.
+			if ( $was_auto_set ) {
+				$exclude = array_values( array_diff( $exclude, [ 'xml' ] ) );
+			}
+			delete_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto' );
+		}
+
+		update_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', $sitemap_override ? '1' : '0' );
 		update_post_meta( $post_id, 'scos_seo_sitemap_exclude', $exclude );
 	}
 
@@ -287,6 +312,9 @@ class Meta_Box {
 			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0',
 			true
 		);
+		wp_localize_script( 'scos-seo-meta-box', 'scosSeoMeta', [
+			'noindexSitemapMsg' => esc_html__( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ),
+		] );
 	}
 
 	// ---- Helpers ----

@@ -5,7 +5,7 @@
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
- * v1.1 | 2026-06-04
+ * v1.2 | 2026-06-04
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -51,6 +51,24 @@ class Meta_Fields {
 			'single'       => true,
 			'show_in_rest' => false,
 			'auth_callback' => function () { return current_user_can( 'edit_posts' ); },
+		] );
+
+		// Sitemap: user override — include in XML sitemap even when noindex is set.
+		register_post_meta( '', 'scos_seo_sitemap_noindex_override', [
+			'type'              => 'boolean',
+			'single'            => true,
+			'sanitize_callback' => 'rest_sanitize_boolean',
+			'show_in_rest'      => false,
+			'auth_callback'     => function () { return current_user_can( 'edit_posts' ); },
+		] );
+
+		// Sitemap: internal flag — xml exclusion was auto-set by noindex (not manually set).
+		register_post_meta( '', 'scos_seo_sitemap_noindex_auto', [
+			'type'              => 'boolean',
+			'single'            => true,
+			'sanitize_callback' => 'rest_sanitize_boolean',
+			'show_in_rest'      => false,
+			'auth_callback'     => function () { return current_user_can( 'edit_posts' ); },
 		] );
 
 		// Per-post flag: freeze modified date / og:updated_time on save.

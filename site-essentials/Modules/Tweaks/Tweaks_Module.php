@@ -1,4 +1,5 @@
 <?php
+// v1.2 | 2026-05-28
 /**
  * WordPress Tweaks Module
  *
@@ -13,7 +14,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Tweaks
- * @version    1.0.0
+ * @version    1.1.0
  * @since      1.0.0
  */
 
@@ -321,6 +322,10 @@ class Tweaks_Module implements Module_Interface {
                 add_filter( 'breakdance_form_submission_capability', function() {
                     return 'edit_posts';
                 } );
+                break;
+
+            case 'hide_honeypot_from_agents':
+                $this->hide_honeypot_from_agents();
                 break;
         }
     }
@@ -648,9 +653,50 @@ class Tweaks_Module implements Module_Interface {
             'disable_dashicons_frontend'      => false,
             // Admin UX/UI
             'allow_editors_form_submissions'  => false,
+            // Agentic
+            'hide_honeypot_from_agents'       => false,
             // Legacy key — preserved for backwards compat but hidden from UI
             'disable_embeds'                  => false,
         ];
+    }
+
+    /**
+     * Inject a toolparamdescription attribute into Breakdance honeypot inputs so
+     * WebMCP agents know to leave the field blank.
+     *
+     * Starts an output buffer on template_redirect. The rewrite callback fires
+     * when the buffer is flushed and patches any honeypot <input> in the rendered HTML.
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    private function hide_honeypot_from_agents() {
+        add_action( 'template_redirect', [ $this, 'start_honeypot_agent_buffer' ], 0 );
+    }
+
+    /**
+     * Output buffer callback — starts the rewrite buffer.
+     *
+     * @since  1.1.0
+     * @return void
+     */
+    public function start_honeypot_agent_buffer() {
+        ob_start( [ $this, 'rewrite_honeypot_for_agents' ] );
+    }
+
+    /**
+     * Injects toolparamdescription into every honeypot <input> (type="hpinput") in the page HTML.
+     *
+     * @since  1.1.0
+     * @param  string $html Full page HTML.
+     * @return string Patched HTML.
+     */
+    public function rewrite_honeypot_for_agents( $html ) {
+        return preg_replace(
+            '/(<input\b[^>]*\btype="hpinput"[^>]*?)(\/?>)/i',
+            '$1 toolparamdescription="Leave this field empty"$2',
+            $html
+        );
     }
 
     /**

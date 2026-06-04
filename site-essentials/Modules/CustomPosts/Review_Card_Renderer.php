@@ -1,5 +1,5 @@
 <?php
-// v1.0 | 2026-05-19
+// v1.5 | 2026-06-01
 
 /**
  * Review Card Renderer
@@ -45,6 +45,7 @@ class Review_Card_Renderer {
             'show_platform'       => '1',
             'show_verify'         => '1',
             'show_featured'       => '0',
+            'show_platform_icon'  => '1',
             'show_project_image'  => '1',
             'show_project_name'   => '1',
             'show_project_link'   => '1',
@@ -128,6 +129,7 @@ class Review_Card_Renderer {
             'is_featured'      => get_post_meta( $post_id, 'bw_is_featured', true ) === '1',
             'platform_name'    => $platform_obj ? $platform_obj->name : '',
             'platform_slug'    => $platform_obj ? $platform_obj->slug : '',
+            'platform_logo_id' => $platform_obj ? absint( get_term_meta( $platform_obj->term_id, 'bw_platform_logo_id', true ) ) : 0,
             'project_id'       => $project_id,
             'project_title'    => $project_id ? get_the_title( $project_id ) : '',
             'project_url'      => $project_id ? get_permalink( $project_id ) : '',
@@ -160,7 +162,7 @@ class Review_Card_Renderer {
         $keys = [
             'rating', 'excerpt', 'full_text', 'outcome',
             'name', 'detail', 'date', 'platform',
-            'verify', 'featured', 'project_image', 'project_name', 'project_link',
+            'verify', 'featured', 'platform_icon', 'project_image', 'project_name', 'project_link',
         ];
         $show = [];
         foreach ( $keys as $key ) {
@@ -184,7 +186,7 @@ class Review_Card_Renderer {
         $has_project = $d['project_id'] && ( $show['project_image'] || $show['project_name'] );
         $has_project_image = $has_project && $show['project_image'] && $d['project_thumb_id'];
         ?>
-        <article class="<?php echo esc_attr( $classes ); ?>" itemscope itemtype="https://schema.org/Review">
+        <div class="<?php echo esc_attr( $classes ); ?>">
 
             <?php if ( $has_project_image ) : ?>
             <div class="bde-review-card__media">
@@ -193,10 +195,9 @@ class Review_Card_Renderer {
                     'medium_large',
                     false,
                     [
-                        'class'    => 'bde-review-card__project-img',
-                        'loading'  => 'lazy',
-                        'itemprop' => 'image',
-                        'alt'      => esc_attr( $d['project_title'] ),
+                        'class'   => 'bde-review-card__project-img',
+                        'loading' => 'lazy',
+                        'alt'     => esc_attr( $d['project_title'] ),
                     ]
                 ); ?>
             </div>
@@ -208,6 +209,21 @@ class Review_Card_Renderer {
                 <span class="bde-review-card__featured-badge"><?php esc_html_e( 'Featured', 'site-essentials' ); ?></span>
                 <?php endif; ?>
 
+                <?php if ( $show['platform_icon'] && $d['platform_logo_id'] ) : ?>
+                <div class="bde-review-card__platform-icon">
+                    <?php echo wp_get_attachment_image(
+                        $d['platform_logo_id'],
+                        'full',
+                        false,
+                        [
+                            'class'   => 'bde-review-card__platform-icon-img',
+                            'loading' => 'lazy',
+                            'alt'     => esc_attr( $d['platform_name'] ),
+                        ]
+                    ); ?>
+                </div>
+                <?php endif; ?>
+
                 <?php if ( $show['rating'] && $d['rating'] ) : ?>
                 <div class="bde-review-card__stars" aria-label="<?php echo esc_attr( $d['rating'] . ' out of 5 stars' ); ?>" role="img">
                     <?php echo $this->render_stars( $d['rating'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
@@ -215,13 +231,13 @@ class Review_Card_Renderer {
                 <?php endif; ?>
 
                 <?php if ( $show['excerpt'] && $d['excerpt'] ) : ?>
-                <blockquote class="bde-review-card__quote" itemprop="reviewBody">
+                <blockquote class="bde-review-card__quote">
                     <p><?php echo esc_html( $d['excerpt'] ); ?></p>
                 </blockquote>
                 <?php endif; ?>
 
                 <?php if ( $show['full_text'] && ! $show['excerpt'] && $d['full_text'] ) : ?>
-                <div class="bde-review-card__full-text" itemprop="reviewBody">
+                <div class="bde-review-card__full-text">
                     <?php echo wp_kses_post( $d['full_text'] ); ?>
                 </div>
                 <?php endif; ?>
@@ -230,10 +246,10 @@ class Review_Card_Renderer {
                 <p class="bde-review-card__outcome"><?php echo esc_html( $d['outcome'] ); ?></p>
                 <?php endif; ?>
 
-                <footer class="bde-review-card__footer">
-                    <div class="bde-review-card__author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+                <div class="bde-review-card__footer">
+                    <div class="bde-review-card__author">
                         <?php if ( $show['name'] && $d['customer_name'] ) : ?>
-                        <strong class="bde-review-card__name" itemprop="name"><?php echo esc_html( $d['customer_name'] ); ?></strong>
+                        <strong class="bde-review-card__name"><?php echo esc_html( $d['customer_name'] ); ?></strong>
                         <?php endif; ?>
 
                         <?php if ( $show['detail'] && $d['customer_detail'] ) : ?>
@@ -242,13 +258,13 @@ class Review_Card_Renderer {
                     </div>
 
                     <?php if ( $show['platform'] && $d['platform_name'] ) : ?>
-                    <span class="bde-review-card__platform bde-review-card__platform--<?php echo esc_attr( $d['platform_slug'] ); ?>" itemprop="publisher">
+                    <span class="bde-review-card__platform bde-review-card__platform--<?php echo esc_attr( $d['platform_slug'] ); ?>">
                         <?php echo esc_html( $d['platform_name'] ); ?>
                     </span>
                     <?php endif; ?>
 
                     <?php if ( $show['date'] && $d['date_formatted'] ) : ?>
-                    <time class="bde-review-card__date" datetime="<?php echo esc_attr( $d['date_raw'] ); ?>" itemprop="datePublished">
+                    <time class="bde-review-card__date" datetime="<?php echo esc_attr( $d['date_raw'] ); ?>">
                         <?php echo esc_html( $d['date_formatted'] ); ?>
                     </time>
                     <?php endif; ?>
@@ -276,10 +292,10 @@ class Review_Card_Renderer {
                     </div>
                     <?php endif; ?>
 
-                </footer>
-            </div>
+                </div><!-- /.bde-review-card__footer -->
+            </div><!-- /.bde-review-card__content -->
 
-        </article>
+        </div><!-- /.bde-review-card -->
         <?php
     }
 

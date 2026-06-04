@@ -16,6 +16,7 @@
  *
  * v1.1 | 2026-05-22 — FAQ intent goal picker: load/save scos_ca_intent_goal_faq_id,
  *                      pending stub creation on save, enriched JS data.
+ * v1.2 | 2026-05-25 — Auto-set scos_faq_is_intent_goal on linked FAQ when saved.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -260,6 +261,7 @@ class Meta_Box {
 			$new_faq  = Intent_Goal_Resolver::create_stub_faq( $pending_faq_title, $topic_id, $post_id );
 			if ( ! is_wp_error( $new_faq ) ) {
 				update_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', $new_faq );
+				// create_stub_faq already sets scos_faq_is_intent_goal = 1 on the new FAQ.
 			}
 		} else {
 			// Step 2: save an explicitly submitted FAQ ID (picker selection or cleared).
@@ -270,6 +272,8 @@ class Meta_Box {
 					$faq_post = get_post( $faq_id );
 					if ( $faq_post && 'faq' === $faq_post->post_type ) {
 						update_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', $faq_id );
+						// Auto-flag the linked FAQ as an intent goal.
+						update_post_meta( $faq_id, \SiteEssentials\Modules\CustomPosts\FAQ\FAQ_Module::META_IS_INTENT_GOAL, '1' );
 					}
 				} else {
 					delete_post_meta( $post_id, 'scos_ca_intent_goal_faq_id' );

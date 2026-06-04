@@ -10,7 +10,7 @@
  * Schema is contributed to the unified site graph by FAQ_Schema_Graph via
  * the `scos_schema_graph_items` filter.
  *
- * v1.0 | 2026-05-19
+ * v1.1 | 2026-06-03
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -58,6 +58,7 @@ class FAQ_Block {
 		);
 
 		register_block_type( FAQ_Module::BLOCK_NAME, [
+			'api_version'     => 3,
 			'editor_script'   => self::SCRIPT_HANDLE,
 			'render_callback' => [ self::class, 'render' ],
 			'attributes'      => [

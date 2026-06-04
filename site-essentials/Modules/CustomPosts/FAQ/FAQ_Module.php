@@ -20,7 +20,7 @@
  *                 brighter-core/v1/faqs         (token-auth, owned by brighter-core API
  *                                                — still used by external GPT/MCP/Postly)
  *
- * v1.2 | 2026-05-22 — Added "Used as intent goal" admin column (count + links).
+ * v1.3 | 2026-05-25 — Added scos_faq_is_intent_goal checkbox, column, and auto-set logic.
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -43,6 +43,14 @@ class FAQ_Module {
 
 	/** Primary meta key for the per-FAQ schema toggle (scos_faq_*). */
 	const META_ENABLE_SCHEMA = 'scos_faq_enable_schema';
+
+	/**
+	 * Meta key: is this FAQ being used as a Search Intent Goal on one or more pages?
+	 * Value '1' = yes. Absence / '' = no.
+	 * Set automatically when a page links this FAQ via scos_ca_intent_goal_faq_id,
+	 * and also available as a manual checkbox on the FAQ edit screen.
+	 */
+	const META_IS_INTENT_GOAL = 'scos_faq_is_intent_goal';
 
 	/** Legacy meta keys — still dual-written so any existing reader keeps working. */
 	const LEGACY_META_SCHEMA_ANSWER = '_faq_schema_answer';
@@ -406,6 +414,9 @@ class FAQ_Module {
 			$schema_answer = (string) get_post_meta( $post->ID, self::LEGACY_META_SCHEMA_ANSWER, true );
 		}
 
+		// Read: is_intent_goal flag
+		$is_intent_goal = '1' === (string) get_post_meta( $post->ID, self::META_IS_INTENT_GOAL, true );
+
 		// TLDR for pre-fill (SEO module field)
 		$tldr = get_post_meta( $post->ID, 'scos_seo_tldr', true )
 			?: get_post_meta( $post->ID, 'bw_tldr', true );
@@ -459,6 +470,25 @@ class FAQ_Module {
 			}
 		} )();
 		</script>
+
+		<hr style="margin:14px 0 10px;border:none;border-top:1px solid #dcdcde;">
+
+		<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+			<input
+				type="checkbox"
+				name="scos_faq_is_intent_goal"
+				id="scos_faq_is_intent_goal"
+				value="1"
+				<?php checked( $is_intent_goal ); ?>
+			>
+			<span>
+				<strong><?php esc_html_e( 'Is Search Intent Goal', 'site-essentials' ); ?></strong>
+				&mdash; <code style="font-size:11px;"><?php echo esc_html( self::META_IS_INTENT_GOAL ); ?></code>
+			</span>
+		</label>
+		<p class="description" style="margin:4px 0 0 22px;">
+			<?php esc_html_e( 'Mark this FAQ as the primary search intent question for one or more pages. Set automatically when a page links this FAQ as its intent goal.', 'site-essentials' ); ?>
+		</p>
 		<?php
 	}
 
@@ -494,6 +524,13 @@ class FAQ_Module {
 		update_post_meta( $post_id, self::META_SCHEMA_ANSWER,        $schema_answer );
 		update_post_meta( $post_id, self::LEGACY_META_SCHEMA_ANSWER, $schema_answer );
 
+		// scos_faq_is_intent_goal — checkbox: store '1' when checked, delete when unchecked.
+		if ( isset( $_POST['scos_faq_is_intent_goal'] ) && '1' === $_POST['scos_faq_is_intent_goal'] ) {
+			update_post_meta( $post_id, self::META_IS_INTENT_GOAL, '1' );
+		} else {
+			delete_post_meta( $post_id, self::META_IS_INTENT_GOAL );
+		}
+
 		// Per-FAQ enable_schema is deprecated — no longer written. Schema is
 		// controlled at the embed point (block `enableSchema`, element
 		// `schema_enabled`). Existing scos_faq_enable_schema / _faq_enable_schema
@@ -516,9 +553,10 @@ class FAQ_Module {
 		foreach ( $columns as $key => $value ) {
 			$new[ $key ] = $value;
 			if ( 'title' === $key ) {
-				$new['scos_faq_topic']           = __( 'Primary Topic', 'site-essentials' );
-				$new['scos_faq_parent']          = __( 'Parent', 'site-essentials' );
-				$new['scos_faq_intent_goal_used'] = __( 'Intent Goal', 'site-essentials' );
+				$new['scos_faq_topic']            = __( 'Primary Topic', 'site-essentials' );
+				$new['scos_faq_parent']           = __( 'Parent', 'site-essentials' );
+				$new['scos_faq_is_intent_goal']   = __( 'Intent Goal?', 'site-essentials' );
+				$new['scos_faq_intent_goal_used'] = __( 'Used by', 'site-essentials' );
 			}
 		}
 		return $new;
@@ -557,6 +595,18 @@ class FAQ_Module {
 			} else {
 				echo '<span style="color:#999">—</span>';
 			}
+		}
+
+		if ( 'scos_faq_is_intent_goal' === $column ) {
+			$val = '1' === (string) get_post_meta( $post_id, self::META_IS_INTENT_GOAL, true );
+			if ( $val ) {
+				echo '<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:600;">'
+					. esc_html__( 'Yes', 'site-essentials' )
+					. '</span>';
+			} else {
+				echo '<span style="color:#999">—</span>';
+			}
+			return;
 		}
 
 		if ( 'scos_faq_intent_goal_used' === $column ) {

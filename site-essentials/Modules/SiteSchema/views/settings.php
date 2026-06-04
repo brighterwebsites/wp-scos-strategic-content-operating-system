@@ -2,7 +2,7 @@
 /**
  * Site Schema Module — settings view.
  *
- * v1.1 | 2026-05-19
+ * v1.2 | 2026-06-01
  *
  * Tabbed panel: Local Business | Success Stories | Product | Service
  * SCOS design system: scos__header, scos__tabs, scos-card, scos-form.
@@ -27,6 +27,7 @@ $local_business  = get_option( 'scos_site_schema_local_business', '' );
 $success_stories = get_option( 'scos_site_schema_success_stories', '' );
 $product         = get_option( 'scos_site_schema_product', '' );
 $product_ids     = get_option( 'scos_site_schema_product_ids', '' );
+$woo_product_auto = get_option( 'scos_site_schema_woo_product_auto', '' );
 $service         = get_option( 'scos_site_schema_service', '' );
 $service_ids     = get_option( 'scos_site_schema_service_ids', '' );
 
@@ -162,12 +163,25 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 			<div class="scos-card__header">
 				<div>
 					<h2 class="scos-card__title"><?php esc_html_e( 'Product Schema', 'site-essentials' ); ?></h2>
-					<p class="scos-card__desc"><?php esc_html_e( 'Merged into the schema graph on single posts/pages whose IDs are in the list below.', 'site-essentials' ); ?></p>
+					<p class="scos-card__desc"><?php esc_html_e( 'Merged into the schema graph on product pages. Enable WooCommerce auto-apply or list specific post/page IDs below.', 'site-essentials' ); ?></p>
 				</div>
 			</div>
 			<div class="scos-card__body">
 				<table class="scos-form">
 					<tbody>
+						<tr>
+							<th>
+								<label for="scos_site_schema_woo_product_auto"><?php esc_html_e( 'WooCommerce auto-apply', 'site-essentials' ); ?></label>
+								<div class="scos-form__slug">scos_site_schema_woo_product_auto</div>
+							</th>
+							<td>
+								<label class="scos-toggle">
+									<input type="checkbox" id="scos_site_schema_woo_product_auto" name="scos_site_schema_woo_product_auto" value="1"<?php checked( $woo_product_auto, '1' ); ?>>
+									<span class="scos-toggle__track"></span>
+								</label>
+								<p class="description"><?php esc_html_e( 'Apply this Product schema to all WooCommerce product pages automatically. No post IDs needed — covers the whole catalogue.', 'site-essentials' ); ?></p>
+							</td>
+						</tr>
 						<tr>
 							<th>
 								<label for="scos_site_schema_product_ids"><?php esc_html_e( 'Post/Page IDs', 'site-essentials' ); ?></label>
@@ -176,7 +190,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 							<td>
 								<input type="text" id="scos_site_schema_product_ids" name="scos_site_schema_product_ids"
 									value="<?php echo esc_attr( $product_ids ); ?>" class="scos-input" placeholder="123, 456, 789">
-								<p class="description"><?php esc_html_e( 'Comma-separated post or page IDs that should output Product schema.', 'site-essentials' ); ?></p>
+								<p class="description"><?php esc_html_e( 'Comma-separated post or page IDs that should output Product schema (non-WooCommerce or specific overrides).', 'site-essentials' ); ?></p>
 							</td>
 						</tr>
 						<tr>
@@ -267,6 +281,9 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 			<li><code>%%_cmeta_meta_key%%</code> &mdash; <?php esc_html_e( 'Custom post meta', 'site-essentials' ); ?></li>
 			<li><code>%%_cmeta_options_option_key%%</code> &mdash; <?php esc_html_e( 'WordPress option value (allowed option name prefixes: se_, scos_, site_essentials_; works in site-wide schema without a post)', 'site-essentials' ); ?></li>
 			<li><code>%%_acf_field_name%%</code> &mdash; <?php esc_html_e( 'ACF field', 'site-essentials' ); ?></li>
+			<li><code>%%date_year_ahead%%</code> &mdash; <?php esc_html_e( 'ISO date one year from today — use for priceValidUntil', 'site-essentials' ); ?></li>
+			<li><code>%%_scos_review_cards_json%%</code> &mdash; <?php esc_html_e( 'Array of Review objects from ScosReviewCard elements on the page (specific mode only)', 'site-essentials' ); ?></li>
+			<li><code>%%_scos_aggregate_rating_json%%</code> &mdash; <?php esc_html_e( 'AggregateRating object — count and average across all published reviews', 'site-essentials' ); ?></li>
 		</ul>
 		<p class="description" style="margin-top:var(--scos-s-2)"><?php esc_html_e( 'Multiple blocks: use a single array [ { … }, { … } ].', 'site-essentials' ); ?></p>
 	</div>

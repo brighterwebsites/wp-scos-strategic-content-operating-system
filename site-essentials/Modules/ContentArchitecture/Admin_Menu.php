@@ -12,6 +12,7 @@
  * setting means WP won't add sidebar boxes, but the term management pages work
  * perfectly.
  *
+ * v1.3.0 | 2026-05-29 — Strategy Configuration section added to Overview (read-only display of scos_ca_strategy_* options).
  * v1.2.0 | 2026-05-21 — SCOS design system applied to Integrations page (structure unchanged).
  * v1.1.0 | 2026-05-19 — SCOS design system applied to Overview; Force Re-analyze All button added.
  *
@@ -182,6 +183,30 @@ class Admin_Menu {
 		$topics        = get_terms( [ 'taxonomy' => 'scos_topic',           'hide_empty' => false ] );
 		$cluster_count = is_wp_error( $clusters ) ? 0 : count( $clusters );
 		$topic_count   = is_wp_error( $topics )   ? 0 : count( $topics );
+
+		// Strategy Configuration — eight scos_ca_strategy_* options (MCP-only writes, read-only here).
+		$s_known_for  = (string) get_option( 'scos_ca_strategy_known_for_position', '' );
+		$s_mat_start  = (string) get_option( 'scos_ca_strategy_maturity_start', '' );
+		$s_mat_goal   = (string) get_option( 'scos_ca_strategy_maturity_goal', '' );
+		$s_geo        = (string) get_option( 'scos_ca_strategy_geographic_scope', '' );
+		$s_market     = (string) get_option( 'scos_ca_strategy_target_market', '' );
+		$s_gaps       = (string) get_option( 'scos_ca_strategy_content_gaps', '' );
+		$s_rec        = (string) get_option( 'scos_ca_strategy_recommendation', '' );
+		$s_outcome    = (string) get_option( 'scos_ca_strategy_outcome_goal', '' );
+		$has_strategy = $s_known_for || $s_mat_start || $s_mat_goal || $s_geo || $s_market || $s_gaps || $s_rec || $s_outcome;
+
+		// Maturity label lookup — handles both underscore and hyphen slug variants.
+		$mat_options = Meta_Fields::maturity_options();
+		$mat_label   = static function( string $slug ) use ( $mat_options ): string {
+			if ( isset( $mat_options[ $slug ] ) ) {
+				return $mat_options[ $slug ];
+			}
+			$alt = str_replace( '-', '_', $slug );
+			if ( isset( $mat_options[ $alt ] ) ) {
+				return $mat_options[ $alt ];
+			}
+			return $slug ? ucwords( str_replace( [ '_', '-' ], ' ', $slug ) ) : '—';
+		};
 		?>
 		<div class="wrap scos">
 
@@ -197,7 +222,100 @@ class Admin_Menu {
 				</div>
 			</header>
 
-			<?php // ── Taxonomy summary cards ──────────────────────────────────── ?>
+			<?php // ── Strategy Configuration ─────────────────────────────────── ?>
+		<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+			<div class="scos-card__header">
+				<div>
+					<span class="scos-card__title"><?php esc_html_e( 'Strategy Configuration', 'site-essentials' ); ?></span>
+					<span class="scos-card__desc">
+						<?php esc_html_e( 'Read-only — populate via MCP or WP-CLI.', 'site-essentials' ); ?>
+						&nbsp;&middot;&nbsp;
+						<a href="<?php echo esc_url( home_url( '/wp-content/ai-knowledge/202-authority-content-strategy.md' ) ); ?>" target="_blank" rel="noopener">202 Authority Strategy &#8599;</a>
+						&nbsp;&middot;&nbsp;
+						<a href="<?php echo esc_url( home_url( '/wp-content/ai-knowledge/105-competitive-positioning.md' ) ); ?>" target="_blank" rel="noopener">105 Competitive Positioning &#8599;</a>
+					</span>
+				</div>
+			</div>
+			<div class="scos-card__body">
+			<?php if ( ! $has_strategy ) : ?>
+				<p style="color:var(--scos-ink-subtle);margin:0"><?php esc_html_e( 'Not synced — populate via MCP.', 'site-essentials' ); ?></p>
+			<?php else : ?>
+
+				<?php // Primary Authority Positioning — highlighted. ?>
+				<?php if ( $s_known_for ) : ?>
+				<div style="border:2px solid var(--scos-accent);background:var(--scos-accent-soft);border-radius:var(--scos-r-lg);padding:var(--scos-s-5);margin-bottom:var(--scos-s-5)">
+					<p class="scos__section-label" style="color:var(--scos-accent);margin:0 0 var(--scos-s-2)"><?php esc_html_e( 'Primary Authority Positioning', 'site-essentials' ); ?></p>
+					<p style="font-size:1.05rem;font-weight:700;color:var(--scos-ink);margin:0;line-height:1.6"><?php echo esc_html( $s_known_for ); ?></p>
+				</div>
+				<?php endif; ?>
+
+				<?php // Maturity Targets. ?>
+				<?php if ( $s_mat_start || $s_mat_goal ) : ?>
+				<div style="margin-bottom:var(--scos-s-5)">
+					<p class="scos__section-label" style="margin:0 0 var(--scos-s-3)"><?php esc_html_e( 'Maturity Targets', 'site-essentials' ); ?></p>
+					<div style="display:flex;align-items:center;gap:var(--scos-s-4)">
+						<div>
+							<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--scos-ink-subtle);margin-bottom:2px"><?php esc_html_e( 'Start', 'site-essentials' ); ?></div>
+							<div style="font-weight:600;color:var(--scos-ink)"><?php echo esc_html( $s_mat_start ? $mat_label( $s_mat_start ) : '—' ); ?></div>
+						</div>
+						<span style="color:var(--scos-ink-subtle);font-size:1.2rem">&rarr;</span>
+						<div>
+							<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--scos-ink-subtle);margin-bottom:2px"><?php esc_html_e( 'Goal', 'site-essentials' ); ?></div>
+							<div style="font-weight:600;color:var(--scos-ink)"><?php echo esc_html( $s_mat_goal ? $mat_label( $s_mat_goal ) : '—' ); ?></div>
+						</div>
+					</div>
+				</div>
+				<?php endif; ?>
+
+				<?php // Geographic Scope + Target Market — two columns. ?>
+				<?php if ( $s_geo || $s_market ) : ?>
+				<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--scos-s-5);margin-bottom:var(--scos-s-5)">
+					<?php if ( $s_geo ) : ?>
+					<div>
+						<p class="scos__section-label" style="margin:0 0 var(--scos-s-2)"><?php esc_html_e( 'Geographic Scope', 'site-essentials' ); ?></p>
+						<p style="color:var(--scos-ink);margin:0;line-height:1.6"><?php echo esc_html( $s_geo ); ?></p>
+					</div>
+					<?php endif; ?>
+					<?php if ( $s_market ) : ?>
+					<div>
+						<p class="scos__section-label" style="margin:0 0 var(--scos-s-2)"><?php esc_html_e( 'Target Market', 'site-essentials' ); ?></p>
+						<p style="color:var(--scos-ink);margin:0;line-height:1.6"><?php echo esc_html( $s_market ); ?></p>
+					</div>
+					<?php endif; ?>
+				</div>
+				<?php endif; ?>
+
+				<?php // Biggest Content Gaps — full width. ?>
+				<?php if ( $s_gaps ) : ?>
+				<div style="margin-bottom:var(--scos-s-5)">
+					<p class="scos__section-label" style="margin:0 0 var(--scos-s-2)"><?php esc_html_e( 'Biggest Content Gaps', 'site-essentials' ); ?></p>
+					<p style="color:var(--scos-ink);margin:0;line-height:1.6"><?php echo esc_html( $s_gaps ); ?></p>
+				</div>
+				<?php endif; ?>
+
+				<?php // Strategic Recommendation + Strategy Outcome Goal — two columns. ?>
+				<?php if ( $s_rec || $s_outcome ) : ?>
+				<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--scos-s-5)">
+					<?php if ( $s_rec ) : ?>
+					<div>
+						<p class="scos__section-label" style="margin:0 0 var(--scos-s-2)"><?php esc_html_e( 'Strategic Recommendation', 'site-essentials' ); ?></p>
+						<p style="color:var(--scos-ink);margin:0;line-height:1.6"><?php echo esc_html( $s_rec ); ?></p>
+					</div>
+					<?php endif; ?>
+					<?php if ( $s_outcome ) : ?>
+					<div>
+						<p class="scos__section-label" style="margin:0 0 var(--scos-s-2)"><?php esc_html_e( 'Strategy Outcome Goal', 'site-essentials' ); ?></p>
+						<p style="color:var(--scos-ink);margin:0;line-height:1.6"><?php echo esc_html( $s_outcome ); ?></p>
+					</div>
+					<?php endif; ?>
+				</div>
+				<?php endif; ?>
+
+			<?php endif; ?>
+			</div>
+		</div>
+
+		<?php // ── Taxonomy summary cards ──────────────────────────────────── ?>
 			<div style="display:flex;gap:var(--scos-s-4);flex-wrap:wrap;margin-bottom:var(--scos-s-6)">
 
 				<div class="scos-card" style="flex:1;min-width:200px">

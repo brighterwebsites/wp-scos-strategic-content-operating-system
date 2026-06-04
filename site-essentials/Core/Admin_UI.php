@@ -1609,13 +1609,14 @@ class Admin_UI {
 
         // Build settings array
         $sitemap_settings = [
-            'enabled'              => isset($sitemap['enabled']),
-            'html_sitemap_enabled' => isset($sitemap['html_sitemap_enabled']),
-            'post_types'           => $post_types,
-            'taxonomies'           => $taxonomies,
-            'include_images'       => isset($sitemap['include_images']),
-            'entries_per_sitemap'  => isset($sitemap['entries_per_sitemap']) ? absint($sitemap['entries_per_sitemap']) : 2000,
-            'exclude_ids'          => $exclude_ids,
+            'enabled'                => isset($sitemap['enabled']),
+            'html_sitemap_enabled'   => isset($sitemap['html_sitemap_enabled']),
+            'post_types'             => $post_types,
+            'taxonomies'             => $taxonomies,
+            'include_images'         => isset($sitemap['include_images']),
+            'entries_per_sitemap'    => isset($sitemap['entries_per_sitemap']) ? absint($sitemap['entries_per_sitemap']) : 2000,
+            'exclude_ids'            => $exclude_ids,
+            'include_author_archive' => isset($sitemap['include_author_archive']),
         ];
 
         // Save settings

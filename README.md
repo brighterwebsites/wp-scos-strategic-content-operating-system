@@ -91,7 +91,7 @@ window.scosCAR = {
   },
   meta: { post_id, post_type, scos_version, car_generated }
 };
-
+```
 GA4 custom dimensions consume this data. Legacy bw_* keys are still read as fallbacks during prefix migration.
 
 Meta key prefixes: scos_ca_* (content architecture), scos_seo_* (SEO meta), scos_schema_*, scos_sa_* (social), scos_biz_* (business info). See CLAUDE.md § Meta Key Reference.
@@ -100,7 +100,7 @@ Meta key prefixes: scos_ca_* (content architecture), scos_seo_* (SEO meta), scos
 Authoritative new data uses scos_* keys. brighter-core dual-writes to legacy bw_* where needed. Do not create new bw_* keys.
 Migration tooling (archive/scos-migration.php) has been retired — sites migrate via WP-CLI/MCP field writes.
 
-##Stack & compatibility
+## Stack & compatibility
 Built for:
 
 WordPress MU plugin deployment (CyberPanel / LiteSpeed)
@@ -110,19 +110,18 @@ WP-CLI + MCP (Claude CLI agent access to fields)
 GitHub → server deploy (agency workflow)
 SEOPress field management is superseded by SCOS SEO Meta; SEOPress may still be present on some sites during transition.
 
-##AI / MCP access
+## AI / MCP access
 SCOS is designed MCP-first: business logic in reusable classes, callable from admin UI, REST API, and WP-CLI.
 
 REST: brighter-core/v1/ (token auth via X-Brighter-Token)
 WP-CLI MCP: external server config per site (see SEO Command Center tools/wp-mcp-server/)
 Key endpoint: /scos — returns CAR-shaped data for any URL or post ID
-Production sites
-Deployed on managed Brighter Websites client infrastructure, 
-SCOS is proprietary agency infrastructure. For documentation corrections or module guides, see the SCOS documentation hub.
 
+## Contributing / support
+SCOS is proprietary agency infrastructure. For documentation corrections or module guides, see the SCOS documentation hub.
 Agency contact: support@brighterwebsites.com.au
 
-License
+## License
 GPL-3.0 — see LICENSE
 
 © Brighter Websites. Framework and implementation methodology are proprietary IP.

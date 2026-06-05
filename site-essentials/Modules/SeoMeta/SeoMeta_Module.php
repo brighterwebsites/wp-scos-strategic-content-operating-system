@@ -76,6 +76,7 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/Virtual_Files.php';
 		require_once __DIR__ . '/Exif_Stripper.php';
 		require_once __DIR__ . '/Redirections.php';
+		require_once __DIR__ . '/Author_SEO.php';
 
 		Meta_Fields::init();
 		Meta_Box::init();
@@ -85,6 +86,7 @@ class SeoMeta_Module implements Module_Interface {
 		Virtual_Files::init();
 		Exif_Stripper::init();
 		Redirections::init();
+		Author_SEO::init();
 	}
 
 	/**

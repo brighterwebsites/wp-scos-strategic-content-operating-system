@@ -7,7 +7,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.1 | 2026-05-22
+ * @version    1.3 | 2026-06-04
  * @since      1.0.0
  */
 
@@ -220,6 +220,8 @@ class Seo_Module implements Module_Interface {
 
         if ($sitemap === 'index') {
             $this->render_sitemap_index($settings);
+        } elseif ($sitemap === 'authors') {
+            $this->render_author_sitemap($settings);
         } else {
             // Check if it's a taxonomy or post type
             if (taxonomy_exists($sitemap)) {
@@ -250,13 +252,14 @@ class Seo_Module implements Module_Interface {
      */
     private function get_default_sitemap_settings() {
         return [
-            'enabled'         => true,
-            'post_types'      => ['post', 'page'],
-            'taxonomies'      => ['category'], // Categories ON by default, tags and custom tax OFF
-            'include_images'  => true,
-            'exclude_ids'     => [],
-            'entries_per_sitemap' => 2000,
-            'html_sitemap_enabled' => false,
+            'enabled'                => true,
+            'post_types'             => ['post', 'page'],
+            'taxonomies'             => ['category'], // Categories ON by default, tags and custom tax OFF
+            'include_images'         => true,
+            'exclude_ids'            => [],
+            'entries_per_sitemap'    => 2000,
+            'html_sitemap_enabled'   => false,
+            'include_author_archive' => false,
         ];
     }
 
@@ -336,6 +339,16 @@ class Seo_Module implements Module_Interface {
                 $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
             }
             $xml .= "\t</sitemap>\n";
+        }
+
+        // Add author archive sub-sitemap if enabled and there are qualifying authors
+        if ( ! empty( $settings['include_author_archive'] ) ) {
+            $author_ids = $this->get_sitemap_author_ids();
+            if ( ! empty( $author_ids ) ) {
+                $xml .= "\t<sitemap>\n";
+                $xml .= "\t\t<loc>" . esc_url( home_url( '/sitemap-authors.xml' ) ) . "</loc>\n";
+                $xml .= "\t</sitemap>\n";
+            }
         }
 
         $xml .= '</sitemapindex>';
@@ -457,14 +470,13 @@ class Seo_Module implements Module_Interface {
             return [];
         }
 
-        // PERFORMANCE OPTIMIZATION: Batch-load all noindex meta for all posts at once
-        // This reduces N queries (where N = number of posts) down to 4 queries total
+        // Batch-load all relevant meta in one pass (noindex, canonical, sitemap overrides).
         $post_ids = wp_list_pluck($posts, 'ID');
         $this->preload_noindex_meta($post_ids);
 
-        // Filter out noindex posts
+        // Filter out noindex posts and non-self-canonical posts.
         return array_filter($posts, function($post) {
-            return !$this->is_noindex($post->ID);
+            return !$this->is_noindex($post->ID) && !$this->is_non_self_canonical($post->ID);
         });
     }
 
@@ -831,6 +843,39 @@ class Seo_Module implements Module_Interface {
         }
 
         return false;
+    }
+
+    /**
+     * Check if a post has a non-self-referencing canonical and no sitemap override.
+     *
+     * A non-self canonical means the page explicitly declares another URL as its
+     * canonical — including it in the sitemap directly contradicts that signal.
+     * The only exception: the user has checked "Include in XML sitemap anyway"
+     * (scos_seo_sitemap_noindex_override, which covers both noindex and non-self-canonical).
+     *
+     * @since  1.2.0
+     * @param  int $post_id
+     * @return bool True if the post should be excluded.
+     */
+    private function is_non_self_canonical( int $post_id ): bool {
+        // Allow override — same flag covers both noindex and non-self-canonical.
+        $override = get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true );
+        if ( '1' === (string) $override ) {
+            return false;
+        }
+
+        $canonical = get_post_meta( $post_id, 'scos_seo_canonical', true );
+        if ( empty( $canonical ) ) {
+            $canonical = get_post_meta( $post_id, '_seopress_robots_canonical', true );
+        }
+
+        if ( empty( $canonical ) ) {
+            return false;
+        }
+
+        // Compare without trailing slashes so minor URL format differences don't trigger.
+        $self = get_permalink( $post_id );
+        return rtrim( $canonical, '/' ) !== rtrim( $self, '/' );
     }
 
     /**
@@ -1217,6 +1262,120 @@ class Seo_Module implements Module_Interface {
         </style>';
 
         return $html;
+    }
+
+    /**
+     * Get author IDs eligible for the author archive sitemap.
+     *
+     * Includes authors with at least one published post, whose archive is not
+     * disabled in Archive_Settings and whose archive URL is not noindex.
+     *
+     * @since  1.1.0
+     * @return int[] User IDs.
+     */
+    private function get_sitemap_author_ids(): array {
+        $users = get_users( [
+            'who'                 => 'authors',
+            'has_published_posts' => true,
+            'fields'              => 'ID',
+        ] );
+
+        if ( empty( $users ) ) {
+            return [];
+        }
+
+        // Respect the "Disable author archives" flag from Archive_Settings.
+        $author_archive_settings = [];
+        if ( class_exists( '\SiteEssentials\Modules\SeoMeta\Archive_Settings' ) ) {
+            $author_archive_settings = \SiteEssentials\Modules\SeoMeta\Archive_Settings::get( 'author' );
+        }
+
+        // If the global author archive is disabled, no author URLs belong in the sitemap.
+        if ( ! empty( $author_archive_settings['disabled'] ) ) {
+            return [];
+        }
+
+        // If author archive is set noindex globally, exclude the whole sub-sitemap.
+        $author_robots = $author_archive_settings['robots'] ?? [];
+        if ( in_array( 'noindex', (array) $author_robots, true ) ) {
+            return [];
+        }
+
+        return array_map( 'intval', $users );
+    }
+
+    /**
+     * Render the author archive sub-sitemap (sitemap-authors.xml).
+     *
+     * @since  1.1.0
+     * @param  array $settings Sitemap settings.
+     * @return void
+     */
+    private function render_author_sitemap( array $settings ): void {
+        if ( empty( $settings['include_author_archive'] ) ) {
+            status_header( 404 );
+            return;
+        }
+
+        $this->disable_litespeed_cache();
+
+        $cache_key = 'sitemap_authors';
+        $xml = Cache_Helper::remember( $cache_key, function () {
+            return $this->generate_author_sitemap();
+        }, 3600, 'seo' );
+
+        header( 'Content-Type: application/xml; charset=utf-8' );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0' );
+        header( 'Pragma: no-cache' );
+        header( 'Expires: 0' );
+        header( 'X-LiteSpeed-Cache-Control: no-cache' );
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo $xml;
+    }
+
+    /**
+     * Generate the author archive sitemap XML.
+     *
+     * @since  1.1.0
+     * @return string XML content.
+     */
+    private function generate_author_sitemap(): string {
+        $author_ids = $this->get_sitemap_author_ids();
+
+        $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
+        $xml .= 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
+        $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">' . "\n";
+
+        foreach ( $author_ids as $user_id ) {
+            $url = get_author_posts_url( $user_id );
+            if ( ! $url ) {
+                continue;
+            }
+
+            // Last modified = most recent published post by this author.
+            global $wpdb;
+            $last_mod = $wpdb->get_var( $wpdb->prepare(
+                "SELECT post_modified_gmt FROM {$wpdb->posts}
+                 WHERE post_type = 'post' AND post_status = 'publish' AND post_author = %d
+                 ORDER BY post_modified_gmt DESC LIMIT 1",
+                $user_id
+            ) );
+
+            $xml .= "\t<url>\n";
+            $xml .= "\t\t<loc>" . esc_url( $url ) . "</loc>\n";
+            if ( $last_mod ) {
+                $xml .= "\t\t<lastmod>" . mysql2date( 'c', $last_mod, false ) . "</lastmod>\n";
+            }
+            $xml .= "\t\t<changefreq>weekly</changefreq>\n";
+            $xml .= "\t\t<priority>0.6</priority>\n";
+            $xml .= "\t</url>\n";
+        }
+
+        $xml .= '</urlset>';
+
+        return $xml;
     }
 
     /**

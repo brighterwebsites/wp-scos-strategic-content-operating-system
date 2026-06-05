@@ -142,6 +142,46 @@ $cache_age  = $cache_time ? human_time_diff( $cache_time, current_time( 'timesta
 					</tr>
 
 					<tr>
+						<th><?php esc_html_e( 'Include Archives', 'site-essentials' ); ?></th>
+						<td>
+							<?php
+							$author_archive_s = class_exists( '\SiteEssentials\Modules\SeoMeta\Archive_Settings' )
+								? \SiteEssentials\Modules\SeoMeta\Archive_Settings::get( 'author' )
+								: [];
+							$author_disabled  = ! empty( $author_archive_s['disabled'] );
+							$author_noindex   = in_array( 'noindex', (array) ( $author_archive_s['robots'] ?? [] ), true );
+							?>
+							<label class="scos-checkbox-row">
+								<input type="checkbox"
+								       id="sitemap_include_author_archive"
+								       name="sitemap[include_author_archive]"
+								       value="1"
+								       <?php checked( ! empty( $sitemap_settings['include_author_archive'] ) ); ?>
+								       <?php disabled( $author_disabled || $author_noindex ); ?>>
+								<span>
+									<?php esc_html_e( 'Add Author Archives', 'site-essentials' ); ?>
+									<small style="color:var(--scos-ink-subtle)">(sitemap-authors.xml)</small>
+								</span>
+							</label>
+							<?php if ( $author_disabled ) : ?>
+								<p class="description" style="color:var(--scos-warning)">
+									<?php printf(
+										/* translators: %s: link to Archive SEO */
+										esc_html__( '⚠ Author archives are disabled in %s — enable them before adding to the sitemap.', 'site-essentials' ),
+										'<a href="' . esc_url( admin_url( 'admin.php?page=site-essentials-seo&tab=meta' ) ) . '">' . esc_html__( 'Archive SEO', 'site-essentials' ) . '</a>'
+									); ?>
+								</p>
+							<?php elseif ( $author_noindex ) : ?>
+								<p class="description" style="color:var(--scos-warning)">
+									<?php esc_html_e( '⚠ Author archives are set to noindex in Archive SEO — they cannot be included in the sitemap.', 'site-essentials' ); ?>
+								</p>
+							<?php else : ?>
+								<p class="description"><?php esc_html_e( 'Includes one URL per author with published posts. Respects the Author Archive disabled flag in Archive SEO.', 'site-essentials' ); ?></p>
+							<?php endif; ?>
+						</td>
+					</tr>
+
+					<tr>
 						<th>
 							<label for="sitemap_include_images"><?php esc_html_e( 'Include Images', 'site-essentials' ); ?></label>
 						</th>

@@ -52,6 +52,52 @@
 	$(function () {
 		updateCounter('scos_seo_title');
 		updateCounter('scos_seo_description');
+		updateNoindexSitemapNotice();
+		updateCanonicalHint();
 	});
+
+	// ── Noindex ↔ sitemap notice ─────────────────────────────────────────────
+
+	function updateNoindexSitemapNotice() {
+		var isNoindex  = $('#scos_seo_robots_noindex').is(':checked');
+		var $notice    = $('#scos-noindex-sitemap-notice');
+		var $override  = $('#scos_seo_sitemap_noindex_override').closest('label');
+		var $overrideP = $override.next('p.scos-seo-help');
+
+		if (isNoindex) {
+			if (!$notice.length) {
+				$('.scos-seo-field:has(#scos_seo_sitemap_noindex_override)').prepend(
+					'<div class="scos-seo-notice scos-seo-notice--warn" id="scos-noindex-sitemap-notice">' +
+					scosSeoMeta.noindexSitemapMsg +
+					'</div>'
+				);
+			} else {
+				$notice.show();
+			}
+			$override.show();
+			$overrideP.show();
+		} else {
+			$notice.hide();
+			// Only hide the override row if it's not already checked (user may want to keep it)
+			if (!$('#scos_seo_sitemap_noindex_override').is(':checked')) {
+				$override.hide();
+				$overrideP.hide();
+			}
+		}
+	}
+
+	$(document).on('change', '#scos_seo_robots_noindex', updateNoindexSitemapNotice);
+
+	// ── Canonical non-self hint ──────────────────────────────────────────────
+
+	function updateCanonicalHint() {
+		var $canonical  = $('#scos_seo_canonical');
+		var selfUrl     = $canonical.attr('placeholder') || '';
+		var val         = $.trim($canonical.val());
+		var isNonSelf   = val !== '' && val !== selfUrl;
+		$('.scos-seo-help--canonical-hint').toggle(isNonSelf);
+	}
+
+	$(document).on('input blur', '#scos_seo_canonical', updateCanonicalHint);
 
 }(jQuery));

@@ -3,16 +3,18 @@
  * SEO Meta box view — 3-tab UI.
  *
  * Variables available from Meta_Box::render():
- *   $post               WP_Post
- *   $breadcrumb_title   string
- *   $tldr               string
- *   $title              string
- *   $description        string
- *   $canonical          string
- *   $robots             string[]
- *   $sitemap_exclude    string[]
- *   $freeze_date        bool   — per-post freeze flag
- *   $global_freeze_date bool   — site-wide freeze option
+ *   $post                      WP_Post
+ *   $breadcrumb_title          string
+ *   $tldr                      string
+ *   $title                     string
+ *   $description               string
+ *   $canonical                 string
+ *   $robots                    string[]
+ *   $sitemap_exclude           string[]
+ *   $sitemap_noindex_override  bool   — user override: include in sitemap despite noindex
+ *   $sitemap_noindex_auto      bool   — internal: xml exclusion was auto-set by noindex
+ *   $freeze_date               bool   — per-post freeze flag
+ *   $global_freeze_date        bool   — site-wide freeze option
  *
  * @package SiteEssentials
  */
@@ -114,7 +116,12 @@ defined( 'ABSPATH' ) || exit;
 				id="scos_seo_canonical"
 				value="<?php echo esc_url( $canonical ); ?>"
 				placeholder="<?php echo esc_attr( get_permalink( $post->ID ) ?: '' ); ?>">
-			<p class="scos-seo-help"><?php esc_html_e( 'Leave blank to use the default page URL. Set only if this content is syndicated or has duplicate URLs.', 'site-essentials' ); ?></p>
+			<p class="scos-seo-help">
+				<?php esc_html_e( 'Leave blank to use the default page URL. Set only if this content is syndicated or has duplicate URLs.', 'site-essentials' ); ?>
+				<span class="scos-seo-help scos-seo-help--canonical-hint" style="display:none;color:#b45309">
+					<?php esc_html_e( 'Setting a canonical to another URL will remove this page from the sitemap. Check "Include in sitemap" in Sitemap Visibility below to override.', 'site-essentials' ); ?>
+				</span>
+			</p>
 		</div>
 
 		<!-- Meta Robots -->
@@ -126,6 +133,7 @@ defined( 'ABSPATH' ) || exit;
 						<input type="checkbox"
 							name="scos_seo_robots[]"
 							value="<?php echo esc_attr( $val ); ?>"
+							id="scos_seo_robots_<?php echo esc_attr( $val ); ?>"
 							<?php checked( in_array( $val, $robots, true ) ); ?>>
 						<code><?php echo esc_html( $val ); ?></code>
 						<span><?php echo esc_html( preg_replace( '/^[a-z]+\s—\s/i', '', $label ) ); ?></span>
@@ -168,6 +176,23 @@ defined( 'ABSPATH' ) || exit;
 		<!-- Sitemap Visibility -->
 		<div class="scos-seo-field">
 			<label><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></label>
+
+			<?php
+			$noindex_active   = in_array( 'noindex', $robots, true );
+			$non_self_canon   = ! empty( $canonical ) && $canonical !== get_permalink( $post->ID );
+			$auto_excluded    = $sitemap_noindex_auto || $non_self_canon;
+			?>
+
+			<?php if ( $noindex_active && ! $sitemap_noindex_override ) : ?>
+				<div class="scos-seo-notice scos-seo-notice--warn" id="scos-noindex-sitemap-notice">
+					<?php esc_html_e( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ); ?>
+				</div>
+			<?php elseif ( $non_self_canon && ! $sitemap_noindex_override ) : ?>
+				<div class="scos-seo-notice scos-seo-notice--warn" id="scos-canonical-sitemap-notice">
+					<?php esc_html_e( 'This page has been removed from the sitemap because a non-self canonical is set.', 'site-essentials' ); ?>
+				</div>
+			<?php endif; ?>
+
 			<div class="scos-seo-checks">
 				<?php foreach ( \SiteEssentials\Modules\SeoMeta\Meta_Fields::sitemap_options() as $val => $label ) : ?>
 					<label class="scos-seo-check-label">
@@ -179,6 +204,20 @@ defined( 'ABSPATH' ) || exit;
 					</label>
 				<?php endforeach; ?>
 			</div>
+
+			<?php if ( $noindex_active || $non_self_canon || $sitemap_noindex_override ) : ?>
+				<label class="scos-seo-check-label scos-seo-check-label--override" style="margin-top:6px">
+					<input type="checkbox"
+						name="scos_seo_sitemap_noindex_override"
+						id="scos_seo_sitemap_noindex_override"
+						value="1"
+						<?php checked( $sitemap_noindex_override ); ?>>
+					<span><?php esc_html_e( 'Include in XML sitemap anyway', 'site-essentials' ); ?></span>
+				</label>
+				<p class="scos-seo-help">
+					<?php esc_html_e( 'Edge case override — e.g. staging-style noindex pages you still want crawled, or deliberate cross-domain canonicals (syndicated content).', 'site-essentials' ); ?>
+				</p>
+			<?php endif; ?>
 		</div>
 
 	</div><!-- /advanced -->

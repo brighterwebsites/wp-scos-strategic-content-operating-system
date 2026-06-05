@@ -28,10 +28,11 @@ add_shortcode('tldr', function($atts) {
         return '';
     }
     
-    // Get TLDR content from new standardized field
-    $tldr = get_post_meta($post_id, 'bw_tldr', true);
-    
-    // Fallback to old ACF field if new field is empty
+    // Get TLDR content — prefer canonical scos_seo_tldr, fall back to legacy keys
+    $tldr = get_post_meta($post_id, 'scos_seo_tldr', true);
+    if (empty($tldr)) {
+        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+    }
     if (empty($tldr)) {
         $tldr = get_post_meta($post_id, 'tldr', true);
     }

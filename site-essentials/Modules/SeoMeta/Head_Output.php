@@ -23,7 +23,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.1 | 2026-05-22
+ * @version    1.3 | 2026-06-04
  * @since      1.0.0
  */
 
@@ -300,8 +300,10 @@ class Head_Output {
 		$og_locale    = str_replace( '-', '_', get_locale() ) ?: 'en_AU';
 		$og_site_name = get_bloginfo( 'name' );
 
-		// Pages → og:type=website; posts and CPTs → og:type=article
-		$is_article = is_singular() && ! is_page();
+		// Pages and atomic-unit CPTs (FAQ) → og:type=website; posts and all other CPTs → og:type=article
+		// FAQ entries represent business knowledge, not personal authorship — article:author must not fire for them.
+		$non_article_types = apply_filters( 'scos_seo_non_article_post_types', [ 'faq' ] );
+		$is_article = is_singular() && ! is_page() && ! in_array( get_post_type(), $non_article_types, true );
 		$og_type    = $is_article ? 'article' : 'website';
 
 		echo '<meta property="og:type" content="' . esc_attr( $og_type ) . '" />' . "\n";
@@ -414,7 +416,17 @@ class Head_Output {
 		}
 
 		// ── OG image ─────────────────────────────────────────────────────────
+		// On author archives, check per-author user meta first, fall back to archive default.
 		$og_image_id = (int) $settings['og_image_id'];
+		if ( 'author' === $slug && is_author() ) {
+			$queried_author = get_queried_object();
+			if ( $queried_author instanceof \WP_User ) {
+				$per_author_id = (int) get_user_meta( $queried_author->ID, Author_SEO::META_KEY, true );
+				if ( $per_author_id > 0 ) {
+					$og_image_id = $per_author_id;
+				}
+			}
+		}
 		if ( $og_image_id > 0 ) {
 			$img = wp_get_attachment_image_src( $og_image_id, 'full' );
 			if ( $img ) {

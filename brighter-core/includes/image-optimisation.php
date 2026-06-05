@@ -276,18 +276,30 @@ function brighter_inject_og_image_tags() {
     if (!is_singular()) {
         return;
     }
-    
+
     global $post;
-    
-    // Skip if no featured image
-    if (!has_post_thumbnail($post->ID)) {
+
+    $attachment_id = 0;
+
+    if (has_post_thumbnail($post->ID)) {
+        $attachment_id = (int) get_post_thumbnail_id($post->ID);
+    } elseif (class_exists('\SiteEssentials\Modules\SeoMeta\Archive_Settings')) {
+        // No featured image — fall back to the post-type archive's default OG image.
+        $post_type       = get_post_type($post->ID) ?: 'post';
+        $archive_s       = \SiteEssentials\Modules\SeoMeta\Archive_Settings::get($post_type);
+        $fallback_id     = (int) ($archive_s['og_image_id'] ?? 0);
+        if ($fallback_id > 0) {
+            $attachment_id = $fallback_id;
+        }
+    }
+
+    if (!$attachment_id) {
         return;
     }
-    
-    $attachment_id = get_post_thumbnail_id($post->ID);
+
     $og_image_url = wp_get_attachment_image_url($attachment_id, 'og-image');
-    
-    // Fallback to full size if og-image doesn't exist
+
+    // Fallback to full size if og-image size doesn't exist
     if (!$og_image_url) {
         $og_image_url = wp_get_attachment_image_url($attachment_id, 'full');
     }

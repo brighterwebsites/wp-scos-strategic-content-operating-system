@@ -113,6 +113,35 @@ class Brighter_API_Endpoints {
                 )
             )
         ));
+
+        // Content Inventory endpoint - full content dump with analysis metadata
+        register_rest_route(self::NAMESPACE, '/content-inventory', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_content_inventory'),
+            'permission_callback' => array($this->auth, 'verify_token'),
+            'args' => array(
+                'page' => array(
+                    'description' => 'Page number',
+                    'type' => 'integer',
+                    'default' => 1,
+                    'minimum' => 1,
+                    'sanitize_callback' => 'absint'
+                ),
+                'per_page' => array(
+                    'description' => 'Items per page (max 500 for internal use)',
+                    'type' => 'integer',
+                    'default' => 50,
+                    'minimum' => 1,
+                    'maximum' => 500,
+                    'sanitize_callback' => 'absint'
+                ),
+                'since' => array(
+                    'description' => 'ISO 8601 timestamp. Return posts modified or analyzed since this time.',
+                    'type' => 'string',
+                    'sanitize_callback' => 'sanitize_text_field'
+                )
+            )
+        ));
     }
 
     /**
@@ -430,6 +459,70 @@ class Brighter_API_Endpoints {
             return new WP_Error(
                 'api_error',
                 'An error occurred while retrieving SCOS data.',
+                array('status' => 500)
+            );
+        }
+    }
+
+    /**
+     * Get full content inventory with analysis metadata
+     * Single-pass gatherer; no cache to ensure fresh data on each call.
+     *
+     * @param WP_REST_Request $request Request object
+     * @return WP_REST_Response|WP_Error Response object or error
+     */
+    public function get_content_inventory($request) {
+        try {
+            // Get parameters
+            $page     = $request->get_param('page');
+            $per_page = $request->get_param('per_page');
+            $since    = $request->get_param('since');
+
+            // Increase memory limit temporarily for large content processing
+            $original_memory = ini_get('memory_limit');
+            @ini_set('memory_limit', '256M');
+
+            // Gather full inventory (no cache). Autoloader will handle class loading.
+            $full_inventory = \SiteEssentials\Modules\ContentArchitecture\Content_Inventory_Gatherer::gather($since);
+
+            // Restore original memory limit
+            @ini_set('memory_limit', $original_memory);
+
+            // Apply pagination to posts array
+            $all_posts = $full_inventory['posts'];
+            $total     = count($all_posts);
+
+            // Calculate pagination
+            $pages     = ceil($total / $per_page);
+            $offset    = ($page - 1) * $per_page;
+
+            // Slice the posts array
+            $paginated_posts = array_slice($all_posts, $offset, $per_page);
+
+            // Build response with pagination metadata
+            $response = array(
+                'meta' => array_merge(
+                    $full_inventory['meta'],
+                    array(
+                        'pagination' => array(
+                            'total'         => $total,
+                            'total_pages'   => $pages,
+                            'current_page'  => $page,
+                            'per_page'      => $per_page,
+                            'has_more'      => $page < $pages
+                        )
+                    )
+                ),
+                'posts' => $paginated_posts
+            );
+
+            return rest_ensure_response($response);
+
+        } catch (Exception $e) {
+            error_log('Brighter API: Error in get_content_inventory: ' . $e->getMessage());
+            return new WP_Error(
+                'api_error',
+                'An error occurred while retrieving content inventory.',
                 array('status' => 500)
             );
         }

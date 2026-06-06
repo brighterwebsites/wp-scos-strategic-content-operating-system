@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SCOS — copy-paste snippets</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="scos-ui.css">
+<style>
+  body { background: #f0f0f1; padding: 24px; font-family: var(--scos-font); }
+  .doc-block { margin-bottom: 48px; }
+  .doc-block > h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: #50575e; margin: 0 0 4px; }
+  .doc-block > .doc-note { font-size: 13px; color: #787c82; margin: 0 0 16px; }
+  .doc-block > pre { background: #1d2327; color: #e0e0e0; padding: 16px; border-radius: 6px; font-family: var(--scos-font-mono); font-size: 12px; line-height: 1.6; overflow: auto; margin: 12px 0 0; max-width: 100%; white-space: pre-wrap; }
+  .doc-block > .doc-render { background: #fff; padding: 24px; border: 1px solid var(--scos-border); border-radius: 8px; }
+  .scos-form__slug { font-family: var(--scos-font-mono); font-size: 11px; color: var(--scos-ink-subtle); font-weight: 400; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1 style="font-size:23px;font-weight:400;color:#1d2327;margin:0 0 8px">SCOS UI · copy-paste snippets</h1>
+<p style="color:#50575e;margin:0 0 32px">Each block is a working chunk of HTML you can paste into a PHP template. Render block shows the visual; code block is what to copy.</p>
+
+<!-- ─────────────────────── PAGE HEADER ─────────────────────── -->
+<div class="doc-block">
+  <h2>1. Page header</h2>
+  <p class="doc-note">Top of every full-width admin page.</p>
+  <div class="doc-render">
+    <div class="wrap scos" style="margin:0">
+      <header class="scos__header">
+        <div>
+          <h1 class="scos__title">Agency</h1>
+          <p class="scos__subtitle">Site Essentials &rsaquo; Agency</p>
+        </div>
+        <div class="scos__header-actions">
+          <button type="button" class="scos-btn">Discard changes</button>
+          <button type="submit" class="scos-btn scos-btn--primary">Save changes</button>
+        </div>
+      </header>
+    </div>
+  </div>
+<pre>&lt;div class="wrap scos"&gt;
+  &lt;header class="scos__header"&gt;
+    &lt;div&gt;
+      &lt;h1 class="scos__title"&gt;Agency&lt;/h1&gt;
+      &lt;p class="scos__subtitle"&gt;Site Essentials &amp;rsaquo; Agency&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div class="scos__header-actions"&gt;
+      &lt;button type="button" class="scos-btn"&gt;Discard changes&lt;/button&gt;
+      &lt;button type="submit" class="scos-btn scos-btn--primary"&gt;Save changes&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/header&gt;
+&lt;/div&gt;</pre>
+</div>
+
+<!-- ─────────────────────── TAB BAR ─────────────────────── -->
+<div class="doc-block">
+  <h2>2. Tab bar</h2>
+  <p class="doc-note">Sub-page navigation. Use anchor tags so each tab is a real URL.</p>
+  <div class="doc-render">
+    <nav class="scos__tabs">
+      <a href="#" class="scos__tab scos__tab--active">Agency Settings</a>
+      <a href="#" class="scos__tab">Support Settings</a>
+      <a href="#" class="scos__tab">Access</a>
+    </nav>
+  </div>
+<pre>&lt;nav class="scos__tabs"&gt;
+  &lt;a href="?page=site-essentials-agency&amp;tab=agency"  class="scos__tab scos__tab--active"&gt;Agency Settings&lt;/a&gt;
+  &lt;a href="?page=site-essentials-agency&amp;tab=support" class="scos__tab"&gt;Support Settings&lt;/a&gt;
+  &lt;a href="?page=site-essentials-agency&amp;tab=access"  class="scos__tab"&gt;Access&lt;/a&gt;
+&lt;/nav&gt;</pre>
+</div>
+
+<!-- ─────────────────────── CARD ─────────────────────── -->
+<div class="doc-block">
+  <h2>3. Card with form-table</h2>
+  <p class="doc-note">Standard settings card. <code>__plain</code> on the header drops the bottom border so the body flows directly under.</p>
+  <div class="doc-render">
+    <div class="scos-card">
+      <div class="scos-card__header scos-card__header--plain">
+        <div>
+          <h2 class="scos-card__title">Agency identity</h2>
+          <p class="scos-card__desc">Shown in client dashboards and the Support hub.</p>
+        </div>
+      </div>
+      <div class="scos-card__body" style="padding-top:0">
+        <table class="scos-form">
+          <tbody>
+            <tr>
+              <th>
+                <label for="se_agency_name">Agency name</label>
+                <div class="scos-form__slug">se_agency_name</div>
+              </th>
+              <td>
+                <input id="se_agency_name" name="se_agency_name" type="text" class="scos-input" value="Brighter Websites">
+                <p class="description">The display name used everywhere this agency is mentioned.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="scos-card__footer">
+        <button type="button" class="scos-btn">Cancel</button>
+        <button type="submit" class="scos-btn scos-btn--primary">Save</button>
+      </div>
+    </div>
+  </div>
+<pre>&lt;div class="scos-card"&gt;
+  &lt;div class="scos-card__header scos-card__header--plain"&gt;
+    &lt;div&gt;
+      &lt;h2 class="scos-card__title"&gt;Agency identity&lt;/h2&gt;
+      &lt;p class="scos-card__desc"&gt;Shown in client dashboards and the Support hub.&lt;/p&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="scos-card__body" style="padding-top:0"&gt;
+    &lt;table class="scos-form"&gt;
+      &lt;tbody&gt;
+        &lt;tr&gt;
+          &lt;th&gt;
+            &lt;label for="se_agency_name"&gt;Agency name&lt;/label&gt;
+            &lt;div class="scos-form__slug"&gt;se_agency_name&lt;/div&gt;
+          &lt;/th&gt;
+          &lt;td&gt;
+            &lt;input id="se_agency_name" name="se_agency_name" type="text"
+                   class="scos-input"
+                   value="&lt;?php echo esc_attr( get_option('se_agency_name') ); ?&gt;"&gt;
+            &lt;p class="description"&gt;The display name used everywhere this agency is mentioned.&lt;/p&gt;
+          &lt;/td&gt;
+        &lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  &lt;/div&gt;
+  &lt;div class="scos-card__footer"&gt;
+    &lt;button type="button" class="scos-btn"&gt;Cancel&lt;/button&gt;
+    &lt;button type="submit" class="scos-btn scos-btn--primary"&gt;Save&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+</div>
+
+<!-- ─────────────────────── MODULE GRID ─────────────────────── -->
+<div class="doc-block">
+  <h2>4. Module grid</h2>
+  <p class="doc-note">Auto-fill grid; cards reflow at narrow widths.</p>
+  <div class="doc-render">
+    <div class="scos__section-label">Modules · 2 available</div>
+    <div class="scos-modules">
+      <div class="scos-module scos-module--on">
+        <div class="scos-module__head">
+          <div style="flex:1;min-width:0">
+            <h3 class="scos-module__title">WordPress Tweaks</h3>
+            <p class="scos-module__desc">Disable comments, hide admin bar, clean up &lt;head&gt;.</p>
+          </div>
+          <label class="scos-toggle">
+            <input type="checkbox" checked>
+            <span class="scos-toggle__track"></span>
+          </label>
+        </div>
+        <div class="scos-module__meta">
+          <span class="scos-badge scos-badge--basic">BASIC</span>
+        </div>
+        <div class="scos-module__divider"></div>
+        <div class="scos-module__foot">
+          <span class="scos-module__status scos-module__status--on">✓ Loaded</span>
+          <div class="scos-module__links">
+            <a href="#" class="scos-module__link">Settings</a>
+            <a href="#" class="scos-module__link">Docs</a>
+          </div>
+        </div>
+      </div>
+      <div class="scos-module">
+        <div class="scos-module__head">
+          <div style="flex:1;min-width:0">
+            <h3 class="scos-module__title">Social Amplification</h3>
+            <p class="scos-module__desc">Auto-share new posts to X, LinkedIn, Facebook.</p>
+          </div>
+          <label class="scos-toggle">
+            <input type="checkbox">
+            <span class="scos-toggle__track"></span>
+          </label>
+        </div>
+        <div class="scos-module__meta">
+          <span class="scos-badge scos-badge--pro">PRO</span>
+        </div>
+        <div class="scos-module__divider"></div>
+        <div class="scos-module__foot">
+          <span class="scos-module__status scos-module__status--off">⊘ Toggle on to load</span>
+        </div>
+      </div>
+    </div>
+  </div>
+<pre>&lt;div class="scos__section-label"&gt;Modules · &lt;?php echo count( $modules ); ?&gt; available&lt;/div&gt;
+&lt;div class="scos-modules"&gt;
+  &lt;?php foreach ( $modules as $m ) : ?&gt;
+    &lt;div class="scos-module &lt;?php echo $m['on'] ? 'scos-module--on' : ''; ?&gt;"&gt;
+      &lt;div class="scos-module__head"&gt;
+        &lt;div style="flex:1;min-width:0"&gt;
+          &lt;h3 class="scos-module__title"&gt;&lt;?php echo esc_html( $m['name'] ); ?&gt;&lt;/h3&gt;
+          &lt;p class="scos-module__desc"&gt;&lt;?php echo esc_html( $m['desc'] ); ?&gt;&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;label class="scos-toggle"&gt;
+          &lt;input type="checkbox" name="se_module_&lt;?php echo esc_attr( $m['slug'] ); ?&gt;" &lt;?php checked( $m['on'] ); ?&gt;&gt;
+          &lt;span class="scos-toggle__track"&gt;&lt;/span&gt;
+        &lt;/label&gt;
+      &lt;/div&gt;
+      &lt;div class="scos-module__meta"&gt;
+        &lt;span class="scos-badge scos-badge--&lt;?php echo esc_attr( strtolower( $m['tier'] ) ); ?&gt;"&gt;&lt;?php echo esc_html( strtoupper( $m['tier'] ) ); ?&gt;&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class="scos-module__divider"&gt;&lt;/div&gt;
+      &lt;div class="scos-module__foot"&gt;
+        &lt;?php if ( $m['on'] ) : ?&gt;
+          &lt;span class="scos-module__status scos-module__status--on"&gt;✓ Loaded&lt;/span&gt;
+          &lt;div class="scos-module__links"&gt;
+            &lt;a href="&lt;?php echo esc_url( $m['settings_url'] ); ?&gt;" class="scos-module__link"&gt;Settings&lt;/a&gt;
+            &lt;a href="&lt;?php echo esc_url( $m['docs_url'] ); ?&gt;" class="scos-module__link"&gt;Docs&lt;/a&gt;
+          &lt;/div&gt;
+        &lt;?php else : ?&gt;
+          &lt;span class="scos-module__status scos-module__status--off"&gt;⊘ Toggle on to load&lt;/span&gt;
+        &lt;?php endif; ?&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;?php endforeach; ?&gt;
+&lt;/div&gt;</pre>
+</div>
+
+<!-- ─────────────────────── NOTICES ─────────────────────── -->
+<div class="doc-block">
+  <h2>5. Notices</h2>
+  <p class="doc-note">Use sparingly — too many notices = noise. Variants: <code>info</code>, <code>success</code>, <code>warning</code>, <code>danger</code>.</p>
+  <div class="doc-render">
+    <div class="scos-notice scos-notice--success">
+      <div class="scos-notice__body">
+        <div class="scos-notice__title">Saved</div>
+        <div>Settings updated successfully.</div>
+      </div>
+    </div>
+    <div class="scos-notice scos-notice--warning">
+      <div class="scos-notice__body">
+        <div>3 modules are using deprecated hooks.</div>
+      </div>
+    </div>
+  </div>
+<pre>&lt;div class="scos-notice scos-notice--success"&gt;
+  &lt;div class="scos-notice__body"&gt;
+    &lt;div class="scos-notice__title"&gt;Saved&lt;/div&gt;
+    &lt;div&gt;Settings updated successfully.&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+</div>
+
+<!-- ─────────────────────── BUTTONS ─────────────────────── -->
+<div class="doc-block">
+  <h2>6. Buttons</h2>
+  <div class="doc-render" style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="scos-btn scos-btn--primary">Primary</button>
+    <button class="scos-btn">Secondary</button>
+    <button class="scos-btn scos-btn--ghost">Ghost</button>
+    <button class="scos-btn scos-btn--danger">Danger</button>
+    <button class="scos-btn scos-btn--primary scos-btn--lg">Large primary</button>
+  </div>
+<pre>&lt;button class="scos-btn scos-btn--primary"&gt;Primary&lt;/button&gt;
+&lt;button class="scos-btn"&gt;Secondary&lt;/button&gt;
+&lt;button class="scos-btn scos-btn--ghost"&gt;Ghost&lt;/button&gt;
+&lt;button class="scos-btn scos-btn--danger"&gt;Danger&lt;/button&gt;
+&lt;button class="scos-btn scos-btn--primary scos-btn--lg"&gt;Large primary&lt;/button&gt;</pre>
+</div>
+
+<!-- ─────────────────────── META BOX ─────────────────────── -->
+<div class="doc-block">
+  <h2>7. Meta box (post editor sidebar)</h2>
+  <p class="doc-note">Use stacked rows here, not the form-table — narrower context.</p>
+  <div class="doc-render" style="max-width:300px">
+    <div class="scos-card" style="margin:0">
+      <div class="scos-card__header scos-card__header--plain" style="padding-bottom:12px">
+        <h2 class="scos-card__title" style="font-size:14px">SCOS · SEO</h2>
+      </div>
+      <div class="scos-card__body" style="padding-top:0">
+        <div class="scos-metabox">
+          <div class="scos-metabox__row">
+            <label class="scos-metabox__label" for="mb_meta_title">Meta title</label>
+            <input id="mb_meta_title" class="scos-input" value="Hello world">
+            <p class="scos-metabox__hint">11 / 60 characters</p>
+          </div>
+          <div class="scos-metabox__row scos-metabox__row--inline">
+            <div>
+              <div class="scos-metabox__label">Index this page</div>
+              <p class="scos-metabox__hint">Allow search engines</p>
+            </div>
+            <label class="scos-toggle">
+              <input type="checkbox" checked>
+              <span class="scos-toggle__track"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<pre>&lt;div class="scos-card"&gt;
+  &lt;div class="scos-card__header scos-card__header--plain"&gt;
+    &lt;h2 class="scos-card__title" style="font-size:14px"&gt;SCOS · SEO&lt;/h2&gt;
+  &lt;/div&gt;
+  &lt;div class="scos-card__body" style="padding-top:0"&gt;
+    &lt;div class="scos-metabox"&gt;
+      &lt;div class="scos-metabox__row"&gt;
+        &lt;label class="scos-metabox__label" for="se_meta_title"&gt;Meta title&lt;/label&gt;
+        &lt;input id="se_meta_title" name="se_meta_title" class="scos-input"
+               value="&lt;?php echo esc_attr( get_post_meta( $post-&gt;ID, 'se_meta_title', true ) ); ?&gt;"&gt;
+        &lt;p class="scos-metabox__hint"&gt;Recommended: under 60 characters&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+</div>
+
+<!-- ─────────────────────── PHP MENU REGISTRATION ─────────────────────── -->
+<div class="doc-block">
+  <h2>8. Menu registration (PHP reference)</h2>
+  <p class="doc-note">Three top-level menus + Site Essentials sub-pages.</p>
+<pre>add_action( 'admin_menu', function () {
+  // 1. Site Essentials (top-level)
+  add_menu_page(
+    'Site Essentials',
+    'Site Essentials',
+    'manage_options',
+    'site-essentials',
+    'scos_render_modules_page',
+    'dashicons-admin-generic',
+    58
+  );
+  add_submenu_page( 'site-essentials', 'Modules',         'Modules',         'manage_options', 'site-essentials',                'scos_render_modules_page' );
+  add_submenu_page( 'site-essentials', 'Agency',          'Agency',          'manage_options', 'site-essentials-agency',         'scos_render_agency_page' );
+  add_submenu_page( 'site-essentials', 'Import / Export', 'Import / Export', 'manage_options', 'site-essentials-import-export',  'scos_render_import_export_page' );
+  add_submenu_page( 'site-essentials', 'API Keys',        'API Keys',        'manage_options', 'site-essentials-api-keys',       'scos_render_api_keys_page' );
+  add_submenu_page( 'site-essentials', 'Cache',           'Cache',           'manage_options', 'site-essentials-cache',          'scos_render_cache_page' );
+  add_submenu_page( 'site-essentials', 'Debug',           'Debug',           'manage_options', 'site-essentials-debug',          'scos_render_debug_page' );
+
+  // 2. Content Architecture (top-level — only when Pro module is active)
+  if ( scos_module_is_active( 'content_architecture' ) ) {
+    add_menu_page(
+      'Content Architecture',
+      'Content Architecture',
+      'manage_options',
+      'site-essentials-content-architecture',
+      'scos_render_content_architecture_page',
+      'dashicons-category',
+      59
+    );
+  }
+
+  // 3. Support (top-level — login redirect target)
+  add_menu_page(
+    'Support',
+    'Support',
+    'read',
+    'site-essentials-support',
+    'scos_render_support_page',
+    'dashicons-sos',
+    60
+  );
+} );
+
+// Login redirect to Support
+add_filter( 'login_redirect', function ( $redirect, $request, $user ) {
+  if ( ! $user instanceof WP_User || empty( $user-&gt;roles ) ) return $redirect;
+  $option = in_array( 'administrator', $user-&gt;roles, true )
+    ? get_option( 'se_agency_login_redirect_admin' )
+    : get_option( 'se_agency_login_redirect_editor' );
+  return $option ? admin_url( $option ) : $redirect;
+}, 10, 3 );</pre>
+</div>
+
+</body>
+</html>

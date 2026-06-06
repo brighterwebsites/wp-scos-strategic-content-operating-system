@@ -82,6 +82,33 @@ class ContentArchitecture_Module implements Module_Interface {
 		Admin_Columns::init();
 		Admin_Menu::init();
 		CA_Defaults::init();
+
+		// Register WP-CLI commands
+		$this->register_cli_commands();
+	}
+
+	/**
+	 * Register WP-CLI commands for Content Architecture.
+	 *
+	 * @since 1.1.0
+	 * @return void
+	 */
+	private function register_cli_commands() {
+		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+			return;
+		}
+
+		require_once __DIR__ . '/CLI/Content_Inventory_Command.php';
+
+		\WP_CLI::add_command(
+			'scos content-inventory',
+			CLI\Content_Inventory_Command::class,
+			[
+				'shortdesc' => 'Gather WordPress content inventory with analysis metadata.',
+				'longdesc'  => 'Collects all published posts/pages with analysis metadata, taxonomies, and URLs. ' .
+					'Supports incremental collection via --since.',
+			]
+		);
 	}
 
 	/**

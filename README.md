@@ -41,17 +41,20 @@ This repo is Brighter Websites' implementation: a deployable MU plugin foundatio
 
 ---
 
-## Repository structure
-wp-scos-strategic-content-operating-system/ 
-├── site-essentials.php # Site Essentials loader (modular system) 
-├── brighter-core-loader.php # Legacy brighter-core loader 
-├── brighter-ga4-tracking.php # GA4 front-end tracking 
-├── site-essentials/ # ✅ New architecture — build here │ 
-├── Core/ # Admin UI, settings, module registry 
-│ └── Modules/ # Feature modules (see table below) 
-├── brighter-core/ # ⚠️ Legacy — migrate to site-essentials 
-│ └── includes/ # CAR injection, schema output, GA4 seeder, API, ntfy… 
-└── archive/ # Retired one-off scripts (do not deploy)
+## Plugin Structure
+
+```
+wp-scos-strategic-content-operating-system/
+├── site-essentials.php          # Site Essentials loader (modular system)
+├── brighter-core-loader.php     # Legacy brighter-core loader
+├── brighter-ga4-tracking.php    # GA4 front-end tracking
+├── site-essentials/             # ✅ New architecture — build here
+│   ├── Core/                    # Admin UI, settings, module registry
+│   └── Modules/                 # Feature modules (see table below)
+├── brighter-core/               # ⚠️ Legacy — migrate to site-essentials
+│   └── includes/                # CAR injection, schema output, GA4 seeder, API, ntfy…
+└── archive/                     # Retired one-off scripts (do not deploy)
+```
 
 **Rule of thumb:** New features go in `site-essentials/` unless a genuine migration-cost exception applies. See `CLAUDE.md` and `.cursor/rules/scos-refactor-first.mdc`.
 ---

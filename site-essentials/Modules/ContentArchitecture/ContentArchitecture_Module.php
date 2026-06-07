@@ -70,6 +70,7 @@ class ContentArchitecture_Module implements Module_Interface {
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Intent_Goal_Resolver.php';
 		require_once __DIR__ . '/Meta_Box.php';
+		require_once __DIR__ . '/Rendered_Content_Extractor.php';
 		require_once __DIR__ . '/Content_Analysis.php';
 		require_once __DIR__ . '/Admin_Columns.php';
 		require_once __DIR__ . '/Admin_Menu.php';

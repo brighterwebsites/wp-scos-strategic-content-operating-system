@@ -213,14 +213,17 @@ class Content_Inventory_Gatherer {
 				return ( '' === $v || null === $v ) ? null : $v;
 			};
 
-			// Get live aggregated content (Breakdance + ACF + editor)
-			// Note: This is expensive at scale. Known bugs: BD images often count as 0,
-			// dynamic elements (QR, repeaters) invisible, ACF relationships not resolved.
-			$content = '';
-			if ( class_exists( 'BW_Content_Analysis' ) && method_exists( 'BW_Content_Analysis', 'get_aggregated_content' ) ) {
-				$content = \BW_Content_Analysis::get_aggregated_content( $pid );
-			} else {
-				$content = $post->post_content;
+			// Prefer the pre-computed rendered markdown (scos_ca_content_md) — it is
+			// the fully rendered page (resolved ACF, dynamic fields, Query Loops,
+			// Post Repeaters, image URLs) and avoids an expensive live render per row.
+			// Fall back to live aggregation only when the markdown hasn't been built yet.
+			$content = get_post_meta( $pid, 'scos_ca_content_md', true );
+			if ( '' === $content || null === $content ) {
+				if ( class_exists( 'BW_Content_Analysis' ) && method_exists( 'BW_Content_Analysis', 'get_aggregated_content' ) ) {
+					$content = \BW_Content_Analysis::get_aggregated_content( $pid );
+				} else {
+					$content = $post->post_content;
+				}
 			}
 
 			// Build post record with all fields

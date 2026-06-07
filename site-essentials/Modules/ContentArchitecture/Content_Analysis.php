@@ -16,6 +16,9 @@
  * both sets of meta keys are written without conflicting.
  *
  * v1.6.0 | 2026-05-19 — Hook onto updated/added_post_meta for _breakdance_data so analysis always uses fresh BD content.
+ * v1.7.0 | 2026-06-07 — Rendered-first content via Rendered_Content_Extractor; analysis
+ *   debounced onto the shared scos_ca_render_analyze cron event (editor stays fast);
+ *   stores rendered markdown in scos_ca_content_md; drafts skipped entirely.
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
@@ -30,11 +33,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Content_Analysis {
 
+	/**
+	 * Shared debounced-analysis cron event (same string used by the legacy
+	 * BW_Content_Analysis class so both write from one loopback render).
+	 */
+	const CRON_EVENT = 'scos_ca_render_analyze';
+
 	public static function init() {
-		add_action( 'save_post', [ __CLASS__, 'analyze' ], 25, 3 );
+		// On save we only schedule — the heavy render/analysis runs in cron so
+		// the editor stays fast.
+		add_action( 'save_post', [ __CLASS__, 'on_save_post' ], 25, 3 );
 		add_action( 'wp_ajax_scos_run_analysis_batch',    [ __CLASS__, 'ajax_run_batch' ] );
 		add_action( 'wp_ajax_scos_analysis_status',       [ __CLASS__, 'ajax_status' ] );
 		add_action( 'wp_ajax_scos_clear_analysis_cache',  [ __CLASS__, 'ajax_clear_cache' ] );
+
+		// Debounced analysis worker (priority 20 so it runs after the legacy
+		// handler at 10 — the rendered HTML is cached, so order is harmless).
+		add_action( self::CRON_EVENT, [ __CLASS__, 'run_scheduled' ], 20, 1 );
 
 		// Breakdance Builder saves _breakdance_data via its own REST API — this may fire
 		// before save_post runs (causing analysis to read stale data) or may not trigger
@@ -42,6 +57,60 @@ class Content_Analysis {
 		// the freshly saved Breakdance content.
 		add_action( 'updated_post_meta', [ __CLASS__, 'on_breakdance_data_saved' ], 10, 3 );
 		add_action( 'added_post_meta',   [ __CLASS__, 'on_breakdance_data_saved' ], 10, 3 );
+	}
+
+	/**
+	 * save_post handler — validate then schedule a debounced analysis run.
+	 *
+	 * Capability / autosave / revision checks live here (request context); the
+	 * cron worker has no current user.
+	 *
+	 * @param int      $post_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 * @param bool     $update  Whether this is an update.
+	 */
+	public static function on_save_post( $post_id, $post, $update ): void {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+		if ( ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		// Rendered analysis only applies to published content (drafts skipped).
+		if ( 'publish' !== $post->post_status ) {
+			return;
+		}
+		self::schedule_analysis( $post_id );
+	}
+
+	/**
+	 * Schedule a single debounced analysis run for a post (deduped).
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public static function schedule_analysis( $post_id ): void {
+		$post_id = (int) $post_id;
+		if ( ! wp_next_scheduled( self::CRON_EVENT, [ $post_id ] ) ) {
+			wp_schedule_single_event( time() + 15, self::CRON_EVENT, [ $post_id ] );
+		}
+	}
+
+	/**
+	 * WP-Cron worker — load the post and run the analysis.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public static function run_scheduled( $post_id ): void {
+		$post = get_post( (int) $post_id );
+		if ( $post ) {
+			self::analyze( $post_id, $post, true );
+		}
 	}
 
 	// ──────────────────────────────────────────────────────────────────────
@@ -134,9 +203,13 @@ class Content_Analysis {
 		if ( ! $post || ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) {
 			return;
 		}
+		// Rendered analysis only applies to published content (drafts skipped).
+		if ( 'publish' !== $post->post_status ) {
+			return;
+		}
 		// Clear the timestamp so the skip-condition in analyze() doesn't block this run.
 		delete_post_meta( $post_id, 'scos_ca_last_analyzed' );
-		self::analyze( $post_id, $post, true );
+		self::schedule_analysis( $post_id );
 	}
 
 	/**
@@ -210,6 +283,8 @@ class Content_Analysis {
 	 * @return void
 	 */
 	public static function analyze( $post_id, $post, $update ) {
+		// No capability check here: analyze() also runs from WP-Cron (run_scheduled)
+		// where there is no current user. on_save_post / ajax_run_batch gate access.
 		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 			return;
 		}
@@ -219,7 +294,8 @@ class Content_Analysis {
 		if ( ! in_array( $post->post_type, Taxonomies::get_post_types(), true ) ) {
 			return;
 		}
-		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		// Rendered analysis only applies to published content (drafts skipped).
+		if ( 'publish' !== $post->post_status ) {
 			return;
 		}
 
@@ -233,6 +309,12 @@ class Content_Analysis {
 		$clean = self::clean_content( $raw );
 		$links = self::analyze_links( $clean );
 		$stats = self::calculate_stats( $clean );
+
+		// Rendered markdown — primary "extractable text/md" deliverable, consumed
+		// by AI prompts and the content inventory without re-rendering live.
+		if ( class_exists( Rendered_Content_Extractor::class ) ) {
+			update_post_meta( $post_id, 'scos_ca_content_md', Rendered_Content_Extractor::to_markdown( $clean ) );
+		}
 
 		$reading_time = $stats['word_count'] > 0
 			? max( 1, (int) ceil( $stats['word_count'] / 200 ) )

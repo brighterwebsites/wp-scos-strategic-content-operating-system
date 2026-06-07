@@ -48,7 +48,9 @@ class BW_Content_Analysis_Seeder {
         $posts_to_analyze = get_posts([
             'post_type' => bw_cs_post_types(),
             'posts_per_page' => self::BATCH_SIZE,
-            'post_status' => ['publish', 'draft', 'pending', 'private'],
+            // Rendered analysis only applies to published content (drafts skipped),
+            // so don't pull unpublished statuses into the backfill queue.
+            'post_status' => ['publish'],
             'meta_query' => [
                 'relation' => 'OR',
                 [

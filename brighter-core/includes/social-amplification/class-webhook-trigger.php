@@ -216,14 +216,19 @@ class BW_Social_Webhook_Trigger {
             $tldr = get_the_excerpt($post_id) ?: '';
         }
 
-        // Get aggregated content (post + ACF + Breakdance)
-        $raw_content = class_exists('BW_Content_Analysis') 
-            ? BW_Content_Analysis::get_aggregated_content($post_id) 
-            : $post->post_content;
-        
+        // Prefer the pre-computed rendered markdown (scos_ca_content_md) — fully
+        // rendered page content with resolved ACF / dynamic fields / loops. Fall
+        // back to live aggregated content (rendered-first, JSON parse fallback).
+        $raw_content = get_post_meta($post_id, 'scos_ca_content_md', true);
+        if (empty($raw_content)) {
+            $raw_content = class_exists('BW_Content_Analysis')
+                ? BW_Content_Analysis::get_aggregated_content($post_id)
+                : $post->post_content;
+        }
+
         // Plain text version (fully stripped)
         $content_plain = wp_strip_all_tags($raw_content);
-        
+
         // Source material version (with H2 as markdown for AI context)
         $source_material = $this->sanitize_content_for_prompt($raw_content);
 

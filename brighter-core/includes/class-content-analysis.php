@@ -3,13 +3,19 @@
  * Content Analysis - Link Counting & Statistics
  *
  * File: class-content-analysis.php
- * Version: 1.3.0 | 2026-05-19
+ * Version: 1.4.0 | 2026-06-07
  *
  * Responsibilities:
  * - Count internal/external links (excluding header/footer/nav)
  * - Calculate content statistics (word count, images, H2s)
- * - Scan post_content, ACF fields, Breakdance content
- * - Save analysis results on post save
+ * - Provide aggregated "full page" content (rendered-first, JSON parse fallback)
+ * - Save analysis results on post save (debounced via WP-Cron)
+ *
+ * v1.4.0 | 2026-06-07 — get_aggregated_content() now prefers the fully rendered
+ *   page (Rendered_Content_Extractor) so ACF / dynamic fields / Query Loops /
+ *   Post Repeaters / image URLs are captured; raw _breakdance_data JSON parse is
+ *   the fallback. Analysis is debounced onto a single WP-Cron event so the
+ *   editor save stays fast.
  */
 
 if (!defined('ABSPATH')) exit;
@@ -19,8 +25,17 @@ class BW_Content_Analysis {
     /**
      * Initialize content analysis
      */
+    /**
+     * Shared cron event for debounced rendered-content analysis. Both this class
+     * and the Content Architecture module schedule and handle this single event,
+     * so the loopback render happens once and is reused from cache.
+     */
+    const CRON_EVENT = 'scos_ca_render_analyze';
+
     public static function init() {
-        add_action('save_post', [__CLASS__, 'analyze_content'], 20, 3);
+        // On save we only schedule — the heavy render/analysis runs in cron so
+        // the editor save stays fast (see schedule_analysis / run_scheduled).
+        add_action('save_post', [__CLASS__, 'on_save_post'], 20, 3);
 
         // Breakdance Builder writes _breakdance_data via its own REST API, which may
         // run after save_post fires or may not trigger save_post at all. Hook onto the
@@ -28,26 +43,79 @@ class BW_Content_Analysis {
         add_action('updated_post_meta', [__CLASS__, 'on_breakdance_data_saved'], 10, 3);
         add_action('added_post_meta',   [__CLASS__, 'on_breakdance_data_saved'], 10, 3);
 
+        // Debounced analysis worker (WP-Cron single event).
+        add_action(self::CRON_EVENT, [__CLASS__, 'run_scheduled'], 10, 1);
+
         // Track post views on frontend
         add_action('wp_head', [__CLASS__, 'track_post_views']);
-        
+
         // Register post_views shortcode (reading_time is in reading-time-shortcode.php)
         add_shortcode('post_views', [__CLASS__, 'post_views_shortcode']);
     }
 
     /**
-     * Main analysis function - runs on save_post
+     * save_post handler — validate then schedule a debounced analysis run.
+     *
+     * Capability / autosave / revision checks live here (request context) rather
+     * than in analyze_content(), which also runs from WP-Cron where there is no
+     * current user.
+     *
+     * @param int      $post_id Post ID.
+     * @param \WP_Post $post    Post object.
+     * @param bool     $update  Whether this is an update.
+     */
+    public static function on_save_post($post_id, $post, $update) {
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+        if (wp_is_post_revision($post_id)) return;
+        if (!in_array($post->post_type, bw_cs_post_types(), true)) return;
+        if (!current_user_can('edit_post', $post_id)) return;
+        // Rendered analysis only applies to published content (drafts skipped).
+        if ('publish' !== $post->post_status) return;
+
+        self::schedule_analysis($post_id);
+    }
+
+    /**
+     * Schedule a single debounced analysis run for a post (deduped).
+     *
+     * @param int $post_id Post ID.
+     */
+    public static function schedule_analysis($post_id) {
+        $post_id = (int) $post_id;
+        if (!wp_next_scheduled(self::CRON_EVENT, [$post_id])) {
+            // ~15s delay lets Breakdance finish writing and any page cache purge.
+            wp_schedule_single_event(time() + 15, self::CRON_EVENT, [$post_id]);
+        }
+    }
+
+    /**
+     * WP-Cron worker — load the post and run the analysis.
+     *
+     * @param int $post_id Post ID.
+     */
+    public static function run_scheduled($post_id) {
+        $post = get_post((int) $post_id);
+        if (!$post) return;
+        self::analyze_content($post_id, $post, true);
+    }
+
+    /**
+     * Main analysis function — runs from WP-Cron (run_scheduled) or directly.
+     *
+     * No capability check here: this also runs in WP-Cron where there is no
+     * current user. The save_post entry point (on_save_post) performs the
+     * capability / autosave / revision checks before scheduling.
      */
     public static function analyze_content($post_id, $post, $update) {
-        // Prevent autosave, revisions
+        // Prevent revisions / autosave (cron-safe guards).
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (wp_is_post_revision($post_id)) return;
 
         // Only analyze supported post types
         if (!in_array($post->post_type, bw_cs_post_types(), true)) return;
 
-        // Check permissions
-        if (!current_user_can('edit_post', $post_id)) return;
+        // Rendered analysis only applies to published content (drafts skipped).
+        if ('publish' !== $post->post_status) return;
 
         // Only recalculate if content changed
         $last_modified = get_post_meta($post_id, '_bw_last_analyzed', true);
@@ -102,6 +170,21 @@ class BW_Content_Analysis {
         if (!$post || !in_array($post->post_type, bw_cs_post_types(), true)) {
             return '';
         }
+
+        // Rendered-first: fetch what actually renders on the page (resolves ACF,
+        // dynamic fields, Query Loops, Post Repeaters and image URLs). Falls back
+        // to the raw _breakdance_data JSON parse + ACF below when the loopback
+        // render is unavailable (draft) or fails. Filterable for per-site control.
+        $extractor = '\\SiteEssentials\\Modules\\ContentArchitecture\\Rendered_Content_Extractor';
+        if (apply_filters('bw_content_analysis_use_rendered', true, $post_id)
+            && class_exists($extractor)
+            && $extractor::is_available($post_id)) {
+            $rendered = $extractor::get_html($post_id);
+            if ('' !== $rendered) {
+                return $rendered;
+            }
+        }
+
         return self::aggregate_content($post_id, $post);
     }
 
@@ -615,9 +698,13 @@ class BW_Content_Analysis {
         if (!$post || !in_array($post->post_type, bw_cs_post_types(), true)) {
             return;
         }
+        // Only schedule rendered analysis for published content (drafts skipped).
+        if ('publish' !== $post->post_status) {
+            return;
+        }
         // Clear the timestamp so the skip-condition doesn't block this run.
         delete_post_meta($post_id, '_bw_last_analyzed');
-        self::analyze_content($post_id, $post, true);
+        self::schedule_analysis($post_id);
     }
 
     /**
@@ -632,7 +719,13 @@ class BW_Content_Analysis {
         if (!is_singular() || is_admin()) {
             return;
         }
-        
+
+        // Skip our own loopback render requests so analysis has no side effects.
+        // (Literal marker; matches Rendered_Content_Extractor::MARKER.)
+        if (isset($_GET['se_render'])) {
+            return;
+        }
+
         // Skip AJAX requests
         if (defined('DOING_AJAX') && DOING_AJAX) {
             return;

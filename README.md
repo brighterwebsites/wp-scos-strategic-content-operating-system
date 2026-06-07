@@ -57,6 +57,8 @@ wp-scos-strategic-content-operating-system/
 ```
 
 **Rule of thumb:** New features go in `site-essentials/` unless a genuine migration-cost exception applies. See `CLAUDE.md` and `.cursor/rules/scos-refactor-first.mdc`.
+
+
 ---
 ## Module status
 Modules load only when enabled. Status reflects current `main` branch.

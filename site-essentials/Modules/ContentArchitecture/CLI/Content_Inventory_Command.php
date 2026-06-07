@@ -37,33 +37,23 @@ class Content_Inventory_Command extends WP_CLI_Command {
 	 *
 	 * [--since=<timestamp>]
 	 * : ISO 8601 timestamp. Return posts modified or analyzed since this time.
-	 * ---
-	 * example: '2026-06-01 12:00:00' or '2026-06-01T12:00:00Z'
-	 * ---
 	 *
 	 * [--format=<format>]
-	 * : Output format (json, table, csv).
-	 * ---
-	 * default: json
-	 * options:
-	 *   - json
-	 *   - table
-	 *   - csv
-	 * ---
+	 * : Output format: json (default), table, or csv.
 	 *
 	 * [--file=<path>]
 	 * : Write output to file instead of stdout (JSON format only).
 	 *
 	 * ## EXAMPLES
 	 *
-	 * wp scos content-inventory
-	 * : Gather all content, output JSON to STDOUT.
+	 *     # Gather all content, output JSON to STDOUT
+	 *     $ wp scos content-inventory
 	 *
-	 * wp scos content-inventory --format=table
-	 * : Gather all content, display as table.
+	 *     # Gather all content, display as table
+	 *     $ wp scos content-inventory --format=table
 	 *
-	 * wp scos content-inventory --since="2026-06-01" --file="/tmp/inventory.json"
-	 * : Gather posts changed since June 1st, write to file.
+	 *     # Gather posts changed since date, write to file
+	 *     $ wp scos content-inventory --since="2026-06-01" --file="/tmp/inventory.json"
 	 *
 	 * @subcommand content-inventory
 	 *

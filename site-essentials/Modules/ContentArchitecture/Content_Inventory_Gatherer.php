@@ -213,6 +213,16 @@ class Content_Inventory_Gatherer {
 				return ( '' === $v || null === $v ) ? null : $v;
 			};
 
+			// Get live aggregated content (Breakdance + ACF + editor)
+			// Note: This is expensive at scale. Known bugs: BD images often count as 0,
+			// dynamic elements (QR, repeaters) invisible, ACF relationships not resolved.
+			$content = '';
+			if ( class_exists( 'BW_Content_Analysis' ) && method_exists( 'BW_Content_Analysis', 'get_aggregated_content' ) ) {
+				$content = \BW_Content_Analysis::get_aggregated_content( $pid );
+			} else {
+				$content = $post->post_content;
+			}
+
 			// Build post record with all fields
 			$post_record = [
 				'id'                           => (int) $pid,
@@ -222,6 +232,9 @@ class Content_Inventory_Gatherer {
 				'post_date'                    => $post->post_date,
 				'post_modified'                => $post->post_modified,
 				'analysis_status'              => $analysis_status,
+
+				// Live aggregated content (Breakdance + ACF + editor)
+				'content'                      => $nn( $content ),
 
 				// Analysis metrics
 				'word_count'                   => $nn( get_post_meta( $pid, $prefix . 'word_count', true ) ),

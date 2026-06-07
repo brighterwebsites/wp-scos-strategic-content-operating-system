@@ -213,7 +213,8 @@ class Content_Inventory_Gatherer {
 				return ( '' === $v || null === $v ) ? null : $v;
 			};
 
-			$posts_out[] = [
+			// Build post record with all fields
+			$post_record = [
 				'id'                           => (int) $pid,
 				'title'                        => $post->post_title,
 				'slug'                         => $slug,
@@ -221,6 +222,8 @@ class Content_Inventory_Gatherer {
 				'post_date'                    => $post->post_date,
 				'post_modified'                => $post->post_modified,
 				'analysis_status'              => $analysis_status,
+
+				// Analysis metrics
 				'word_count'                   => $nn( get_post_meta( $pid, $prefix . 'word_count', true ) ),
 				'h2_count'                     => $nn( get_post_meta( $pid, $prefix . 'h2_count', true ) ),
 				'image_count'                  => $nn( get_post_meta( $pid, $prefix . 'image_count', true ) ),
@@ -228,23 +231,58 @@ class Content_Inventory_Gatherer {
 				'internal_link_count'          => $nn( get_post_meta( $pid, $prefix . 'links_to_internal', true ) ),
 				'external_link_count'          => $nn( get_post_meta( $pid, $prefix . 'links_to_external', true ) ),
 				'last_analyzed'                => $nn( $last_analyzed ),
+
+				// Content Architecture — Strategy
 				'scos_ca_intent'               => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_intent', true ) ),
+				'scos_ca_intent_goal'          => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_intent_goal', true ) ),
 				'scos_ca_purpose'              => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_purpose', true ) ),
 				'scos_ca_maturity'             => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_maturity', true ) ),
+
+				// Content Architecture — Relationships
+				'scos_ca_pillar_page_id'       => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_pillar_page_id', true ) ),
+				'scos_ca_service_pathway_id'   => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_service_pathway_id', true ) ),
+				'scos_ca_intent_goal_faq_id'   => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_intent_goal_faq_id', true ) ),
+
+				// Content Architecture — Taxonomy (supporting topics as array)
+				'scos_ca_supporting_topics'    => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_supporting_topics', true ) ),
+
+				// Content Architecture — Workflow
 				'scos_ca_index_status'         => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_index_status', true ) ),
 				'scos_ca_optimization_progress' => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_optimization_progress', true ) ),
 				'scos_ca_next_step'            => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_next_step', true ) ),
+
+				// Content Architecture — Advanced Analysis
+				'scos_ca_links_to_internal_list' => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_links_to_internal_list', true ) ),
+				'scos_ca_links_to_external_list' => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_links_to_external_list', true ) ),
+				'scos_ca_reading_time_iso'    => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_reading_time_iso', true ) ),
+				'scos_ca_schema_track'         => $is_bw ? null : $nn( get_post_meta( $pid, 'scos_ca_schema_track', true ) ),
+
+				// SEO Meta
 				'scos_seo_title'               => $nn( get_post_meta( $pid, 'scos_seo_title', true ) ),
 				'scos_seo_description'         => $nn( get_post_meta( $pid, 'scos_seo_description', true ) ),
+				'scos_seo_tldr'                => $nn( get_post_meta( $pid, 'scos_seo_tldr', true ) ),
 				'scos_seo_robots'              => $nn( get_post_meta( $pid, 'scos_seo_robots', true ) ),
 				'scos_seo_canonical'           => $nn( get_post_meta( $pid, 'scos_seo_canonical', true ) ),
 				'scos_seo_breadcrumb_title'    => $nn( get_post_meta( $pid, 'scos_seo_breadcrumb_title', true ) ),
+				'scos_seo_freeze_og_date'      => $nn( get_post_meta( $pid, 'scos_seo_freeze_og_date', true ) ),
+				'scos_seo_sitemap_exclude'     => $nn( get_post_meta( $pid, 'scos_seo_sitemap_exclude', true ) ),
+				'scos_seo_sitemap_noindex_override' => $nn( get_post_meta( $pid, 'scos_seo_sitemap_noindex_override', true ) ),
+				'scos_seo_isnoindex'           => $nn( get_post_meta( $pid, 'scos_seo_isnoindex', true ) ),
+
+				// Social Amplification
+				'scos_sa_shortlink_slug'       => $nn( get_post_meta( $pid, 'scos_sa_shortlink_slug', true ) ),
+
+				// Taxonomies (clustered)
 				'cluster'                      => $nn( $cluster ),
 				'topic'                        => $nn( $topic ),
+
+				// URLs
 				'production_url'               => $production_url,
 				'gsc_url'                      => $gsc_url,
 				'ga4_path'                     => $ga4_path,
 			];
+
+			$posts_out[] = $post_record;
 		}
 
 		// ──────────────────────────────────────────────────────────────────────

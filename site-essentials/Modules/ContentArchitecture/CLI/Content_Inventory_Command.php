@@ -42,7 +42,7 @@ class Content_Inventory_Command extends WP_CLI_Command {
 	 * ---
 	 *
 	 * [--format=<format>]
-	 * : Output format.
+	 * : Output format (json, table, csv).
 	 * ---
 	 * default: json
 	 * options:
@@ -53,10 +53,6 @@ class Content_Inventory_Command extends WP_CLI_Command {
 	 *
 	 * [--file=<path>]
 	 * : Write output to file instead of stdout (JSON format only).
-	 * If not provided, output goes to STDOUT.
-	 * ---
-	 * example: '/home/example.com/data/content-inventory.json'
-	 * ---
 	 *
 	 * ## EXAMPLES
 	 *
@@ -77,9 +73,9 @@ class Content_Inventory_Command extends WP_CLI_Command {
 	 * @param array $assoc_args Associated arguments (flags).
 	 */
 	public function __invoke( $args, $assoc_args ) {
-		$since   = WP_CLI::get_flag_value( $assoc_args, 'since' );
-		$format  = WP_CLI::get_flag_value( $assoc_args, 'format', 'json' );
-		$file    = WP_CLI::get_flag_value( $assoc_args, 'file' );
+		$since   = isset( $assoc_args['since'] ) ? $assoc_args['since'] : null;
+		$format  = isset( $assoc_args['format'] ) ? $assoc_args['format'] : 'json';
+		$file    = isset( $assoc_args['file'] ) ? $assoc_args['file'] : null;
 
 		// Validate format
 		$allowed_formats = [ 'json', 'table', 'csv' ];

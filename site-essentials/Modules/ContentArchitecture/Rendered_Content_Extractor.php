@@ -141,7 +141,7 @@ class Rendered_Content_Extractor {
 		$url = add_query_arg( self::MARKER, '1', $url );
 
 		$args = apply_filters( 'scos_ca_render_request_args', [
-			'timeout'     => 15,
+			'timeout'     => 10,
 			'redirection' => 3,
 			'sslverify'   => false,
 			'headers'     => [ 'Cache-Control' => 'no-cache' ],

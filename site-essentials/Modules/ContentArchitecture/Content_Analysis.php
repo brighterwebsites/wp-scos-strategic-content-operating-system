@@ -215,11 +215,12 @@ class Content_Analysis {
 	/**
 	 * Analyze a batch of posts that haven't been analyzed yet.
 	 * Accepts optional $_POST['post_type'] to limit to one type.
-	 * Processes 10 posts per call.
 	 *
-	 * Pass $_POST['force'] = '1' to re-analyze already-analyzed posts (e.g. after
-	 * clearing the cache with scos_clear_analysis_cache). When force is active the
-	 * function processes the next batch ordered by ID regardless of analyzed state.
+	 * Each post is analyzed via a live page render (loopback fetch), so the call
+	 * is bounded by a wall-clock budget rather than a fixed count — this keeps the
+	 * AJAX request under PHP's max_execution_time when renders are slow. Every
+	 * post that is touched is guaranteed to be stamped (even if its render throws)
+	 * so the queue always drains and the front-end progress loop converges.
 	 */
 	public static function ajax_run_batch(): void {
 		check_ajax_referer( 'scos_analysis', 'nonce' );
@@ -229,7 +230,8 @@ class Content_Analysis {
 
 		$type_filter = isset( $_POST['post_type'] ) ? sanitize_key( $_POST['post_type'] ) : '';
 		$post_types  = $type_filter ? [ $type_filter ] : Taxonomies::get_post_types();
-		$batch_size  = 10;
+		$batch_size  = (int) apply_filters( 'scos_ca_batch_size', 10 );
+		$deadline    = microtime( true ) + (float) apply_filters( 'scos_ca_batch_time_budget', 12.0 );
 
 		$ids = get_posts( [
 			'post_type'      => $post_types,
@@ -248,8 +250,19 @@ class Content_Analysis {
 		foreach ( $ids as $post_id ) {
 			$post = get_post( $post_id );
 			if ( $post ) {
-				self::analyze( $post_id, $post, true );
+				try {
+					self::analyze( $post_id, $post, true );
+				} catch ( \Throwable $e ) {
+					// Never let one bad post stall the queue — stamp it so it can't
+					// be re-selected, and log for follow-up.
+					update_post_meta( $post_id, 'scos_ca_last_analyzed', $post->post_modified );
+					error_log( 'SCOS CA batch: analyze() failed for post ' . $post_id . ' — ' . $e->getMessage() );
+				}
 				$processed++;
+			}
+			// Stop once the time budget is spent; the JS loop will call again.
+			if ( microtime( true ) >= $deadline ) {
+				break;
 			}
 		}
 

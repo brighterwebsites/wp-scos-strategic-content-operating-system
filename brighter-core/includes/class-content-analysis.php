@@ -123,8 +123,8 @@ class BW_Content_Analysis {
             return; // Skip - nothing changed
         }
 
-        // 1. Aggregate content from all sources
-        $raw_content = self::aggregate_content($post_id, $post);
+        // 1. Aggregate content from all sources (rendered-first, JSON parse fallback)
+        $raw_content = self::get_aggregated_content($post_id);
 
         // 2. Clean content (remove header/footer/nav)
         $clean_content = self::clean_content($raw_content);

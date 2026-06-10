@@ -15,6 +15,7 @@
  * @since      1.0.0
  *
  * v1.1 | 2026-05-22 — Added scos_ca_intent_goal_faq_id integer meta key.
+ * v1.2 | 2026-06-10 — Added "review" to next_step_options(); triggers Revision Viewer.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -316,6 +317,8 @@ class Meta_Fields {
 	/**
 	 * Next step options (single-select colour badge).
 	 *
+	 * "revise" and "review" also activate the front-end Revision Viewer module.
+	 *
 	 * @return array<string, array{label: string, color: string, bg: string}>
 	 */
 	public static function next_step_options() {
@@ -324,6 +327,7 @@ class Meta_Fields {
 			'approve' => [ 'label' => 'Approved',    'color' => '#15803d', 'bg' => '#dcfce7' ],
 			'testing' => [ 'label' => 'Testing',     'color' => '#ca8a04', 'bg' => '#fef9c3' ],
 			'revise'  => [ 'label' => 'Revise',      'color' => '#2563eb', 'bg' => '#dbeafe' ],
+			'review'  => [ 'label' => 'Review',      'color' => '#0d9488', 'bg' => '#ccfbf1' ],
 			'merge'   => [ 'label' => 'Merge',       'color' => '#7c3aed', 'bg' => '#ede9fe' ],
 			'archive' => [ 'label' => 'Archive',     'color' => '#dc2626', 'bg' => '#fee2e2' ],
 		];

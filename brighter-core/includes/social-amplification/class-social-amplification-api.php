@@ -293,8 +293,13 @@ class BW_Social_Amplification_API {
         }
         $h2_count = (int) get_post_meta($post_id, 'bw_h2_count', true);
         $source_url = get_permalink($post_id) ?: '';
-        // Use same aggregated content as Content Analysis (post_content + ACF + Breakdance)
-        $raw_content = class_exists('BW_Content_Analysis') ? BW_Content_Analysis::get_aggregated_content($post_id) : $post->post_content;
+        // Prefer the pre-computed rendered markdown (scos_ca_content_md) — fully
+        // rendered page content with resolved ACF / dynamic fields / loops. Fall
+        // back to live aggregated content (rendered-first, JSON parse fallback).
+        $raw_content = get_post_meta($post_id, 'scos_ca_content_md', true);
+        if (empty($raw_content)) {
+            $raw_content = class_exists('BW_Content_Analysis') ? BW_Content_Analysis::get_aggregated_content($post_id) : $post->post_content;
+        }
         $source_material = self::sanitize_content_for_prompt($raw_content);
 
         $talking_points = $this->talking_points->get_talking_points_by_content_type($content_type);
@@ -549,11 +554,15 @@ class BW_Social_Amplification_API {
             $breadcrumb = sanitize_title(substr($post->post_title, 0, 50));
         }
 
-        // Get aggregated content (post content + ACF + Breakdance)
-        $content = class_exists('BW_Content_Analysis') 
-            ? BW_Content_Analysis::get_aggregated_content($post_id) 
-            : $post->post_content;
-        
+        // Prefer pre-computed rendered markdown (scos_ca_content_md); fall back to
+        // live aggregated content (rendered-first, JSON parse fallback).
+        $content = get_post_meta($post_id, 'scos_ca_content_md', true);
+        if (empty($content)) {
+            $content = class_exists('BW_Content_Analysis')
+                ? BW_Content_Analysis::get_aggregated_content($post_id)
+                : $post->post_content;
+        }
+
         // Strip HTML for cleaner AI processing
         $content_plain = wp_strip_all_tags($content);
 

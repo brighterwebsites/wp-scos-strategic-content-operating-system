@@ -1,0 +1,191 @@
+/**
+ * SCOS Revision Viewer — Front-End Panel Styles
+ *
+ * Fixed mid-right panel, visible only to editors/admins.
+ * Namespaced with scos-rv- to avoid conflicts with any theme.
+ *
+ * v1.0 | 2026-06-10
+ */
+
+/* ── Panel container ───────────────────────────────────────────── */
+
+.scos-rv-panel {
+	position: fixed;
+	right: 0;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 999990;
+	width: 220px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 13px;
+	line-height: 1.4;
+	color: #1f2937;
+	filter: drop-shadow(-3px 0 12px rgba(0, 0, 0, 0.15));
+}
+
+.scos-rv-panel details {
+	background: #ffffff;
+	border: 1px solid #e5e7eb;
+	border-right: none;
+	border-radius: 10px 0 0 10px;
+	overflow: hidden;
+}
+
+/* ── Header (summary) ──────────────────────────────────────────── */
+
+.scos-rv-panel__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 10px 14px;
+	background: #4f46e5;
+	cursor: pointer;
+	user-select: none;
+	list-style: none;
+}
+
+/* Remove default browser disclosure triangle */
+.scos-rv-panel__header::-webkit-details-marker { display: none; }
+.scos-rv-panel__header::marker { display: none; }
+
+.scos-rv-panel__title {
+	font-weight: 600;
+	font-size: 12px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: #ffffff;
+}
+
+/* ── Status badge ──────────────────────────────────────────────── */
+
+.scos-rv-panel__badge {
+	font-size: 10px;
+	font-weight: 600;
+	padding: 2px 7px;
+	border-radius: 999px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	white-space: nowrap;
+}
+
+.scos-rv-badge--revise {
+	background: #dbeafe;
+	color: #1d4ed8;
+}
+
+.scos-rv-badge--review {
+	background: #ccfbf1;
+	color: #0d9488;
+}
+
+/* ── Panel body ────────────────────────────────────────────────── */
+
+.scos-rv-panel__body {
+	padding: 12px 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.scos-rv-panel__state {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.scos-rv-panel__state strong {
+	font-size: 13px;
+	color: #111827;
+}
+
+.scos-rv-panel__meta {
+	font-size: 11px;
+	color: #6b7280;
+	line-height: 1.3;
+}
+
+/* ── Navigation row ────────────────────────────────────────────── */
+
+.scos-rv-panel__nav {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.scos-rv-btn {
+	display: inline-block;
+	padding: 4px 8px;
+	font-size: 11px;
+	font-weight: 500;
+	border-radius: 5px;
+	text-decoration: none;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background 0.12s ease;
+	background: #f3f4f6;
+	color: #374151;
+	border: 1px solid #e5e7eb;
+	flex: 1;
+	text-align: center;
+}
+
+.scos-rv-btn:hover {
+	background: #e5e7eb;
+	color: #111827;
+	text-decoration: none;
+}
+
+.scos-rv-btn--live {
+	background: #4f46e5;
+	color: #ffffff;
+	border-color: #4338ca;
+}
+
+.scos-rv-btn--live:hover {
+	background: #4338ca;
+	color: #ffffff;
+}
+
+.scos-rv-btn--active {
+	background: #e0e7ff;
+	color: #3730a3;
+	border-color: #c7d2fe;
+	cursor: default;
+}
+
+.scos-rv-btn--disabled {
+	background: #f9fafb;
+	color: #d1d5db;
+	border-color: #f3f4f6;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
+/* ── Collapsed state ───────────────────────────────────────────── */
+
+/* When collapsed, only the header is visible — keep it usable */
+.scos-rv-panel details:not([open]) .scos-rv-panel__header {
+	border-radius: 10px 0 0 10px;
+}
+
+/* Add a subtle arrow indicator */
+.scos-rv-panel__header::after {
+	content: "▲";
+	font-size: 9px;
+	color: rgba(255, 255, 255, 0.7);
+	transition: transform 0.2s ease;
+}
+
+.scos-rv-panel details:not([open]) .scos-rv-panel__header::after {
+	content: "▼";
+}
+
+/* ── Responsive: don't overlap on small viewports ──────────────── */
+
+@media (max-width: 480px) {
+	.scos-rv-panel {
+		width: 180px;
+	}
+}

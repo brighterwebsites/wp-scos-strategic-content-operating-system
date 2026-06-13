@@ -1,5 +1,5 @@
 <?php
-// v1.2 | 2026-05-28
+// v1.3 | 2026-06-13
 /**
  * WordPress Tweaks Module
  *
@@ -603,6 +603,8 @@ class Tweaks_Module implements Module_Interface {
                 '/wp-json/brighter/',     // Brighter custom endpoints (GPT, Make, etc.)
                 '/wp-json/brighter-core/', // Brighter Core endpoints (social amplification, etc.)
                 '/wp-json/brighter-x/',   // Brighter-X endpoints
+                '/wp-json/litespeed/',    // LiteSpeed Cache REST endpoints (pretty permalinks)
+                'rest_route=/litespeed',  // QUIC.cloud callback via query string (?rest_route=/litespeed/v1/notify_ucss)
             ];
             
             foreach ($whitelist_patterns as $pattern) {

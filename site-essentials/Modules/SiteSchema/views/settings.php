@@ -2,7 +2,7 @@
 /**
  * Site Schema Module — settings view.
  *
- * v1.2 | 2026-06-01
+ * v1.3 | 2026-06-18
  *
  * Tabbed panel: Local Business | Success Stories | Product | Service
  * SCOS design system: scos__header, scos__tabs, scos-card, scos-form.
@@ -27,9 +27,11 @@ $local_business  = get_option( 'scos_site_schema_local_business', '' );
 $success_stories = get_option( 'scos_site_schema_success_stories', '' );
 $product         = get_option( 'scos_site_schema_product', '' );
 $product_ids     = get_option( 'scos_site_schema_product_ids', '' );
-$woo_product_auto = get_option( 'scos_site_schema_woo_product_auto', '' );
-$service         = get_option( 'scos_site_schema_service', '' );
-$service_ids     = get_option( 'scos_site_schema_service_ids', '' );
+$woo_product_auto         = get_option( 'scos_site_schema_woo_product_auto', '' );
+$product_purpose_auto     = get_option( 'scos_site_schema_product_purpose_auto', '' );
+$service                  = get_option( 'scos_site_schema_service', '' );
+$service_ids              = get_option( 'scos_site_schema_service_ids', '' );
+$service_purpose_auto     = get_option( 'scos_site_schema_service_purpose_auto', '' );
 
 $guide_base = 'https://brighterwebsites.com.au/software/schema/';
 $guide_urls = [
@@ -184,6 +186,19 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 						</tr>
 						<tr>
 							<th>
+								<label for="scos_site_schema_product_purpose_auto"><?php esc_html_e( 'Purpose auto-apply', 'site-essentials' ); ?></label>
+								<div class="scos-form__slug">scos_site_schema_product_purpose_auto</div>
+							</th>
+							<td>
+								<label class="scos-toggle">
+									<input type="checkbox" id="scos_site_schema_product_purpose_auto" name="scos_site_schema_product_purpose_auto" value="1"<?php checked( $product_purpose_auto, '1' ); ?>>
+									<span class="scos-toggle__track"></span>
+								</label>
+								<p class="description"><?php esc_html_e( 'Apply this Product schema to any page whose Content Architecture purpose is set to Product (product-page). No post IDs needed.', 'site-essentials' ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th>
 								<label for="scos_site_schema_product_ids"><?php esc_html_e( 'Post/Page IDs', 'site-essentials' ); ?></label>
 								<div class="scos-form__slug">scos_site_schema_product_ids</div>
 							</th>
@@ -222,12 +237,25 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 			<div class="scos-card__header">
 				<div>
 					<h2 class="scos-card__title"><?php esc_html_e( 'Service Schema', 'site-essentials' ); ?></h2>
-					<p class="scos-card__desc"><?php esc_html_e( 'Merged into the schema graph on single posts/pages whose IDs are in the list below.', 'site-essentials' ); ?></p>
+					<p class="scos-card__desc"><?php esc_html_e( 'Merged into the schema graph on single posts/pages whose IDs are in the list below, or when Content Architecture purpose auto-apply is enabled.', 'site-essentials' ); ?></p>
 				</div>
 			</div>
 			<div class="scos-card__body">
 				<table class="scos-form">
 					<tbody>
+						<tr>
+							<th>
+								<label for="scos_site_schema_service_purpose_auto"><?php esc_html_e( 'Purpose auto-apply', 'site-essentials' ); ?></label>
+								<div class="scos-form__slug">scos_site_schema_service_purpose_auto</div>
+							</th>
+							<td>
+								<label class="scos-toggle">
+									<input type="checkbox" id="scos_site_schema_service_purpose_auto" name="scos_site_schema_service_purpose_auto" value="1"<?php checked( $service_purpose_auto, '1' ); ?>>
+									<span class="scos-toggle__track"></span>
+								</label>
+								<p class="description"><?php esc_html_e( 'Apply this Service schema to any page whose Content Architecture purpose is set to Service (service-page). No post IDs needed.', 'site-essentials' ); ?></p>
+							</td>
+						</tr>
 						<tr>
 							<th>
 								<label for="scos_site_schema_service_ids"><?php esc_html_e( 'Post/Page IDs', 'site-essentials' ); ?></label>

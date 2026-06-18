@@ -1,5 +1,5 @@
 <?php
-// v1.3 | 2026-05-27
+// v1.4 | 2026-06-18
 /**
  * Tweaks Module Settings View
  *
@@ -38,7 +38,7 @@ $groups = [
             ],
             'disable_embeds_outbound' => [
                 'label'       => __( 'Disable Outbound Embeds', 'site-essentials' ),
-                'description' => __( 'Stops WordPress auto-converting plain pasted URLs (YouTube, Vimeo, Twitter, etc.) into embedded players in your content. Use when your page builder handles embeds, or you want URLs to stay as links. The <code>[embed]</code> shortcode still works if you need explicit embeds.', 'site-essentials' ),
+                'description' => __( 'Stops WordPress converting URLs into embedded players in two ways: (1) plain pasted URLs in Classic Editor content no longer auto-convert to iframes; (2) Gutenberg <code>core/embed</code> blocks are replaced with a plain link. Use when your page builder handles embeds, or you want URLs to stay as links. The <code>[embed]</code> shortcode still works if you need an explicit embed.', 'site-essentials' ),
             ],
             'remove_google_fonts' => [
                 'label'       => __( 'Remove Google Fonts', 'site-essentials' ),

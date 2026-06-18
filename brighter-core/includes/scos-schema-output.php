@@ -995,6 +995,14 @@ function bw_render_schema_graph() {
             $include_product = true;
         }
 
+        // Content Architecture purpose: auto-apply when purpose = product-page
+        if ( !$include_product && get_option('scos_site_schema_product_purpose_auto') ) {
+            $purpose = get_post_meta( $singular_id, 'scos_ca_purpose', true ) ?: get_post_meta( $singular_id, 'bw_purpose', true );
+            if ( $purpose === 'product-page' ) {
+                $include_product = true;
+            }
+        }
+
         if ($include_product && $product_schema !== '') {
             $decoded = json_decode(bw_schema_normalize_json_placeholders($product_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
@@ -1008,13 +1016,21 @@ function bw_render_schema_graph() {
         }
     }
     
-    // Service — on single post or page when its ID is in the list
+    // Service — on single post or page when its ID is in the list, or when purpose = service-page
     if ($singular_id) {
         $service_post_ids = get_option( 'scos_site_schema_service_ids', '' ) ?: get_option( 'bw_service_post_ids', '' );
         $service_schema   = get_option( 'scos_site_schema_service', '' ) ?: get_option( 'bw_service_schema', '' );
         $ids = bw_schema_parse_post_id_list($service_post_ids);
         $ids = apply_filters('bw_schema_service_post_ids', $ids, $singular_id);
         $include_service = in_array($singular_id, $ids, true) || apply_filters('bw_schema_force_include_service', false, $singular_id);
+
+        // Content Architecture purpose: auto-apply when purpose = service-page
+        if ( !$include_service && get_option('scos_site_schema_service_purpose_auto') ) {
+            $purpose = get_post_meta( $singular_id, 'scos_ca_purpose', true ) ?: get_post_meta( $singular_id, 'bw_purpose', true );
+            if ( $purpose === 'service-page' ) {
+                $include_service = true;
+            }
+        }
         if ($include_service && $service_schema !== '') {
             $decoded = json_decode(bw_schema_normalize_json_placeholders($service_schema), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {

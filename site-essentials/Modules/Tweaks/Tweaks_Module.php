@@ -1,5 +1,5 @@
 <?php
-// v1.2 | 2026-05-28
+// v1.3 | 2026-06-18
 /**
  * WordPress Tweaks Module
  *
@@ -456,41 +456,72 @@ class Tweaks_Module implements Module_Interface {
     /**
      * Disable outbound embeds — stops WordPress auto-converting pasted URLs into iframes.
      *
+     * Covers two embed paths:
+     *  1. Classic Editor / raw content: WP_Embed::autoembed() scans the_content for plain
+     *     URLs and converts them — we remove that filter.
+     *  2. Block Editor (Gutenberg): core/embed blocks are rendered by a separate PHP
+     *     callback that bypasses autoembed entirely. We intercept via pre_render_block
+     *     and return a plain link instead.
+     *
+     * The [embed] shortcode is intentionally left active so editors can still produce
+     * an explicit embed when they need one.
+     *
      * @since 1.0.0
      * @return void
      */
     private function disable_embeds_outbound() {
-        // Must run after WP_Embed is instantiated (it hooks itself at wp-settings load time).
+        // Classic Editor: remove the hook that converts plain URLs to [embed] shortcodes.
         // Priority 9999 on init fires after our own init-10 bootstrap; $wp_embed is already set.
         add_action( 'init', static function () {
             global $wp_embed;
             if ( ! empty( $wp_embed ) ) {
-                // This is the key hook: WordPress scans content for plain URLs and
-                // auto-converts them to [embed] shortcodes then to iframes.
                 remove_filter( 'the_content', [ $wp_embed, 'autoembed' ], 8 );
             }
-            // Also block discovery of new oEmbed providers from unknown URLs
             add_filter( 'embed_oembed_discover', '__return_false' );
         }, 9999 );
+
+        // Block Editor: intercept core/embed blocks before they render as iframes.
+        // Returns a plain anchor link so the URL is still visible and clickable.
+        add_filter( 'pre_render_block', static function ( $pre_render, $parsed_block ) {
+            if ( 'core/embed' !== ( $parsed_block['blockName'] ?? '' ) ) {
+                return $pre_render;
+            }
+            $url = $parsed_block['attrs']['url'] ?? '';
+            return $url
+                ? '<p><a href="' . esc_url( $url ) . '">' . esc_html( $url ) . '</a></p>'
+                : '';
+        }, 10, 2 );
     }
 
     /**
      * Disable inbound embeds — stops other sites from embedding this site's content.
      *
-     * wp_oembed_add_host_js is intentionally NOT removed: the wp-embed.js script it
-     * enqueues is also used by WordPress to render outbound embed players on your own
-     * pages — removing it would break YouTube/Vimeo iframes on your own site.
+     * We remove ONLY the /oembed/1.0/embed REST route (the endpoint other sites call
+     * to get your embed HTML). The /oembed/1.0/proxy route is intentionally preserved —
+     * it is used by Gutenberg and page builders (e.g. Breakdance) to fetch oEmbed data
+     * for outbound embeds (YouTube, Vimeo, etc.) on your own pages. Removing it via
+     * remove_action('rest_api_init','wp_oembed_register_route') takes out both routes
+     * and breaks outbound YouTube embeds on your own site.
+     *
+     * wp_oembed_add_host_js (enqueues wp-embed.js for iframes you serve to others)
+     * is also intentionally left in place.
      *
      * @since 1.0.0
      * @return void
      */
     private function disable_embeds_inbound() {
+        // Remove the <link rel="alternate" type="application/json+oembed"> discovery tags.
         add_action( 'init', static function () {
-            // Remove the REST API endpoint that oEmbed clients call to get your embed HTML
-            remove_action( 'rest_api_init', 'wp_oembed_register_route' );
-            // Remove the <link rel="alternate" type="application/json+oembed"> discovery tags
             remove_action( 'wp_head', 'wp_oembed_add_discovery_links' );
         }, 9999 );
+
+        // Remove only the inbound /oembed/1.0/embed route after all routes are registered.
+        // Using rest_endpoints filter (not remove_action on wp_oembed_register_route) so that
+        // the /oembed/1.0/proxy route remains active for outbound embed fetching.
+        add_filter( 'rest_endpoints', static function ( $endpoints ) {
+            unset( $endpoints['/oembed/1.0/embed'] );
+            return $endpoints;
+        } );
     }
 
     /**

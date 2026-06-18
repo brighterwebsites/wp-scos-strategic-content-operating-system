@@ -14,7 +14,7 @@
  * @subpackage Modules\RevisionViewer
  * @since      1.0.0
  *
- * v1.0 | 2026-06-10
+ * v1.1 | 2026-06-18
  */
 
 namespace SiteEssentials\Modules\RevisionViewer;
@@ -40,6 +40,7 @@ class Revision_Viewer {
 		add_filter( 'the_content',        [ self::class, 'maybe_swap_content' ], 1 );
 		add_action( 'wp_enqueue_scripts', [ self::class, 'enqueue_assets' ] );
 		add_action( 'wp_footer',          [ self::class, 'render_panel' ] );
+		add_action( 'wp_ajax_scos_rv_approve', [ self::class, 'ajax_approve' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -108,7 +109,7 @@ class Revision_Viewer {
 	}
 
 	/**
-	 * Enqueue the panel CSS only on eligible singular pages for eligible users.
+	 * Enqueue the panel CSS and JS only on eligible singular pages for eligible users.
 	 */
 	public static function enqueue_assets() {
 		if ( ! is_singular() || ! self::can_access() ) {
@@ -119,12 +120,26 @@ class Revision_Viewer {
 			return;
 		}
 
+		$base = SITE_ESSENTIALS_URL . 'Modules/RevisionViewer/assets/';
+
 		wp_enqueue_style(
 			'scos-revision-viewer',
-			SITE_ESSENTIALS_URL . 'Modules/RevisionViewer/assets/css/revision-viewer.css',
+			$base . 'css/revision-viewer.css',
 			[],
-			'1.0.0'
+			'1.1.0'
 		);
+
+		wp_enqueue_script(
+			'scos-revision-viewer',
+			$base . 'js/revision-viewer.js',
+			[],
+			'1.0.0',
+			true
+		);
+
+		wp_localize_script( 'scos-revision-viewer', 'scosRvData', [
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+		] );
 	}
 
 	/**
@@ -196,8 +211,33 @@ class Revision_Viewer {
 		}
 
 		$is_viewing_revision = null !== $current_id;
+		$edit_url            = get_edit_post_link( $post_id, 'raw' );
+		$commenter_url       = add_query_arg( 'simple-commenter', 'true' );
+		$approve_nonce       = wp_create_nonce( 'scos_rv_approve' );
 
 		include __DIR__ . '/views/panel.php';
+	}
+
+	/**
+	 * AJAX: update scos_ca_next_step to "testing" (approve for live).
+	 */
+	public static function ajax_approve() {
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'scos_rv_approve' ) ) {
+			wp_send_json_error( [ 'message' => 'Security check failed.' ] );
+		}
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( [ 'message' => 'Insufficient permissions.' ] );
+		}
+
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid post.' ] );
+		}
+
+		update_post_meta( $post_id, 'scos_ca_next_step', 'testing' );
+
+		wp_send_json_success( [ 'message' => 'Status updated to Testing.' ] );
 	}
 
 	// -------------------------------------------------------------------------

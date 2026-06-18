@@ -1,5 +1,5 @@
 <?php
-// v1.1 | 2026-06-01
+// v1.2 | 2026-06-18
 
 /**
  * Review schema token resolver.
@@ -13,8 +13,9 @@
  *   associated bw_reviews data, and returns a PHP array of schema.org
  *   Review objects. Usage:
  *     { "@type": "Service", "review": "%%_scos_review_cards_json%%" }
- *   Only "specific" mode elements contribute (loop-mode cards don't hold an
- *   explicit post ID and cannot be resolved at schema-output time).
+ *   "specific" mode elements contribute an explicit review ID.
+ *   "connected" mode elements contribute all reviews linked to the page's
+ *   project post via the bw_related_project meta key.
  *
  * %%_scos_aggregate_rating_json%%
  *   Queries all published bw_reviews posts, calculates the count and average
@@ -127,10 +128,14 @@ class Review_Schema_Graph {
 
 	/**
 	 * Read `_breakdance_data` for the page and collect bw_reviews post IDs
-	 * from every ScosReviewCard element configured in "specific" mode.
+	 * from every ScosReviewCard element.
+	 *
+	 * - "specific" mode: collects the explicit review_id stored in element props.
+	 * - "connected" mode: queries bw_reviews where bw_related_project = $post_id.
+	 * - "loop" mode: no explicit ID — skipped for schema purposes.
 	 *
 	 * Returns an empty array on any decode error or when no matching element
-	 * is found — these are "no reviews from BD" outcomes, not errors.
+	 * is found.
 	 *
 	 * @param int $post_id Page post ID.
 	 * @return int[]
@@ -156,8 +161,15 @@ class Review_Schema_Graph {
 			return [];
 		}
 
-		$collected = [];
-		self::walk_bd_tree( $tree, $collected );
+		$collected    = [];
+		$has_connected = false;
+		self::walk_bd_tree( $tree, $collected, $has_connected );
+
+		// For connected-mode elements, query reviews linked to this project.
+		if ( $has_connected ) {
+			$connected_ids = self::get_connected_review_ids( $post_id );
+			$collected     = array_merge( $collected, $connected_ids );
+		}
 
 		return $collected;
 	}
@@ -193,27 +205,26 @@ class Review_Schema_Graph {
 	}
 
 	/**
-	 * Recursively walk the BD tree, collecting review IDs from ScosReviewCard
-	 * nodes that are configured in "specific" mode.
+	 * Recursively walk the BD tree, collecting review IDs from ScosReviewCard nodes.
 	 *
-	 * Tolerates both fully-qualified and short class-name `type` values, and
-	 * accepts both `data.type` and flat `type` node shapes. Recurses into every
-	 * array value (not just `children`) for resilience across BD versions.
+	 * Sets $has_connected = true when any element uses "connected" mode.
+	 * Tolerates both fully-qualified and short class-name `type` values.
 	 *
-	 * @param array $node      Current tree fragment.
-	 * @param array $collected Reference; review IDs are appended.
+	 * @param array $node          Current tree fragment.
+	 * @param array $collected     Reference; review IDs are appended.
+	 * @param bool  $has_connected Reference; set to true when a connected-mode element is found.
 	 * @return void
 	 */
-	private static function walk_bd_tree( array $node, array &$collected ): void {
+	private static function walk_bd_tree( array $node, array &$collected, bool &$has_connected ): void {
 		$type = self::resolve_node_type( $node );
 
 		if ( self::BD_ELEMENT_TYPE === $type || self::BD_ELEMENT_TYPE_SHORT === $type ) {
-			self::harvest_review_node( $node, $collected );
+			self::harvest_review_node( $node, $collected, $has_connected );
 		}
 
 		foreach ( $node as $value ) {
 			if ( is_array( $value ) ) {
-				self::walk_bd_tree( $value, $collected );
+				self::walk_bd_tree( $value, $collected, $has_connected );
 			}
 		}
 	}
@@ -251,16 +262,18 @@ class Review_Schema_Graph {
 	}
 
 	/**
-	 * Extract the review post ID from a matched ScosReviewCard node.
+	 * Extract review data from a matched ScosReviewCard node.
 	 *
-	 * Only "specific" mode elements carry an explicit review ID.
-	 * Property path mirrors element.php: content.source.{mode, review_id}.
+	 * - "specific" mode: appends the explicit review_id to $collected.
+	 * - "connected" mode: sets $has_connected = true (IDs resolved later from meta).
+	 * - "loop" mode: no action (cannot resolve at schema-output time).
 	 *
-	 * @param array $node      The matched element node.
-	 * @param array $collected Reference; review IDs are appended.
+	 * @param array $node          The matched element node.
+	 * @param array $collected     Reference; review IDs are appended.
+	 * @param bool  $has_connected Reference; set to true for connected-mode elements.
 	 * @return void
 	 */
-	private static function harvest_review_node( array $node, array &$collected ): void {
+	private static function harvest_review_node( array $node, array &$collected, bool &$has_connected ): void {
 		$properties = [];
 		if ( isset( $node['data']['properties'] ) && is_array( $node['data']['properties'] ) ) {
 			$properties = $node['data']['properties'];
@@ -278,6 +291,11 @@ class Review_Schema_Graph {
 
 		$mode = isset( $source['mode'] ) ? (string) $source['mode'] : 'loop';
 
+		if ( 'connected' === $mode ) {
+			$has_connected = true;
+			return;
+		}
+
 		if ( 'specific' !== $mode || empty( $source['review_id'] ) ) {
 			return;
 		}
@@ -286,6 +304,31 @@ class Review_Schema_Graph {
 		if ( $id > 0 ) {
 			$collected[] = $id;
 		}
+	}
+
+	/**
+	 * Query bw_reviews posts linked to a project via bw_related_project meta.
+	 *
+	 * @param int $project_id The project post ID.
+	 * @return int[]
+	 */
+	private static function get_connected_review_ids( int $project_id ): array {
+		$query = new \WP_Query( [
+			'post_type'              => 'bw_reviews',
+			'post_status'            => 'publish',
+			'posts_per_page'         => -1,
+			'fields'                 => 'ids',
+			'no_found_rows'          => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+			'meta_query'             => [ [
+				'key'     => 'bw_related_project',
+				'value'   => $project_id,
+				'compare' => '=',
+				'type'    => 'NUMERIC',
+			] ],
+		] );
+		return array_map( 'intval', (array) $query->posts );
 	}
 
 	/**

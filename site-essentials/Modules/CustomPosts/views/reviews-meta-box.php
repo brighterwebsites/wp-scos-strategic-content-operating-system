@@ -6,16 +6,18 @@
  *
  * Variables available (set in render_reviews_meta_box before include):
  *
- * @var WP_Post $post            Current post
- * @var string  $rating          bw_rating value (1–5)
- * @var string  $date            bw_date value (YYYY-MM-DD)
- * @var string  $date_precision  bw_date_precision value (year|month-year|full)
- * @var string  $verify_url      bw_verify_url value
- * @var string  $schema_id       bw_schema_id value
- * @var string  $success_outcome bw_success_outcome value
- * @var string  $customer_detail bw_customer_detail value
- * @var string  $is_featured     bw_is_featured value (1|0|'')
- * @var string  $review_excerpt  bw_review_excerpt value
+ * @var WP_Post  $post            Current post
+ * @var string   $rating          bw_rating value (1–5)
+ * @var string   $date            bw_date value (YYYY-MM-DD)
+ * @var string   $date_precision  bw_date_precision value (year|month-year|full)
+ * @var string   $verify_url      bw_verify_url value
+ * @var string   $schema_id       bw_schema_id value
+ * @var string   $success_outcome bw_success_outcome value
+ * @var string   $customer_detail bw_customer_detail value
+ * @var string   $is_featured     bw_is_featured value (1|0|'')
+ * @var string   $review_excerpt  bw_review_excerpt value
+ * @var int      $related_project bw_related_project value (project post ID, 0 when none)
+ * @var WP_Post[] $projects        Published projects list (empty when ACF is active)
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts
@@ -34,6 +36,32 @@ if (!defined('ABSPATH')) {
 <div class="bw-reviews-meta">
     <table class="form-table" role="presentation">
         <tbody>
+
+            <!-- ── Related Project (native — only shown when ACF is not active) ── -->
+            <?php if ( ! function_exists( 'get_field' ) && ! empty( $projects ) ) : ?>
+            <tr>
+                <th scope="row">
+                    <label for="bw_related_project"><?php esc_html_e( 'Related Project', 'site-essentials' ); ?></label>
+                </th>
+                <td>
+                    <select id="bw_related_project" name="bw_related_project">
+                        <option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
+                        <?php foreach ( $projects as $project ) : ?>
+                        <option value="<?php echo esc_attr( $project->ID ); ?>"
+                                <?php selected( $related_project, $project->ID ); ?>>
+                            <?php echo esc_html( $project->post_title ); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php esc_html_e( 'Link this review to a project/success story. Used to display reviews on project single templates.', 'site-essentials' ); ?></p>
+                </td>
+            </tr>
+            <?php elseif ( ! function_exists( 'get_field' ) ) : ?>
+            <tr>
+                <th scope="row"><?php esc_html_e( 'Related Project', 'site-essentials' ); ?></th>
+                <td><p class="description"><?php esc_html_e( 'No published projects found. Create a project first.', 'site-essentials' ); ?></p></td>
+            </tr>
+            <?php endif; ?>
 
             <!-- ── Rating ────────────────────────────────────────── -->
             <tr>

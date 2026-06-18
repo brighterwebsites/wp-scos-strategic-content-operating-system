@@ -733,6 +733,17 @@ JS;
         $customer_detail = get_post_meta($post->ID, 'bw_customer_detail', true);
         $is_featured     = get_post_meta($post->ID, 'bw_is_featured', true);
         $review_excerpt  = get_post_meta($post->ID, 'bw_review_excerpt', true);
+        $related_project = (int) get_post_meta($post->ID, 'bw_related_project', true);
+
+        // Projects list for native selector — only needed when ACF is not active
+        $projects = function_exists('get_field') ? [] : get_posts([
+            'post_type'      => self::POST_TYPE_PROJECTS,
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'no_found_rows'  => true,
+        ]);
 
         include __DIR__ . '/views/reviews-meta-box.php';
     }
@@ -806,6 +817,16 @@ JS;
         // bw_review_excerpt: textarea ~150 chars
         if (isset($_POST['bw_review_excerpt'])) {
             update_post_meta($post_id, 'bw_review_excerpt', sanitize_textarea_field($_POST['bw_review_excerpt']));
+        }
+
+        // bw_related_project: native meta box (only active when ACF is not installed)
+        if (isset($_POST['bw_related_project'])) {
+            $project_id = absint($_POST['bw_related_project']);
+            if ($project_id > 0) {
+                update_post_meta($post_id, 'bw_related_project', $project_id);
+            } else {
+                delete_post_meta($post_id, 'bw_related_project');
+            }
         }
     }
 

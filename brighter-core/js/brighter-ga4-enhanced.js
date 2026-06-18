@@ -1,6 +1,11 @@
 /**
- * Brighter GA4 Enhanced v5.0.2
+ * Brighter GA4 Enhanced v5.1.0
  * Lead Hierarchy + Selector Attribution + CTA Tracking
+ *
+ * v5.1.0: Live RULES lookup for click tracking — fires correctly before tag() runs,
+ * eliminating early-click gaps. Deferred tag() + IntersectionObserver to
+ * requestIdleCallback, reducing TBT. Fixed IntersectionObserver setup order
+ * so it queries [data-ga-impression] after tag() has stamped the attributes.
  */
 (function() {
   'use strict';
@@ -9,349 +14,340 @@
 
   function initializeEnhanced() {
     if (enhancedInitialized) return;
-    // Skip tracking if admin/editor is logged in
     if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
     if (typeof window.gtag !== 'function') { setTimeout(initializeEnhanced, 100); return; }
     enhancedInitialized = true;
-  
-  // Use SCOS CAR directly (single source of truth)
-  const scos = window.scosCAR || {};
-  const car = scos.car || {};
-  const meta = scos.meta || {};
-  const pillar = car.pillar || null;
-  const servicePathway = car.service_pathway || null;
-  
-  function getBaseParams() {
-    // Use breadcrumb schema as short title if available, fallback to document.title
-    const breadcrumb = scos.breadcrumb_schema || '';
-    const pageTitle = (breadcrumb && breadcrumb.trim()) 
-      ? breadcrumb.trim() 
-      : document.title;
-    
-    return {
-      // Page metadata
-      page_title: pageTitle,
-      // Note: page_path removed - GA4 automatically tracks this as 'page_location'
-      
-      // Content strategy fields (from SCOS CAR)
-      content_intent: car.intent || 'not_set',
-      content_purpose: car.purpose || 'not_set',
-      
-      // ALTC Framework fields (from SCOS CAR)
-      altc_primary: car.cluster || 'not_set',
-      altc_topic: car.topic || 'not_set', // Preferred field name
-      content_topic: car.topic || 'not_set', // Legacy - kept for backwards compatibility
-      content_maturity: car.maturity || 'not_set',
-      
-      // Content workflow fields (from SCOS CAR)
-      content_plan: car.content_plan || 'none',
-      
-      // Relationship fields (from SCOS CAR)
-      pillar_page: (pillar && pillar.title) ? pillar.title : 'none',
-      pillar_type: (pillar && pillar.type) ? pillar.type : 'none',
-      service_pathway: (servicePathway && servicePathway.title) ? servicePathway.title : 'none',
-      
-      // Post metadata (from SCOS CAR)
-      post_type: meta.post_type || 'page'
-    };
-  }
 
-  // Lead tier mappings
-  const CLASS_TO_TYPE = {
-    'ga-quote': 'quote_request', 'ga-business-enquiry': 'business_enquiry', 'ga-quiz-quote': 'quiz_quote',
-    'ga-contact': 'contact_form', 'ga-quick-contact': 'quick_quote', 'ga-meeting': 'meeting_request',
-    'ga-subscribe': 'newsletter', 'ga-lead_magnet': 'lead_magnet', 'ga-newsletter': 'newsletter'
-  };
+    const scos = window.scosCAR || {};
+    const car = scos.car || {};
+    const meta = scos.meta || {};
+    const pillar = car.pillar || null;
+    const servicePathway = car.service_pathway || null;
 
-  const FORM_TYPE_TO_TIER = {
-    'quote_request': 'hot', 'business_enquiry': 'hot', 'quiz_quote': 'hot',
-    'contact_form': 'warm', 'quick_quote': 'warm', 'meeting_request': 'warm',
-    'newsletter': 'cold', 'lead_magnet': 'cold'
-  };
-
-  const ID_PATTERNS = [
-    { pattern: /quote|enquiry|business/i, type: 'quote_request', tier: 'hot' },
-    { pattern: /quiz.*quote/i, type: 'quiz_quote', tier: 'hot' },
-    { pattern: /contact|inquiry/i, type: 'contact_form', tier: 'warm' },
-    { pattern: /quick|express/i, type: 'quick_quote', tier: 'warm' },
-    { pattern: /meeting|book|schedule/i, type: 'meeting_request', tier: 'warm' },
-    { pattern: /subscribe|newsletter/i, type: 'newsletter', tier: 'cold' },
-    { pattern: /download|magnet|guide/i, type: 'lead_magnet', tier: 'cold' }
-  ];
-
-  function inferFromFieldCount(count) {
-    if (count >= 7) return { tier: 'hot', type: 'quote_request' };
-    if (count >= 3) return { tier: 'warm', type: 'contact_form' };
-    return { tier: 'cold', type: 'newsletter' };
-  }
-
-  function detectFormLeadData(form) {
-    const wrapper = form.closest('[class*="ga-"]') || form.parentElement;
-    const classList = Array.from(wrapper?.classList || []);
-    const formId = (form.id || form.getAttribute('name') || '').toLowerCase();
-    let tier = null, type = null;
-
-    classList.forEach(cls => { if (cls.startsWith('ga-form-')) tier = cls.replace('ga-form-', ''); });
-    classList.forEach(cls => {
-      if (CLASS_TO_TYPE[cls]) {
-        type = CLASS_TO_TYPE[cls];
-        if (!tier && FORM_TYPE_TO_TIER[type]) tier = FORM_TYPE_TO_TIER[type];
-      }
-    });
-
-    if (!tier || !type) {
-      for (const item of ID_PATTERNS) {
-        if (item.pattern.test(formId)) { type = type || item.type; tier = tier || item.tier; break; }
-      }
-    }
-
-    if (!tier || !type) {
-      const fieldCount = form.querySelectorAll('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])').length;
-      const inferred = inferFromFieldCount(fieldCount);
-      tier = tier || inferred.tier;
-      type = type || inferred.type;
-    }
-    
-    // Ensure tier is always a valid value: 'hot', 'warm', 'cold', or 'unknown'
-    const validTiers = ['hot', 'warm', 'cold'];
-    if (!tier || !validTiers.includes(tier)) {
-      tier = 'unknown';
-    }
-    
-    // Ensure type is always a string
-    type = type || 'unknown';
-    
-    return { tier, type };
-  }
-
-  // Selector attribution rules
-  const RULES = [
-
-    //All the CTA Caetegory here must have the link/button text as the default lablel fallback to label only if no text (like for image links, icon links etc)
-    { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting', c: 'CTA', l: 'Meeting CTA', v: 5 },
-    { s: '.ga-cta-menu', e: 'click_menu_cta', c: 'CTA', l: 'Menu CTA', v: 5 },
-    { s: '.ga-cta-main', e: 'click_main_cta', c: 'CTA', l: 'Main CTA', v: 5 },
-    { s: '.ga-cta-micro', e: 'click_micro_cta', c: 'CTA', l: 'Micro CTA', v: 3 },
-    { s: '.ga-cta-assist', e: 'click_assist_cta', c: 'CTA', l: 'Assist CTA', v: 2 },
-    { s: '.ga-cta-end', e: 'click_end_cta', c: 'CTA', l: 'Final CTA', v: 5 },
-
-    { s: '.ga-cta-phone, [href^="tel:"]', e: 'click_phone', c: 'Contact', l: 'Phone CTA', v: 20 },
-    { s: '.ga-cta-email, [href^="mailto:"]', e: 'click_email', c: 'Contact', l: 'Email CTA', v: 20 },
-
-//All the Form Caetegory label should be the form id and fallback to lable here. 
-   
-{ s: '.ga-form',      e: 'form_enquiry', c: 'Forms', l: 'Specific Enquiry', v: 15 },  
-{ s: '.ga-quote',     e: 'form_quote', c: 'Forms', l: 'Quote Form', v: 30 },
-{ s: '.ga-subscribe', e: 'form_subscribe', c: 'Forms', l: 'Subscribed', v: 1 },
-{ s: '.ga-lead_magnet',     e: 'form_lead_magnet', c: 'Forms', l: 'Lead Magnet', v: 5 },
-
-
-    //Form Containers not form itself
-    { s: '.ga-vsubscribe', e: 'view_sub_form', c: 'Engagement', l: 'Subscribe Form Viewed ', v: 0 },
-    { s: '.ga-vquote',     e: 'view_enquiry_form', c: 'Engagement', l: 'Enquiry Form Viewed', v: 0 },
-    { s: '.ga-vcontact',   e: 'view_contact_form', c: 'Engagement', l: 'Contact Form Viewed', v: 0 },
-
-    { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 0 },
-
-    { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog', c: 'Navigation', l: 'Blog Path', v: 1 },
-    { s: '.ga-nav-project', e: 'nav_project', c: 'Navigation', l: 'Portfolio Path', v: 1 },
-    { s: '.ga-nav-product', e: 'nav_product', c: 'Navigation', l: 'Product Path', v: 2 },
-    { s: '.ga-nav-service', e: 'nav_service', c: 'Navigation', l: 'Service Path', v: 2 },
-    { s: '.ga-nav-pricing', e: 'nav_pricing_detail', c: 'Navigation', l: 'Pricing Path', v: 8 },
-
-
-
-
-    { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed', v: 0 },
-    { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed', v: 0 },
-    { s: '.ga-trust-specs', e: 'view_specs', c: 'Trust', l: 'Specifications Viewed', v: 0 },
-    { s: '.ga-trust-case', e: 'view_case', c: 'Trust', l: 'Case Study Excerpt Viewed', v: 0 },
-    { s: '.ga-exp-video', e: 'click_video', c: 'Trust', l: 'Expert Video Viewed', v: 0 },
-    { s: '.ga-trust-badge', e: 'view_badge', c: 'Trust', l: 'Trust Badge Viewed', v: 0 },
-    
-    { s: '.ga-hrcy-atf', e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed', v: 1 },
-    { s: '.ga-hrcy-phs', e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed', v: 1 },
-    { s: '.ga-hrcy-ppd', e: 'view_section', c: 'Hierarchy', l: 'Position Promise Dif Viewed', v: 0 },
-    { s: '.ga-hrcy-method', e: 'view_section', c: 'Hierarchy', l: 'Method Viewed', v: 0 },
-    { s: '.ga-hrcy-specs', e: 'view_section', c: 'Hierarchy', l: 'Specifications Viewed', v: 0 },
-    { s: '.ga-hrcy-pricing', e: 'view_section', c: 'Hierarchy', l: 'Pricing Viewed', v: 0 },
-    { s: '.ga-hrcy-aut', e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed', v: 0 },
-    { s: '.ga-hrcy-tac', e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed', v: 0 },
-    { s: '.ga-hrcy-faq', e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed', v: 0 },
-    { s: '.ga-hrcy-mid', e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached', v: 1 },
-    { s: '.ga-hrcy-final', e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached', v: 2 },
-    { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached', v: 2 },
-    { s: '.ga-hrcy-end', e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached', v: 3 },
- 
-  ];
-  
-  function tag(root = document) {
-    RULES.forEach(r => {
-      root.querySelectorAll(r.s).forEach(el => {
-        if (!el.dataset.gaEvent && r.e) el.dataset.gaEvent = r.e;
-        if (!el.dataset.gaCategory) el.dataset.gaCategory = r.c;
-        if (!el.dataset.gaLabel) el.dataset.gaLabel = r.l;
-        if (!el.dataset.value && r.v) el.dataset.value = r.v;
-        if (r.v && !el.dataset.currency) el.dataset.currency = 'AUD';
-        if (r.e && !r.e.includes('download') && !el.dataset.gaImpression) el.dataset.gaImpression = '';
-      });
-    });
-  }
-
-  // CTA context tracking
-  function storeCTAContext(element) {
-    try {
-      const ctaData = {
-        label: element.textContent?.trim() || element.value || 'Unknown',
-        location: detectLocation(element),
-        type: detectCTAType(element),
-        timestamp: Date.now()
+    function getBaseParams() {
+      const breadcrumb = scos.breadcrumb_schema || '';
+      const pageTitle = (breadcrumb && breadcrumb.trim()) ? breadcrumb.trim() : document.title;
+      return {
+        page_title:       pageTitle,
+        content_intent:   car.intent    || 'not_set',
+        content_purpose:  car.purpose   || 'not_set',
+        altc_primary:     car.cluster   || 'not_set',
+        altc_topic:       car.topic     || 'not_set',
+        content_topic:    car.topic     || 'not_set', // legacy — kept for backwards compatibility
+        content_maturity: car.maturity  || 'not_set',
+        content_plan:     car.content_plan || 'none',
+        pillar_page:      (pillar && pillar.title)         ? pillar.title         : 'none',
+        pillar_type:      (pillar && pillar.type)          ? pillar.type          : 'none',
+        service_pathway:  (servicePathway && servicePathway.title) ? servicePathway.title : 'none',
+        post_type:        meta.post_type || 'page'
       };
-      const history = JSON.parse(sessionStorage.getItem('bw_cta_history') || '[]');
-      history.unshift(ctaData);
-      if (history.length > 3) history.length = 3;
-      sessionStorage.setItem('bw_cta_history', JSON.stringify(history));
-    } catch(e) {}
-  }
-
-  function detectLocation(element) {
-    const section = element.closest('section, [class*="ga-hrcy-"]');
-    if (section) {
-      const hrchyClass = Array.from(section.classList).find(c => c.startsWith('ga-hrcy-'));
-      if (hrchyClass) return hrchyClass.replace('ga-hrcy-', '');
     }
-    if (element.closest('header')) return 'header';
-    if (element.closest('footer')) return 'footer';
-    if (section && section.classList.length > 0) return section.classList[0];
-    return 'unknown';
-  }
 
-  function detectCTAType(element) {
-    const classList = Array.from(element.classList);
-    if (classList.some(c => c.includes('ga-cta-main'))) return 'main';
-    if (classList.some(c => c.includes('ga-cta-micro'))) return 'micro';
-    if (classList.some(c => c.includes('ga-cta-assist'))) return 'assist';
-    return 'unknown';
-  }
+    // Lead tier mappings
+    const CLASS_TO_TYPE = {
+      'ga-quote': 'quote_request', 'ga-business-enquiry': 'business_enquiry', 'ga-quiz-quote': 'quiz_quote',
+      'ga-contact': 'contact_form', 'ga-quick-contact': 'quick_quote', 'ga-meeting': 'meeting_request',
+      'ga-subscribe': 'newsletter', 'ga-lead_magnet': 'lead_magnet', 'ga-newsletter': 'newsletter'
+    };
 
-  function getLastCTAContext() {
-    try { return JSON.parse(sessionStorage.getItem('bw_cta_history') || '[]')[0] || null; }
-    catch(e) { return null; }
-  }
+    const FORM_TYPE_TO_TIER = {
+      'quote_request': 'hot', 'business_enquiry': 'hot', 'quiz_quote': 'hot',
+      'contact_form': 'warm', 'quick_quote': 'warm', 'meeting_request': 'warm',
+      'newsletter': 'cold', 'lead_magnet': 'cold'
+    };
 
-  // Click tracking
-  document.addEventListener('click', function(e) {
-    // Skip if admin/editor is logged in
-    if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
-    const el = e.target.closest('[data-ga-event]');
-    if (!el || el.dataset.gaSkip === '1') return;
-    if (el.classList.contains('ga-cta-main') || el.classList.contains('ga-cta-micro') || 
-        el.classList.contains('ga-cta-assist') || el.tagName === 'BUTTON' || el.tagName === 'A') {
-      storeCTAContext(el);
+    const ID_PATTERNS = [
+      { pattern: /quote|enquiry|business/i, type: 'quote_request',   tier: 'hot'  },
+      { pattern: /quiz.*quote/i,            type: 'quiz_quote',       tier: 'hot'  },
+      { pattern: /contact|inquiry/i,        type: 'contact_form',     tier: 'warm' },
+      { pattern: /quick|express/i,          type: 'quick_quote',      tier: 'warm' },
+      { pattern: /meeting|book|schedule/i,  type: 'meeting_request',  tier: 'warm' },
+      { pattern: /subscribe|newsletter/i,   type: 'newsletter',       tier: 'cold' },
+      { pattern: /download|magnet|guide/i,  type: 'lead_magnet',      tier: 'cold' }
+    ];
+
+    function inferFromFieldCount(count) {
+      if (count >= 7) return { tier: 'hot',  type: 'quote_request' };
+      if (count >= 3) return { tier: 'warm', type: 'contact_form'  };
+      return              { tier: 'cold', type: 'newsletter'    };
     }
-    const ds = el.dataset;
-    const payload = getBaseParams();
-    if (ds.gaCategory) payload.event_category = ds.gaCategory;
-    if (ds.gaLabel) payload.event_label = ds.gaLabel;
-    if (ds.value && !isNaN(ds.value)) { payload.value = parseFloat(ds.value); payload.currency = ds.currency || 'AUD'; }
-    if (ds.meetingType) payload.meeting_type = ds.meetingType;
-    if (ds.meetingLocation) payload.meeting_location = ds.meetingLocation;
-    if (ds.service) payload.service_type = ds.service;
-    gtag('event', ds.gaEvent, payload);
-  }, true);
-  
-  // Impression tracking
-  if ('IntersectionObserver' in window) {
-    // Skip if admin/editor is logged in
-    if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
-    
-    const obs = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const el = entry.target, ds = el.dataset;
-          const payload = getBaseParams();
-          payload.event_category = (ds.gaCategory || 'Engagement') + ' Impressions';
-          payload.event_label = ds.gaLabel || el.textContent?.trim() || 'Unknown';
-          gtag('event', ds.gaEvent || 'view_component', payload);
-          obs.unobserve(el);
+
+    function detectFormLeadData(form) {
+      const wrapper  = form.closest('[class*="ga-"]') || form.parentElement;
+      const classList = Array.from(wrapper?.classList || []);
+      const formId   = (form.id || form.getAttribute('name') || '').toLowerCase();
+      let tier = null, type = null;
+
+      classList.forEach(cls => { if (cls.startsWith('ga-form-')) tier = cls.replace('ga-form-', ''); });
+      classList.forEach(cls => {
+        if (CLASS_TO_TYPE[cls]) {
+          type = CLASS_TO_TYPE[cls];
+          if (!tier && FORM_TYPE_TO_TIER[type]) tier = FORM_TYPE_TO_TIER[type];
         }
       });
-    }, { threshold: 0.5 });
-    document.querySelectorAll('[data-ga-impression]').forEach(el => obs.observe(el));
-  }
-  
-  // Form tracking with lead hierarchy
-  // Skip if admin/editor is logged in
-  if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
-  
-  const started = new WeakSet();
-  document.querySelectorAll('form').forEach(form => {
-    const id = form.id || form.className || 'Form';
-    const cat = form.dataset.gaCategory || 'Forms';
-    const label = form.dataset.gaLabel || id;
 
-    form.addEventListener('input', () => {
-      if (!started.has(form)) {
-        const leadData = detectFormLeadData(form);
-        const payload = getBaseParams();
-        payload.event_category = cat;
-        payload.event_label = label;
-        // Include lead_tier on form_start (may be determined from form structure)
-        payload.lead_tier = leadData.tier || 'unknown';
-        payload.lead_type = leadData.type || 'unknown';
-        gtag('event', 'form_start', payload);
-        started.add(form);
+      if (!tier || !type) {
+        for (const item of ID_PATTERNS) {
+          if (item.pattern.test(formId)) { type = type || item.type; tier = tier || item.tier; break; }
+        }
       }
-    }, { once: true });
 
-    form.addEventListener('submit', () => {
-      const leadData = detectFormLeadData(form);
-      const lastCTA = getLastCTAContext();
-      const fieldCount = form.querySelectorAll('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])').length;
+      if (!tier || !type) {
+        const fieldCount = form.querySelectorAll('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])').length;
+        const inferred = inferFromFieldCount(fieldCount);
+        tier = tier || inferred.tier;
+        type = type || inferred.type;
+      }
+
+      const validTiers = ['hot', 'warm', 'cold'];
+      if (!validTiers.includes(tier)) tier = 'unknown';
+      type = type || 'unknown';
+      return { tier, type };
+    }
+
+    // Selector attribution rules
+    const RULES = [
+      // CTA — label falls back to link/button text; use label only for image/icon links
+      { s: '[data-track="meeting"], .ga-cta-meeting', e: 'click_meeting',   c: 'CTA',         l: 'Meeting CTA',              v: 5  },
+      { s: '.ga-cta-menu',                            e: 'click_menu_cta',  c: 'CTA',         l: 'Menu CTA',                 v: 5  },
+      { s: '.ga-cta-main',                            e: 'click_main_cta',  c: 'CTA',         l: 'Main CTA',                 v: 5  },
+      { s: '.ga-cta-micro',                           e: 'click_micro_cta', c: 'CTA',         l: 'Micro CTA',                v: 3  },
+      { s: '.ga-cta-assist',                          e: 'click_assist_cta',c: 'CTA',         l: 'Assist CTA',               v: 2  },
+      { s: '.ga-cta-end',                             e: 'click_end_cta',   c: 'CTA',         l: 'Final CTA',                v: 5  },
+
+      { s: '.ga-cta-phone, [href^="tel:"]',           e: 'click_phone',     c: 'Contact',     l: 'Phone CTA',                v: 20 },
+      { s: '.ga-cta-email, [href^="mailto:"]',        e: 'click_email',     c: 'Contact',     l: 'Email CTA',                v: 20 },
+
+      // Forms — label should be form id; fall back to label here
+      { s: '.ga-form',        e: 'form_enquiry',    c: 'Forms',       l: 'Specific Enquiry', v: 15 },
+      { s: '.ga-quote',       e: 'form_quote',      c: 'Forms',       l: 'Quote Form',       v: 30 },
+      { s: '.ga-subscribe',   e: 'form_subscribe',  c: 'Forms',       l: 'Subscribed',       v: 1  },
+      { s: '.ga-lead_magnet', e: 'form_lead_magnet',c: 'Forms',       l: 'Lead Magnet',      v: 5  },
+
+      // Form containers (not the form itself)
+      { s: '.ga-vsubscribe',  e: 'view_sub_form',     c: 'Engagement',  l: 'Subscribe Form Viewed', v: 0 },
+      { s: '.ga-vquote',      e: 'view_enquiry_form', c: 'Engagement',  l: 'Enquiry Form Viewed',   v: 0 },
+      { s: '.ga-vcontact',    e: 'view_contact_form', c: 'Engagement',  l: 'Contact Form Viewed',   v: 0 },
+
+      { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 0 },
+
+      { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog',           c: 'Navigation', l: 'Blog Path',      v: 1 },
+      { s: '.ga-nav-project',               e: 'nav_project',         c: 'Navigation', l: 'Portfolio Path', v: 1 },
+      { s: '.ga-nav-product',               e: 'nav_product',         c: 'Navigation', l: 'Product Path',   v: 2 },
+      { s: '.ga-nav-service',               e: 'nav_service',         c: 'Navigation', l: 'Service Path',   v: 2 },
+      { s: '.ga-nav-pricing',               e: 'nav_pricing_detail',  c: 'Navigation', l: 'Pricing Path',   v: 8 },
+
+      { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed',             v: 0 },
+      { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed',              v: 0 },
+      { s: '.ga-trust-specs',   e: 'view_specs',   c: 'Trust', l: 'Specifications Viewed',       v: 0 },
+      { s: '.ga-trust-case',    e: 'view_case',    c: 'Trust', l: 'Case Study Excerpt Viewed',   v: 0 },
+      { s: '.ga-exp-video',     e: 'click_video',  c: 'Trust', l: 'Expert Video Viewed',         v: 0 },
+      { s: '.ga-trust-badge',   e: 'view_badge',   c: 'Trust', l: 'Trust Badge Viewed',          v: 0 },
+
+      { s: '.ga-hrcy-atf',    e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed',                   v: 1 },
+      { s: '.ga-hrcy-phs',    e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed',           v: 1 },
+      { s: '.ga-hrcy-ppd',    e: 'view_section', c: 'Hierarchy', l: 'Position Promise Dif Viewed',   v: 0 },
+      { s: '.ga-hrcy-method', e: 'view_section', c: 'Hierarchy', l: 'Method Viewed',                 v: 0 },
+      { s: '.ga-hrcy-specs',  e: 'view_section', c: 'Hierarchy', l: 'Specifications Viewed',         v: 0 },
+      { s: '.ga-hrcy-pricing',e: 'view_section', c: 'Hierarchy', l: 'Pricing Viewed',                v: 0 },
+      { s: '.ga-hrcy-aut',    e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed',              v: 0 },
+      { s: '.ga-hrcy-tac',    e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed',          v: 0 },
+      { s: '.ga-hrcy-faq',    e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed',                    v: 0 },
+      { s: '.ga-hrcy-mid',    e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached',                v: 1 },
+      { s: '.ga-hrcy-final',  e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached',            v: 2 },
+      { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached',            v: 2 },
+      { s: '.ga-hrcy-end',    e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached',                v: 3 },
+    ];
+
+    // Stamps data-ga-* attributes; used by impression tracking and DevTools inspection
+    function tag(root) {
+      root = root || document;
+      RULES.forEach(r => {
+        root.querySelectorAll(r.s).forEach(el => {
+          if (!el.dataset.gaEvent && r.e) el.dataset.gaEvent = r.e;
+          if (!el.dataset.gaCategory) el.dataset.gaCategory = r.c;
+          if (!el.dataset.gaLabel) el.dataset.gaLabel = r.l;
+          if (!el.dataset.value && r.v) el.dataset.value = r.v;
+          if (r.v && !el.dataset.currency) el.dataset.currency = 'AUD';
+          if (r.e && !r.e.includes('download') && !el.dataset.gaImpression) el.dataset.gaImpression = '';
+        });
+      });
+    }
+
+    // CTA context tracking
+    function storeCTAContext(element) {
+      try {
+        const ctaData = {
+          label:     element.textContent?.trim() || element.value || 'Unknown',
+          location:  detectLocation(element),
+          type:      detectCTAType(element),
+          timestamp: Date.now()
+        };
+        const history = JSON.parse(sessionStorage.getItem('bw_cta_history') || '[]');
+        history.unshift(ctaData);
+        if (history.length > 3) history.length = 3;
+        sessionStorage.setItem('bw_cta_history', JSON.stringify(history));
+      } catch(e) {}
+    }
+
+    function detectLocation(element) {
+      const section = element.closest('section, [class*="ga-hrcy-"]');
+      if (section) {
+        const hrchyClass = Array.from(section.classList).find(c => c.startsWith('ga-hrcy-'));
+        if (hrchyClass) return hrchyClass.replace('ga-hrcy-', '');
+      }
+      if (element.closest('header')) return 'header';
+      if (element.closest('footer')) return 'footer';
+      if (section && section.classList.length > 0) return section.classList[0];
+      return 'unknown';
+    }
+
+    function detectCTAType(element) {
+      const classList = Array.from(element.classList);
+      if (classList.some(c => c.includes('ga-cta-main')))   return 'main';
+      if (classList.some(c => c.includes('ga-cta-micro')))  return 'micro';
+      if (classList.some(c => c.includes('ga-cta-assist'))) return 'assist';
+      return 'unknown';
+    }
+
+    function getLastCTAContext() {
+      try { return JSON.parse(sessionStorage.getItem('bw_cta_history') || '[]')[0] || null; }
+      catch(e) { return null; }
+    }
+
+    // Click tracking — live RULES lookup ensures events fire even before tag() has run.
+    // Uses el.contains() to prefer the deepest (most specific) match when multiple rules
+    // match ancestors of the click target.
+    document.addEventListener('click', function(e) {
+      if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
+
+      let el = null, rule = null;
+      for (const r of RULES) {
+        try {
+          const match = e.target.closest(r.s);
+          if (match && (!el || el.contains(match))) { el = match; rule = r; }
+        } catch(err) {}
+      }
+
+      if (!el || el.dataset.gaSkip === '1') return;
+
+      if (el.classList.contains('ga-cta-main')  || el.classList.contains('ga-cta-micro') ||
+          el.classList.contains('ga-cta-assist') || el.tagName === 'BUTTON' || el.tagName === 'A') {
+        storeCTAContext(el);
+      }
+
+      const ds        = el.dataset;
+      const eventName = ds.gaEvent    || (rule && rule.e);
+      const category  = ds.gaCategory || (rule && rule.c);
+      const label     = ds.gaLabel    || (rule && rule.l);
+      const value     = ds.value      || (rule && rule.v);
+
+      if (!eventName) return;
 
       const payload = getBaseParams();
-      payload.event_category = cat;
-      payload.event_label = label;
-      // Ensure lead_tier is always a valid string (GA4 may ignore null/undefined)
-      payload.lead_tier = leadData.tier || 'unknown';
-      payload.lead_type = leadData.type || 'unknown';
-      payload.form_type = leadData.type || 'unknown';
-      payload.form_fields = fieldCount;
-      payload.form_id = form.id || form.getAttribute('name') || 'unknown';
+      if (category) payload.event_category = category;
+      if (label)    payload.event_label    = label;
+      if (value && !isNaN(value)) { payload.value = parseFloat(value); payload.currency = ds.currency || 'AUD'; }
+      if (ds.meetingType)     payload.meeting_type     = ds.meetingType;
+      if (ds.meetingLocation) payload.meeting_location = ds.meetingLocation;
+      if (ds.service)         payload.service_type     = ds.service;
 
-      if (lastCTA) {
-        payload.cta_label = lastCTA.label;
-        payload.cta_location = lastCTA.location;
-        payload.cta_type = lastCTA.type;
+      gtag('event', eventName, payload);
+    }, true);
+
+    // Form tracking with lead hierarchy
+    const started = new WeakSet();
+    document.querySelectorAll('form').forEach(form => {
+      const id    = form.id || form.className || 'Form';
+      const cat   = form.dataset.gaCategory || 'Forms';
+      const label = form.dataset.gaLabel || id;
+
+      form.addEventListener('input', () => {
+        if (!started.has(form)) {
+          const leadData = detectFormLeadData(form);
+          const payload  = getBaseParams();
+          payload.event_category = cat;
+          payload.event_label    = label;
+          payload.lead_tier      = leadData.tier || 'unknown';
+          payload.lead_type      = leadData.type || 'unknown';
+          gtag('event', 'form_start', payload);
+          started.add(form);
+        }
+      }, { once: true });
+
+      form.addEventListener('submit', () => {
+        const leadData   = detectFormLeadData(form);
+        const lastCTA    = getLastCTAContext();
+        const fieldCount = form.querySelectorAll('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])').length;
+
+        const payload = getBaseParams();
+        payload.event_category = cat;
+        payload.event_label    = label;
+        payload.lead_tier      = leadData.tier || 'unknown';
+        payload.lead_type      = leadData.type || 'unknown';
+        payload.form_type      = leadData.type || 'unknown';
+        payload.form_fields    = fieldCount;
+        payload.form_id        = form.id || form.getAttribute('name') || 'unknown';
+
+        if (lastCTA) {
+          payload.cta_label    = lastCTA.label;
+          payload.cta_location = lastCTA.location;
+          payload.cta_type     = lastCTA.type;
+        }
+
+        const wrapper = form.closest('[class*="ga-hrcy-"]');
+        payload.element_location = (wrapper && wrapper.classList.contains('ga-hrcy-atf')) ? 'above_fold' : 'below_fold';
+
+        const val = form.dataset.value;
+        if (val && !isNaN(val)) payload.value = parseFloat(val);
+        else payload.value = { hot: 50, warm: 25, cold: 10 }[leadData.tier] || 20;
+        payload.currency = form.dataset.currency || 'AUD';
+
+        gtag('event', 'form_submit', payload);
+        gtag('event', 'generate_lead', payload);
+      });
+    });
+
+    // page_view
+    gtag('event', 'page_view', getBaseParams());
+
+    // Defer DOM-heavy work to idle time to reduce TBT.
+    // tag() runs first so IntersectionObserver can query [data-ga-impression] correctly.
+    function deferredSetup() {
+      tag();
+
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const el = entry.target, ds = el.dataset;
+              const payload = getBaseParams();
+              payload.event_category = (ds.gaCategory || 'Engagement') + ' Impressions';
+              payload.event_label    = ds.gaLabel || el.textContent?.trim() || 'Unknown';
+              gtag('event', ds.gaEvent || 'view_component', payload);
+              obs.unobserve(el);
+            }
+          });
+        }, { threshold: 0.5 });
+        // Query after tag() so [data-ga-impression] attributes exist
+        document.querySelectorAll('[data-ga-impression]').forEach(el => obs.observe(el));
       }
 
-      const wrapper = form.closest('[class*="ga-hrcy-"]');
-      payload.element_location = (wrapper && wrapper.classList.contains('ga-hrcy-atf')) ? 'above_fold' : 'below_fold';
+      // Watch for dynamic content added after initial load
+      const contentObserver = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(node => { if (node.nodeType === 1) tag(node); });
+        });
+      });
+      contentObserver.observe(document.body, { childList: true, subtree: true });
+    }
 
-      const val = form.dataset.value;
-      if (val && !isNaN(val)) payload.value = parseFloat(val);
-      else payload.value = { hot: 50, warm: 25, cold: 10 }[leadData.tier] || 20;
-      payload.currency = form.dataset.currency || 'AUD';
-
-      gtag('event', 'form_submit', payload);
-      gtag('event', 'generate_lead', payload);
-    });
-  });
-  
-  // Only send page_view if not admin/editor
-  if (!(window.brighterGA4 && window.brighterGA4.skipTracking === true)) {
-    gtag('event', 'page_view', getBaseParams());
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(deferredSetup, { timeout: 2000 });
+    } else {
+      setTimeout(deferredSetup, 200);
+    }
   }
-  
-  // Watch for dynamic content
-  const contentObserver = new MutationObserver(mutations => {
-    mutations.forEach(mutation => {
-      mutation.addedNodes.forEach(node => { if (node.nodeType === 1) tag(node); });
-    });
-  });
-  contentObserver.observe(document.body, { childList: true, subtree: true });
-  tag();
-}
 
   initializeEnhanced();
 })();

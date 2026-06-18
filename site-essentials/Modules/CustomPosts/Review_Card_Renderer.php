@@ -1,5 +1,5 @@
 <?php
-// v1.5 | 2026-06-01
+// v1.6 | 2026-06-19
 
 /**
  * Review Card Renderer
@@ -118,7 +118,12 @@ class Review_Card_Renderer {
         return [
             'post_id'          => $post_id,
             'customer_name'    => get_the_title( $post_id ),
-            'full_text'        => apply_filters( 'the_content', $post->post_content ),
+            // Raw body. Formatted at display time (see render_card). We deliberately do
+            // NOT run apply_filters( 'the_content', ... ) here: Breakdance hooks the_content
+            // to render builder content, so re-entering that chain from inside an element's
+            // SSR/AJAX render recurses into Breakdance and leaks output ("Unexpected output
+            // during AJAX request"). wpautop + do_shortcode covers what a review body needs.
+            'full_text'        => $post->post_content,
             'excerpt'          => $excerpt,
             'rating'           => (int) get_post_meta( $post_id, 'bw_rating', true ),
             'date_raw'         => $raw_date,
@@ -238,7 +243,7 @@ class Review_Card_Renderer {
 
                 <?php if ( $show['full_text'] && ! $show['excerpt'] && $d['full_text'] ) : ?>
                 <div class="bde-review-card__full-text">
-                    <?php echo wp_kses_post( $d['full_text'] ); ?>
+                    <?php echo wp_kses_post( wpautop( do_shortcode( $d['full_text'] ) ) ); ?>
                 </div>
                 <?php endif; ?>
 

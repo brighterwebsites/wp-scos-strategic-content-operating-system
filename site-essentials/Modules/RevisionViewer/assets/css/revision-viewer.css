@@ -4,7 +4,7 @@
  * Fixed mid-right panel, visible only to editors/admins.
  * Namespaced with scos-rv- to avoid conflicts with any theme.
  *
- * v1.0 | 2026-06-10
+ * v1.1 | 2026-06-18
  */
 
 /* ── Panel container ───────────────────────────────────────────── */
@@ -180,6 +180,131 @@
 
 .scos-rv-panel details:not([open]) .scos-rv-panel__header::after {
 	content: "▼";
+}
+
+/* ── Action buttons ────────────────────────────────────────────── */
+
+.scos-rv-panel__actions {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	padding-top: 10px;
+	border-top: 1px solid #f3f4f6;
+}
+
+.scos-rv-action {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	font-size: 11px;
+	font-weight: 500;
+	border-radius: 6px;
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: background 0.12s ease, color 0.12s ease;
+	border: 1px solid transparent;
+	position: relative;
+	background: #f9fafb;
+	color: #374151;
+	border-color: #e5e7eb;
+	font-family: inherit;
+	line-height: 1;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: left;
+}
+
+.scos-rv-action__icon {
+	flex-shrink: 0;
+	vertical-align: middle;
+}
+
+/* Approve */
+.scos-rv-action--approve {
+	color: #166534;
+	background: #f0fdf4;
+	border-color: #bbf7d0;
+}
+.scos-rv-action--approve:hover {
+	background: #dcfce7;
+	border-color: #86efac;
+	color: #15803d;
+	text-decoration: none;
+}
+.scos-rv-action--approve:disabled,
+.scos-rv-action--approve.scos-rv-action--done {
+	cursor: default;
+	background: #f0fdf4;
+	border-color: #bbf7d0;
+	color: #166534;
+	opacity: 0.7;
+}
+
+/* Make comments */
+.scos-rv-action--comment {
+	color: #1e40af;
+	background: #eff6ff;
+	border-color: #bfdbfe;
+}
+.scos-rv-action--comment:hover {
+	background: #dbeafe;
+	border-color: #93c5fd;
+	color: #1d4ed8;
+	text-decoration: none;
+}
+
+/* Edit live */
+.scos-rv-action--edit {
+	color: #374151;
+	background: #f9fafb;
+	border-color: #e5e7eb;
+}
+.scos-rv-action--edit:hover {
+	background: #f3f4f6;
+	border-color: #d1d5db;
+	color: #111827;
+	text-decoration: none;
+}
+
+/* ── CSS tooltips (data-tooltip attr) ──────────────────────────── */
+
+.scos-rv-action[data-tooltip] {
+	overflow: visible;
+}
+
+.scos-rv-action[data-tooltip]::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	right: calc(100% + 8px);
+	top: 50%;
+	transform: translateY(-50%);
+	background: #1f2937;
+	color: #f9fafb;
+	font-size: 11px;
+	font-weight: 400;
+	line-height: 1.4;
+	padding: 5px 8px;
+	border-radius: 5px;
+	white-space: normal;
+	width: 160px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+	z-index: 999999;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.scos-rv-action[data-tooltip]:hover::after {
+	opacity: 1;
+}
+
+/* ── badge variant for "testing" state ─────────────────────────── */
+
+.scos-rv-badge--testing {
+	background: #fef9c3;
+	color: #854d0e;
 }
 
 /* ── Responsive: don't overlap on small viewports ──────────────── */

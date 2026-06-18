@@ -14,6 +14,12 @@
  *   string|null $viewing_date        — formatted date of active revision
  *   string|null $viewing_author      — display name of revision author
  *   bool      $is_viewing_revision   — true when previewing a revision
+ *   string    $edit_url              — WP admin edit link for the post
+ *   string    $commenter_url         — current URL + ?simple-commenter=true
+ *   string    $approve_nonce         — nonce for scos_rv_approve AJAX action
+ *   int       $post_id               — current post ID
+ *
+ * v1.1 | 2026-06-18
  *
  * @package SiteEssentials\Modules\RevisionViewer
  */
@@ -87,6 +93,46 @@ $status_label = isset( $status_labels[ $next_step ] ) ? $status_labels[ $next_st
 				<?php endif; ?>
 
 			</nav>
+
+			<div class="scos-rv-panel__actions">
+
+				<button type="button"
+				        class="scos-rv-action scos-rv-action--approve"
+				        data-post-id="<?php echo esc_attr( $post_id ); ?>"
+				        data-nonce="<?php echo esc_attr( $approve_nonce ); ?>"
+				        data-tooltip="<?php esc_attr_e( 'Moves this page to Testing status — approved for live, monitoring in search', 'site-essentials' ); ?>">
+					<svg class="scos-rv-action__icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+						<circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/>
+						<path d="M5 8l2 2.5 4-4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+					</svg>
+					<?php esc_html_e( 'Approve — No changes needed', 'site-essentials' ); ?>
+				</button>
+
+				<a href="<?php echo esc_url( $commenter_url ); ?>"
+				   class="scos-rv-action scos-rv-action--comment"
+				   data-tooltip="<?php esc_attr_e( 'Use the commenter to add annotations to the page', 'site-essentials' ); ?>">
+					<svg class="scos-rv-action__icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+						<path d="M13.5 2h-11A1.5 1.5 0 0 0 1 3.5V10a1.5 1.5 0 0 0 1.5 1.5H4L6 14l2-2.5h5.5A1.5 1.5 0 0 0 15 10V3.5A1.5 1.5 0 0 0 13.5 2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+						<path d="M4.5 6.5h7M4.5 8.5h4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+					</svg>
+					<?php esc_html_e( 'Make comments', 'site-essentials' ); ?>
+				</a>
+
+				<?php if ( $edit_url ) : ?>
+				<a href="<?php echo esc_url( $edit_url ); ?>"
+				   class="scos-rv-action scos-rv-action--edit"
+				   target="_blank"
+				   rel="noopener noreferrer"
+				   data-tooltip="<?php esc_attr_e( 'Opens the live version to edit', 'site-essentials' ); ?>">
+					<svg class="scos-rv-action__icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+						<path d="M11.5 1.5 14.5 4.5l-8 8H3.5v-3l8-8Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+						<path d="M9.5 3.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+					</svg>
+					<?php esc_html_e( 'Edit live version', 'site-essentials' ); ?>
+				</a>
+				<?php endif; ?>
+
+			</div>
 
 		</div>
 	</details>

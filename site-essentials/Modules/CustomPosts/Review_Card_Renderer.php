@@ -68,35 +68,6 @@ class Review_Card_Renderer {
      * @return string         HTML output.
      */
     public function render( int $post_id, array $atts = [] ): string {
-        // ===== TEMP DEBUG — trace every card render. Remove after diagnosis. =====
-        // Logs to wp-content/scos-review-debug.log. Captures who calls render(),
-        // during which request/AJAX action, so we can pin the "unexpected output
-        // during AJAX request" leak and the stray card after <body>.
-        if ( defined( 'SCOS_REVIEW_DEBUG' ) && SCOS_REVIEW_DEBUG ) {
-            $frames = array_slice( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ), 0, 14 );
-            $stack  = array_map(
-                static function ( $f ) {
-                    $where = isset( $f['file'] ) ? basename( $f['file'] ) . ':' . ( $f['line'] ?? '?' ) : '(internal)';
-                    $fn    = ( isset( $f['class'] ) ? $f['class'] . $f['type'] : '' ) . ( $f['function'] ?? '?' );
-                    return $fn . '  @ ' . $where;
-                },
-                $frames
-            );
-            $entry = sprintf(
-                "[%s] render() post_id=%d ajax=%s action=%s builder=%s rest=%s uri=%s\n    %s\n",
-                gmdate( 'H:i:s' ),
-                $post_id,
-                ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) ? 'YES' : 'no',
-                isset( $_REQUEST['action'] ) ? preg_replace( '/[^a-z0-9_\-]/i', '', (string) $_REQUEST['action'] ) : '(none)',
-                ( defined( 'BREAKDANCE_BUILDER' ) && BREAKDANCE_BUILDER ) ? 'YES' : 'no',
-                ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ? 'YES' : 'no',
-                isset( $_SERVER['REQUEST_URI'] ) ? preg_replace( '/[\r\n]/', '', (string) $_SERVER['REQUEST_URI'] ) : '(none)',
-                implode( "\n    ", $stack )
-            );
-            error_log( $entry, 3, WP_CONTENT_DIR . '/scos-review-debug.log' );
-        }
-        // ===== END TEMP DEBUG =====
-
         $post = get_post( $post_id );
         if ( ! $post || $post->post_type !== 'bw_reviews' ) {
             return '';

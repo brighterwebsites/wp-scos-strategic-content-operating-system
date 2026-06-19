@@ -61,16 +61,36 @@ class Review_Card_Renderer {
     }
 
     /**
-     * Core render method — reusable from WP-CLI / MCP tool calls.
+     * Core render method — returns HTML as a string (shortcode / WP-CLI / MCP).
      *
      * @param int   $post_id  bw_reviews post ID.
      * @param array $atts     Display options (layout, show_* flags).
      * @return string         HTML output.
      */
     public function render( int $post_id, array $atts = [] ): string {
+        ob_start();
+        $this->echo_card( $post_id, $atts );
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the card straight to the active output buffer (no nested ob_start).
+     *
+     * The Breakdance SCOS Review Card element calls THIS from ssr.php so the card
+     * markup is emitted directly into Breakdance's own SSR capture buffer — the
+     * exact pattern the working SCOS FAQs element uses. The string-returning
+     * render() wraps a nested ob_start()/ob_get_clean(); on LiteSpeed that nested
+     * buffer let the card escape Breakdance's capture (rendered after <body> and
+     * tripped "Unexpected output during AJAX request"). Emitting directly keeps
+     * the output inside whatever buffer Breakdance opened around the include.
+     *
+     * @param int   $post_id  bw_reviews post ID.
+     * @param array $atts     Display options (layout, show_* flags).
+     */
+    public function echo_card( int $post_id, array $atts = [] ): void {
         $post = get_post( $post_id );
         if ( ! $post || $post->post_type !== 'bw_reviews' ) {
-            return '';
+            return;
         }
 
         $layout = in_array( $atts['layout'] ?? 'stacked', self::LAYOUTS, true )
@@ -82,9 +102,7 @@ class Review_Card_Renderer {
         // Gather all data up front — one meta read per field
         $data = $this->get_review_data( $post_id, $post );
 
-        ob_start();
         $this->render_card( $data, $layout, $show );
-        return (string) ob_get_clean();
     }
 
     // =========================================================================

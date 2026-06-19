@@ -46,12 +46,30 @@ class Aggregate_Review_Renderer {
     }
 
     /**
-     * Core render method — reusable from WP-CLI / MCP tool calls.
+     * Core render method — returns HTML as a string (shortcode / WP-CLI / MCP).
      *
      * @param array $atts Display options.
      * @return string HTML output.
      */
     public function render( array $atts = [] ): string {
+        ob_start();
+        $this->echo_card( $atts );
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the widget straight to the active output buffer (no nested ob_start).
+     *
+     * Called by the Breakdance SCOS Aggregate Review element from ssr.php so the
+     * markup is emitted directly into Breakdance's own SSR capture buffer (same
+     * pattern as the working SCOS FAQs element). The string-returning render()
+     * wraps a nested ob_start()/ob_get_clean(); on LiteSpeed that nested buffer
+     * let the widget escape Breakdance's capture (rendered after <body> and
+     * tripped "Unexpected output during AJAX request").
+     *
+     * @param array $atts Display options.
+     */
+    public function echo_card( array $atts = [] ): void {
         $layout = in_array( $atts['layout'] ?? 'google-full', self::LAYOUTS, true )
             ? $atts['layout']
             : 'google-full';
@@ -73,16 +91,14 @@ class Aggregate_Review_Renderer {
 
         if ( $data['count'] === 0 ) {
             if ( defined( 'BREAKDANCE_BUILDER' ) && BREAKDANCE_BUILDER ) {
-                return '<div class="bde-aggregate-review__placeholder">No published reviews found for this platform.</div>';
+                echo '<div class="bde-aggregate-review__placeholder">No published reviews found for this platform.</div>';
             }
-            return '';
+            return;
         }
 
         $data['reviews_url'] = esc_url_raw( $atts['reviews_url'] ?? '' );
 
-        ob_start();
         $this->render_card( $data, $layout, $show );
-        return (string) ob_get_clean();
     }
 
     // =========================================================================

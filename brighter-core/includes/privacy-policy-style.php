@@ -34,7 +34,7 @@ add_filter('body_class', function($classes) {
     return $classes;
 });
 
-// Output the skip link
-add_action('wp_body_open', function () {
-    echo '<a class="skip-link screen-reader-text" href="#main-content">Skip to main content</a>';
-});
+// Skip link removed — Breakdance outputs its own skip link (href="#bde-main") and
+// <main id="bde-main"> wrapper when the skip links setting is enabled in
+// Breakdance → Settings. Duplicate skip links here caused a #main-content anchor
+// mismatch and contributed to a double <main> tag on the frontend.

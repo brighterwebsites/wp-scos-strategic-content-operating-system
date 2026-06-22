@@ -1,55 +1,10 @@
 /*
  * Brighter Core - Frontend CSS
- * Version: 1.0.0
- * 
- * Consolidated frontend styles for performance optimization.
- * Previously loaded as inline styles, now cached as single CSS file.
+ * v1.1 | 2026-06-21
+ *
+ * Structural/layout styles only. No hardcoded colours or typography —
+ * site theme variables and Breakdance global styles handle those.
  */
-
-/* ============================================
- * ACCESSIBILITY - Skip Link
- * ============================================ */
-
-/* Base: keep it hidden but focusable */
-a.skip-link.screen-reader-text {
-    position: fixed;         /* sit above layout */
-    top: 0; 
-    left: 0;
-    transform: translateY(-120%);   /* visually hide, better than clip for overrides */
-    background: var(--bde-button-primary-background-color);
-    color: var(--bde-button-text-text-color);
-    padding: 8px 16px;
-    z-index: 999999;         /* above sticky header */
-    text-decoration: none;
-}
-
-/* Reveal on keyboard focus */
-a.skip-link.screen-reader-text:focus,
-a.skip-link.screen-reader-text:focus-visible {
-    transform: none;
-    /* force-undo typical screen-reader-text rules */
-    clip: auto !important;
-    -webkit-clip-path: none !important;
-    clip-path: none !important;
-    width: auto !important;
-    height: auto !important;
-    margin: 0 !important;
-    overflow: visible !important;
-    outline: 2px solid #fff !important;
-    outline-offset: 2px !important;
-}
-
-/* Logged-in admin bar offset (desktop) */
-body.admin-bar a.skip-link.screen-reader-text {
-    top: 32px;
-}
-
-/* Admin bar on mobile */
-@media (max-width: 782px) {
-    body.admin-bar a.skip-link.screen-reader-text { 
-        top: 46px; 
-    }
-}
 
 /* ============================================
  * PRIVACY POLICY PAGE STYLES
@@ -95,7 +50,8 @@ body.admin-bar a.skip-link.screen-reader-text {
 .page-slug-privacy-policy .c05 { padding-left: 100px; }
 
 /* ============================================
- * TLDR SHORTCODE STYLES
+ * TLDR SHORTCODE
+ * Layout only — colour/typography inherits from site
  * ============================================ */
 
 .tldr-summary {
@@ -106,10 +62,6 @@ body.admin-bar a.skip-link.screen-reader-text {
 .tldr-summary .tldr-heading {
     margin-top: 0;
     margin-bottom: 1rem;
-    font-size: calc(var(--bde-base-font-size) * .9) !important;
-    color: var(--bde-body-text-color) !important;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .tldr-summary .tldr-content {
@@ -121,7 +73,8 @@ body.admin-bar a.skip-link.screen-reader-text {
 }
 
 /* ============================================
- * FAQ SHORTCODE STYLES
+ * FAQ SHORTCODE
+ * Layout and state only — colour/typography inherits from site
  * ============================================ */
 
 .bw-faq-section {
@@ -132,10 +85,8 @@ body.admin-bar a.skip-link.screen-reader-text {
     margin-bottom: 1.5rem;
 }
 
-/* Accordion styles */
+/* Accordion */
 .bw-faq-accordion {
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
     padding: 0;
     margin-bottom: 1rem;
 }
@@ -143,58 +94,44 @@ body.admin-bar a.skip-link.screen-reader-text {
 .bw-faq-accordion summary {
     padding: 1rem 1.5rem;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 1.1em;
-    background: var(--bde-background-color) !important;
-    border-radius: 4px;
     user-select: none;
-}
-
-.bw-faq-accordion summary:hover {
-    background: #f0f0f0;
 }
 
 .bw-faq-accordion[open] summary {
     border-bottom: 1px solid #e0e0e0;
-    border-radius: 4px 4px 0 0;
 }
 
 .bw-faq-accordion .bw-faq-answer {
     padding: 1.5rem;
 }
 
-/* Plain styles */
+/* Plain format */
 .bw-faq-section[data-format="plain"] .bw-faq-question {
     margin-bottom: 0.5rem;
-    font-weight: 600;
 }
 
 .bw-faq-section[data-format="plain"] .bw-faq-answer {
     margin-bottom: 1.5rem;
     padding-left: 1rem;
-    border-left: 3px solid var(--bde-brand-primary-color);  
+    border-left: 3px solid var(--bde-brand-primary-color);
 }
 
 /* ============================================
  * LITESPEED LAZY LOAD ANIMATION
- * Only applies when LiteSpeed Cache is active
  * ============================================ */
 
-/* PART 1 - Before Lazy Load */
 img[data-lazyloaded] {
     opacity: 0;
 }
 
-/* PART 2 - Upon Lazy Load */
 img.litespeed-loaded {
-    -webkit-transition: opacity .5s linear 0.2s;
-    -moz-transition: opacity .5s linear 0.2s;
     transition: opacity .5s linear 0.2s;
     opacity: 1;
 }
 
 /* ============================================
- * BREADCRUMB SHORTCODE STYLES
+ * BREADCRUMB SHORTCODE
+ * Layout and scroll behaviour only — colour/typography inherits from site
  * ============================================ */
 
 .bw-breadcrumbs-wrap {
@@ -233,36 +170,20 @@ ul.bw-breadcrumbs {
 
 .bw-breadcrumbs li,
 .bw-breadcrumbs li a {
-    color: var(--bde-body-text-color);
     text-decoration-line: none;
-    text-transform: uppercase;
     line-height: 1;
-    letter-spacing: 1px;
     margin-bottom: 5px;
 }
 
-.bw-breadcrumbs li a:hover {
-    color: var(--bde-button-text-text-color-hover);
+@media (max-width: 675px) {
+    .bw-breadcrumbs li,
+    .bw-breadcrumbs li a {
+        font-size: calc(var(--bde-base-font-size) * .8);
+    }
 }
 
-/* Overflow fade indicator */
-.bw-breadcrumbs-wrap.is-overflowing::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 60px;
-    height: 100%;
-    pointer-events: none;
-    background: linear-gradient(
-        to right,
-        transparent 0%,
-        rgba(255, 255, 255, 0.15) 50%,
-        rgba(255, 255, 255, 0.35) 100%
-    );
-}
-
-/* Overflow fade — light page background (darker gradient at right edge) */
+/* Overflow fade — shared positioning */
+.bw-breadcrumbs-wrap.is-overflowing::after,
 .bw-breadcrumbs-light-bg .bw-breadcrumbs-wrap.is-overflowing::after {
     content: "";
     position: absolute;
@@ -271,17 +192,24 @@ ul.bw-breadcrumbs {
     width: 60px;
     height: 100%;
     pointer-events: none;
+}
+
+/* Dark background (default) */
+.bw-breadcrumbs-wrap.is-overflowing::after {
+    background: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.35) 100%
+    );
+}
+
+/* Light background */
+.bw-breadcrumbs-light-bg .bw-breadcrumbs-wrap.is-overflowing::after {
     background: linear-gradient(
         to right,
         transparent 0%,
         rgba(0, 0, 0, 0.15) 50%,
         rgba(0, 0, 0, 0.35) 100%
     );
-}
-
-@media (max-width: 675px) {
-    .bw-breadcrumbs li,
-    .bw-breadcrumbs li a {
-        font-size: calc(var(--bde-base-font-size) * .8) !important;
-    }
 }

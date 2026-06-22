@@ -1,6 +1,9 @@
 <?php
 /**
- * Image SEO — attachment page optimisations and upload-time file renaming.
+ * Image SEO — attachment page optimisations, upload-time file renaming,
+ * and miscellaneous content-output settings (excerpt length).
+ *
+ * v1.1 | 2026-06-21
  *
  * Settings are stored as a single serialised array in the `scos_image_seo`
  * wp_option. All behaviour is gated behind individual toggles; nothing runs
@@ -29,6 +32,8 @@ class Image_SEO {
 			'no_comments_attachments' => false,
 			'redirect_attachments'    => false,
 			'rename_files'            => false,
+			'excerpt_length_enabled'  => false,
+			'excerpt_length_words'    => 20,
 		];
 	}
 
@@ -62,6 +67,14 @@ class Image_SEO {
 
 		if ( ! empty( $opts['rename_files'] ) ) {
 			add_filter( 'sanitize_file_name', [ __CLASS__, 'rename_uploaded_file' ] );
+		}
+
+		if ( ! empty( $opts['excerpt_length_enabled'] ) ) {
+			// Priority 999 — runs after Breakdance and other plugins; only affects
+			// WP auto-generated excerpts (wp_trim_excerpt). Breakdance's own
+			// "Limit Characters" field in the builder applies post-generation and
+			// is unaffected by this filter.
+			add_filter( 'excerpt_length', [ __CLASS__, 'filter_excerpt_length' ], 999 );
 		}
 	}
 
@@ -137,6 +150,18 @@ class Image_SEO {
 		return $ext ? "{$name}.{$ext}" : $name;
 	}
 
+	/**
+	 * Filter callback: return the configured auto-excerpt word count.
+	 * Only registered when excerpt_length_enabled is true.
+	 *
+	 * @param int $length Default WP excerpt word count (55).
+	 * @return int
+	 */
+	public static function filter_excerpt_length( int $length ): int {
+		$opts = self::get();
+		return max( 5, (int) ( $opts['excerpt_length_words'] ?? 20 ) );
+	}
+
 	// ── Admin save handler ────────────────────────────────────────────────────
 
 	public static function handle_save(): void {
@@ -166,6 +191,8 @@ class Image_SEO {
 				'no_comments_attachments' => ! empty( $posted['no_comments_attachments'] ),
 				'redirect_attachments'    => ! empty( $posted['redirect_attachments'] ),
 				'rename_files'            => ! empty( $posted['rename_files'] ),
+				'excerpt_length_enabled'  => ! empty( $posted['excerpt_length_enabled'] ),
+				'excerpt_length_words'    => max( 5, (int) ( $posted['excerpt_length_words'] ?? 20 ) ),
 			],
 			false
 		);

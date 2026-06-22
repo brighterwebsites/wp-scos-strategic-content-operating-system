@@ -51,6 +51,7 @@ class Admin_UI {
     const SITE_SCHEMA_PAGE_SLUG = 'site-essentials-schema';
     const SUPPORT_PAGE_SLUG     = 'site-essentials-support';
     const AGENCY_PAGE_SLUG      = 'site-essentials-agency';
+    const AGENTIC_PAGE_SLUG     = 'site-essentials-agentic';
 
     /** Legacy Support → Schema (bw-schema-admin); removed from brighter-core — redirect here. */
     private const LEGACY_BRIGHTER_SCHEMA_PAGE = 'brighter-schema';
@@ -91,6 +92,7 @@ class Admin_UI {
         add_action('wp_ajax_scos_send_test_email',          [$this, 'ajax_send_test_email']);
         add_action('admin_notices',                         [$this, 'maybe_notice_email_no_api_key']);
         add_action('admin_post_site_essentials_save_support', [$this, 'save_support_hub_settings']);
+        add_action('admin_post_scos_save_agentic',            [$this, 'save_agentic_settings']);
         // Asset Preload form POSTs to the Performance page URL (not admin-post) so save is handled here
         add_action('admin_init', [$this, 'maybe_save_asset_preload'], 1);
     }
@@ -342,7 +344,19 @@ class Admin_UI {
             );
         }
 
-        // 9. Settings (always visible)
+        // 9. Agentic (only when Agentic module is active)
+        if ( defined( 'SCOS_AGENTIC_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Agentic', 'site-essentials' ),
+                __( 'Agentic', 'site-essentials' ),
+                'manage_options',
+                self::AGENTIC_PAGE_SLUG,
+                [ $this, 'render_agentic_page' ]
+            );
+        }
+
+        // 10. Settings (always visible)
         add_submenu_page(
             self::PAGE_SLUG,
             __( 'Plugin Settings', 'site-essentials' ),
@@ -404,6 +418,7 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::BUSINESS_INFO_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SITE_SCHEMA_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::AGENTIC_PAGE_SLUG,
         ];
 
         if ( in_array( $hook, $scos_ui_hooks, true ) ) {
@@ -849,6 +864,67 @@ class Admin_UI {
         echo '<div class="wrap scos">';
         $analytics_module->render_settings();
         echo '</div>';
+    }
+
+    /**
+     * Render Agentic page
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function render_agentic_page(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $module = Module_Loader::get_module( 'agentic' );
+
+        if ( ! $module ) {
+            echo '<div class="wrap"><div class="notice notice-warning"><p>';
+            esc_html_e( 'Agentic module is not loaded.', 'site-essentials' );
+            echo '</p></div></div>';
+            return;
+        }
+
+        echo '<div class="wrap scos">';
+        $module->render_settings();
+        echo '</div>';
+    }
+
+    /**
+     * Save Agentic module settings.
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function save_agentic_settings(): void {
+        if ( ! isset( $_POST['scos_agentic_nonce'] )
+            || ! wp_verify_nonce(
+                sanitize_text_field( wp_unslash( $_POST['scos_agentic_nonce'] ) ),
+                'scos_save_agentic'
+            ) ) {
+            wp_die( esc_html__( 'Security check failed.', 'site-essentials' ) );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
+        }
+
+        update_option(
+            'scos_agentic_markdown_enabled',
+            ! empty( $_POST['scos_agentic_markdown_enabled'] ) ? 1 : 0
+        );
+
+        wp_safe_redirect(
+            add_query_arg(
+                [
+                    'page'    => self::AGENTIC_PAGE_SLUG,
+                    'updated' => 'true',
+                ],
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
     }
 
     /**

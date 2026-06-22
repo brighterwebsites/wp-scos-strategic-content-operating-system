@@ -7,7 +7,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.3 | 2026-06-04
+ * @version    1.4 | 2026-06-21
  * @since      1.0.0
  */
 
@@ -134,6 +134,9 @@ class Seo_Module implements Module_Interface {
 
         // Register HTML sitemap shortcode
         add_shortcode('site_essentials_sitemap', [$this, 'render_html_sitemap_shortcode']);
+
+        // Bust cached HTML sitemap whenever a post is published or its meta is updated.
+        add_action('save_post', [$this, 'on_save_post_bust_sitemap_cache']);
 
         // Flush rewrite rules on activation
         if (!get_option('se_sitemap_rules_flushed')) {
@@ -1092,6 +1095,22 @@ class Seo_Module implements Module_Interface {
     }
 
     /**
+     * Bust the HTML sitemap cache on post save.
+     *
+     * Fires on every save_post (revisions and autosaves skipped) so that
+     * changes to scos_seo_sitemap_exclude or publish status are reflected
+     * immediately rather than waiting for the 1-hour TTL to expire.
+     *
+     * @param int $post_id Saved post ID.
+     */
+    public function on_save_post_bust_sitemap_cache(int $post_id): void {
+        if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+            return;
+        }
+        Cache_Helper::flush('seo');
+    }
+
+    /**
      * Render HTML sitemap shortcode
      *
      * @since  1.0.0
@@ -1169,9 +1188,14 @@ class Seo_Module implements Module_Interface {
                 $this->preload_noindex_meta($post_ids);
             }
 
-            // Filter out noindex posts
+            // Filter out noindex posts and individually HTML-sitemap-excluded posts.
+            // Meta is already in cache from preload_noindex_meta() — no N+1 risk.
             $posts = array_filter($all_posts, function($post) {
-                return !$this->is_noindex($post->ID);
+                if ($this->is_noindex($post->ID)) {
+                    return false;
+                }
+                $sitemap_exclude = (array) get_post_meta($post->ID, 'scos_seo_sitemap_exclude', true);
+                return !in_array('html', $sitemap_exclude, true);
             });
 
             if (empty($posts)) {

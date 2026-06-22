@@ -2,7 +2,7 @@
 /**
  * SEO — Advanced tab view
  *
- * v1.1 | 2026-05-19
+ * v1.2 | 2026-06-21
  *
  * SCOS design system: scos-card per section, scos-checkbox-row, scos-input--mono,
  * scos-save-bar, scos-notice. Inline <style> block removed.
@@ -397,6 +397,66 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 			fieldsReset.addEventListener( 'click', function() {
 				if ( window.confirm( '<?php echo esc_js( __( 'Reset fields to defaults?', 'site-essentials' ) ); ?>' ) ) {
 					fieldsTa.value = this.dataset.default;
+				}
+			} );
+		}
+	} )();
+	</script>
+
+	<!-- ── Other ────────────────────────────────────────────────────── -->
+	<h2 class="scos__section-label" style="margin-bottom:var(--scos-s-3)"><?php esc_html_e( 'Other', 'site-essentials' ); ?></h2>
+
+	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+		<div class="scos-card__header scos-card__header--plain">
+			<h3 class="scos-card__title"><?php esc_html_e( 'Excerpt', 'site-essentials' ); ?></h3>
+		</div>
+		<div class="scos-card__body">
+			<p class="description" style="margin-bottom:var(--scos-s-4)">
+				<?php esc_html_e( 'Sets the fallback word count for WordPress auto-generated excerpts. Only applies when no manual excerpt is set and only to the WP excerpt API — it does not affect Breakdance\'s "Limit Characters" setting in the builder, which runs independently.', 'site-essentials' ); ?>
+			</p>
+
+			<div style="display:flex;align-items:flex-start;gap:var(--scos-s-4);flex-wrap:wrap">
+				<label class="scos-checkbox-row" style="flex:1;min-width:220px;cursor:pointer;padding:0">
+					<input type="checkbox"
+						name="scos_image_seo[excerpt_length_enabled]"
+						id="scos_excerpt_enabled"
+						value="1"
+						<?php checked( $opts['excerpt_length_enabled'] ); ?>>
+					<span>
+						<strong><?php esc_html_e( 'Limit auto-excerpt word count', 'site-essentials' ); ?></strong>
+						<span class="description" style="display:block;margin-top:2px">
+							<?php esc_html_e( 'Overrides WordPress\'s default of 55 words. Has no effect when a manual excerpt is set on the post.', 'site-essentials' ); ?>
+						</span>
+					</span>
+				</label>
+
+				<div style="display:flex;align-items:center;gap:var(--scos-s-2);flex-shrink:0;padding-top:2px">
+					<input type="number"
+						name="scos_image_seo[excerpt_length_words]"
+						id="scos_excerpt_words"
+						value="<?php echo esc_attr( (int) $opts['excerpt_length_words'] ); ?>"
+						min="5"
+						max="200"
+						class="scos-input"
+						style="width:72px;text-align:center"
+						<?php echo empty( $opts['excerpt_length_enabled'] ) ? 'disabled' : ''; ?>>
+					<span style="color:var(--scos-ink-subtle);font-size:var(--scos-fs-sm);white-space:nowrap">
+						<?php esc_html_e( 'words', 'site-essentials' ); ?>
+					</span>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+	( function () {
+		var excerptCb    = document.getElementById( 'scos_excerpt_enabled' );
+		var excerptWords = document.getElementById( 'scos_excerpt_words' );
+		if ( excerptCb && excerptWords ) {
+			excerptCb.addEventListener( 'change', function () {
+				excerptWords.disabled = ! this.checked;
+				if ( this.checked ) {
+					excerptWords.focus();
 				}
 			} );
 		}

@@ -1,5 +1,5 @@
 <?php
-// v1.6 | 2026-06-19
+// v1.7 | 2026-06-22
 
 /**
  * Review Card Renderer
@@ -200,13 +200,16 @@ class Review_Card_Renderer {
 
     /**
      * Output the card HTML.
-     * All layouts share the same element structure; CSS controls ordering and direction.
+     *
+     * Flat structure — all child elements are direct children of .bde-review-card.
+     * No __content, __footer, or __author wrapper divs. CSS flex/grid controls
+     * layout and ordering. All text nodes use p/a/time — no blockquote/strong/span
+     * for text content — so Breakdance design tools can target each selector cleanly.
      */
     private function render_card( array $d, string $layout, array $show ): void {
         $classes = 'bde-review-card bde-review-card--layout-' . esc_attr( $layout );
 
-        // Has project data we can show
-        $has_project = $d['project_id'] && ( $show['project_image'] || $show['project_name'] );
+        $has_project       = $d['project_id'] && ( $show['project_image'] || $show['project_name'] );
         $has_project_image = $has_project && $show['project_image'] && $d['project_thumb_id'];
         ?>
         <div class="<?php echo esc_attr( $classes ); ?>">
@@ -226,99 +229,76 @@ class Review_Card_Renderer {
             </div>
             <?php endif; ?>
 
-            <div class="bde-review-card__content">
+            <?php if ( $show['featured'] && $d['is_featured'] ) : ?>
+            <span class="bde-review-card__featured-badge"><?php esc_html_e( 'Featured', 'site-essentials' ); ?></span>
+            <?php endif; ?>
 
-                <?php if ( $show['featured'] && $d['is_featured'] ) : ?>
-                <span class="bde-review-card__featured-badge"><?php esc_html_e( 'Featured', 'site-essentials' ); ?></span>
-                <?php endif; ?>
+            <?php if ( $show['platform_icon'] && $d['platform_logo_id'] ) : ?>
+            <div class="bde-review-card__platform-icon">
+                <?php echo wp_get_attachment_image(
+                    $d['platform_logo_id'],
+                    'full',
+                    false,
+                    [
+                        'class'   => 'bde-review-card__platform-icon-img',
+                        'loading' => 'lazy',
+                        'alt'     => esc_attr( $d['platform_name'] ),
+                    ]
+                ); ?>
+            </div>
+            <?php endif; ?>
 
-                <?php if ( $show['platform_icon'] && $d['platform_logo_id'] ) : ?>
-                <div class="bde-review-card__platform-icon">
-                    <?php echo wp_get_attachment_image(
-                        $d['platform_logo_id'],
-                        'full',
-                        false,
-                        [
-                            'class'   => 'bde-review-card__platform-icon-img',
-                            'loading' => 'lazy',
-                            'alt'     => esc_attr( $d['platform_name'] ),
-                        ]
-                    ); ?>
-                </div>
-                <?php endif; ?>
+            <?php if ( $show['rating'] && $d['rating'] ) : ?>
+            <div class="bde-review-card__stars" aria-label="<?php echo esc_attr( $d['rating'] . ' out of 5 stars' ); ?>" role="img">
+                <?php echo $this->render_stars( $d['rating'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+            </div>
+            <?php endif; ?>
 
-                <?php if ( $show['rating'] && $d['rating'] ) : ?>
-                <div class="bde-review-card__stars" aria-label="<?php echo esc_attr( $d['rating'] . ' out of 5 stars' ); ?>" role="img">
-                    <?php echo $this->render_stars( $d['rating'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-                </div>
-                <?php endif; ?>
+            <?php if ( $show['excerpt'] && $d['excerpt'] ) : ?>
+            <p class="bde-review-card__quote"><?php echo esc_html( $d['excerpt'] ); ?></p>
+            <?php endif; ?>
 
-                <?php if ( $show['excerpt'] && $d['excerpt'] ) : ?>
-                <blockquote class="bde-review-card__quote">
-                    <p><?php echo esc_html( $d['excerpt'] ); ?></p>
-                </blockquote>
-                <?php endif; ?>
+            <?php if ( $show['full_text'] && ! $show['excerpt'] && $d['full_text'] ) : ?>
+            <div class="bde-review-card__full-text">
+                <?php echo wp_kses_post( wpautop( do_shortcode( $d['full_text'] ) ) ); ?>
+            </div>
+            <?php endif; ?>
 
-                <?php if ( $show['full_text'] && ! $show['excerpt'] && $d['full_text'] ) : ?>
-                <div class="bde-review-card__full-text">
-                    <?php echo wp_kses_post( wpautop( do_shortcode( $d['full_text'] ) ) ); ?>
-                </div>
-                <?php endif; ?>
+            <?php if ( $show['outcome'] && $d['outcome'] ) : ?>
+            <p class="bde-review-card__outcome"><?php echo esc_html( $d['outcome'] ); ?></p>
+            <?php endif; ?>
 
-                <?php if ( $show['outcome'] && $d['outcome'] ) : ?>
-                <p class="bde-review-card__outcome"><?php echo esc_html( $d['outcome'] ); ?></p>
-                <?php endif; ?>
+            <?php if ( $show['name'] && $d['customer_name'] ) : ?>
+            <p class="bde-review-card__name"><?php echo esc_html( $d['customer_name'] ); ?></p>
+            <?php endif; ?>
 
-                <div class="bde-review-card__footer">
-                    <div class="bde-review-card__author">
-                        <?php if ( $show['name'] && $d['customer_name'] ) : ?>
-                        <strong class="bde-review-card__name"><?php echo esc_html( $d['customer_name'] ); ?></strong>
-                        <?php endif; ?>
+            <?php if ( $show['detail'] && $d['customer_detail'] ) : ?>
+            <p class="bde-review-card__detail"><?php echo esc_html( $d['customer_detail'] ); ?></p>
+            <?php endif; ?>
 
-                        <?php if ( $show['detail'] && $d['customer_detail'] ) : ?>
-                        <span class="bde-review-card__detail"><?php echo esc_html( $d['customer_detail'] ); ?></span>
-                        <?php endif; ?>
-                    </div>
+            <?php if ( $show['platform'] && $d['platform_name'] ) : ?>
+            <p class="bde-review-card__platform bde-review-card__platform--<?php echo esc_attr( $d['platform_slug'] ); ?>"><?php echo esc_html( $d['platform_name'] ); ?></p>
+            <?php endif; ?>
 
-                    <?php if ( $show['platform'] && $d['platform_name'] ) : ?>
-                    <span class="bde-review-card__platform bde-review-card__platform--<?php echo esc_attr( $d['platform_slug'] ); ?>">
-                        <?php echo esc_html( $d['platform_name'] ); ?>
-                    </span>
+            <?php if ( $show['date'] && $d['date_formatted'] ) : ?>
+            <time class="bde-review-card__date" datetime="<?php echo esc_attr( $d['date_raw'] ); ?>"><?php echo esc_html( $d['date_formatted'] ); ?></time>
+            <?php endif; ?>
+
+            <?php if ( $show['verify'] && $d['verify_url'] ) : ?>
+            <a class="bde-review-card__verify" href="<?php echo esc_url( $d['verify_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Verify review', 'site-essentials' ); ?></a>
+            <?php endif; ?>
+
+            <?php if ( $has_project && $d['project_title'] ) : ?>
+                <?php if ( $show['project_name'] ) : ?>
+                    <?php if ( $show['project_link'] && $d['project_url'] ) : ?>
+            <a class="bde-review-card__project-link" href="<?php echo esc_url( $d['project_url'] ); ?>"><?php echo esc_html( $d['project_title'] ); ?></a>
+                    <?php else : ?>
+            <p class="bde-review-card__project-name"><?php echo esc_html( $d['project_title'] ); ?></p>
                     <?php endif; ?>
+                <?php endif; ?>
+            <?php endif; ?>
 
-                    <?php if ( $show['date'] && $d['date_formatted'] ) : ?>
-                    <time class="bde-review-card__date" datetime="<?php echo esc_attr( $d['date_raw'] ); ?>">
-                        <?php echo esc_html( $d['date_formatted'] ); ?>
-                    </time>
-                    <?php endif; ?>
-
-                    <?php if ( $show['verify'] && $d['verify_url'] ) : ?>
-                    <a class="bde-review-card__verify"
-                       href="<?php echo esc_url( $d['verify_url'] ); ?>"
-                       target="_blank"
-                       rel="noopener noreferrer">
-                        <?php esc_html_e( 'Verify review', 'site-essentials' ); ?>
-                    </a>
-                    <?php endif; ?>
-
-                    <?php if ( $has_project && $d['project_title'] ) : ?>
-                    <div class="bde-review-card__project-meta">
-                        <?php if ( $show['project_name'] ) : ?>
-                        <?php if ( $show['project_link'] && $d['project_url'] ) : ?>
-                        <a class="bde-review-card__project-link" href="<?php echo esc_url( $d['project_url'] ); ?>">
-                            <?php echo esc_html( $d['project_title'] ); ?>
-                        </a>
-                        <?php else : ?>
-                        <span class="bde-review-card__project-name"><?php echo esc_html( $d['project_title'] ); ?></span>
-                        <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-
-                </div><!-- /.bde-review-card__footer -->
-            </div><!-- /.bde-review-card__content -->
-
-        </div><!-- /.bde-review-card -->
+        </div>
         <?php
     }
 

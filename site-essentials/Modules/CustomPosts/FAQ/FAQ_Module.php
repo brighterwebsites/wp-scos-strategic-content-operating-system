@@ -21,6 +21,7 @@
  *                                                — still used by external GPT/MCP/Postly)
  *
  * v1.3 | 2026-05-25 — Added scos_faq_is_intent_goal checkbox, column, and auto-set logic.
+ * v1.4 | 2026-06-23 — Auto-register 301 redirects to scos_redirects_301 when a published FAQ's scos_topic changes.
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -90,6 +91,11 @@ class FAQ_Module {
 
 		// ── Permalink generation ──────────────────────────────────────────────
 		add_filter( 'post_type_link', [ self::class, 'faq_permalink' ], 10, 2 );
+
+		// ── Auto 301 on topic reassignment ────────────────────────────────────
+		// Runs globally (not admin-only) so block editor, REST, and WP-CLI saves
+		// all trigger the redirect registration.
+		add_action( 'set_object_terms', [ self::class, 'on_topic_reassigned' ], 10, 6 );
 
 		// ── Archive / topic-folder redirects ──────────────────────────────────
 		add_action( 'template_redirect', [ self::class, 'handle_redirects' ] );
@@ -237,6 +243,96 @@ class FAQ_Module {
 		$slug  = ( $terms && ! is_wp_error( $terms ) ) ? $terms[0]->slug : 'general';
 
 		return str_replace( '%scos_topic%', $slug, $link );
+	}
+
+	// =========================================================================
+	// Auto 301 on topic reassignment
+	// =========================================================================
+
+	/**
+	 * Register a 301 redirect when a published FAQ's scos_topic changes.
+	 *
+	 * Fires on set_object_terms (after WP updates term relationships).
+	 * Appends or updates a rule in the scos_redirects_301 option using the
+	 * same /old-path => /new-path format consumed by Redirections::handle_redirect().
+	 *
+	 * Guards:
+	 *  - Only runs for scos_topic taxonomy changes on faq CPT.
+	 *  - Skips non-published posts (draft stubs, etc. have no live URL to protect).
+	 *  - Skips if there were no previous terms (FAQ never had a real topic-prefixed URL).
+	 *  - Skips if the computed old and new paths are identical.
+	 *
+	 * @param int    $object_id  Post ID.
+	 * @param array  $terms      Terms passed to wp_set_object_terms().
+	 * @param int[]  $tt_ids     New term taxonomy IDs.
+	 * @param string $taxonomy   Taxonomy name.
+	 * @param bool   $append     Whether terms were appended rather than replaced.
+	 * @param int[]  $old_tt_ids Previous term taxonomy IDs (before this change).
+	 * @return void
+	 */
+	public static function on_topic_reassigned(
+		int    $object_id,
+		array  $terms,
+		array  $tt_ids,
+		string $taxonomy,
+		bool   $append,
+		array  $old_tt_ids
+	): void {
+		if ( 'scos_topic' !== $taxonomy ) {
+			return;
+		}
+
+		$post = get_post( $object_id );
+		if ( ! $post || self::POST_TYPE !== $post->post_type || 'publish' !== $post->post_status ) {
+			return;
+		}
+
+		// No previous topic means the old URL was /faq/general/slug/ — likely never live.
+		if ( empty( $old_tt_ids ) ) {
+			return;
+		}
+
+		// Resolve old topic slug from the previous term taxonomy ID.
+		global $wpdb;
+		$old_term_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT term_id FROM {$wpdb->term_taxonomy} WHERE term_taxonomy_id = %d",
+				(int) reset( $old_tt_ids )
+			)
+		);
+
+		$old_slug = 'general';
+		if ( $old_term_id > 0 ) {
+			$old_term = get_term( $old_term_id, 'scos_topic' );
+			if ( $old_term && ! is_wp_error( $old_term ) ) {
+				$old_slug = $old_term->slug;
+			}
+		}
+
+		// Build old path manually: terms are already updated, so get_permalink() returns the new URL.
+		$old_path = rtrim( '/faq/' . $old_slug . '/' . $post->post_name, '/' );
+		$new_path = rtrim( (string) wp_make_link_relative( (string) get_permalink( $object_id ) ), '/' );
+
+		if ( $old_path === $new_path || '' === $new_path ) {
+			return;
+		}
+
+		$raw      = (string) get_option( 'scos_redirects_301', '' );
+		$new_rule = $old_path . ' => ' . $new_path;
+		$pattern  = '/^' . preg_quote( $old_path, '/' ) . '\s*=>.*$/m';
+
+		if ( preg_match( $pattern, $raw ) ) {
+			// An existing rule points from this old path — update its destination.
+			$updated = (string) preg_replace( $pattern, $new_rule, $raw );
+		} else {
+			// Append as a new rule with a datestamped comment.
+			$updated  = rtrim( $raw, "\n" );
+			$updated .= ( '' !== $updated ? "\n" : '' );
+			$updated .= '# Auto: FAQ topic change ' . current_time( 'Y-m-d' ) . "\n";
+			$updated .= $new_rule . "\n";
+		}
+
+		update_option( 'scos_redirects_301', $updated, false );
 	}
 
 	// =========================================================================

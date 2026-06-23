@@ -17,6 +17,7 @@
  * v1.1 | 2026-05-22 — FAQ intent goal picker: load/save scos_ca_intent_goal_faq_id,
  *                      pending stub creation on save, enriched JS data.
  * v1.2 | 2026-05-25 — Auto-set scos_faq_is_intent_goal on linked FAQ when saved.
+ * v1.3 | 2026-06-23 — Register scos-content-architecture ability category; load and wire CA_Suggest ability.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -28,12 +29,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Meta_Box {
 
 	public static function init() {
-		add_action( 'add_meta_boxes',          [ __CLASS__, 'register' ] );
+		add_action( 'add_meta_boxes',                   [ __CLASS__, 'register' ] );
 		// Late pass: strip legacy ALTC taxonomy + Content Management boxes if anything registered them earlier.
-		add_action( 'add_meta_boxes',          [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
-		add_action( 'save_post',               [ __CLASS__, 'save' ], 10, 2 );
-		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_scos_ca_add_term', [ __CLASS__, 'ajax_add_term' ] );
+		add_action( 'add_meta_boxes',                   [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
+		add_action( 'save_post',                        [ __CLASS__, 'save' ], 10, 2 );
+		add_action( 'admin_enqueue_scripts',            [ __CLASS__, 'enqueue_assets' ] );
+		add_action( 'wp_ajax_scos_ca_add_term',         [ __CLASS__, 'ajax_add_term' ] );
+		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
+
+		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+			require_once __DIR__ . '/Abilities/CA_Suggest/CA_Suggest.php';
+		}
+	}
+
+	/**
+	 * Register the scos-content-architecture ability category.
+	 *
+	 * @since 1.3.0
+	 * @return void
+	 */
+	public static function register_ability_category(): void {
+		if ( ! function_exists( 'wp_register_ability_category' ) ) {
+			return;
+		}
+		wp_register_ability_category( 'scos-content-architecture', [
+			'label'       => __( 'SCOS: Content Architecture', 'site-essentials' ),
+			'description' => __( 'AI-assisted suggestions for Content Architecture fields.', 'site-essentials' ),
+		] );
 	}
 
 	/**
@@ -378,6 +400,23 @@ class Meta_Box {
 				'faqNeedsAnswer' => __( 'Needs answer', 'site-essentials' ),
 			],
 		] );
+
+		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+			$suggest_js = SITE_ESSENTIALS_PATH . 'Modules/ContentArchitecture/assets/scos-ca-suggest.js';
+			wp_enqueue_script(
+				'scos-ca-suggest',
+				SITE_ESSENTIALS_URL . 'Modules/ContentArchitecture/assets/scos-ca-suggest.js',
+				[ 'scos-ca-meta-box' ],
+				file_exists( $suggest_js ) ? (string) filemtime( $suggest_js ) : '1.0.0',
+				true
+			);
+			wp_localize_script( 'scos-ca-suggest', 'ScosCaSuggest', [
+				'postId'          => get_the_ID(),
+				'nonce'           => wp_create_nonce( 'wp_rest' ),
+				'endpoint'        => rest_url( 'wp-abilities/v1/scos/suggest-intent-goal/run' ),
+				'faqModuleActive' => defined( 'SCOS_FAQ_ACTIVE' ),
+			] );
+		}
 	}
 
 	/**

@@ -23,6 +23,7 @@ use WordPress\AI\Abstracts\Abstract_Ability;
 
 use function WordPress\AI\get_post_context;
 use function WordPress\AI\normalize_content;
+use function WordPress\AI\get_preferred_models_for_text_generation;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -197,7 +198,7 @@ class CA_Suggest extends Abstract_Ability {
 		$prompt_builder = wp_ai_client_prompt( $prompt )
 			->using_system_instruction( $this->get_system_instruction() )
 			->using_temperature( 0.4 )
-			->using_model_preference( [ 'anthropic', 'claude-sonnet-4-6' ] );
+			->using_model_preference( ...get_preferred_models_for_text_generation() );
 
 		$prompt_builder = $this->ensure_text_generation_supported(
 			$prompt_builder,

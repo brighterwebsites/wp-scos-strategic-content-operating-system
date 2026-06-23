@@ -413,7 +413,7 @@ class Meta_Box {
 			wp_localize_script( 'scos-ca-suggest', 'ScosCaSuggest', [
 				'postId'          => get_the_ID(),
 				'nonce'           => wp_create_nonce( 'wp_rest' ),
-				'endpoint'        => rest_url( 'wp-abilities/v1/abilities/scos%2Fsuggest-intent-goal/run' ),
+				'endpoint'        => rest_url( 'wp-abilities/v1/abilities/scos/suggest-intent-goal/run' ),
 				'faqModuleActive' => defined( 'SCOS_FAQ_ACTIVE' ),
 			] );
 		}

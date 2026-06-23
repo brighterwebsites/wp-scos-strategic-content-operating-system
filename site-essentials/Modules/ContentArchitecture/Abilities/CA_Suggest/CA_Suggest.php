@@ -196,7 +196,8 @@ class CA_Suggest extends Abstract_Ability {
 
 		$prompt_builder = wp_ai_client_prompt( $prompt )
 			->using_system_instruction( $this->get_system_instruction() )
-			->using_temperature( 0.4 );
+			->using_temperature( 0.4 )
+			->using_model_preference( [ 'anthropic', 'claude-sonnet-4-6' ] );
 
 		$prompt_builder = $this->ensure_text_generation_supported(
 			$prompt_builder,

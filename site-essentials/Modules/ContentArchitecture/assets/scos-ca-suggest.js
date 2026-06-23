@@ -157,15 +157,14 @@
 		clearError();
 		setLoading( true );
 
-		var input   = JSON.stringify( { post_id: parseInt( cfg.postId, 10 ) } );
-		var url     = cfg.endpoint + '?input=' + encodeURIComponent( input );
-
-		fetch( url, {
-			method:  'GET',
+		fetch( cfg.endpoint, {
+			method:  'POST',
 			headers: {
-				'X-WP-Nonce': cfg.nonce,
-				'Accept':     'application/json',
+				'X-WP-Nonce':   cfg.nonce,
+				'Content-Type': 'application/json',
+				'Accept':       'application/json',
 			},
+			body: JSON.stringify( { input: { post_id: parseInt( cfg.postId, 10 ) } } ),
 		} )
 			.then( function ( response ) {
 				return response.json().then( function ( data ) {

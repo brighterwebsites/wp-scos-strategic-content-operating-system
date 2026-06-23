@@ -61,11 +61,6 @@ class CA_Suggest extends Abstract_Ability {
 					'public' => true,
 					'type'   => 'tool',
 				],
-				'annotations'  => [
-					'readonly'    => true,
-					'destructive' => false,
-					'idempotent'  => false,
-				],
 			],
 		] );
 	}
@@ -285,11 +280,6 @@ class CA_Suggest extends Abstract_Ability {
 			'mcp'          => [
 				'public' => true,
 				'type'   => 'tool',
-			],
-			'annotations'  => [
-				'readonly'    => true,
-				'destructive' => false,
-				'idempotent'  => false,
 			],
 		];
 	}

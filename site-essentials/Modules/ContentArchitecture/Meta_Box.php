@@ -18,6 +18,7 @@
  *                      pending stub creation on save, enriched JS data.
  * v1.2 | 2026-05-25 — Auto-set scos_faq_is_intent_goal on linked FAQ when saved.
  * v1.3 | 2026-06-23 — Register scos-content-architecture ability category; load and wire CA_Suggest ability.
+ * v1.4 | 2026-06-23 — Guard save() against recursive save_post loops triggered by internal wp_insert_post calls.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -213,6 +214,13 @@ class Meta_Box {
 			return;
 		}
 
+		// Guard against recursive save_post loops: when wp_insert_post() is called internally
+		// (e.g. during stub FAQ creation), save_post fires for the new post's ID, but $_POST
+		// still carries the original form's post_ID. Bail if they don't match.
+		if ( isset( $_POST['post_ID'] ) && $post_id !== absint( $_POST['post_ID'] ) ) {
+			return;
+		}
+
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			return;
 		}
@@ -280,7 +288,13 @@ class Meta_Box {
 
 		if ( '' !== $pending_faq_title ) {
 			$topic_id = absint( $_POST['scos_ca_topic'] ?? 0 );
-			$new_faq  = Intent_Goal_Resolver::create_stub_faq( $pending_faq_title, $topic_id, $post_id );
+
+			// Temporarily unhook save() so wp_insert_post inside create_stub_faq
+			// cannot trigger a recursive call back into this handler.
+			remove_action( 'save_post', [ __CLASS__, 'save' ], 10 );
+			$new_faq = Intent_Goal_Resolver::create_stub_faq( $pending_faq_title, $topic_id, $post_id );
+			add_action( 'save_post', [ __CLASS__, 'save' ], 10, 2 );
+
 			if ( ! is_wp_error( $new_faq ) ) {
 				update_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', $new_faq );
 				// create_stub_faq already sets scos_faq_is_intent_goal = 1 on the new FAQ.

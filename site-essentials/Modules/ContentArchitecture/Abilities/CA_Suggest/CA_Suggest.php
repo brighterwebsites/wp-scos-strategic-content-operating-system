@@ -11,7 +11,7 @@
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture\Abilities\CA_Suggest
  *
- * v1.0 | 2026-06-23
+ * v1.1 | 2026-06-23
  */
 
 declare( strict_types=1 );
@@ -55,6 +55,18 @@ class CA_Suggest extends Abstract_Ability {
 			'description'   => __( 'Reads post content and suggests search intent goal phrasings for the SCOS Content Architecture meta box.', 'site-essentials' ),
 			'category'      => 'scos-content-architecture',
 			'ability_class' => self::class,
+			'meta'          => [
+				'show_in_rest' => true,
+				'mcp'          => [
+					'public' => true,
+					'type'   => 'tool',
+				],
+				'annotations'  => [
+					'readonly'    => true,
+					'destructive' => false,
+					'idempotent'  => false,
+				],
+			],
 		] );
 	}
 
@@ -137,55 +149,80 @@ class CA_Suggest extends Abstract_Ability {
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public function execute_callback( $input ) {
-		$post_id = isset( $input['post_id'] ) ? (int) $input['post_id'] : 0;
-		$content = isset( $input['content'] ) ? (string) $input['content'] : '';
-		$title   = isset( $input['title'] ) ? (string) $input['title'] : '';
+		$args = wp_parse_args(
+			$input,
+			[
+				'post_id' => null,
+				'content' => null,
+				'title'   => null,
+			]
+		);
 
-		if ( $post_id > 0 ) {
-			$context = get_post_context( $post_id );
-			if ( is_wp_error( $context ) ) {
-				return $context;
+		$content = '';
+		$title   = $args['title'] ?? '';
+
+		if ( $args['post_id'] ) {
+			$post = get_post( (int) $args['post_id'] );
+			if ( ! $post instanceof \WP_Post ) {
+				return new WP_Error(
+					'post_not_found',
+					/* translators: %d: Post ID. */
+					sprintf( esc_html__( 'Post with ID %d not found.', 'site-essentials' ), absint( $args['post_id'] ) )
+				);
 			}
-			$content = $context['content'] ?? '';
-			if ( empty( $title ) ) {
-				$post  = get_post( $post_id );
-				$title = $post ? $post->post_title : '';
+			$post_context = get_post_context( $post->ID );
+			$content      = $post_context['content'] ?? '';
+			if ( empty( $title ) && ! empty( $post->post_title ) ) {
+				$title = $post->post_title;
 			}
-		} elseif ( ! empty( $content ) ) {
-			$content = normalize_content( $content );
-		} else {
+		}
+
+		if ( $args['content'] ) {
+			$content = normalize_content( $args['content'] );
+		}
+
+		if ( empty( $content ) ) {
 			return new WP_Error(
-				'scos_suggest_missing_input',
-				__( 'Provide either post_id or content.', 'site-essentials' ),
-				[ 'status' => 400 ]
+				'content_not_provided',
+				esc_html__( 'Content is required to suggest an intent goal.', 'site-essentials' )
 			);
 		}
 
 		// Truncate very long content: keep first 1500 + last 500 words.
-		$words      = explode( ' ', $content );
-		$word_count = count( $words );
-		if ( $word_count > 2500 ) {
-			$first   = array_slice( $words, 0, 1500 );
-			$last    = array_slice( $words, -500 );
-			$content = implode( ' ', $first ) . ' [...] ' . implode( ' ', $last );
+		$words = explode( ' ', $content );
+		if ( count( $words ) > 2500 ) {
+			$content = implode( ' ', array_slice( $words, 0, 1500 ) )
+				. ' [...] '
+				. implode( ' ', array_slice( $words, -500 ) );
 		}
 
-		$prompt = '<title>' . esc_html( $title ) . '</title>' . "\n\n"
-			. '<content>' . $content . '</content>';
+		$prompt  = '<title>' . $title . '</title>';
+		$prompt .= '<content>' . $content . '</content>';
 
-		$this->ensure_text_generation_supported();
-
-		$result = wp_ai_client_prompt( $prompt )
+		$prompt_builder = wp_ai_client_prompt( $prompt )
 			->using_system_instruction( $this->get_system_instruction() )
-			->using_temperature( 0.4 )
-			->as_json_response( $this->suggestions_schema() )
-			->generate_text();
+			->using_temperature( 0.4 );
+
+		$prompt_builder = $this->ensure_text_generation_supported(
+			$prompt_builder,
+			esc_html__( 'Intent goal suggestion failed. Please ensure you have a connected provider that supports text generation.', 'site-essentials' )
+		);
+
+		if ( is_wp_error( $prompt_builder ) ) {
+			return $prompt_builder;
+		}
+
+		$result = $prompt_builder->generate_text();
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 
-		$parsed = json_decode( $result, true );
+		// Strip markdown code fences if the model wraps output.
+		$json_str = preg_replace( '/^```(?:json)?\s*/i', '', trim( (string) $result ) );
+		$json_str = preg_replace( '/\s*```$/', '', $json_str );
+
+		$parsed = json_decode( $json_str, true );
 
 		if ( ! is_array( $parsed ) || empty( $parsed['intent_goals'] ) ) {
 			return new WP_Error(
@@ -196,12 +233,15 @@ class CA_Suggest extends Abstract_Ability {
 		}
 
 		return [
-			'intent_goals' => array_map( function( $item ) {
-				return [
-					'goal'       => sanitize_text_field( $item['goal'] ?? '' ),
-					'confidence' => isset( $item['confidence'] ) ? (float) $item['confidence'] : 0.0,
-				];
-			}, $parsed['intent_goals'] ),
+			'intent_goals' => array_map(
+				function ( $item ) {
+					return [
+						'goal'       => sanitize_text_field( $item['goal'] ?? '' ),
+						'confidence' => isset( $item['confidence'] ) ? (float) $item['confidence'] : 0.0,
+					];
+				},
+				$parsed['intent_goals']
+			),
 		];
 	}
 
@@ -258,36 +298,6 @@ class CA_Suggest extends Abstract_Ability {
 	// Private helpers
 	// -------------------------------------------------------------------------
 
-	/**
-	 * JSON Schema passed to as_json_response() for structured AI output.
-	 *
-	 * Mirrors output_schema() but with additionalProperties: false for strict
-	 * enforcement on the AI response side.
-	 *
-	 * @since 1.0.0
-	 * @return array<string, mixed>
-	 */
-	private function suggestions_schema(): array {
-		return [
-			'type'                 => 'object',
-			'properties'           => [
-				'intent_goals' => [
-					'type'  => 'array',
-					'items' => [
-						'type'                 => 'object',
-						'properties'           => [
-							'goal'       => [ 'type' => 'string' ],
-							'confidence' => [ 'type' => 'number' ],
-						],
-						'required'             => [ 'goal', 'confidence' ],
-						'additionalProperties' => false,
-					],
-				],
-			],
-			'required'             => [ 'intent_goals' ],
-			'additionalProperties' => false,
-		];
-	}
 }
 
 // Register on wp_abilities_api_init — fires after both APIs are ready.

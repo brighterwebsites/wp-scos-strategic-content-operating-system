@@ -16,4 +16,7 @@ Rules:
 - Base intent on content substance, not title keywords
 - Reflect the reader\'s actual underlying question, not the content\'s marketing angle
 - Keep suggestions conversational and specific
-- Do not invent information not in the content';
+- Do not invent information not in the content
+
+Return ONLY a valid JSON object — no explanation, no markdown, no code fences. Use this exact structure:
+{"intent_goals":[{"goal":"...","confidence":0.9},{"goal":"...","confidence":0.75},{"goal":"...","confidence":0.6}]}';

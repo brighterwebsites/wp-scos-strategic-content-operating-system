@@ -19,6 +19,10 @@
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
+ *
+ * v1.1 | 2026-06-24 — Register scos-seo-meta ability category; load Suggest_Seo_Meta
+ *                      and Suggest_Tldr abilities; extend enqueue_assets() with
+ *                      scos-seo-suggest.js and ScosSeoSuggest localization data.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -30,11 +34,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Meta_Box {
 
 	public static function init() {
-		add_action( 'add_meta_boxes',        [ __CLASS__, 'register' ] );
-		add_action( 'add_meta_boxes',        [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
-		add_action( 'save_post',             [ __CLASS__, 'save' ], 10, 2 );
-		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
-		add_filter( 'wp_insert_post_data',   [ __CLASS__, 'maybe_freeze_modified_date' ], 10, 2 );
+		add_action( 'add_meta_boxes',                   [ __CLASS__, 'register' ] );
+		add_action( 'add_meta_boxes',                   [ __CLASS__, 'remove_legacy_meta_boxes' ], 999, 1 );
+		add_action( 'save_post',                        [ __CLASS__, 'save' ], 10, 2 );
+		add_action( 'admin_enqueue_scripts',            [ __CLASS__, 'enqueue_assets' ] );
+		add_filter( 'wp_insert_post_data',              [ __CLASS__, 'maybe_freeze_modified_date' ], 10, 2 );
+		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
+
+		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+			require_once __DIR__ . '/Abilities/Suggest_Seo_Meta/Suggest_Seo_Meta.php';
+			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
+		}
+	}
+
+	/**
+	 * Register the scos-seo-meta ability category.
+	 *
+	 * @since 1.1.0
+	 * @return void
+	 */
+	public static function register_ability_category(): void {
+		if ( ! function_exists( 'wp_register_ability_category' ) ) {
+			return;
+		}
+		wp_register_ability_category( 'scos-seo-meta', [
+			'label'       => __( 'SCOS: SEO Meta', 'site-essentials' ),
+			'description' => __( 'AI-assisted suggestions for SEO meta fields.', 'site-essentials' ),
+		] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -315,6 +341,38 @@ class Meta_Box {
 		wp_localize_script( 'scos-seo-meta-box', 'scosSeoMeta', [
 			'noindexSitemapMsg' => esc_html__( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ),
 		] );
+
+		// AI suggest script — only when the Abilities API is available.
+		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+			$suggest_js_path = SITE_ESSENTIALS_PATH . 'Modules/SeoMeta/assets/scos-seo-suggest.js';
+			wp_enqueue_script(
+				'scos-seo-suggest',
+				SITE_ESSENTIALS_URL . 'Modules/SeoMeta/assets/scos-seo-suggest.js',
+				[ 'jquery' ],
+				file_exists( $suggest_js_path ) ? (string) filemtime( $suggest_js_path ) : '1.0.0',
+				true
+			);
+
+			// Resolve search intent goal server-side: FAQ title first, freetext fallback.
+			// Inline resolution avoids a direct class dependency on the CA module.
+			$intent_goal = '';
+			$faq_id      = (int) get_post_meta( $post->ID, 'scos_ca_intent_goal_faq_id', true );
+			if ( $faq_id > 0 ) {
+				$faq         = get_post( $faq_id );
+				$intent_goal = $faq instanceof \WP_Post ? $faq->post_title : '';
+			}
+			if ( empty( $intent_goal ) ) {
+				$intent_goal = (string) get_post_meta( $post->ID, 'scos_ca_intent_goal', true );
+			}
+
+			wp_localize_script( 'scos-seo-suggest', 'ScosSeoSuggest', [
+				'endpointSeoMeta' => rest_url( 'wp-abilities/v1/abilities/scos/suggest-seo-meta/run' ),
+				'endpointTldr'    => rest_url( 'wp-abilities/v1/abilities/scos/suggest-tldr/run' ),
+				'nonce'           => wp_create_nonce( 'wp_rest' ),
+				'postId'          => $post->ID,
+				'intentGoalText'  => sanitize_text_field( $intent_goal ),
+			] );
+		}
 	}
 
 	// ---- Helpers ----

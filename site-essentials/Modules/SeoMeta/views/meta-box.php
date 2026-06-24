@@ -43,6 +43,16 @@ defined( 'ABSPATH' ) || exit;
 	<!-- ══ CORE SEO TAB ══ -->
 	<div class="scos-seo-tab-panel is-active" id="scos-seo-tab-core" role="tabpanel">
 
+		<!-- AI suggest trigger — breadcrumb + title + description in one call -->
+		<?php if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) : ?>
+		<div class="scos-seo-ai-row">
+			<button type="button" id="scos-seo-suggest-btn" class="button">
+				<?php esc_html_e( 'Suggest with AI', 'site-essentials' ); ?>
+			</button>
+			<span class="scos-seo-ai-hint"><?php esc_html_e( 'Suggest breadcrumb label, meta title and description from page content.', 'site-essentials' ); ?></span>
+		</div>
+		<?php endif; ?>
+
 		<!-- Breadcrumb Title -->
 		<div class="scos-seo-field">
 			<label for="scos_seo_breadcrumb_title">
@@ -58,8 +68,13 @@ defined( 'ABSPATH' ) || exit;
 
 		<!-- TLDR Summary -->
 		<div class="scos-seo-field">
-			<label for="scos_seo_tldr">
+			<label for="scos_seo_tldr" class="scos-seo-label-row">
 				<?php esc_html_e( 'TLDR / Article Summary', 'site-essentials' ); ?>
+				<?php if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) : ?>
+				<button type="button" id="scos-tldr-suggest-btn" class="button button-small scos-seo-label-btn">
+					<?php esc_html_e( 'Suggest TLDR', 'site-essentials' ); ?>
+				</button>
+				<?php endif; ?>
 			</label>
 			<textarea name="scos_seo_tldr" id="scos_seo_tldr" rows="3"
 				placeholder="<?php esc_attr_e( 'Brief 1–3 sentence summary used for voice search, social sharing, and the [tldr] shortcode…', 'site-essentials' ); ?>"><?php echo esc_textarea( $tldr ); ?></textarea>

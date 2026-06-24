@@ -127,3 +127,99 @@
 }
 .scos-seo-phase2-notice strong { display: block; margin-bottom: 6px; color: #1d2327; }
 .scos-seo-phase2-notice p { margin: 0 0 6px; font-size: 12px; }
+
+/* ── AI Suggest row (above breadcrumb) ── */
+.scos-seo-ai-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 8px 0 12px;
+}
+.scos-seo-ai-hint {
+	font-size: 11px;
+	color: #646970;
+}
+
+/* ── Label row (TLDR label + inline button) ── */
+.scos-seo-label-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.scos-seo-label-btn {
+	font-size: 11px !important;
+	height: 22px !important;
+	line-height: 20px !important;
+	padding: 0 8px !important;
+}
+
+/* ── Shared suggest modal — reuses .scos-ca-* classes from CA meta-box ── */
+#scos-seo-suggest-modal .scos-ca-modal-inner {
+	background: #fff;
+	border-radius: 6px;
+	padding: 20px 22px;
+	width: min(560px, 92vw);
+	max-height: 80vh;
+	overflow-y: auto;
+	box-shadow: 0 8px 32px rgba(0,0,0,.22);
+}
+#scos-seo-suggest-modal .scos-ca-step-header {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	color: #646970;
+	margin: 10px 0 4px;
+}
+#scos-seo-suggest-modal .scos-ca-modal-note {
+	font-size: 12px;
+	color: #646970;
+	margin: 2px 0 6px;
+	line-height: 1.5;
+}
+#scos-seo-suggest-modal .scos-ca-modal-note--info {
+	background: #eff6ff;
+	border-left: 3px solid #3b82f6;
+	padding: 6px 10px;
+	border-radius: 3px;
+	color: #1e3a5f;
+}
+#scos-seo-suggest-modal .scos-ca-modal-note--warn {
+	background: #fffbeb;
+	border-left: 3px solid #f59e0b;
+	padding: 6px 10px;
+	border-radius: 3px;
+	color: #78350f;
+}
+#scos-seo-suggest-modal .scos-ca-pills {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+#scos-seo-suggest-modal .scos-ca-pill {
+	text-align: left;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 7px 10px;
+	font-size: 12px;
+	line-height: 1.45;
+	cursor: pointer;
+	transition: background .12s, border-color .12s;
+	white-space: normal;
+}
+#scos-seo-suggest-modal .scos-ca-pill:hover {
+	background: #e8f0fe;
+	border-color: #4f46e5;
+}
+#scos-seo-suggest-modal .scos-ca-pill--selected {
+	background: #e8f0fe;
+	border-color: #4f46e5;
+	outline: 2px solid #4f46e5;
+	outline-offset: -1px;
+}
+#scos-seo-suggest-modal .scos-ca-pills--tldr .scos-ca-pill {
+	padding: 9px 12px;
+	font-size: 12.5px;
+}

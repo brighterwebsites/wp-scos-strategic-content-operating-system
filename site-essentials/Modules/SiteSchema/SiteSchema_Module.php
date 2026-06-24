@@ -14,6 +14,7 @@
  * @package    SiteEssentials
  * @subpackage Modules\SiteSchema
  * @since      1.0.0
+ * v1.1 | 2026-06-24
  */
 
 namespace SiteEssentials\Modules\SiteSchema;
@@ -150,6 +151,11 @@ class SiteSchema_Module implements Module_Interface {
 
 	/**
 	 * Handle direct form saves (nonce-verified POST, not via Settings API).
+	 *
+	 * Toggle options (checkboxes) are only updated for the tab that was submitted.
+	 * Saving from the Product tab must not wipe Service toggles and vice versa,
+	 * because absent checkboxes in POST are indistinguishable from "unchecked"
+	 * without knowing which tab was active.
 	 */
 	public static function handle_save() {
 		if ( ! isset( $_POST['scos_site_schema_nonce'] ) ) {
@@ -162,6 +168,8 @@ class SiteSchema_Module implements Module_Interface {
 			return;
 		}
 
+		$current_tab = isset( $_POST['current_tab_hidden'] ) ? sanitize_key( wp_unslash( $_POST['current_tab_hidden'] ) ) : '';
+
 		$schema_keys = [
 			'scos_site_schema_local_business',
 			'scos_site_schema_success_stories',
@@ -173,17 +181,25 @@ class SiteSchema_Module implements Module_Interface {
 				update_option( $key, wp_unslash( trim( $_POST[ $key ] ) ) );
 			}
 		}
+
 		if ( isset( $_POST['scos_site_schema_product_ids'] ) ) {
 			update_option( 'scos_site_schema_product_ids', self::sanitize_post_ids( wp_unslash( $_POST['scos_site_schema_product_ids'] ) ) );
 		}
-		update_option( 'scos_site_schema_woo_product_auto', isset( $_POST['scos_site_schema_woo_product_auto'] ) ? '1' : '' );
-		update_option( 'scos_site_schema_product_purpose_auto', isset( $_POST['scos_site_schema_product_purpose_auto'] ) ? '1' : '' );
-		update_option( 'scos_site_schema_service_purpose_auto', isset( $_POST['scos_site_schema_service_purpose_auto'] ) ? '1' : '' );
 		if ( isset( $_POST['scos_site_schema_service_ids'] ) ) {
 			update_option( 'scos_site_schema_service_ids', self::sanitize_post_ids( wp_unslash( $_POST['scos_site_schema_service_ids'] ) ) );
 		}
 
-		wp_safe_redirect( add_query_arg( [ 'page' => 'site-essentials-schema', 'scos_schema_saved' => '1', 'tab' => isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'local-business' ], admin_url( 'admin.php' ) ) );
+		// Only update tab-specific toggles when the owning tab was submitted,
+		// to prevent wiping the other tab's values (unchecked checkboxes are absent from POST).
+		if ( $current_tab === 'product' ) {
+			update_option( 'scos_site_schema_woo_product_auto', isset( $_POST['scos_site_schema_woo_product_auto'] ) ? '1' : '' );
+			update_option( 'scos_site_schema_product_purpose_auto', isset( $_POST['scos_site_schema_product_purpose_auto'] ) ? '1' : '' );
+		}
+		if ( $current_tab === 'service' ) {
+			update_option( 'scos_site_schema_service_purpose_auto', isset( $_POST['scos_site_schema_service_purpose_auto'] ) ? '1' : '' );
+		}
+
+		wp_safe_redirect( add_query_arg( [ 'page' => 'site-essentials-schema', 'scos_schema_saved' => '1', 'tab' => $current_tab ?: 'local-business' ], admin_url( 'admin.php' ) ) );
 		exit;
 	}
 

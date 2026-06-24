@@ -1,23 +1,23 @@
 <?php
 /**
- * CA Suggest — WordPress Ability
+ * Suggest Topics — WordPress Ability
  *
- * Reads post content and suggests search intent goal phrasings for the
- * SCOS Content Architecture meta box.
+ * Fetches the scos_topic taxonomy term list server-side and asks the AI to
+ * identify which existing topics best match the post content. Returns term_ids
+ * that can be directly applied to the scos_ca_topic select in the meta box.
  *
- * Ability slug: scos/suggest-intent-goal (permanent — do not rename after deployment)
+ * Ability slug: scos/suggest-topics (permanent — do not rename after deployment)
  * Category:     scos-content-architecture
  *
  * @package    SiteEssentials
- * @subpackage Modules\ContentArchitecture\Abilities\CA_Suggest
+ * @subpackage Modules\ContentArchitecture\Abilities\Suggest_Topics
  *
- * v1.1 | 2026-06-23
- * v1.2 | 2026-06-24 — Add topic_term_id + existing_intent_goal to input schema; inject <topic> and reassessment context into prompt.
+ * v1.0 | 2026-06-24
  */
 
 declare( strict_types=1 );
 
-namespace SiteEssentials\Modules\ContentArchitecture\Abilities\CA_Suggest;
+namespace SiteEssentials\Modules\ContentArchitecture\Abilities\Suggest_Topics;
 
 use WP_Error;
 use WordPress\AI\Abstracts\Abstract_Ability;
@@ -30,7 +30,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class CA_Suggest extends Abstract_Ability {
+class Suggest_Topics extends Abstract_Ability {
 
 	// -------------------------------------------------------------------------
 	// Ability API registration
@@ -38,9 +38,6 @@ class CA_Suggest extends Abstract_Ability {
 
 	/**
 	 * Register this ability with the WP Abilities API.
-	 *
-	 * Called via wp_abilities_api_init hook from Meta_Box::init() after the
-	 * class_exists guard confirms both APIs are available.
 	 *
 	 * @since 1.0.0
 	 * @return void
@@ -52,9 +49,9 @@ class CA_Suggest extends Abstract_Ability {
 		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
 			return;
 		}
-		wp_register_ability( 'scos/suggest-intent-goal', [
-			'label'         => __( 'SCOS: Suggest Intent Goal', 'site-essentials' ),
-			'description'   => __( 'Reads post content and suggests search intent goal phrasings for the SCOS Content Architecture meta box.', 'site-essentials' ),
+		wp_register_ability( 'scos/suggest-topics', [
+			'label'         => __( 'SCOS: Suggest Topics', 'site-essentials' ),
+			'description'   => __( 'Reads post content and suggests matching scos_topic taxonomy terms for the SCOS Content Architecture meta box.', 'site-essentials' ),
 			'category'      => 'scos-content-architecture',
 			'ability_class' => self::class,
 			'meta'          => [
@@ -72,8 +69,6 @@ class CA_Suggest extends Abstract_Ability {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Guideline categories used by the WP AI plugin for system guidelines.
-	 *
 	 * @since 1.0.0
 	 * @return array<string>
 	 */
@@ -82,8 +77,6 @@ class CA_Suggest extends Abstract_Ability {
 	}
 
 	/**
-	 * JSON Schema for the input accepted by this ability.
-	 *
 	 * @since 1.0.0
 	 * @return array<string, mixed>
 	 */
@@ -91,33 +84,23 @@ class CA_Suggest extends Abstract_Ability {
 		return [
 			'type'       => 'object',
 			'properties' => [
-				'post_id'              => [
+				'post_id' => [
 					'type'        => 'integer',
 					'description' => 'The post ID to analyse. When provided, post content is fetched server-side.',
 				],
-				'content'              => [
+				'content' => [
 					'type'        => 'string',
 					'description' => 'Raw post content. Used only when post_id is not provided.',
 				],
-				'title'                => [
+				'title'   => [
 					'type'        => 'string',
 					'description' => 'Post title. Secondary signal — content is primary.',
-				],
-				'topic_term_id'        => [
-					'type'        => 'integer',
-					'description' => 'Optional. scos_topic term_id to scope intent goal suggestions to a specific topic perspective.',
-				],
-				'existing_intent_goal' => [
-					'type'        => 'string',
-					'description' => 'Optional. The currently saved intent goal text or FAQ title. When provided, the AI treats this as a reassessment.',
 				],
 			],
 		];
 	}
 
 	/**
-	 * JSON Schema for the output returned by this ability.
-	 *
 	 * @since 1.0.0
 	 * @return array<string, mixed>
 	 */
@@ -125,19 +108,28 @@ class CA_Suggest extends Abstract_Ability {
 		return [
 			'type'       => 'object',
 			'properties' => [
-				'intent_goals' => [
+				'suggestions' => [
 					'type'        => 'array',
-					'description' => 'Suggested search intent goal statements, ordered by confidence.',
+					'description' => 'Suggested topics from the existing scos_topic taxonomy, ordered by confidence.',
 					'items'       => [
 						'type'       => 'object',
 						'properties' => [
-							'goal'       => [
-								'type'        => 'string',
-								'description' => 'Plain-language question or goal statement.',
+							'term_id'        => [
+								'type'        => 'integer',
+								'description' => 'Exact term_id from scos_topic taxonomy.',
 							],
-							'confidence' => [
-								'type'        => 'number',
-								'description' => 'Confidence score 0–1.',
+							'name'           => [
+								'type'        => 'string',
+								'description' => 'Human-readable topic name.',
+							],
+							'confidence'     => [
+								'type'        => 'string',
+								'enum'        => [ 'high', 'medium', 'low' ],
+								'description' => 'Confidence level for this topic match.',
+							],
+							'topic_coverage' => [
+								'type'        => 'string',
+								'description' => 'Rough estimate of how thoroughly the content covers this topic (e.g. "~70%").',
 							],
 						],
 					],
@@ -147,7 +139,7 @@ class CA_Suggest extends Abstract_Ability {
 	}
 
 	/**
-	 * Execute the ability — analyse content and return intent goal suggestions.
+	 * Execute the ability — fetch topics and return suggestions.
 	 *
 	 * @since 1.0.0
 	 * @param mixed $input Validated input array.
@@ -157,17 +149,38 @@ class CA_Suggest extends Abstract_Ability {
 		$args = wp_parse_args(
 			$input,
 			[
-				'post_id'              => null,
-				'content'              => null,
-				'title'                => null,
-				'topic_term_id'        => null,
-				'existing_intent_goal' => null,
+				'post_id' => null,
+				'content' => null,
+				'title'   => null,
 			]
 		);
 
 		$content = '';
 		$title   = $args['title'] ?? '';
 
+		// ---- Fetch and validate all available scos_topic terms ----
+		$raw_terms = get_terms( [
+			'taxonomy'   => 'scos_topic',
+			'hide_empty' => false,
+			'orderby'    => 'count',
+			'order'      => 'DESC',
+			'number'     => 100,
+		] );
+
+		if ( is_wp_error( $raw_terms ) || empty( $raw_terms ) ) {
+			return new WP_Error(
+				'scos_suggest_no_topics',
+				__( 'No scos_topic terms found. Create topics first in Content Architecture.', 'site-essentials' )
+			);
+		}
+
+		// Build a term_id → name map for validation later.
+		$term_map = [];
+		foreach ( $raw_terms as $term ) {
+			$term_map[ (int) $term->term_id ] = $term->name;
+		}
+
+		// ---- Fetch post content ----
 		if ( $args['post_id'] ) {
 			$post = get_post( (int) $args['post_id'] );
 			if ( ! $post instanceof \WP_Post ) {
@@ -191,58 +204,49 @@ class CA_Suggest extends Abstract_Ability {
 		if ( empty( $content ) ) {
 			return new WP_Error(
 				'content_not_provided',
-				esc_html__( 'Content is required to suggest an intent goal.', 'site-essentials' )
+				esc_html__( 'Content is required to suggest topics.', 'site-essentials' )
 			);
 		}
 
 		// Truncate very long content: keep first 1500 + last 500 words.
 		$words = explode( ' ', $content );
-		if ( count( $words ) > 2500 ) {
+		if ( count( $words ) > 2000 ) {
 			$content = implode( ' ', array_slice( $words, 0, 1500 ) )
 				. ' [...] '
 				. implode( ' ', array_slice( $words, -500 ) );
 		}
 
-		$prompt = '';
-
-		// Topic scoping context — when a topic is selected, scope the intent goal to it.
-		if ( ! empty( $args['topic_term_id'] ) ) {
-			$topic_term = get_term( (int) $args['topic_term_id'], 'scos_topic' );
-			if ( $topic_term && ! is_wp_error( $topic_term ) ) {
-				$prompt .= '<topic>' . esc_html( $topic_term->name ) . '</topic>' . "\n";
-			}
+		// ---- Build the available topics list for the prompt ----
+		$topic_lines = [];
+		foreach ( $raw_terms as $term ) {
+			$topic_lines[] = $term->term_id . ': ' . $term->name;
 		}
+		$available_topics = implode( "\n", $topic_lines );
 
-		// Reassessment context — server-side lookup takes priority over client-passed value.
-		$current_intent_goal = '';
+		// ---- Check for an already-assigned topic (reassessment context) ----
+		$current_topic_tag = '';
 		if ( $args['post_id'] ) {
-			$existing_faq_id = (int) get_post_meta( (int) $args['post_id'], 'scos_ca_intent_goal_faq_id', true );
-			if ( $existing_faq_id > 0 ) {
-				$existing_faq          = get_post( $existing_faq_id );
-				$current_intent_goal   = $existing_faq ? $existing_faq->post_title : '';
+			$assigned = get_the_terms( (int) $args['post_id'], 'scos_topic' );
+			if ( $assigned && ! is_wp_error( $assigned ) ) {
+				$assigned_name    = $assigned[0]->name;
+				$current_topic_tag = '<current_topic>' . esc_html( $assigned_name ) . '</current_topic>' . "\n";
 			}
-			if ( empty( $current_intent_goal ) ) {
-				$current_intent_goal = (string) get_post_meta( (int) $args['post_id'], 'scos_ca_intent_goal', true );
-			}
-		}
-		if ( empty( $current_intent_goal ) && ! empty( $args['existing_intent_goal'] ) ) {
-			$current_intent_goal = sanitize_text_field( $args['existing_intent_goal'] );
-		}
-		if ( ! empty( $current_intent_goal ) ) {
-			$prompt .= '<current_intent_goal>' . esc_html( $current_intent_goal ) . '</current_intent_goal>' . "\n";
 		}
 
+		// ---- Build prompt ----
+		$prompt  = '<available_topics>' . "\n" . $available_topics . "\n" . '</available_topics>' . "\n";
+		$prompt .= $current_topic_tag;
 		$prompt .= '<title>' . $title . '</title>' . "\n";
 		$prompt .= '<content>' . $content . '</content>';
 
 		$prompt_builder = wp_ai_client_prompt( $prompt )
 			->using_system_instruction( $this->get_system_instruction() )
-			->using_temperature( 0.4 )
+			->using_temperature( 0.3 )
 			->using_model_preference( ...get_preferred_models_for_text_generation() );
 
 		$prompt_builder = $this->ensure_text_generation_supported(
 			$prompt_builder,
-			esc_html__( 'Intent goal suggestion failed. Please ensure you have a connected provider that supports text generation.', 'site-essentials' )
+			esc_html__( 'Topic suggestion failed. Please ensure you have a connected provider that supports text generation.', 'site-essentials' )
 		);
 
 		if ( is_wp_error( $prompt_builder ) ) {
@@ -261,30 +265,49 @@ class CA_Suggest extends Abstract_Ability {
 
 		$parsed = json_decode( $json_str, true );
 
-		if ( ! is_array( $parsed ) || empty( $parsed['intent_goals'] ) ) {
+		if ( ! is_array( $parsed ) || empty( $parsed['suggestions'] ) ) {
 			return new WP_Error(
-				'scos_suggest_parse_error',
+				'scos_suggest_topics_parse_error',
 				__( 'AI response could not be parsed. Please try again.', 'site-essentials' ),
 				[ 'status' => 500 ]
 			);
 		}
 
-		return [
-			'intent_goals' => array_map(
-				function ( $item ) {
-					return [
-						'goal'       => sanitize_text_field( $item['goal'] ?? '' ),
-						'confidence' => isset( $item['confidence'] ) ? (float) $item['confidence'] : 0.0,
-					];
-				},
-				$parsed['intent_goals']
-			),
-		];
+		$valid_confidences = [ 'high', 'medium', 'low' ];
+		$suggestions       = [];
+
+		foreach ( $parsed['suggestions'] as $item ) {
+			$term_id = isset( $item['term_id'] ) ? (int) $item['term_id'] : 0;
+
+			// Validate the returned term_id exists in our fetched list.
+			if ( $term_id <= 0 || ! isset( $term_map[ $term_id ] ) ) {
+				continue;
+			}
+
+			$confidence = isset( $item['confidence'] ) && in_array( $item['confidence'], $valid_confidences, true )
+				? $item['confidence']
+				: 'low';
+
+			$suggestions[] = [
+				'term_id'        => $term_id,
+				'name'           => $term_map[ $term_id ], // use server-side name, not AI-provided
+				'confidence'     => $confidence,
+				'topic_coverage' => sanitize_text_field( $item['topic_coverage'] ?? '' ),
+			];
+		}
+
+		if ( empty( $suggestions ) ) {
+			return new WP_Error(
+				'scos_suggest_topics_no_valid',
+				__( 'No valid topic suggestions returned. Please try again.', 'site-essentials' ),
+				[ 'status' => 500 ]
+			);
+		}
+
+		return [ 'suggestions' => $suggestions ];
 	}
 
 	/**
-	 * Permission callback — mirrors the Meta_Description ability pattern.
-	 *
 	 * @since 1.0.0
 	 * @param mixed $input Validated input array.
 	 * @return bool|WP_Error
@@ -311,8 +334,6 @@ class CA_Suggest extends Abstract_Ability {
 	}
 
 	/**
-	 * Ability metadata — REST and MCP exposure.
-	 *
 	 * @since 1.0.0
 	 * @return array<string, mixed>
 	 */
@@ -325,12 +346,6 @@ class CA_Suggest extends Abstract_Ability {
 			],
 		];
 	}
-
-	// -------------------------------------------------------------------------
-	// Private helpers
-	// -------------------------------------------------------------------------
-
 }
 
-// Register on wp_abilities_api_init — fires after both APIs are ready.
-add_action( 'wp_abilities_api_init', [ CA_Suggest::class, 'register' ] );
+add_action( 'wp_abilities_api_init', [ Suggest_Topics::class, 'register' ] );

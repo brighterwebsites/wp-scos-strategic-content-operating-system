@@ -19,6 +19,7 @@
  * v1.2 | 2026-05-25 — Auto-set scos_faq_is_intent_goal on linked FAQ when saved.
  * v1.3 | 2026-06-23 — Register scos-content-architecture ability category; load and wire CA_Suggest ability.
  * v1.4 | 2026-06-23 — Guard save() against recursive save_post loops triggered by internal wp_insert_post calls.
+ * v1.5 | 2026-06-24 — Load Suggest_Topics ability; pass endpointTopics + currentTopicId/Name to JS localization.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -40,6 +41,7 @@ class Meta_Box {
 
 		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
 			require_once __DIR__ . '/Abilities/CA_Suggest/CA_Suggest.php';
+			require_once __DIR__ . '/Abilities/Suggest_Topics/Suggest_Topics.php';
 		}
 	}
 
@@ -424,11 +426,23 @@ class Meta_Box {
 				file_exists( $suggest_js ) ? (string) filemtime( $suggest_js ) : '1.0.0',
 				true
 			);
+			// Resolve current topic id + name for reassessment context.
+			$suggest_topic_id   = 0;
+			$suggest_topic_name = '';
+			$topic_terms        = wp_get_post_terms( $post->ID, 'scos_topic' );
+			if ( ! is_wp_error( $topic_terms ) && ! empty( $topic_terms ) ) {
+				$suggest_topic_id   = (int) $topic_terms[0]->term_id;
+				$suggest_topic_name = $topic_terms[0]->name;
+			}
+
 			wp_localize_script( 'scos-ca-suggest', 'ScosCaSuggest', [
-				'postId'          => get_the_ID(),
-				'nonce'           => wp_create_nonce( 'wp_rest' ),
-				'endpoint'        => rest_url( 'wp-abilities/v1/abilities/scos/suggest-intent-goal/run' ),
-				'faqModuleActive' => defined( 'SCOS_FAQ_ACTIVE' ),
+				'postId'            => get_the_ID(),
+				'nonce'             => wp_create_nonce( 'wp_rest' ),
+				'endpointTopics'    => rest_url( 'wp-abilities/v1/abilities/scos/suggest-topics/run' ),
+				'endpointIntentGoal' => rest_url( 'wp-abilities/v1/abilities/scos/suggest-intent-goal/run' ),
+				'faqModuleActive'   => defined( 'SCOS_FAQ_ACTIVE' ),
+				'currentTopicId'    => $suggest_topic_id,
+				'currentTopicName'  => $suggest_topic_name,
 			] );
 		}
 	}

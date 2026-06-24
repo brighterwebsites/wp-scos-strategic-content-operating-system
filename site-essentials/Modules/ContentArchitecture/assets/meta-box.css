@@ -587,3 +587,68 @@
 .scos-ca-section {
 	margin-bottom: 12px;
 }
+
+/* ═══════════════ CHAINED MODAL — STEP HEADER ═══════════════ */
+
+.scos-ca-step-header {
+	font-size: 11px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: var(--scos-ink-subtle, #888);
+	margin-bottom: 2px;
+}
+
+/* ═══════════════ CONFIDENCE BADGES ═══════════════ */
+
+.scos-ca-confidence-badge {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 10px;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	vertical-align: middle;
+	margin-right: 2px;
+}
+
+.scos-ca-confidence-badge--high {
+	background: #d1fae5;
+	color: #065f46;
+}
+
+.scos-ca-confidence-badge--medium {
+	background: #fef3c7;
+	color: #92400e;
+}
+
+.scos-ca-confidence-badge--low {
+	background: #f3f4f6;
+	color: #374151;
+}
+
+/* ═══════════════ TOPIC COVERAGE ═══════════════ */
+
+.scos-ca-coverage {
+	opacity: .6;
+	font-size: 11px;
+	margin-left: 2px;
+}
+
+/* ═══════════════ BACK BUTTON ═══════════════ */
+
+.scos-ca-modal-back {
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 12px;
+	color: var(--scos-accent, #4f46e5);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.scos-ca-modal-back:hover {
+	text-decoration: underline;
+	color: var(--scos-accent, #4f46e5);
+}

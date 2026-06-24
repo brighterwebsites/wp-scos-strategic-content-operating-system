@@ -332,7 +332,7 @@ $purpose_type_labels = [
 			<?php if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) : ?>
 			<div class="scos-ca-suggest-wrap">
 				<button type="button" id="scos-ca-suggest-btn" class="button">
-					<?php esc_html_e( 'Suggest Intent Goal', 'site-essentials' ); ?>
+					<?php esc_html_e( 'Suggest with AI', 'site-essentials' ); ?>
 				</button>
 				<span class="scos-ca-suggest-spinner spinner" style="float:none;vertical-align:middle;margin-left:4px;"></span>
 				<p class="scos-ca-suggest-error" id="scos-ca-suggest-error" style="display:none;color:#cc0000;font-size:12px;margin:4px 0 0;"></p>

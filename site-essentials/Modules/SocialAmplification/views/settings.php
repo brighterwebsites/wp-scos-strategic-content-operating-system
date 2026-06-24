@@ -336,13 +336,9 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
                   <?php esc_html_e( 'Automatically amplify when a Projects post is published', 'site-essentials' ); ?>
                 </label>
                 <p class="description">
-                  <?php
-                  printf(
-                    /* translators: %s: link to AI API Keys settings page */
-                    esc_html__( 'Requires Postly API key, Workspace ID, and Anthropic API key (in %s) to be configured.', 'site-essentials' ),
-                    '<a href="' . esc_url( admin_url( 'admin.php?page=site-essentials-settings&tab=ai-keys' ) ) . '">' . esc_html__( 'Settings &rarr; AI API Keys', 'site-essentials' ) . '</a>'
-                  );
-                  ?>
+                  <?php esc_html_e( 'Automatically amplifies any published post where "Social Amplification" is checked in the Optimization Progress field, and amplification has not yet run. Requires Postly API key, Workspace ID, and Anthropic API key (in', 'site-essentials' ); ?>
+                  <a href="<?php echo esc_url( admin_url( 'admin.php?page=site-essentials-settings&tab=ai-keys' ) ); ?>"><?php esc_html_e( 'Settings &rarr; AI API Keys', 'site-essentials' ); ?></a>)
+                  <?php esc_html_e( 'to be configured.', 'site-essentials' ); ?>
                 </p>
               </td>
             </tr>

@@ -1,21 +1,22 @@
 <?php
 /**
- * Publish Hook — projects CPT
+ * Publish Hook — any post type
  *
- * Hooks into `publish_projects` (fires when a post of post_type=projects
- * transitions to "publish"). Validates that all required settings are
- * present, then fires an internal loopback request to the REST endpoint
- * so the amplification runs asynchronously and doesn't block the save.
- *
- * Guards (all must pass before firing):
+ * Hooks into `save_post` and fires the amplification pipeline when all
+ * of the following conditions are met:
+ *  - Post status is publish (not a revision or autosave)
+ *  - scos_ca_optimization_progress contains 'amplification'
+ *  - _scos_sa_amplified is not already '1' (prevents re-runs)
  *  - bw_social_enabled == '1'
- *  - bw_anthropic_api_key not empty
- *  - bw_postly_api_key not empty
- *  - bw_postly_workspace_id not empty
- *  - bw_social_webhook_secret not empty
+ *  - bw_anthropic_api_key, bw_postly_api_key, bw_postly_workspace_id,
+ *    and bw_social_webhook_secret are all configured
+ *
+ * Fires an internal loopback request to the REST endpoint so the
+ * amplification runs asynchronously and does not block the save.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
+ * @version    1.1 | 2026-06-24
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -28,30 +29,41 @@ class Publish_Hook {
 	const AMPLIFIED_META = '_scos_sa_amplified';
 
 	public static function init(): void {
-		add_action( 'publish_projects', [ __CLASS__, 'on_publish' ], 10, 2 );
+		add_action( 'save_post', [ __CLASS__, 'on_save_post' ], 10, 2 );
 	}
 
 	/**
 	 * @param int      $post_id
 	 * @param \WP_Post $post
 	 */
-	public static function on_publish( int $post_id, \WP_Post $post ): void {
+	public static function on_save_post( int $post_id, \WP_Post $post ): void {
 		// Only run on the real post, not revisions or auto-saves.
 		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
 			return;
 		}
 
-		// Avoid double-firing (e.g. minor saves after initial publish)
+		// Post must be published.
+		if ( $post->post_status !== 'publish' ) {
+			return;
+		}
+
+		// scos_ca_optimization_progress must include 'amplification'.
+		$progress = get_post_meta( $post_id, 'scos_ca_optimization_progress', true );
+		if ( ! is_array( $progress ) || ! in_array( 'amplification', $progress, true ) ) {
+			return;
+		}
+
+		// Avoid double-firing (e.g. minor saves after initial publish).
 		if ( get_post_meta( $post_id, self::AMPLIFIED_META, true ) === '1' ) {
 			return;
 		}
 
-		// Guard: all required settings must be configured
+		// Guard: all required settings must be configured.
 		if ( ! self::settings_complete() ) {
 			return;
 		}
 
-		// Mark immediately so concurrent saves don't double-fire
+		// Mark immediately so concurrent saves don't double-fire.
 		update_post_meta( $post_id, self::AMPLIFIED_META, '1' );
 
 		// Fire loopback request — non-blocking so the save doesn't time out

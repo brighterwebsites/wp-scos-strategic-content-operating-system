@@ -18,6 +18,9 @@
  *
  * v1.1 | 2026-05-22 — search-intent now resolved via Intent_Goal_Resolver when available,
  *                      so FAQ-linked posts output the FAQ title rather than the raw meta value.
+ * v1.2 | 2026-06-24 — restructured CAR keys: cluster → known-for-goal (title + description),
+ *                      maturity → topic-maturity, search-intent → answers, pillar removed,
+ *                      service_pathway (id/title) → commercial-end-target (url/title).
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -47,14 +50,13 @@ add_action( 'wp_head', function () {
 	if ( ! $post_id ) {
 		$scos = [
 			'car'  => [
-				'cluster'       => 'not_set',
-				'topic'         => 'not_set',
-				'maturity'      => 'not_set',
-				'intent'        => 'not_set',
-				'search-intent' => 'not_set',
-				'purpose'       => 'not_set',
-				'pillar'        => null,
-				'service_pathway' => null,
+				'known-for-goal'        => [ 'title' => 'not_set', 'description' => 'not_set' ],
+				'topic'                 => 'not_set',
+				'topic-maturity'        => 'not_set',
+				'intent'                => 'not_set',
+				'answers'               => 'not_set',
+				'purpose'               => 'not_set',
+				'commercial-end-target' => null,
 			],
 			'meta' => [
 				'post_id'       => 0,
@@ -81,21 +83,27 @@ add_action( 'wp_head', function () {
 	};
 
 	// ── Cluster (scos_content_cluster taxonomy → legacy altc_strategic_lens) ─
-	$cluster_name = 'not_set';
-	$cluster_terms = wp_get_post_terms( $post_id, 'scos_content_cluster', [ 'fields' => 'names' ] );
+	$cluster_name        = 'not_set';
+	$cluster_description = 'not_set';
+	$cluster_terms = wp_get_post_terms( $post_id, 'scos_content_cluster' );
 	if ( ! is_wp_error( $cluster_terms ) && ! empty( $cluster_terms ) ) {
-		$cluster_name = $cluster_terms[0];
+		$cluster_name        = $cluster_terms[0]->name;
+		$cluster_description = $cluster_terms[0]->description ?: 'not_set';
 	} else {
 		// Legacy fallback
 		$legacy_altc_id = get_post_meta( $post_id, 'bw_primary_altc_id', true );
 		if ( $legacy_altc_id ) {
 			$t = get_term( $legacy_altc_id, 'altc_strategic_lens' );
-			if ( $t && ! is_wp_error( $t ) ) { $cluster_name = $t->name; }
+			if ( $t && ! is_wp_error( $t ) ) {
+				$cluster_name        = $t->name;
+				$cluster_description = $t->description ?: 'not_set';
+			}
 		}
 		if ( $cluster_name === 'not_set' ) {
-			$legacy_terms = wp_get_post_terms( $post_id, 'altc_strategic_lens', [ 'fields' => 'names' ] );
+			$legacy_terms = wp_get_post_terms( $post_id, 'altc_strategic_lens' );
 			if ( ! is_wp_error( $legacy_terms ) && ! empty( $legacy_terms ) ) {
-				$cluster_name = $legacy_terms[0];
+				$cluster_name        = $legacy_terms[0]->name;
+				$cluster_description = $legacy_terms[0]->description ?: 'not_set';
 			}
 		}
 	}
@@ -124,27 +132,13 @@ add_action( 'wp_head', function () {
 		}
 	}
 
-	// ── Pillar relationship ───────────────────────────────────────────────────
-	$pillar    = null;
-	$pillar_id = (int) get_post_meta( $post_id, 'scos_ca_pillar_page_id', true )
-	          ?: (int) get_post_meta( $post_id, 'bw_pillar_page_id', true );
-	if ( $pillar_id > 0 ) {
-		$pillar_purpose = get_post_meta( $pillar_id, 'scos_ca_purpose', true )
-		               ?: get_post_meta( $pillar_id, 'bw_purpose', true );
-		$pillar = [
-			'id'    => $pillar_id,
-			'title' => get_the_title( $pillar_id ),
-			'type'  => ( $pillar_purpose === 'service-page' ) ? 'service' : 'pillar',
-		];
-	}
-
-	// ── Service pathway ───────────────────────────────────────────────────────
-	$service_pathway    = null;
-	$service_pathway_id = (int) get_post_meta( $post_id, 'scos_ca_service_pathway_id', true )
-	                   ?: (int) get_post_meta( $post_id, 'bw_service_pathway_id', true );
+	// ── Commercial end target (formerly service_pathway) ─────────────────────
+	$commercial_end_target = null;
+	$service_pathway_id    = (int) get_post_meta( $post_id, 'scos_ca_service_pathway_id', true )
+	                      ?: (int) get_post_meta( $post_id, 'bw_service_pathway_id', true );
 	if ( $service_pathway_id > 0 ) {
-		$service_pathway = [
-			'id'    => $service_pathway_id,
+		$commercial_end_target = [
+			'url'   => get_permalink( $service_pathway_id ),
 			'title' => get_the_title( $service_pathway_id ),
 		];
 	}
@@ -177,15 +171,17 @@ add_action( 'wp_head', function () {
 
 	$scos = [
 		'car' => [
-			'cluster'         => $cluster_name,
-			'topic'           => $topic_name,
-			'maturity'        => $val( 'scos_ca_maturity',    'bw_cont_maturity' ),
-			'intent'          => $val( 'scos_ca_intent',      'bw_intent' ),
-			'search-intent'   => $search_intent,
-			'purpose'         => $val( 'scos_ca_purpose',     'bw_purpose' ),
-			'pillar'          => $pillar,
-			'service_pathway' => $service_pathway,
-			'metrics'         => $metrics,
+			'known-for-goal'        => [
+				'title'       => $cluster_name,
+				'description' => $cluster_description,
+			],
+			'topic'                 => $topic_name,
+			'topic-maturity'        => $val( 'scos_ca_maturity', 'bw_cont_maturity' ),
+			'intent'                => $val( 'scos_ca_intent',   'bw_intent' ),
+			'answers'               => $search_intent,
+			'purpose'               => $val( 'scos_ca_purpose',  'bw_purpose' ),
+			'commercial-end-target' => $commercial_end_target,
+			'metrics'               => $metrics,
 		],
 		'meta' => [
 			'post_id'       => $post_id,

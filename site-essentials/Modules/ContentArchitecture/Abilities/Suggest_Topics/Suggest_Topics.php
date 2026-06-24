@@ -13,6 +13,7 @@
  * @subpackage Modules\ContentArchitecture\Abilities\Suggest_Topics
  *
  * v1.0 | 2026-06-24
+ * v1.1 | 2026-06-24 — Prefer scos_ca_content_md (Breakdance + ACF rendered content) over raw post_content.
  */
 
 declare( strict_types=1 );
@@ -190,8 +191,18 @@ class Suggest_Topics extends Abstract_Ability {
 					sprintf( esc_html__( 'Post with ID %d not found.', 'site-essentials' ), absint( $args['post_id'] ) )
 				);
 			}
-			$post_context = get_post_context( $post->ID );
-			$content      = $post_context['content'] ?? '';
+
+			// Prefer scos_ca_content_md — fully rendered markdown including Breakdance
+			// blocks, ACF fields, Query Loops, and Post Repeaters. Falls back to
+			// get_post_context() for posts not yet analysed.
+			$md_content = (string) get_post_meta( $post->ID, 'scos_ca_content_md', true );
+			if ( ! empty( $md_content ) ) {
+				$content = $md_content;
+			} else {
+				$post_context = get_post_context( $post->ID );
+				$content      = $post_context['content'] ?? '';
+			}
+
 			if ( empty( $title ) && ! empty( $post->post_title ) ) {
 				$title = $post->post_title;
 			}

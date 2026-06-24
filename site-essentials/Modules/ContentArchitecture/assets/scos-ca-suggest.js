@@ -11,9 +11,12 @@
  * Fill paths (step 2, unchanged from Phase 1):
  *   Path A — FAQ module not active: fills #scos_ca_intent_goal textarea.
  *   Path B — FAQ module active, no FAQ linked: pre-fills Add FAQ modal.
- *   Path C — FAQ module active, FAQ already linked: informational note.
+ *   Path C — FAQ module active, FAQ already linked: shows suggestions;
+ *             picking clears existing link and opens Add FAQ modal with
+ *             the suggestion pre-filled.
  *
  * v2.0 | 2026-06-24
+ * v2.1 | 2026-06-24 — Path C now shows suggestions and replaces linked FAQ.
  */
 
 ( function () {
@@ -126,6 +129,25 @@
 		closeModal();
 	}
 
+	// Path C: FAQ already linked — clear the existing link then open Add FAQ modal
+	// with the suggestion pre-filled, letting the user choose to replace.
+	function fillFaqLinked( goal ) {
+		// Trigger the Remove button to transition the UI from panel to picker state.
+		var clearBtn = document.querySelector( '.scos-ca-intent-faq-clear' );
+		if ( clearBtn ) clearBtn.click();
+
+		// After clear, the picker is visible — fill and open Add FAQ modal.
+		var titleInput = document.getElementById( 'scos-intent-faq-new-title' );
+		var addModal   = document.getElementById( 'scos-intent-faq-modal' );
+		if ( titleInput ) titleInput.value = goal;
+		if ( addModal ) {
+			addModal.hidden = false;
+			addModal.removeAttribute( 'hidden' );
+			if ( titleInput ) titleInput.focus();
+		}
+		closeModal();
+	}
+
 	// -------------------------------------------------------------------------
 	// Topic dropdown fill (step 1 pick-to-fill)
 	// -------------------------------------------------------------------------
@@ -226,20 +248,20 @@
 		html += '<h3 style="margin:4px 0 4px;font-size:13px;font-weight:600;">Suggested Intent Goals</h3>';
 
 		if ( path === 'faq-linked' ) {
-			html += '<p class="scos-ca-modal-note">An FAQ is already linked — edit it directly to change the intent goal.</p>';
+			html += '<p class="scos-ca-modal-note">An FAQ is already linked. Picking a suggestion will remove it and replace with a new FAQ.</p>';
 		} else {
 			html += '<p class="scos-ca-modal-note">Click a suggestion to fill the field. Save the post to keep changes.</p>';
-			html += '<div class="scos-ca-pills">';
-			goals.forEach( function ( item ) {
-				var pct = Math.round( ( item.confidence || 0 ) * 100 );
-				html += '<button type="button" class="scos-ca-pill scos-ca-pill--goal"'
-					+ ' data-goal="' + escAttr( item.goal ) + '">';
-				html += escHtml( item.goal );
-				if ( pct > 0 ) html += ' <span style="opacity:.6;font-size:11px;">(' + pct + '%)</span>';
-				html += '</button>';
-			} );
-			html += '</div>';
 		}
+		html += '<div class="scos-ca-pills">';
+		goals.forEach( function ( item ) {
+			var pct = Math.round( ( item.confidence || 0 ) * 100 );
+			html += '<button type="button" class="scos-ca-pill scos-ca-pill--goal"'
+				+ ' data-goal="' + escAttr( item.goal ) + '">';
+			html += escHtml( item.goal );
+			if ( pct > 0 ) html += ' <span style="opacity:.6;font-size:11px;">(' + pct + '%)</span>';
+			html += '</button>';
+		} );
+		html += '</div>';
 
 		html += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">';
 		html += '<button type="button" id="scos-ca-back" class="scos-ca-modal-back">&larr; Back to Topics</button>';
@@ -256,6 +278,8 @@
 					fillFreetext( goal );
 				} else if ( path === 'faq-picker' ) {
 					fillFaqPicker( goal );
+				} else if ( path === 'faq-linked' ) {
+					fillFaqLinked( goal );
 				}
 			} );
 		} );

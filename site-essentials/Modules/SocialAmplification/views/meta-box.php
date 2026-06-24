@@ -146,9 +146,14 @@ $can_trigger        = $is_published && $webhook_configured;
 			<p style="margin-top:12px;">
 				<button type="button"
 					id="scos-sa-reamp-btn"
-					class="button button-secondary"
-					data-post-id="<?php echo esc_attr( $post->ID ); ?>">
-					<?php esc_html_e( 'Reset & Re-amplify', 'site-essentials' ); ?>
+					class="button <?php echo $amplified ? 'button-secondary' : 'button-primary'; ?>"
+					data-post-id="<?php echo esc_attr( $post->ID ); ?>"
+					data-amplified="<?php echo $amplified ? '1' : '0'; ?>">
+					<?php if ( $amplified ) : ?>
+						<?php esc_html_e( 'Reset & Re-amplify', 'site-essentials' ); ?>
+					<?php else : ?>
+						<?php esc_html_e( 'Create Social Post', 'site-essentials' ); ?>
+					<?php endif; ?>
 				</button>
 			</p>
 		<?php endif; ?>

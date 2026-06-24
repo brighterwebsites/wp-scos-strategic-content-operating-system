@@ -72,38 +72,60 @@
 
 	$(document).on('click', '#scos-sa-reamp-btn', function (e) {
 		e.preventDefault();
-		var $btn = $(this);
-		var $msg = $('#scos-sa-reamp-msg');
+		var $btn     = $(this);
+		var $msg     = $('#scos-sa-reamp-msg');
 		var $results = $('#scos-sa-reamp-results');
-		var postId = $btn.data('post-id');
+		var $badge   = $btn.closest('.scos-sa-section--amplify').find('.scos-sa-amplify-badge');
+		var postId   = $btn.data('post-id');
 
 		if ($btn.prop('disabled')) { return; }
 
-		$btn.prop('disabled', true).text(scosSA.i18n.amplifying || 'Running...');
-		$msg.removeAttr('hidden').removeClass('is-success is-error').text(scosSA.i18n.amplifying || 'Running...');
+		$btn.prop('disabled', true).text(scosSA.i18n.amplifying || 'Running…');
+		$msg.removeAttr('hidden').removeClass('is-success is-error').text(scosSA.i18n.amplifying || 'Running…');
 		$results.empty();
 
 		$.post(
 			scosSA.ajaxurl,
 			{
-				action: 'scos_sa_amplify',
+				action:  'scos_sa_amplify',
 				post_id: postId,
-				nonce: scosSA.amplifyNonce
+				nonce:   scosSA.amplifyNonce
 			},
 			function (resp) {
 				if (resp.success) {
 					$msg.addClass('is-success').text('Amplification completed.');
+
+					// Update badge and mark as amplified
+					$badge.removeClass('is-no').addClass('is-yes').text('Amplified');
+					$btn.data('amplified', '1')
+						.attr('data-amplified', '1')
+						.removeClass('button-primary').addClass('button-secondary');
+
 					var slots = (resp.data && resp.data.result && resp.data.result.posts) ? resp.data.result.posts : [];
 					$results.html(renderSlotsTable(slots));
 				} else {
-					var message = (resp.data && resp.data.message) ? resp.data.message : 'Unknown error';
-					$msg.addClass('is-error').text((scosSA.i18n.error + ': ') + message);
+					var data    = resp.data || {};
+					var message = data.message || 'Unknown error';
+					var code    = data.code    || 'error';
+
+					if (code === 'config_error' && scosSA.settingsUrl) {
+						var linkText = scosSA.i18n.settingsLink || 'Social Amplification settings';
+						var hint     = scosSA.i18n.configError  || 'AI knowledge not configured. Set up in';
+						$msg.addClass('is-error').html(
+							hint + ' <a href="' + scosSA.settingsUrl + '">' + linkText + '</a>.'
+						);
+					} else {
+						$msg.addClass('is-error').text((scosSA.i18n.error + ': ') + message);
+					}
 				}
 			}
 		).fail(function () {
 			$msg.addClass('is-error').text((scosSA.i18n.error || 'Error') + ': Request failed');
 		}).always(function () {
-			$btn.prop('disabled', false).text(scosSA.i18n.reAmplify || 'Reset & Re-amplify');
+			$btn.prop('disabled', false);
+			// Restore correct label based on current amplified state (success may have updated it)
+			var isAmplified = $btn.data('amplified') === '1' || $btn.attr('data-amplified') === '1';
+			$btn.text(isAmplified ? (scosSA.i18n.reAmplify || 'Reset & Re-amplify') : (scosSA.i18n.create || 'Create Social Post'));
 		});
 	});
 

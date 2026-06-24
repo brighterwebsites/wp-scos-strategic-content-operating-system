@@ -139,16 +139,19 @@ class Meta_Box {
 			true
 		);
 		wp_localize_script( 'scos-sa-meta-box', 'scosSA', [
-			'nonce'   => wp_create_nonce( 'bw_social_webhook' ),
+			'nonce'        => wp_create_nonce( 'bw_social_webhook' ),
 			'amplifyNonce' => wp_create_nonce( 'scos_sa_amplify' ),
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'i18n'    => [
-				'sending' => __( 'Sending…', 'site-essentials' ),
-				'sent'    => __( 'Sent!', 'site-essentials' ),
-				'create'  => __( 'Create Social Post', 'site-essentials' ),
-				'error'   => __( 'Error', 'site-essentials' ),
-				'reAmplify' => __( 'Reset & Re-amplify', 'site-essentials' ),
-				'amplifying' => __( 'Running...', 'site-essentials' ),
+			'ajaxurl'      => admin_url( 'admin-ajax.php' ),
+			'settingsUrl'  => admin_url( 'admin.php?page=site-essentials-social-amplification&scos_sma_tab=postly#postly' ),
+			'i18n'         => [
+				'sending'    => __( 'Sending…', 'site-essentials' ),
+				'sent'       => __( 'Sent!', 'site-essentials' ),
+				'create'     => __( 'Create Social Post', 'site-essentials' ),
+				'error'      => __( 'Error', 'site-essentials' ),
+				'reAmplify'  => __( 'Reset & Re-amplify', 'site-essentials' ),
+				'amplifying' => __( 'Running…', 'site-essentials' ),
+				'configError' => __( 'AI knowledge not configured. Set up Anthropic API key and knowledge files in', 'site-essentials' ),
+				'settingsLink' => __( 'Social Amplification settings', 'site-essentials' ),
 			],
 		] );
 	}
@@ -171,7 +174,18 @@ class Meta_Box {
 			update_post_meta( $post_id, \SiteEssentials\Modules\SocialAmplification\Publish_Hook::AMPLIFIED_META, '1' );
 			wp_send_json_success( [ 'result' => $result ] );
 		} catch ( \RuntimeException $e ) {
-			wp_send_json_error( [ 'message' => $e->getMessage() ], 500 );
+			$message = $e->getMessage();
+			// Classify config-type failures so the JS can render a targeted help message.
+			$is_config_error = (
+				stripos( $message, 'api key' ) !== false
+				|| stripos( $message, 'anthropic' ) !== false
+				|| stripos( $message, 'ai-knowledge' ) !== false
+				|| stripos( $message, 'knowledge' ) !== false
+			);
+			wp_send_json_error( [
+				'message' => $message,
+				'code'    => $is_config_error ? 'config_error' : 'error',
+			], 500 );
 		}
 	}
 }

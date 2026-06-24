@@ -501,6 +501,18 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
           </tbody>
         </table>
 
+        <?php // ── Fetch channel IDs helper ──────────────────────────────── ?>
+        <div style="display:flex;align-items:center;gap:var(--scos-s-3);margin-top:var(--scos-s-4)">
+          <button type="button" id="scos-sa-fetch-channels" class="scos-btn"
+                  data-nonce="<?php echo esc_attr( wp_create_nonce( 'scos_sa_channels' ) ); ?>"
+                  data-ajaxurl="<?php echo esc_attr( admin_url( 'admin-ajax.php' ) ); ?>">
+            <span class="dashicons dashicons-update" style="margin-right:4px"></span>
+            <?php esc_html_e( 'Fetch channel IDs', 'site-essentials' ); ?>
+          </button>
+          <span id="scos-sa-channels-msg" style="font-size:var(--scos-fs-sm);color:var(--scos-ink-subtle)"></span>
+        </div>
+        <div id="scos-sa-channels-result" style="margin-top:var(--scos-s-3)"></div>
+
         <hr style="border:none;border-top:1px solid var(--scos-border);margin:var(--scos-s-5) 0">
 
         <p class="scos__section-label"><?php esc_html_e( 'Social channel settings', 'site-essentials' ); ?></p>
@@ -668,6 +680,79 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 
     </div>
   </div><!-- /.scos-card AI knowledge docs -->
+
+<?php // ── Postly channel fetch JS ──────────────────────────────────────────── ?>
+<script>
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var btn     = document.getElementById('scos-sa-fetch-channels');
+    var result  = document.getElementById('scos-sa-channels-result');
+    var msg     = document.getElementById('scos-sa-channels-msg');
+
+    if ( ! btn ) return;
+
+    btn.addEventListener('click', function() {
+      msg.textContent  = '<?php echo esc_js( __( 'Fetching…', 'site-essentials' ) ); ?>';
+      result.innerHTML = '';
+      btn.disabled     = true;
+
+      var data = new FormData();
+      data.append('action', 'scos_sa_fetch_postly_channels');
+      data.append('nonce',  btn.dataset.nonce);
+
+      fetch(btn.dataset.ajaxurl, { method: 'POST', body: data, credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+          btn.disabled = false;
+          if ( ! json.success ) {
+            msg.textContent = '';
+            result.innerHTML = '<div class="scos-notice scos-notice--danger">' + escHtml(json.data.message || '<?php echo esc_js( __( 'Request failed.', 'site-essentials' ) ); ?>') + '</div>';
+            return;
+          }
+
+          var channels = json.data.channels;
+          msg.textContent = '';
+
+          if ( ! channels || channels.length === 0 ) {
+            result.innerHTML = '<div class="scos-notice scos-notice--info"><?php echo esc_js( __( 'No connected channels found for this workspace.', 'site-essentials' ) ); ?></div>';
+            return;
+          }
+
+          var rows = channels.map(function(ch) {
+            var target = ch.target.charAt(0).toUpperCase() + ch.target.slice(1);
+            return '<tr>'
+              + '<td style="padding:6px 12px 6px 0;font-weight:500;white-space:nowrap">' + escHtml(target) + '</td>'
+              + '<td style="padding:6px 12px 6px 0;color:var(--scos-ink-subtle)">' + escHtml(ch.name) + '</td>'
+              + '<td style="padding:6px 12px 6px 0"><code class="scos-input--mono" style="font-size:var(--scos-fs-sm);background:var(--scos-surface-2);padding:2px 6px;border-radius:var(--scos-r-sm)">' + escHtml(ch.channel_id) + '</code></td>'
+              + '<td style="padding:6px 0"><button type="button" class="scos-btn" style="padding:2px 10px;font-size:var(--scos-fs-sm)" onclick="scosCopyId(this,\'' + escHtml(ch.channel_id) + '\')"><?php echo esc_js( __( 'Copy ID', 'site-essentials' ) ); ?></button></td>'
+              + '</tr>';
+          }).join('');
+
+          result.innerHTML = '<table style="border-collapse:collapse;width:100%"><tbody>' + rows + '</tbody></table>';
+        })
+        .catch(function() {
+          btn.disabled    = false;
+          msg.textContent = '';
+          result.innerHTML = '<div class="scos-notice scos-notice--danger"><?php echo esc_js( __( 'Network error — check your connection and try again.', 'site-essentials' ) ); ?></div>';
+        });
+    });
+  });
+
+  function escHtml(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(String(str)));
+    return d.innerHTML;
+  }
+
+  window.scosCopyId = function(btn, id) {
+    navigator.clipboard.writeText(id).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = '<?php echo esc_js( __( 'Copied!', 'site-essentials' ) ); ?>';
+      setTimeout(function() { btn.textContent = orig; }, 1800);
+    });
+  };
+})();
+</script>
 
 </div><!-- /#scos-sa-panel-postly -->
 

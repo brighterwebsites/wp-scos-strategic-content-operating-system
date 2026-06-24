@@ -15,7 +15,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
- * @version    1.1.0
+ * @version    1.2 | 2026-06-24
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -79,6 +79,9 @@ class SocialAmplification_Module implements Module_Interface {
 		Publish_Hook::init();
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_settings_assets' ] );
 
+		// AJAX: fetch Postly channel IDs (admin-only)
+		add_action( 'wp_ajax_scos_sa_fetch_postly_channels', [ $this, 'ajax_fetch_postly_channels' ] );
+
 		// WP-CLI backfill command
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			require_once __DIR__ . '/CLI/Backfill_Command.php';
@@ -141,6 +144,49 @@ class SocialAmplification_Module implements Module_Interface {
 			return get_option( $legacy_key, $default );
 		}
 		return $default;
+	}
+
+	/**
+	 * AJAX handler: fetch connected Postly social channels for the workspace.
+	 *
+	 * Returns [{target, name, channel_id}] using the saved API key + workspace ID.
+	 * Nonce: scos_sa_channels (printed by settings.php via wp_create_nonce).
+	 */
+	public function ajax_fetch_postly_channels(): void {
+		check_ajax_referer( 'scos_sa_channels', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'site-essentials' ) ], 403 );
+		}
+
+		$api_key      = (string) get_option( 'bw_postly_api_key', '' );
+		$workspace_id = (string) get_option( 'bw_postly_workspace_id', '' );
+
+		if ( ! $api_key || ! $workspace_id ) {
+			wp_send_json_error( [ 'message' => __( 'Postly API key and Workspace ID must be saved before fetching channels.', 'site-essentials' ) ] );
+		}
+
+		try {
+			$client   = new Amplification\Postly_Client( $api_key, $workspace_id );
+			$socials  = $client->get_socials();
+
+			$channels = [];
+			foreach ( $socials as $item ) {
+				if ( empty( $item['channel_id'] ) ) {
+					continue;
+				}
+				$channels[] = [
+					'target'     => sanitize_text_field( $item['target']     ?? '' ),
+					'name'       => sanitize_text_field( $item['name']       ?? '' ),
+					'channel_id' => sanitize_text_field( $item['channel_id'] ?? '' ),
+					'connected'  => ! empty( $item['connected'] ),
+				];
+			}
+
+			wp_send_json_success( [ 'channels' => $channels ] );
+		} catch ( \RuntimeException $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+		}
 	}
 
 	public function render_settings() {

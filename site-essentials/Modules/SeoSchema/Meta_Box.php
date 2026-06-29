@@ -3,12 +3,15 @@
  * SEO Schema — Meta Box Controller
  *
  * Registers the "Schema" meta box and handles save.
- * Dual-writes to bw_custom_schema so scos-schema-output.php
- * continues to inject schema without changes.
+ * bw_custom_schema dual-write removed — scos-schema-output.php now reads
+ * scos_schema_custom first, falling back to bw_custom_schema for legacy data.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoSchema
  * @since      1.0.0
+ *
+ * v1.0 | 2026-05-01
+ * v1.1 | 2026-06-29 — Remove bw_custom_schema dual-write; scos-schema-output.php now reads scos_schema_custom first.
  */
 
 namespace SiteEssentials\Modules\SeoSchema;
@@ -122,8 +125,6 @@ class Meta_Box {
 		$clean = wp_json_encode( json_decode( $raw, true ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		update_post_meta( $post_id, 'scos_schema_custom', $clean );
-		// Dual-write: scos-schema-output.php reads bw_custom_schema to inject into <head>
-		update_post_meta( $post_id, 'bw_custom_schema', $clean );
 	}
 
 	// -------------------------------------------------------------------------

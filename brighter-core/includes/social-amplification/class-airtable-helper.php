@@ -7,7 +7,10 @@
  *
  * @package BrighterCore
  * @subpackage SocialAmplification
- * @version 1.0.0
+ * @version 1.1.0
+ *
+ * v1.0 | original
+ * v1.1 | 2026-06-29 — Read scos_seo_tldr + scos_sa_shortlink_slug first; bw_ keys as fallback only.
  */
 
 if (!defined('ABSPATH')) exit;
@@ -339,7 +342,8 @@ class BW_Airtable_Helper {
             'Category' => wp_get_post_categories($post_id, array('fields' => 'names'))[0] ?? '',
             
             // Content fields
-            'TLDR' => get_post_meta($post_id, 'bw_tldr', true),
+            'TLDR' => get_post_meta($post_id, 'scos_seo_tldr', true)
+                   ?: get_post_meta($post_id, 'bw_tldr', true), // TODO: remove bw_ fallback once all sites resaved
             'Excerpt' => $post->post_excerpt ?: wp_trim_words($post->post_content, 55, '...'),
             
             // ALTC Strategy fields - Linked Record when we have Airtable record IDs
@@ -384,7 +388,8 @@ class BW_Airtable_Helper {
                 ?: get_post_meta($post_id, '_seopress_titles_desc', true),
             
             // SEO Fields (Brighter)
-            'Short Link' => get_post_meta($post_id, '_bw_breadcrumb', true),
+            'Short Link' => get_post_meta($post_id, 'scos_sa_shortlink_slug', true)
+                         ?: get_post_meta($post_id, '_bw_breadcrumb', true), // TODO: remove bw_ fallback once all sites resaved
             'Breadcrumbs' => get_post_meta($post_id, 'bw_breadcrumb_schema', true),
             'Index Status' => get_post_meta($post_id, 'bw_index_status', true),
         );

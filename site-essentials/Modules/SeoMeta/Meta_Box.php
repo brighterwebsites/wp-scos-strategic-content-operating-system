@@ -5,13 +5,14 @@
  * Registers the "SEO" meta box on all supported post types.
  * Handles save with:
  *  - Primary write to scos_seo_* keys
- *  - Dual-write to SEOPress / legacy keys for backward compatibility:
+ *  - Dual-write to SEOPress keys for backward compatibility:
  *      scos_seo_title       → _seopress_titles_title
  *      scos_seo_description → _seopress_titles_desc
  *      scos_seo_canonical   → _seopress_robots_canonical
  *      scos_seo_robots (noindex) → _seopress_robots_index = 'yes' | 'no'
- *      scos_seo_breadcrumb_title → _bw_breadcrumb, _seopress_robots_breadcrumbs
- *      scos_seo_tldr        → bw_tldr (used by [tldr] shortcode)
+ *      scos_seo_breadcrumb_title → _seopress_robots_breadcrumbs
+ *
+ *  - bw_tldr dual-write removed — all consumers now read scos_seo_tldr first
  *
  * Reads existing legacy values as fallback so posts not yet resaved still
  * show their current effective SEO values in the metabox.
@@ -23,6 +24,7 @@
  * v1.1 | 2026-06-24 — Register scos-seo-meta ability category; load Suggest_Seo_Meta
  *                      and Suggest_Tldr abilities; extend enqueue_assets() with
  *                      scos-seo-suggest.js and ScosSeoSuggest localization data.
+ * v1.2 | 2026-06-29 — Remove bw_tldr dual-write; consumers now read scos_seo_tldr first.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -171,8 +173,6 @@ class Meta_Box {
 		if ( isset( $_POST['scos_seo_tldr'] ) ) {
 			$val = wp_kses_post( $_POST['scos_seo_tldr'] );
 			self::update_or_delete( $post_id, 'scos_seo_tldr', $val );
-			// Dual-write: [tldr] shortcode reads bw_tldr
-			self::update_or_delete( $post_id, 'bw_tldr', $val );
 		}
 
 		// ---- Meta title ----

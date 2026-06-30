@@ -151,6 +151,7 @@ fieldset.scos-qe-fieldset.inline-edit-col {
 	letter-spacing: .03em;
 	display: block;
 	margin-bottom: 2px;
+	width: unset !important;
 }
 
 .scos-qe-label select {

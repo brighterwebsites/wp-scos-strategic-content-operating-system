@@ -2,12 +2,17 @@
 /**
  * SCOS Schema Output - Graphed JSON-LD
  *
+ * v1.3 | 2026-06-29 — Guard inline Service block against admin template; no duplicate schema.
+ * v1.4 | 2026-06-29 — Read scos_seo_tldr + scos_schema_custom first; bw_ keys as fallback only.
+ *
  * Outputs consolidated @graph schema for all page types.
  * Uses template_redirect to ensure WordPress conditionals work.
  *
  * Meta fields used:
- * - bw_custom_schema: Custom JSON-LD to merge into @graph
+ * - scos_schema_custom: Custom JSON-LD to merge into @graph (primary; bw_custom_schema read as fallback)
+ * - scos_seo_tldr: TLDR/description text (primary; bw_tldr read as fallback)
  * - bw_breadcrumb_schema: Override breadcrumb label
+ * - bw_custom_schema: Legacy key — fallback only; TODO: remove once all sites resaved
  * - bw_purpose: Detect service pages (value: 'service-page')
  *
  * Kill Switch Controls:
@@ -17,7 +22,7 @@
  *
  * @package    BrighterCore
  * @subpackage Schema
- * @version    1.2 | 2026-06-01
+ * @version    1.3 | 2026-06-29
  * @since      1.0.0
  */
 
@@ -698,7 +703,10 @@ function bw_render_schema_graph() {
     
     if (is_singular('post')) {
         // Get TLDR for description (fallback to excerpt)
-        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        $tldr = get_post_meta($post_id, 'scos_seo_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'bw_tldr', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($tldr)) {
             $tldr = get_post_meta($post_id, 'tldr', true); // ACF fallback
         }
@@ -819,7 +827,10 @@ function bw_render_schema_graph() {
     
     if (is_singular('news')) {
         // Get TLDR for description (fallback to excerpt)
-        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        $tldr = get_post_meta($post_id, 'scos_seo_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'bw_tldr', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($tldr)) {
             $tldr = get_post_meta($post_id, 'tldr', true); // ACF fallback
         }
@@ -939,10 +950,22 @@ function bw_render_schema_graph() {
     
     if (is_singular('page')) {
         $purpose = get_post_meta($post_id, 'bw_purpose', true);
-        $has_custom_schema = !empty(get_post_meta($post_id, 'bw_custom_schema', true));
-        
-        // Only auto-generate Service schema if it's a service page AND no custom schema
-        if ($purpose === 'service-page' && !$has_custom_schema) {
+        $has_custom_schema = !empty(get_post_meta($post_id, 'scos_schema_custom', true))
+                          || !empty(get_post_meta($post_id, 'bw_custom_schema', true)); // TODO: remove bw_ fallback once all sites resaved
+
+        // Skip inline Service generation if the admin template block below will handle this page.
+        // That block fires when: purpose-auto is on, OR post ID is in the service IDs list.
+        $service_template_set = ( get_option( 'scos_site_schema_service', '' ) !== '' );
+        $service_purpose_auto = (bool) get_option( 'scos_site_schema_service_purpose_auto' );
+        $service_id_list      = bw_schema_parse_post_id_list( get_option( 'scos_site_schema_service_ids', '' ) );
+        $template_will_handle = $service_template_set && (
+            ( $service_purpose_auto && $purpose === 'service-page' ) ||
+            in_array( $post_id, $service_id_list, true )
+        );
+
+        // Only auto-generate the fallback inline Service schema when no custom schema AND
+        // the admin template block won't already output one for this page.
+        if ($purpose === 'service-page' && !$has_custom_schema && !$template_will_handle) {
             $description = get_post_meta($post_id, 'bw_service_description', true) ?: get_the_excerpt();
           
             $graph[] = [
@@ -1154,7 +1177,10 @@ function bw_render_schema_graph() {
     // ============================================
     
     if (is_singular() && $post_id) {
-        $custom_schema = get_post_meta($post_id, 'bw_custom_schema', true);
+        $custom_schema = get_post_meta($post_id, 'scos_schema_custom', true);
+        if (empty($custom_schema)) {
+            $custom_schema = get_post_meta($post_id, 'bw_custom_schema', true); // TODO: remove fallback once all sites resaved
+        }
         
         if (!empty($custom_schema)) {
             $decoded = json_decode(bw_schema_normalize_json_placeholders($custom_schema), true);

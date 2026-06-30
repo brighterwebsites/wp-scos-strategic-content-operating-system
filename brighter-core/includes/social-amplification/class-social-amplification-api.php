@@ -6,7 +6,10 @@
  *
  * @package BrighterCore
  * @subpackage SocialAmplification
- * @version 1.0.0
+ * @version 1.1.0
+ *
+ * v1.0 | original
+ * v1.1 | 2026-06-29 — Read scos_seo_tldr + scos_sa_shortlink_slug first; bw_ keys as fallback only.
  */
 
 if (!defined('ABSPATH')) exit;
@@ -287,7 +290,10 @@ class BW_Social_Amplification_API {
         $content_type = BW_Content_Type_Helper::get_content_type($post_id, $post->post_type);
         $purpose = get_post_meta($post_id, 'scos_ca_purpose', true) ?: get_post_meta($post_id, 'bw_purpose', true) ?: '';
         $intent  = get_post_meta($post_id, 'scos_ca_intent',  true) ?: get_post_meta($post_id, 'bw_intent',  true) ?: '';
-        $tldr    = get_post_meta($post_id, 'bw_tldr', true);
+        $tldr    = get_post_meta($post_id, 'scos_seo_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'bw_tldr', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($tldr)) {
             $tldr = get_the_excerpt($post_id) ?: '';
         }
@@ -461,8 +467,11 @@ class BW_Social_Amplification_API {
             return new WP_Error('invalid_post', 'Post not found', array('status' => 404));
         }
 
-        // Get breadcrumb
-        $breadcrumb = get_post_meta($post_id, '_bw_breadcrumb', true);
+        // Get breadcrumb (shortlink slug)
+        $breadcrumb = get_post_meta($post_id, 'scos_sa_shortlink_slug', true);
+        if (empty($breadcrumb)) {
+            $breadcrumb = get_post_meta($post_id, '_bw_breadcrumb', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($breadcrumb)) {
             // Fallback to sanitized title
             $breadcrumb = sanitize_title(substr($post->post_title, 0, 50));
@@ -544,12 +553,18 @@ class BW_Social_Amplification_API {
         }
 
         // Get post context
-        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        $tldr = get_post_meta($post_id, 'scos_seo_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'bw_tldr', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($tldr)) {
             $tldr = get_the_excerpt($post_id) ?: '';
         }
-        
-        $breadcrumb = get_post_meta($post_id, '_bw_breadcrumb', true);
+
+        $breadcrumb = get_post_meta($post_id, 'scos_sa_shortlink_slug', true);
+        if (empty($breadcrumb)) {
+            $breadcrumb = get_post_meta($post_id, '_bw_breadcrumb', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($breadcrumb)) {
             $breadcrumb = sanitize_title(substr($post->post_title, 0, 50));
         }

@@ -20,6 +20,7 @@
  * v1.3 | 2026-06-23 — Register scos-content-architecture ability category; load and wire CA_Suggest ability.
  * v1.4 | 2026-06-23 — Guard save() against recursive save_post loops triggered by internal wp_insert_post calls.
  * v1.5 | 2026-06-24 — Load Suggest_Topics ability; pass endpointTopics + currentTopicId/Name to JS localization.
+ * v1.6 | 2026-06-29 — Allow self-assignment in pillar and service pathway dropdowns (remove post exclude).
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -165,24 +166,25 @@ class Meta_Box {
 		if ( is_wp_error( $topics ) )   { $topics   = []; }
 
 		// ---- Pillar pages: posts with purpose = pillar ----
+		// No self-exclude: a pillar page can assign itself as its own pillar.
 		$pillar_pages = get_posts( [
 			'post_type'      => Taxonomies::get_post_types(),
 			'posts_per_page' => -1,
 			'post_status'    => 'publish',
 			'orderby'        => 'title',
 			'order'          => 'ASC',
-			'exclude'        => [ $post->ID ],
 			'meta_query'     => [ [ 'key' => 'scos_ca_purpose', 'value' => 'pillar' ] ],
 		] );
 
 		// ---- Service pathway pages: service, product, conversion-hub ----
+		// No self-exclude: a service/product/conversion-hub page can assign itself as
+		// its own pathway endpoint. Requires a save first so the purpose meta exists.
 		$service_pathway_pages = get_posts( [
 			'post_type'      => Taxonomies::get_post_types(),
 			'posts_per_page' => -1,
 			'post_status'    => 'publish',
 			'orderby'        => 'title',
 			'order'          => 'ASC',
-			'exclude'        => [ $post->ID ],
 			'meta_query'     => [
 				'relation' => 'OR',
 				[ 'key' => 'scos_ca_purpose', 'value' => 'service-page' ],

@@ -6,7 +6,10 @@
  *
  * @package BrighterCore
  * @subpackage SocialAmplification
- * @version 1.0.0
+ * @version 1.1.0
+ *
+ * v1.0 | original
+ * v1.1 | 2026-06-29 — Read scos_seo_tldr first; bw_tldr as fallback only.
  */
 
 if (!defined('ABSPATH')) exit;
@@ -211,7 +214,10 @@ class BW_Social_Webhook_Trigger {
     private function get_image_optimization_data($post_id) {
         // Get post content
         $post = get_post($post_id);
-        $tldr = get_post_meta($post_id, 'bw_tldr', true);
+        $tldr = get_post_meta($post_id, 'scos_seo_tldr', true);
+        if (empty($tldr)) {
+            $tldr = get_post_meta($post_id, 'bw_tldr', true); // TODO: remove fallback once all sites resaved
+        }
         if (empty($tldr)) {
             $tldr = get_the_excerpt($post_id) ?: '';
         }

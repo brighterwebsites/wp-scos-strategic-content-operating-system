@@ -4,7 +4,7 @@
  *
  * Registers a "Social Amplification" meta box on all supported post types.
  * Handles:
- *  - scos_sa_shortlink_slug save (also dual-writes to _bw_breadcrumb for YOURLS compat)
+ *  - scos_sa_shortlink_slug save (_bw_breadcrumb dual-write removed — consumers now read scos_sa_shortlink_slug first)
  *  - Enqueues JS for the Create Social Post button
  *
  * The button delegates to the existing bw_trigger_social_webhook AJAX action
@@ -14,6 +14,9 @@
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
  * @since      1.0.0
+ *
+ * v1.0 | 2026-05-01
+ * v1.1 | 2026-06-29 — Remove _bw_breadcrumb dual-write; consumers now read scos_sa_shortlink_slug first.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -107,8 +110,6 @@ class Meta_Box {
 			$slug = sanitize_title( $_POST['scos_sa_shortlink_slug'] );
 			if ( ! empty( $slug ) ) {
 				update_post_meta( $post_id, 'scos_sa_shortlink_slug', $slug );
-				// Dual-write: YOURLS helper reads _bw_breadcrumb as the keyword
-				update_post_meta( $post_id, '_bw_breadcrumb', $slug );
 			} else {
 				delete_post_meta( $post_id, 'scos_sa_shortlink_slug' );
 			}

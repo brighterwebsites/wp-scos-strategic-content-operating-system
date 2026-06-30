@@ -14,6 +14,7 @@
  * v1.1 | 2026-06-23
  * v1.2 | 2026-06-24 — Add topic_term_id + existing_intent_goal to input schema; inject <topic> and reassessment context into prompt.
  * v1.3 | 2026-06-24 — Prefer scos_ca_content_md (Breakdance + ACF rendered content) over raw post_content.
+ * v1.4 | 2026-06-30 — Query existing FAQs and inject into prompt for deduplication; parse matched_faq from AI response.
  */
 
 declare( strict_types=1 );
@@ -22,6 +23,7 @@ namespace SiteEssentials\Modules\ContentArchitecture\Abilities\CA_Suggest;
 
 use WP_Error;
 use WordPress\AI\Abstracts\Abstract_Ability;
+use SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver;
 
 use function WordPress\AI\get_post_context;
 use function WordPress\AI\normalize_content;
@@ -126,6 +128,20 @@ class CA_Suggest extends Abstract_Ability {
 		return [
 			'type'       => 'object',
 			'properties' => [
+				'matched_faq'  => [
+					'type'        => 'object',
+					'description' => 'An existing FAQ that matches or closely matches the content\'s search intent. Omitted when no match is found.',
+					'properties'  => [
+						'faq_id'        => [ 'type' => 'integer', 'description' => 'FAQ post ID.' ],
+						'match_quality' => [ 'type' => 'string', 'description' => '"good" = usable as-is. "close" = matches but could be improved.' ],
+						'suggested_edit' => [ 'type' => 'string', 'description' => 'Improved title when match_quality is "close". Null otherwise.' ],
+						'title'         => [ 'type' => 'string', 'description' => 'Existing FAQ title.' ],
+						'status'        => [ 'type' => 'string', 'description' => 'Post status.' ],
+						'topic'         => [ 'type' => 'string', 'description' => 'Assigned topic name.' ],
+						'edit_url'      => [ 'type' => 'string', 'description' => 'Admin edit URL for the FAQ.' ],
+						'incomplete'    => [ 'type' => 'boolean', 'description' => 'True when the FAQ has no answer yet.' ],
+					],
+				],
 				'intent_goals' => [
 					'type'        => 'array',
 					'description' => 'Suggested search intent goal statements, ordered by confidence.',
@@ -214,11 +230,12 @@ class CA_Suggest extends Abstract_Ability {
 				. implode( ' ', array_slice( $words, -500 ) );
 		}
 
-		$prompt = '';
+		$topic_term_id = (int) ( $args['topic_term_id'] ?? 0 );
+		$prompt        = '';
 
 		// Topic scoping context — when a topic is selected, scope the intent goal to it.
-		if ( ! empty( $args['topic_term_id'] ) ) {
-			$topic_term = get_term( (int) $args['topic_term_id'], 'scos_topic' );
+		if ( $topic_term_id > 0 ) {
+			$topic_term = get_term( $topic_term_id, 'scos_topic' );
 			if ( $topic_term && ! is_wp_error( $topic_term ) ) {
 				$prompt .= '<topic>' . esc_html( $topic_term->name ) . '</topic>' . "\n";
 			}
@@ -229,8 +246,8 @@ class CA_Suggest extends Abstract_Ability {
 		if ( $args['post_id'] ) {
 			$existing_faq_id = (int) get_post_meta( (int) $args['post_id'], 'scos_ca_intent_goal_faq_id', true );
 			if ( $existing_faq_id > 0 ) {
-				$existing_faq          = get_post( $existing_faq_id );
-				$current_intent_goal   = $existing_faq ? $existing_faq->post_title : '';
+				$existing_faq        = get_post( $existing_faq_id );
+				$current_intent_goal = $existing_faq ? $existing_faq->post_title : '';
 			}
 			if ( empty( $current_intent_goal ) ) {
 				$current_intent_goal = (string) get_post_meta( (int) $args['post_id'], 'scos_ca_intent_goal', true );
@@ -241,6 +258,12 @@ class CA_Suggest extends Abstract_Ability {
 		}
 		if ( ! empty( $current_intent_goal ) ) {
 			$prompt .= '<current_intent_goal>' . esc_html( $current_intent_goal ) . '</current_intent_goal>' . "\n";
+		}
+
+		// Existing FAQs — inject for deduplication check.
+		$existing_faqs_text = $this->get_existing_faqs_for_prompt( $topic_term_id );
+		if ( ! empty( $existing_faqs_text ) ) {
+			$prompt .= "<existing_faqs>\n" . $existing_faqs_text . "\n</existing_faqs>\n";
 		}
 
 		$prompt .= '<title>' . $title . '</title>' . "\n";
@@ -272,7 +295,7 @@ class CA_Suggest extends Abstract_Ability {
 
 		$parsed = json_decode( $json_str, true );
 
-		if ( ! is_array( $parsed ) || empty( $parsed['intent_goals'] ) ) {
+		if ( ! is_array( $parsed ) ) {
 			return new WP_Error(
 				'scos_suggest_parse_error',
 				__( 'AI response could not be parsed. Please try again.', 'site-essentials' ),
@@ -280,8 +303,30 @@ class CA_Suggest extends Abstract_Ability {
 			);
 		}
 
-		return [
-			'intent_goals' => array_map(
+		// Resolve matched_faq — validate the returned ID against the actual FAQ library.
+		$matched_faq = null;
+		if ( ! empty( $parsed['matched_faq'] ) && is_array( $parsed['matched_faq'] ) ) {
+			$matched_faq_id = (int) ( $parsed['matched_faq']['faq_id'] ?? 0 );
+			if ( $matched_faq_id > 0 ) {
+				$summary = Intent_Goal_Resolver::get_faq_summary( $matched_faq_id );
+				if ( $summary ) {
+					$matched_faq = array_merge(
+						$summary,
+						[
+							'match_quality'  => in_array( $parsed['matched_faq']['match_quality'] ?? '', [ 'good', 'close' ], true )
+								? $parsed['matched_faq']['match_quality']
+								: 'good',
+							'suggested_edit' => ! empty( $parsed['matched_faq']['suggested_edit'] )
+								? sanitize_text_field( (string) $parsed['matched_faq']['suggested_edit'] )
+								: null,
+						]
+					);
+				}
+			}
+		}
+
+		$intent_goals = ! empty( $parsed['intent_goals'] ) && is_array( $parsed['intent_goals'] )
+			? array_map(
 				function ( $item ) {
 					return [
 						'goal'       => sanitize_text_field( $item['goal'] ?? '' ),
@@ -289,8 +334,23 @@ class CA_Suggest extends Abstract_Ability {
 					];
 				},
 				$parsed['intent_goals']
-			),
-		];
+			)
+			: [];
+
+		if ( empty( $intent_goals ) && ! $matched_faq ) {
+			return new WP_Error(
+				'scos_suggest_parse_error',
+				__( 'AI response could not be parsed. Please try again.', 'site-essentials' ),
+				[ 'status' => 500 ]
+			);
+		}
+
+		$response = [ 'intent_goals' => $intent_goals ];
+		if ( $matched_faq ) {
+			$response['matched_faq'] = $matched_faq;
+		}
+
+		return $response;
 	}
 
 	/**
@@ -340,6 +400,82 @@ class CA_Suggest extends Abstract_Ability {
 	// -------------------------------------------------------------------------
 	// Private helpers
 	// -------------------------------------------------------------------------
+
+	/**
+	 * Build the <existing_faqs> prompt block for deduplication checking.
+	 *
+	 * Returns up to 30 FAQs tagged with the selected topic first, then up
+	 * to 20 more from other topics / no topic. Titles only — no content.
+	 * Returns an empty string when the FAQ library is empty.
+	 *
+	 * @param int $topic_term_id Selected scos_topic term ID, or 0.
+	 * @return string Ready-to-inject prompt block, or empty string.
+	 */
+	private function get_existing_faqs_for_prompt( int $topic_term_id ): string {
+		$lines    = [];
+		$seen_ids = [];
+
+		// Topic-matched FAQs first so the AI finds the best match early.
+		if ( $topic_term_id > 0 ) {
+			$topic_faqs = get_posts(
+				[
+					'post_type'      => 'faq',
+					'post_status'    => [ 'publish', 'draft' ],
+					'posts_per_page' => 30,
+					'no_found_rows'  => true,
+					'orderby'        => 'title',
+					'order'          => 'ASC',
+					'tax_query'      => [
+						[
+							'taxonomy' => 'scos_topic',
+							'field'    => 'term_id',
+							'terms'    => $topic_term_id,
+						],
+					],
+				]
+			);
+			if ( $topic_faqs ) {
+				$lines[] = '[Matching topic]';
+				foreach ( $topic_faqs as $faq ) {
+					$lines[]    = $faq->ID . ': ' . $faq->post_title;
+					$seen_ids[] = $faq->ID;
+				}
+			}
+		}
+
+		// All remaining FAQs — different topics or none assigned.
+		$other_args = [
+			'post_type'      => 'faq',
+			'post_status'    => [ 'publish', 'draft' ],
+			'posts_per_page' => 20,
+			'no_found_rows'  => true,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+		];
+		if ( ! empty( $seen_ids ) ) {
+			$other_args['post__not_in'] = $seen_ids;
+		}
+		$other_faqs = get_posts( $other_args );
+		if ( $other_faqs ) {
+			$lines[] = $topic_term_id > 0 ? '[Other topics / no topic]' : '[All FAQs]';
+			foreach ( $other_faqs as $faq ) {
+				$lines[] = $faq->ID . ': ' . $faq->post_title;
+			}
+		}
+
+		// Only 2 lines means only section headers — no actual FAQs.
+		if ( count( $lines ) <= ( $topic_term_id > 0 ? 1 : 1 ) ) {
+			return '';
+		}
+
+		// Need at least one actual FAQ line (not just headers).
+		$faq_lines = array_filter( $lines, fn( $l ) => false !== strpos( $l, ': ' ) );
+		if ( empty( $faq_lines ) ) {
+			return '';
+		}
+
+		return implode( "\n", $lines );
+	}
 
 }
 

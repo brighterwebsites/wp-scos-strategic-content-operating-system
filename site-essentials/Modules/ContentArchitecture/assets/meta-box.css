@@ -636,6 +636,56 @@
 	margin-left: 2px;
 }
 
+/* ═══════════════ MATCHED FAQ PANEL ═══════════════ */
+
+.scos-ca-match-found {
+	border-radius: 4px;
+	padding: 10px 12px;
+	margin-bottom: 12px;
+}
+
+.scos-ca-match-found--good {
+	background: #d1fae5;
+}
+
+.scos-ca-match-found--close {
+	background: #fef3c7;
+}
+
+.scos-ca-match-found__label {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	margin-bottom: 4px;
+}
+
+.scos-ca-match-found--good .scos-ca-match-found__label {
+	color: #065f46;
+}
+
+.scos-ca-match-found--close .scos-ca-match-found__label {
+	color: #92400e;
+}
+
+.scos-ca-match-found__title {
+	font-size: 13px;
+	font-weight: 500;
+	margin-bottom: 4px;
+}
+
+.scos-ca-match-found__edit {
+	font-size: 12px;
+	color: var(--scos-ink-muted, #666);
+	margin-bottom: 8px;
+}
+
+.scos-ca-match-found__actions {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
 /* ═══════════════ BACK BUTTON ═══════════════ */
 
 .scos-ca-modal-back {

@@ -378,6 +378,13 @@
 			);
 		});
 
+		// Allow scos-ca-suggest.js to link an existing FAQ via custom event.
+		document.addEventListener( 'scos:selectFaq', function ( e ) {
+			if ( e.detail && e.detail.id ) {
+				selectFaq( e.detail );
+			}
+		} );
+
 	} // end if faqModuleActive
 
 }(jQuery));

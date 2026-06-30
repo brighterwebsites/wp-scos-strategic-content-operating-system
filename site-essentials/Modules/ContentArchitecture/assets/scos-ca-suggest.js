@@ -17,6 +17,7 @@
  *
  * v2.0 | 2026-06-24
  * v2.1 | 2026-06-24 — Path C now shows suggestions and replaces linked FAQ.
+ * v2.2 | 2026-06-30 — Show matched_faq panel in step 2; dispatch scos:selectFaq to link existing FAQ.
  */
 
 ( function () {
@@ -232,10 +233,10 @@
 	}
 
 	// -------------------------------------------------------------------------
-	// Step 2 render — Intent Goal suggestions
+	// Step 2 render — Intent Goal suggestions (+ optional matched FAQ)
 	// -------------------------------------------------------------------------
 
-	function renderStep2( goals ) {
+	function renderStep2( goals, matchedFaq ) {
 		state.step = 2;
 		var path   = detectFillPath();
 
@@ -245,23 +246,51 @@
 		html += '<div class="scos-ca-step-header">Step 2 of 2 &mdash; Intent Goal'
 			+ ( topicLabel ? ' <span style="opacity:.7;">(scoped to: ' + escHtml( topicLabel ) + ')</span>' : '' )
 			+ '</div>';
-		html += '<h3 style="margin:4px 0 4px;font-size:13px;font-weight:600;">Suggested Intent Goals</h3>';
 
-		if ( path === 'faq-linked' ) {
-			html += '<p class="scos-ca-modal-note">An FAQ is already linked. Picking a suggestion will remove it and replace with a new FAQ.</p>';
-		} else {
-			html += '<p class="scos-ca-modal-note">Click a suggestion to fill the field. Save the post to keep changes.</p>';
+		// ── Matched FAQ panel ─────────────────────────────────────────────
+		if ( matchedFaq ) {
+			var isGood  = matchedFaq.match_quality === 'good';
+			var modCls  = isGood ? 'scos-ca-match-found--good' : 'scos-ca-match-found--close';
+			var matchLabel = isGood ? '&#10003; Existing FAQ matches' : '&#126; Similar FAQ found';
+
+			html += '<div class="scos-ca-match-found ' + modCls + '">';
+			html += '<div class="scos-ca-match-found__label">' + matchLabel + '</div>';
+			html += '<div class="scos-ca-match-found__title">' + escHtml( matchedFaq.title ) + '</div>';
+			if ( matchedFaq.suggested_edit ) {
+				html += '<div class="scos-ca-match-found__edit">Suggested edit: <em>' + escHtml( matchedFaq.suggested_edit ) + '</em></div>';
+			}
+			html += '<div class="scos-ca-match-found__actions">';
+			html += '<button type="button" class="button button-primary" id="scos-ca-link-existing-faq">Link this FAQ</button>';
+			html += '<a href="' + escAttr( matchedFaq.edit_url || '' ) + '" target="_blank" rel="noopener" class="button">Edit FAQ &#8599;</a>';
+			html += '</div>';
+			html += '</div>';
 		}
-		html += '<div class="scos-ca-pills">';
-		goals.forEach( function ( item ) {
-			var pct = Math.round( ( item.confidence || 0 ) * 100 );
-			html += '<button type="button" class="scos-ca-pill scos-ca-pill--goal"'
-				+ ' data-goal="' + escAttr( item.goal ) + '">';
-			html += escHtml( item.goal );
-			if ( pct > 0 ) html += ' <span style="opacity:.6;font-size:11px;">(' + pct + '%)</span>';
-			html += '</button>';
-		} );
-		html += '</div>';
+
+		// ── New suggestions ───────────────────────────────────────────────
+		if ( goals.length ) {
+			html += '<h3 style="margin:8px 0 4px;font-size:13px;font-weight:600;">'
+				+ ( matchedFaq ? 'Or create a new FAQ:' : 'Suggested Intent Goals' )
+				+ '</h3>';
+
+			if ( ! matchedFaq ) {
+				if ( path === 'faq-linked' ) {
+					html += '<p class="scos-ca-modal-note">An FAQ is already linked. Picking a suggestion will remove it and replace with a new FAQ.</p>';
+				} else {
+					html += '<p class="scos-ca-modal-note">Click a suggestion to fill the field. Save the post to keep changes.</p>';
+				}
+			}
+
+			html += '<div class="scos-ca-pills">';
+			goals.forEach( function ( item ) {
+				var pct = Math.round( ( item.confidence || 0 ) * 100 );
+				html += '<button type="button" class="scos-ca-pill scos-ca-pill--goal"'
+					+ ' data-goal="' + escAttr( item.goal ) + '">';
+				html += escHtml( item.goal );
+				if ( pct > 0 ) html += ' <span style="opacity:.6;font-size:11px;">(' + pct + '%)</span>';
+				html += '</button>';
+			} );
+			html += '</div>';
+		}
 
 		html += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">';
 		html += '<button type="button" id="scos-ca-back" class="scos-ca-modal-back">&larr; Back to Topics</button>';
@@ -270,6 +299,15 @@
 		html += '</div>';
 
 		modal.innerHTML = html;
+
+		// "Link this FAQ" — dispatch to meta-box.js via custom event.
+		var linkBtn = document.getElementById( 'scos-ca-link-existing-faq' );
+		if ( linkBtn && matchedFaq ) {
+			linkBtn.addEventListener( 'click', function () {
+				document.dispatchEvent( new CustomEvent( 'scos:selectFaq', { detail: matchedFaq } ) );
+				closeModal();
+			} );
+		}
 
 		modal.querySelectorAll( '.scos-ca-pill--goal' ).forEach( function ( pill ) {
 			pill.addEventListener( 'click', function () {
@@ -287,7 +325,6 @@
 		var backBtn = document.getElementById( 'scos-ca-back' );
 		if ( backBtn ) {
 			backBtn.addEventListener( 'click', function () {
-				// Restore step 1 from cache — no second API call.
 				if ( state.step1Results ) {
 					renderStep1( state.step1Results );
 				} else {
@@ -344,14 +381,14 @@
 			},
 		} )
 			.then( function ( data ) {
-				var goals = data.intent_goals || [];
-				if ( ! goals.length ) {
+				var goals      = data.intent_goals || [];
+				var matchedFaq = data.matched_faq || null;
+				if ( ! goals.length && ! matchedFaq ) {
 					throw new Error( 'No intent goal suggestions returned. Please try again.' );
 				}
-				renderStep2( goals );
+				renderStep2( goals, matchedFaq );
 			} )
 			.catch( function ( err ) {
-				// On step 2 failure, show error inside modal with back button.
 				modal.innerHTML = '<div class="scos-ca-modal-inner">'
 					+ '<p style="color:#cc0000;font-size:12px;">' + escHtml( err.message || 'Something went wrong.' ) + '</p>'
 					+ '<div style="margin-top:8px;display:flex;gap:8px;">'

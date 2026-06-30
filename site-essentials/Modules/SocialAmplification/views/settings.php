@@ -648,28 +648,28 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 
       <div class="scos-support__grid">
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/brand-core.md' ) ); ?>"
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/301-social-brand-voice.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
-          <strong>brand-core.md</strong>
+          <strong>301-social-brand-voice.md</strong>
           <span><?php esc_html_e( 'Brand voice for social media — how your posts should sound, tone, style, and personality.', 'site-essentials' ); ?></span>
         </a>
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/vocabulary.md' ) ); ?>"
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/302-social-media-meta.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
-          <strong>vocabulary.md</strong>
-          <span><?php esc_html_e( 'Words and phrases to use and never use in generated content.', 'site-essentials' ); ?></span>
-        </a>
-
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/social-media.md' ) ); ?>"
-           target="_blank" rel="noopener" class="scos-support__tile">
-          <strong>social-media.md</strong>
+          <strong>302-social-media-meta.md</strong>
           <span><?php esc_html_e( 'Rules for Facebook & Instagram posts — word length, hashtag and emoji usage, link inclusion.', 'site-essentials' ); ?></span>
         </a>
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/social-media-gmb.md' ) ); ?>"
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/303-social-media-gmb.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
-          <strong>social-media-gmb.md</strong>
+          <strong>303-social-media-gmb.md</strong>
           <span><?php esc_html_e( 'Rules for Google Business posts — ensures GMB terms of use compliance (no contact details or URLs in body).', 'site-essentials' ); ?></span>
+        </a>
+
+        <a href="<?php echo esc_url( content_url( 'ai-knowledge/304-brand-vocabulary.md' ) ); ?>"
+           target="_blank" rel="noopener" class="scos-support__tile">
+          <strong>304-brand-vocabulary.md</strong>
+          <span><?php esc_html_e( 'Words and phrases to use and never use in generated content.', 'site-essentials' ); ?></span>
         </a>
 
       </div>

@@ -1,0 +1,82 @@
+/* =========================================================================
+   SCOS SEO Meta — Admin List Table Columns
+   (edit.php — column display, quick edit fields, taxonomy checklist hide)
+   ========================================================================= */
+
+/* ---- Hide redundant taxonomy checklists in Quick Edit ----
+   WP always renders hidden inputs (tax_input[scos_topic][], etc.) that
+   preserve existing terms on save, so the visible checklists are redundant
+   noise. The hidden inputs keep terms intact without any JS needed.        */
+ul.cat-checklist.scos_topic-checklist,
+ul.cat-checklist.scos_content_cluster-checklist {
+	display: none;
+}
+
+/* ---- Column sizing ---- */
+.column-scos_seo_title {
+	width: 160px;
+}
+
+.column-scos_seo_desc {
+	width: 200px;
+}
+
+/* ---- Column text (shared with CA — safe to re-declare) ---- */
+.scos-col-empty {
+	color: #9ca3af;
+	font-size: 12px;
+}
+
+.scos-col-text {
+	font-size: 11px;
+	color: #374151;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	cursor: help;
+}
+
+/* ---- Quick Edit panel wrapper (matches CA panel style) ---- */
+fieldset.scos-qe-fieldset.inline-edit-col {
+	background: #fff;
+	padding: 10px !important;
+	border-radius: 4px;
+}
+
+/* ---- Quick Edit fields ---- */
+.scos-seo-qe-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 6px;
+}
+
+.scos-seo-qe-label--wide {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: 12px;
+}
+
+.scos-seo-qe-label--wide .title {
+	font-weight: 600;
+	color: #3c434a;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .03em;
+	display: block;
+	margin-bottom: 2px;
+}
+
+.scos-seo-qe-input,
+.scos-seo-qe-textarea {
+	font-size: 12px;
+	padding: 4px 6px;
+	box-sizing: border-box;
+}
+
+.scos-seo-qe-textarea {
+	resize: vertical;
+	min-height: 56px;
+}

@@ -6,9 +6,10 @@
  * prompt, calls the Anthropic Messages API, and parses the JSON caption response.
  *
  * Knowledge files (all optional — missing files are silently skipped):
- *   brand-core.md   — brand identity, tone, positioning
- *   vocabulary.md   — approved / banned word list
- *   social-media.md — platform-specific rules and formatting
+ *   301-social-brand-voice.md — brand identity, tone, positioning
+ *   302-social-media-meta.md  — platform-specific rules and formatting
+ *   303-social-media-gmb.md   — Google Business post rules
+ *   304-brand-vocabulary.md   — approved / banned word list
  *
  * Automatically writes wp-content/ai-knowledge/.htaccess if the folder
  * exists but the file does not, so HTTP access is blocked from day one.
@@ -31,10 +32,10 @@ class Anthropic_Client {
 
 	/** Knowledge files relative to WP_CONTENT_DIR/ai-knowledge/ */
 	const KNOWLEDGE_FILES = [
-		'brand_core'   => 'brand-core.md',
-		'vocabulary'   => 'vocabulary.md',
-		'social_media' => 'social-media.md',
-		'gmb_rules'    => 'social-media-gmb.md',
+		'brand_core'   => '301-social-brand-voice.md',
+		'social_media' => '302-social-media-meta.md',
+		'gmb_rules'    => '303-social-media-gmb.md',
+		'vocabulary'   => '304-brand-vocabulary.md',
 	];
 
 	/**
@@ -374,7 +375,7 @@ class Anthropic_Client {
 		if ( ! empty( $knowledge['gmb_rules'] ) ) {
 			$parts[] = "[GMB RULES]\n\n{$knowledge['gmb_rules']}";
 		} else {
-			error_log( self::LOG_PREFIX . ' social-media-gmb.md missing. Falling back to inline GMB rules.' );
+			error_log( self::LOG_PREFIX . ' 303-social-media-gmb.md missing. Falling back to inline GMB rules.' );
 			$parts[] = "[GMB RULES]\n\n"
 				. "- No URLs in caption body.\n"
 				. "- No phone numbers.\n"

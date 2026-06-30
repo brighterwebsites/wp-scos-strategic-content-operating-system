@@ -106,10 +106,16 @@
 }
 
 /* ---- Quick/Bulk edit panel ---- */
-.scos-qe-fieldset {
+fieldset.scos-qe-fieldset {
 	border: 0;
 	margin: 0;
 	padding: 0;
+}
+
+fieldset.scos-qe-fieldset.inline-edit-col {
+	background: #fff;
+	padding: 10px !important;
+	border-radius: 4px;
 }
 
 .scos-qe-title {
@@ -118,7 +124,7 @@
 	color: #1d2327;
 	text-transform: uppercase;
 	letter-spacing: .05em;
-	margin: 10px 0 8px;
+	margin: 4px 0 10px;
 	padding: 0;
 }
 
@@ -130,10 +136,11 @@
 }
 
 .scos-qe-label {
-	display: flex;
+	display: flex !important;
 	flex-direction: column;
 	gap: 3px;
 	font-size: 12px;
+	min-width: 200px;
 }
 
 .scos-qe-label .title {
@@ -142,12 +149,20 @@
 	font-size: 11px;
 	text-transform: uppercase;
 	letter-spacing: .03em;
+	display: block;
+	margin-bottom: 2px;
 }
 
 .scos-qe-label select {
 	font-size: 12px;
 	height: 28px;
 	padding: 0 6px;
+}
+
+/* ---- Hide Pillar Page — kept in PHP/DB for data integrity, hidden from UI ---- */
+label:has( select[name="scos_ca_qe_pillar_page_id"] ),
+label:has( select[name="scos_ca_be_pillar_page_id"] ) {
+	display: none !important;
 }
 
 /* ---- Progress tags in quick/bulk edit ---- */

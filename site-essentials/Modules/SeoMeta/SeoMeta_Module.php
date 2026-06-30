@@ -17,7 +17,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.0.0
+ * @version    1.1.0
+ *
+ * v1.1 | 2026-06-30 — Admin columns (SEO Title, SEO Desc) + Quick Edit for Title, Description, Breadcrumb.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -77,6 +79,7 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/Exif_Stripper.php';
 		require_once __DIR__ . '/Redirections.php';
 		require_once __DIR__ . '/Author_SEO.php';
+		require_once __DIR__ . '/Admin_Columns.php';
 
 		Meta_Fields::init();
 		Meta_Box::init();
@@ -87,6 +90,7 @@ class SeoMeta_Module implements Module_Interface {
 		Exif_Stripper::init();
 		Redirections::init();
 		Author_SEO::init();
+		Admin_Columns::init();
 	}
 
 	/**

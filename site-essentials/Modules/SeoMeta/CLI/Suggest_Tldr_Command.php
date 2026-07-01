@@ -9,6 +9,7 @@
  *
  * v1.0 | 2026-07-01
  * v1.1 | 2026-07-01 — Use wp_get_ability() + execute() instead of direct instantiation.
+ * v1.2 | 2026-07-01 — Fix --apply and table output to extract text field from tldr_options objects.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta\CLI
@@ -103,7 +104,7 @@ class Suggest_Tldr_Command extends WP_CLI_Command {
 		}
 
 		if ( $apply ) {
-			$top_tldr = $result['tldr_options'][0] ?? null;
+			$top_tldr = $result['tldr_options'][0]['text'] ?? null;
 			if ( $top_tldr ) {
 				update_post_meta( $post_id, 'scos_seo_tldr', sanitize_text_field( $top_tldr ) );
 				WP_CLI::success( "Applied TLDR to post {$post_id}: \"{$top_tldr}\"" );
@@ -137,7 +138,7 @@ class Suggest_Tldr_Command extends WP_CLI_Command {
 		foreach ( $tldr_options as $i => $tldr ) {
 			$rows[] = [
 				'#'    => $i + 1,
-				'TLDR' => $tldr,
+				'TLDR' => $tldr['text'] ?? '',
 			];
 		}
 

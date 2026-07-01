@@ -11,6 +11,7 @@
  *
  * v1.0 | 2026-07-01
  * v1.1 | 2026-07-01 — Use wp_get_ability() + execute() instead of direct instantiation.
+ * v1.2 | 2026-07-01 — Fix --apply and table output to extract scalar fields from option objects.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta\CLI
@@ -106,19 +107,19 @@ class Suggest_Seo_Meta_Command extends WP_CLI_Command {
 		if ( $apply ) {
 			$saved = [];
 
-			$breadcrumb = $result['breadcrumb_options'][0] ?? null;
+			$breadcrumb = $result['breadcrumb_options'][0]['label'] ?? null;
 			if ( $breadcrumb ) {
 				update_post_meta( $post_id, 'scos_seo_breadcrumb_title', sanitize_text_field( $breadcrumb ) );
 				$saved[] = "breadcrumb: \"{$breadcrumb}\"";
 			}
 
-			$title = $result['title_options'][0] ?? null;
+			$title = $result['title_options'][0]['title'] ?? null;
 			if ( $title ) {
 				update_post_meta( $post_id, 'scos_seo_title', sanitize_text_field( $title ) );
 				$saved[] = "title: \"{$title}\"";
 			}
 
-			$description = $result['description_options'][0] ?? null;
+			$description = $result['description_options'][0]['description'] ?? null;
 			if ( $description ) {
 				update_post_meta( $post_id, 'scos_seo_description', sanitize_text_field( $description ) );
 				$saved[] = "description: \"{$description}\"";
@@ -144,23 +145,23 @@ class Suggest_Seo_Meta_Command extends WP_CLI_Command {
 			[
 				'Field'       => 'Breadcrumb Title',
 				'Meta Key'    => 'scos_seo_breadcrumb_title',
-				'#1 Option'   => $result['breadcrumb_options'][0] ?? '—',
-				'#2 Option'   => $result['breadcrumb_options'][1] ?? '—',
-				'#3 Option'   => $result['breadcrumb_options'][2] ?? '—',
+				'#1 Option'   => $result['breadcrumb_options'][0]['label'] ?? '—',
+				'#2 Option'   => $result['breadcrumb_options'][1]['label'] ?? '—',
+				'#3 Option'   => $result['breadcrumb_options'][2]['label'] ?? '—',
 			],
 			[
 				'Field'       => 'Meta Title',
 				'Meta Key'    => 'scos_seo_title',
-				'#1 Option'   => $result['title_options'][0] ?? '—',
-				'#2 Option'   => $result['title_options'][1] ?? '—',
-				'#3 Option'   => $result['title_options'][2] ?? '—',
+				'#1 Option'   => $result['title_options'][0]['title'] ?? '—',
+				'#2 Option'   => $result['title_options'][1]['title'] ?? '—',
+				'#3 Option'   => $result['title_options'][2]['title'] ?? '—',
 			],
 			[
 				'Field'       => 'Meta Description',
 				'Meta Key'    => 'scos_seo_description',
-				'#1 Option'   => isset( $result['description_options'][0] ) ? substr( $result['description_options'][0], 0, 60 ) . '…' : '—',
-				'#2 Option'   => isset( $result['description_options'][1] ) ? substr( $result['description_options'][1], 0, 60 ) . '…' : '—',
-				'#3 Option'   => isset( $result['description_options'][2] ) ? substr( $result['description_options'][2], 0, 60 ) . '…' : '—',
+				'#1 Option'   => isset( $result['description_options'][0]['description'] ) ? substr( $result['description_options'][0]['description'], 0, 60 ) . '…' : '—',
+				'#2 Option'   => isset( $result['description_options'][1]['description'] ) ? substr( $result['description_options'][1]['description'], 0, 60 ) . '…' : '—',
+				'#3 Option'   => isset( $result['description_options'][2]['description'] ) ? substr( $result['description_options'][2]['description'], 0, 60 ) . '…' : '—',
 			],
 		];
 

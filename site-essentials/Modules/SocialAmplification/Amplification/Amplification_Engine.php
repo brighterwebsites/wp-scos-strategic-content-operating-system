@@ -30,6 +30,53 @@ class Amplification_Engine {
 	const LOG_PREFIX         = '[SCOS SMA Engine]';
 
 	// ──────────────────────────────────────────────────────────────────────────
+	// Channel resolution
+	// ──────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Build the channel ID list for standard social posts.
+	 * Combines per-platform IDs (Facebook, Instagram) and the legacy Others field.
+	 *
+	 * @return string[]
+	 */
+	private static function get_standard_channel_ids(): array {
+		$ids = [];
+
+		$fb_id = trim( (string) get_option( 'scos_sa_postly_fb_channel_id', '' ) );
+		if ( $fb_id && get_option( 'scos_sa_postly_fb_enabled', '1' ) !== '0' ) {
+			$ids[] = $fb_id;
+		}
+
+		$ig_id = trim( (string) get_option( 'scos_sa_postly_ig_channel_id', '' ) );
+		if ( $ig_id && get_option( 'scos_sa_postly_ig_enabled', '1' ) !== '0' ) {
+			$ids[] = $ig_id;
+		}
+
+		$others_raw = (string) get_option( 'bw_postly_channel_ids', '' );
+		foreach ( array_filter( array_map( 'trim', explode( ',', $others_raw ) ) ) as $id ) {
+			$ids[] = $id;
+		}
+
+		return array_values( array_unique( array_filter( $ids ) ) );
+	}
+
+	/**
+	 * Get the configured GMB channel ID (new key with legacy fallback).
+	 * Public so CLI and external callers can check without instantiating.
+	 */
+	public static function resolve_gmb_channel_id(): string {
+		$id = trim( (string) get_option( 'scos_sa_postly_gmb_channel_id', '' ) );
+		if ( '' !== $id ) {
+			return $id;
+		}
+		return trim( (string) get_option( 'se_postly_gmb_channel_id', '' ) );
+	}
+
+	private static function get_gmb_channel_id(): string {
+		return self::resolve_gmb_channel_id();
+	}
+
+	// ──────────────────────────────────────────────────────────────────────────
 	// Entry point
 	// ──────────────────────────────────────────────────────────────────────────
 
@@ -107,9 +154,18 @@ class Amplification_Engine {
 
 		error_log( self::LOG_PREFIX . ' Base schedule (standard default): ' . $base_dt->format( 'Y-m-d H:i T' ) . " (window {$time_min_str}–{$time_max_str})" );
 
-		$platform_configs = self::get_platform_configs();
-		$run_standard     = array_key_exists( 'run_standard', $options ) ? (bool) $options['run_standard'] : true;
-		$run_gmb          = array_key_exists( 'run_gmb', $options ) ? (bool) $options['run_gmb'] : true;
+		// ── 6. Resolve per-post-type config ─────────────────────────────────
+		$pt_config = \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::get_config(
+			$post->post_type
+		);
+
+		$run_standard = array_key_exists( 'run_standard', $options ) ? (bool) $options['run_standard'] : true;
+		$run_gmb      = array_key_exists( 'run_gmb', $options ) ? (bool) $options['run_gmb'] : true;
+
+		// Override post_count if passed explicitly via CLI/ability options.
+		if ( isset( $options['post_count'] ) ) {
+			$pt_config['post_count'] = max( 1, (int) $options['post_count'] );
+		}
 
 		$standard_results = [];
 		$gmb_results      = [];
@@ -118,7 +174,7 @@ class Amplification_Engine {
 			$standard_results = self::run_standard_flow(
 				$post_id,
 				$context,
-				$platform_configs['standard'],
+				$pt_config,
 				$timezone,
 				$options['standard_schedule_at'] ?? $base_dt
 			);
@@ -128,7 +184,6 @@ class Amplification_Engine {
 			$gmb_results = self::run_gmb_flow(
 				$post_id,
 				$context,
-				$platform_configs['gmb'],
 				$timezone,
 				$options['gmb_schedule_at'] ?? null
 			);
@@ -136,7 +191,7 @@ class Amplification_Engine {
 
 		error_log( self::LOG_PREFIX . " ── Run complete for post #{$post_id} ──" );
 
-		// ── 6. Log results ───────────────────────────────────────────────────
+		// ── 7. Log results ───────────────────────────────────────────────────
 		$log_entry = [
 			'post_id'         => $post_id,
 			'ran_at'          => current_time( 'mysql' ),
@@ -162,10 +217,14 @@ class Amplification_Engine {
 		return wp_trim_words( wp_strip_all_tags( $post->post_content ), 40, '...' );
 	}
 
+	/**
+	 * @deprecated Replaced by per-post-type config from Post_Type_Config::get_config().
+	 *             Retained for external callers that may still reference this method.
+	 */
 	private static function get_platform_configs(): array {
 		return [
 			'standard' => [
-				'count'    => 3,
+				'count'    => max( 1, (int) get_option( 'scos_sa_postly_post_count', 3 ) ),
 				'gap_days' => 42,
 				'adapter'  => 'standard',
 			],
@@ -177,42 +236,46 @@ class Amplification_Engine {
 		];
 	}
 
+	/**
+	 * @param array $pt_config  Resolved config from Post_Type_Config::get_config().
+	 *                          Keys: post_count, frames, no_featured, no_attachments,
+	 *                          acf_gallery_keys, max_images.
+	 */
 	private static function run_standard_flow(
 		int $post_id,
 		array $context,
-		array $config,
+		array $pt_config,
 		string $timezone,
 		\DateTimeImmutable $base_dt
 	): array {
-		$channel_ids = array_filter( array_map(
-			'trim',
-			explode( ',', (string) get_option( 'bw_postly_channel_ids', '' ) )
-		) );
+		$channel_ids = self::get_standard_channel_ids();
 
 		if ( empty( $channel_ids ) ) {
-			error_log( self::LOG_PREFIX . ' Standard not configured: bw_postly_channel_ids is blank. Skipping standard flow.' );
+			error_log( self::LOG_PREFIX . ' Standard not configured: no channel IDs found. Skipping standard flow.' );
 			return [];
 		}
 
 		$api_key      = get_option( 'bw_postly_api_key', '' );
 		$workspace_id = get_option( 'bw_postly_workspace_id', '' );
-		error_log( self::LOG_PREFIX . " Standard flow workspace: {$workspace_id} | channels: " . implode( ',', $channel_ids ) . " | tz: {$timezone}" );
+		$post_count   = max( 1, (int) ( $pt_config['post_count'] ?? 3 ) );
+		$gap_days     = 42;
+		$frames       = $pt_config['frames'] ?? [];
+		error_log( self::LOG_PREFIX . " Standard flow workspace: {$workspace_id} | channels: " . implode( ',', $channel_ids ) . " | count: {$post_count} | tz: {$timezone}" );
 
-		$all_images = self::collect_images( $post_id );
+		$all_images = self::collect_images( $post_id, $pt_config );
 		error_log( self::LOG_PREFIX . ' Standard images collected: ' . count( $all_images ) . ' — ' . implode( ', ', array_map( 'basename', $all_images ) ) );
-		$image_sets = self::build_image_sets( $all_images );
+		$image_sets = self::build_image_sets( $all_images, $post_count, (int) ( $pt_config['max_images'] ?? self::IMAGES_PER_POST ) );
 
-		error_log( self::LOG_PREFIX . ' Calling Anthropic for standard captions…' );
-		$captions = Anthropic_Client::generate_captions( $context );
+		error_log( self::LOG_PREFIX . " Calling Anthropic for {$post_count} standard captions…" );
+		$captions = Anthropic_Client::generate_captions( $context, $frames, $post_count );
 		$client   = new Postly_Client( $api_key, $workspace_id, $channel_ids );
 
 		$post_results = [];
-		$caption_keys = [ 'post_1', 'post_2', 'post_3' ];
 
-		for ( $i = 0; $i < (int) $config['count']; $i++ ) {
-			$offset_days = (int) $config['gap_days'] * $i;
+		for ( $i = 0; $i < $post_count; $i++ ) {
+			$offset_days = $gap_days * $i;
 			$schedule_dt = $base_dt->modify( "+{$offset_days} days" );
-			$caption_key = $caption_keys[ $i ] ?? 'post_1';
+			$caption_key = 'post_' . ( $i + 1 );
 			$caption     = $captions[ $caption_key ] ?? '';
 
 			error_log( self::LOG_PREFIX . " Standard slot " . ( $i + 1 ) . ": scheduled {$schedule_dt->format('Y-m-d H:i')} | images from set " . count( $image_sets[ $i ] ?? [] ) );
@@ -257,13 +320,12 @@ class Amplification_Engine {
 	private static function run_gmb_flow(
 		int $post_id,
 		array $context,
-		array $config,
 		string $timezone,
 		?\DateTimeImmutable $base_dt = null
 	): array {
-		$gmb_channel_id = trim( (string) get_option( 'se_postly_gmb_channel_id', '' ) );
+		$gmb_channel_id = self::get_gmb_channel_id();
 		if ( '' === $gmb_channel_id ) {
-			error_log( self::LOG_PREFIX . ' GMB not configured: se_postly_gmb_channel_id is blank. Skipping GMB flow.' );
+			error_log( self::LOG_PREFIX . ' GMB not configured: scos_sa_postly_gmb_channel_id / se_postly_gmb_channel_id is blank. Skipping GMB flow.' );
 			return [];
 		}
 
@@ -404,46 +466,61 @@ class Amplification_Engine {
 	}
 
 	/**
-	 * Collect all candidate images: featured + ACF gallery fields.
-	 * Returns array of publicly accessible image URLs, deduplicated.
+	 * Collect all candidate images for a post using the per-type config.
 	 *
+	 * Config keys used:
+	 *   no_featured      — skip the WP featured image
+	 *   no_attachments   — skip post image attachments (not currently fetched by default,
+	 *                      but governs future attachment-scan logic)
+	 *   acf_gallery_keys — comma-separated ACF field keys (overrides global option when
+	 *                      set to a non-empty string in per-type config)
+	 *
+	 * Falls back gracefully: if ACF gallery key doesn't exist on this post type the key
+	 * simply returns empty and the engine continues with whatever images it found.
+	 *
+	 * @param  int   $post_id
+	 * @param  array $config  Resolved config from Post_Type_Config::get_config().
 	 * @return string[]
 	 */
-	private static function collect_images( int $post_id ): array {
-		$urls = [];
+	private static function collect_images( int $post_id, array $config = [] ): array {
+		$urls         = [];
+		$no_featured  = ! empty( $config['no_featured'] );
+		$acf_keys_raw = isset( $config['acf_gallery_keys'] )
+			? (string) $config['acf_gallery_keys']
+			: (string) get_option( 'bw_social_acf_gallery_keys', '' );
 
-		// Featured image
-		$featured_id = get_post_thumbnail_id( $post_id );
-		if ( $featured_id ) {
-			// Check for custom ACF key override
-			$featured_key = get_option( 'bw_social_acf_featured_key', '' );
-			if ( $featured_key ) {
-				$acf_featured = get_post_meta( $post_id, $featured_key, true );
-				if ( $acf_featured ) {
-					$url = is_array( $acf_featured ) ? ( $acf_featured['url'] ?? '' ) : (string) $acf_featured;
-					if ( $url ) {
-						$urls[] = $url;
+		// Featured image (unless disabled)
+		if ( ! $no_featured ) {
+			$featured_id = get_post_thumbnail_id( $post_id );
+			if ( $featured_id ) {
+				// Check for custom ACF key override (global option, not per-type)
+				$featured_key = get_option( 'bw_social_acf_featured_key', '' );
+				if ( $featured_key ) {
+					$acf_featured = get_post_meta( $post_id, $featured_key, true );
+					if ( $acf_featured ) {
+						$url = is_array( $acf_featured ) ? ( $acf_featured['url'] ?? '' ) : (string) $acf_featured;
+						if ( $url ) {
+							$urls[] = $url;
+						}
 					}
 				}
-			}
-			if ( empty( $urls ) ) {
-				$src = wp_get_attachment_image_url( $featured_id, 'large' );
-				if ( $src ) {
-					$urls[] = $src;
+				if ( empty( $urls ) ) {
+					$src = wp_get_attachment_image_url( $featured_id, 'large' );
+					if ( $src ) {
+						$urls[] = $src;
+					}
 				}
 			}
 		}
 
 		// ACF gallery fields
-		$gallery_keys_raw = get_option( 'bw_social_acf_gallery_keys', '' );
-		if ( $gallery_keys_raw ) {
-			$gallery_keys = array_filter( array_map( 'trim', explode( ',', $gallery_keys_raw ) ) );
+		if ( $acf_keys_raw ) {
+			$gallery_keys = array_filter( array_map( 'trim', explode( ',', $acf_keys_raw ) ) );
 			foreach ( $gallery_keys as $key ) {
 				$gallery = get_post_meta( $post_id, $key, true );
 				if ( ! $gallery ) {
-					continue;
+					continue; // Key absent or empty — fail gracefully
 				}
-				// ACF gallery returns array of image arrays [{ID, url, ...}] or array of IDs
 				if ( is_array( $gallery ) ) {
 					foreach ( $gallery as $img ) {
 						if ( is_array( $img ) ) {
@@ -466,31 +543,41 @@ class Amplification_Engine {
 	}
 
 	/**
-	 * Divide collected images into three sets following the spec rules.
+	 * Divide collected images into N sets for N social posts.
 	 *
-	 * - ≥ 5 images: Post1 = first 4, Post2 = last 4, Post3 = random 4.
-	 * - < 5 images: all three posts get the same set (up to 4 images).
+	 * - ≥ (max_per_post + 1) images: vary sets across posts.
+	 * - Fewer images: all posts share the same set.
 	 *
 	 * @param  string[] $images
-	 * @return array[]  3-element array of image URL sets.
+	 * @param  int      $post_count   Number of social posts being created.
+	 * @param  int      $max_per_post Max images per post slot.
+	 * @return array[]  $post_count-element array of image URL sets.
 	 */
-	private static function build_image_sets( array $images ): array {
-		$n = count( $images );
+	private static function build_image_sets( array $images, int $post_count = 3, int $max_per_post = self::IMAGES_PER_POST ): array {
+		$max_per_post = max( 1, $max_per_post );
+		$n            = count( $images );
+		$sets         = [];
 
-		if ( $n >= 5 ) {
-			// Post 1: first 4
-			$set1 = array_slice( $images, 0, self::IMAGES_PER_POST );
-			// Post 2: last 4
-			$set2 = array_slice( $images, -self::IMAGES_PER_POST );
-			// Post 3: random 4
-			$pool = $images;
+		if ( $n >= ( $max_per_post + 1 ) ) {
+			// Enough images to vary: post 1 = first N, post 2 = last N, rest = random N.
+			$sets[0] = array_slice( $images, 0, $max_per_post );
+			$sets[1] = array_slice( $images, -$max_per_post );
+			$pool    = $images;
 			shuffle( $pool );
-			$set3 = array_slice( $pool, 0, self::IMAGES_PER_POST );
+			$random = array_slice( $pool, 0, $max_per_post );
+			for ( $i = 0; $i < $post_count; $i++ ) {
+				if ( ! isset( $sets[ $i ] ) ) {
+					$sets[ $i ] = $random;
+				}
+			}
 		} else {
-			$set1 = $set2 = $set3 = array_slice( $images, 0, self::IMAGES_PER_POST );
+			$base = array_slice( $images, 0, $max_per_post );
+			for ( $i = 0; $i < $post_count; $i++ ) {
+				$sets[ $i ] = $base;
+			}
 		}
 
-		return [ $set1, $set2, $set3 ];
+		return $sets;
 	}
 
 	/**

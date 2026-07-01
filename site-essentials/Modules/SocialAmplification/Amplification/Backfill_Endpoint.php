@@ -57,6 +57,12 @@ class Backfill_Endpoint {
 					'default'           => 5,
 					'sanitize_callback' => 'absint',
 				],
+				'slot_gap_days' => [
+					'required'          => false,
+					'type'              => 'integer',
+					'default'           => 0,
+					'sanitize_callback' => 'absint',
+				],
 			],
 		] );
 	}
@@ -75,10 +81,11 @@ class Backfill_Endpoint {
 	}
 
 	public static function handle( \WP_REST_Request $request ): \WP_REST_Response {
-		$post_ids  = (array) $request->get_param( 'post_ids' );
-		$date_from = (string) $request->get_param( 'date_from' );
-		$date_to   = (string) $request->get_param( 'date_to' );
-		$limit     = max( 1, min( 100, (int) $request->get_param( 'limit' ) ) );
+		$post_ids     = (array) $request->get_param( 'post_ids' );
+		$date_from    = (string) $request->get_param( 'date_from' );
+		$date_to      = (string) $request->get_param( 'date_to' );
+		$limit        = max( 1, min( 100, (int) $request->get_param( 'limit' ) ) );
+		$slot_gap     = min( 365, absint( $request->get_param( 'slot_gap_days' ) ?: get_option( 'scos_sa_backfill_slot_gap_days', 0 ) ) );
 
 		$posts = self::resolve_posts( $post_ids, $date_from, $date_to, $limit );
 		if ( is_wp_error( $posts ) ) {
@@ -88,17 +95,37 @@ class Backfill_Endpoint {
 			], 400 );
 		}
 
+		$timezone  = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
+		$tz        = new \DateTimeZone( $timezone );
+		$base_dt   = ( new \DateTimeImmutable( 'now', $tz ) )->modify( '+1 day' )->setTime( 9, 0, 0 );
+		$gap_days  = max( 0, $slot_gap );
+
 		$results = [];
+		$slot_offset = 0;
+
 		foreach ( $posts as $post ) {
 			try {
-				$result = Amplification_Engine::run( (int) $post->ID );
+				$schedule_at = $gap_days > 0
+					? $base_dt->modify( '+' . ( $gap_days * $slot_offset ) . ' days' )
+					: null;
+
+				$options = [];
+				if ( $schedule_at ) {
+					$options['standard_schedule_at'] = $schedule_at;
+				}
+
+				$result = Amplification_Engine::run( (int) $post->ID, $options );
 				update_post_meta( (int) $post->ID, Publish_Hook::AMPLIFIED_META, '1' );
 				$results[] = [
 					'post_id' => (int) $post->ID,
 					'title'   => get_the_title( $post ),
 					'status'  => 'scheduled',
-					'posts'   => $result['posts'] ?? [],
+					'posts'   => array_merge(
+						$result['standard_posts'] ?? [],
+						$result['gmb_posts'] ?? []
+					),
 				];
+				$slot_offset++;
 			} catch ( \RuntimeException $e ) {
 				$results[] = [
 					'post_id' => (int) $post->ID,

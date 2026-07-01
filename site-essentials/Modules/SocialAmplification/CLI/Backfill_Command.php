@@ -3,14 +3,14 @@
  * WP-CLI Backfill Command
  *
  * Usage:
- *   wp bw-social backfill
- *   wp bw-social backfill --post-from=2025-06-01 --before=2025-12-31 --limit=10 --dry-run
+ *   wp scos-social backfill
+ *   wp scos-social backfill --post-type=projects --post-from=2025-06-01 --before=2025-12-31 --limit=10 --dry-run
  *
- * Finds published `projects` posts whose **publish date** falls in the window
+ * Finds published posts of the specified post type whose **publish date** falls in
  * [--post-from] … [--before] (default: no lower bound … today inclusive),
  * skips any that have already been amplified, and schedules them using a
- * Mon/Wed/Fri spread calendar. Optional: --schedule-from (first slot not before this
- * date) and --slot-gap-days (minimum days between slots in this run).
+ * Mon/Wed/Fri spread calendar. Optional: --schedule-from (first slot not before
+ * this date) and --slot-gap-days (minimum days between slots in this run).
  *
  * The spread calendar works by:
  *  1. Fetching existing Postly scheduled posts for the workspace.
@@ -20,6 +20,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\CLI
+ * v1.1 | 2026-07-01
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\CLI;
@@ -33,9 +34,12 @@ use SiteEssentials\Modules\SocialAmplification\Publish_Hook;
 class Backfill_Command {
 
 	/**
-	 * Backfill social amplification for existing projects posts.
+	 * Backfill social amplification for existing posts.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--post-type=<slug>]
+	 * : **WordPress post type** to backfill. Default: projects.
 	 *
 	 * [--before=<date>]
 	 * : **WordPress post publish date** upper bound: include posts published **on or before**
@@ -63,9 +67,9 @@ class Backfill_Command {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp bw-social backfill
-	 *     wp bw-social backfill --post-from=2025-01-01 --before=2025-12-31 --limit=5
-	 *     wp bw-social backfill --schedule-from=2026-05-01 --slot-gap-days=7 --limit=5 --dry-run
+	 *     wp scos-social backfill
+	 *     wp scos-social backfill --post-type=projects --post-from=2025-01-01 --before=2025-12-31 --limit=5
+	 *     wp scos-social backfill --post-type=post --schedule-from=2026-05-01 --slot-gap-days=7 --limit=5 --dry-run
 	 *
 	 * @when after_wp_load
 	 *
@@ -73,6 +77,8 @@ class Backfill_Command {
 	 * @param  array $assoc_args Named args.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
+		$post_type = \WP_CLI\Utils\get_flag_value( $assoc_args, 'post-type', 'projects' );
+		$post_type = sanitize_key( (string) $post_type );
 		$before    = \WP_CLI\Utils\get_flag_value( $assoc_args, 'before', date( 'Y-m-d' ) );
 		$post_from = \WP_CLI\Utils\get_flag_value( $assoc_args, 'post-from', '' );
 		$post_from = is_string( $post_from ) ? trim( $post_from ) : '';
@@ -82,6 +88,9 @@ class Backfill_Command {
 		$limit     = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'limit', 3 );
 		$dry_run   = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
 
+		if ( ! post_type_exists( $post_type ) ) {
+			\WP_CLI::error( "Post type '{$post_type}' does not exist." );
+		}
 		if ( ! $this->validate_ymd( $before ) ) {
 			\WP_CLI::error( 'Invalid --before= date. Use YYYY-MM-DD.' );
 		}
@@ -108,11 +117,11 @@ class Backfill_Command {
 			$date_clause['after'] = $post_from;
 		}
 
-		// ── Query projects ────────────────────────────────────────────────────
+		// ── Query posts ───────────────────────────────────────────────────────
 		$posts = get_posts( [
-			'post_type'   => 'projects',
+			'post_type'   => $post_type,
 			'post_status' => 'publish',
-			'numberposts' => $limit * 3, // fetch extra to account for already-amplified
+			'numberposts' => $limit * 3,
 			'order'       => 'ASC',
 			'orderby'     => 'date',
 			'date_query'  => [ $date_clause ],
@@ -120,7 +129,7 @@ class Backfill_Command {
 
 		if ( empty( $posts ) ) {
 			$range = $post_from !== '' ? "{$post_from} … {$before}" : "≤ {$before}";
-			\WP_CLI::line( 'No published projects found in publish-date window ' . $range . '.' );
+			\WP_CLI::line( "No published {$post_type} posts found in publish-date window {$range}." );
 			return;
 		}
 
@@ -132,13 +141,13 @@ class Backfill_Command {
 		$pending = array_slice( array_values( $pending ), 0, $limit );
 
 		if ( empty( $pending ) ) {
-			\WP_CLI::success( "All found projects have already been amplified (or limit={$limit} reached). Nothing to do." );
+			\WP_CLI::success( "All found {$post_type} posts have already been amplified (or limit={$limit} reached). Nothing to do." );
 			return;
 		}
 
-		\WP_CLI::line( sprintf( 'Found %d post(s) to amplify.', count( $pending ) ) );
+		\WP_CLI::line( sprintf( 'Found %d post(s) to amplify (post type: %s).', count( $pending ), $post_type ) );
 
-		// ── Build spread schedule ────────────────────────────────────────────
+		// ── Build spread schedule ─────────────────────────────────────────────
 		$timezone = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
 		if ( $sched_from !== '' || $slot_gap > 0 ) {
 			\WP_CLI::line(
@@ -150,8 +159,8 @@ class Backfill_Command {
 				)
 			);
 		}
-		$slots = $this->get_free_slots( count( $pending ), $timezone, $sched_from, $slot_gap );
-		$gmb_channel_id = trim( (string) get_option( 'se_postly_gmb_channel_id', '' ) );
+		$slots          = $this->get_free_slots( count( $pending ), $timezone, $sched_from, $slot_gap );
+		$gmb_channel_id = Amplification_Engine::resolve_gmb_channel_id();
 		$gmb_slots      = [];
 		if ( $gmb_channel_id !== '' ) {
 			$gmb_slots = $this->get_gmb_free_slots( count( $pending ), $timezone, $sched_from, $slot_gap );
@@ -164,7 +173,7 @@ class Backfill_Command {
 			\WP_CLI::warning( 'Not enough free schedule slots for all posts. Some may overlap.' );
 		}
 
-		// ── Process each post ────────────────────────────────────────────────
+		// ── Process each post ─────────────────────────────────────────────────
 		$success = 0;
 		$failed  = 0;
 
@@ -195,7 +204,6 @@ class Backfill_Command {
 
 			try {
 				$result = Amplification_Engine::run( $post->ID, $options );
-				// Mark as amplified
 				update_post_meta( $post->ID, Publish_Hook::AMPLIFIED_META, '1' );
 
 				$scheduled_standard = array_column( $result['standard_posts'] ?? [], 'scheduled' );
@@ -212,8 +220,7 @@ class Backfill_Command {
 				$failed++;
 			}
 
-			// Small pause between API calls
-			usleep( 500000 ); // 0.5s
+			usleep( 500000 ); // 0.5s pause between API calls
 		}
 
 		if ( ! $dry_run ) {
@@ -240,7 +247,7 @@ class Backfill_Command {
 	 * Abort early with a clear message if required settings are missing.
 	 */
 	private function validate_settings(): void {
-		$missing = [];
+		$missing  = [];
 		$required = [
 			'bw_anthropic_api_key'    => 'Anthropic API key',
 			'bw_postly_api_key'       => 'Postly API key',
@@ -262,8 +269,8 @@ class Backfill_Command {
 	 *
 	 * @param  int    $count             Number of slots needed.
 	 * @param  string $timezone          WP timezone string.
-	 * @param  string $schedule_from     YYYY-MM-DD or '' — first slot on this calendar day or later (also never before tomorrow).
-	 * @param  int    $slot_gap_days     Minimum days between consecutive slots (0 = pack tightly on MWF).
+	 * @param  string $schedule_from     YYYY-MM-DD or '' — first slot on this calendar day or later.
+	 * @param  int    $slot_gap_days     Minimum days between consecutive slots (0 = pack tightly).
 	 * @return \DateTimeImmutable[]
 	 */
 	private function get_free_slots( int $count, string $timezone, string $schedule_from = '', int $slot_gap_days = 0 ): array {
@@ -283,7 +290,7 @@ class Backfill_Command {
 
 		$slots         = [];
 		$day           = $scan_start;
-		$next_earliest = null; // next slot date must be >= this (Y-m-d compare).
+		$next_earliest = null;
 
 		$guard = max( 500, $count * ( 7 + max( 0, $slot_gap_days ) ) * 3 );
 
@@ -312,7 +319,7 @@ class Backfill_Command {
 	}
 
 	/**
-	 * Build a separate GMB calendar: Tue/Thu slots only (max 2/week naturally).
+	 * Build a separate GMB calendar: Tue/Thu slots only.
 	 *
 	 * @return \DateTimeImmutable[]
 	 */
@@ -360,7 +367,7 @@ class Backfill_Command {
 	}
 
 	/**
-	 * Fetch dates (YYYY-MM-DD) of already-scheduled Postly posts for the workspace.
+	 * Fetch dates (YYYY-MM-DD) of already-scheduled Postly posts.
 	 * Silently returns empty array if Postly API is unreachable.
 	 *
 	 * @return string[]
@@ -383,16 +390,15 @@ class Backfill_Command {
 				if ( empty( $page ) ) {
 					break;
 				}
-			foreach ( $page as $post ) {
-				$sched = $post['one_off_schedule'] ?? [];
-				$d     = $sched['one_off_date'] ?? '';
-				if ( $d ) {
-					// Postly returns ISO-8601 (e.g. "2026-05-19T00:00:00.000Z") — extract date part only.
-					$dates[] = substr( $d, 0, 10 );
+				foreach ( $page as $post ) {
+					$sched = $post['one_off_schedule'] ?? [];
+					$d     = $sched['one_off_date'] ?? '';
+					if ( $d ) {
+						$dates[] = substr( $d, 0, 10 );
+					}
 				}
-			}
 				$skip += count( $page );
-			} while ( count( $page ) >= 50 ); // Postly default page size appears to be 50
+			} while ( count( $page ) >= 50 );
 
 			return array_unique( $dates );
 

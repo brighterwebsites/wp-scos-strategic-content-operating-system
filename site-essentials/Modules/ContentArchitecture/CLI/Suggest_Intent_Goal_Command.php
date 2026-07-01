@@ -8,6 +8,7 @@
  * Supports --apply to auto-save the top suggestion to scos_ca_intent_goal.
  *
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-07-01 — Use wp_get_ability() + execute() instead of direct instantiation.
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture\CLI
@@ -92,11 +93,12 @@ class Suggest_Intent_Goal_Command extends WP_CLI_Command {
 			WP_CLI::error( "Invalid --format value: {$format}. Allowed: json, table." );
 		}
 
-		require_once __DIR__ . '/../Abilities/CA_Suggest/CA_Suggest.php';
-
 		WP_CLI::log( "Running scos/suggest-intent-goal for post {$post_id}..." );
 
-		$ability = new \SiteEssentials\Modules\ContentArchitecture\Abilities\CA_Suggest\CA_Suggest();
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'scos/suggest-intent-goal' ) : null;
+		if ( ! $ability ) {
+			WP_CLI::error( 'scos/suggest-intent-goal is not registered. Ensure the WordPress AI plugin is active and abilities are loaded.' );
+		}
 
 		$input = [ 'post_id' => $post_id ];
 		if ( $topic_term_id > 0 ) {
@@ -106,7 +108,7 @@ class Suggest_Intent_Goal_Command extends WP_CLI_Command {
 			$input['existing_intent_goal'] = $existing_intent_goal;
 		}
 
-		$result = $ability->execute_callback( $input );
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );

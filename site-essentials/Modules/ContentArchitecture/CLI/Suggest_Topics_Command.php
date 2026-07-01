@@ -8,6 +8,7 @@
  * Supports --apply to auto-assign the top-confidence topic term to the post.
  *
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-07-01 — Use wp_get_ability() + execute() instead of direct instantiation.
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture\CLI
@@ -80,12 +81,14 @@ class Suggest_Topics_Command extends WP_CLI_Command {
 			WP_CLI::error( "Invalid --format value: {$format}. Allowed: json, table." );
 		}
 
-		require_once __DIR__ . '/../Abilities/Suggest_Topics/Suggest_Topics.php';
-
 		WP_CLI::log( "Running scos/suggest-topics for post {$post_id}..." );
 
-		$ability = new \SiteEssentials\Modules\ContentArchitecture\Abilities\Suggest_Topics\Suggest_Topics();
-		$result  = $ability->execute_callback( [ 'post_id' => $post_id ] );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'scos/suggest-topics' ) : null;
+		if ( ! $ability ) {
+			WP_CLI::error( 'scos/suggest-topics is not registered. Ensure the WordPress AI plugin is active and abilities are loaded.' );
+		}
+
+		$result  = $ability->execute( [ 'post_id' => $post_id ] );
 
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );

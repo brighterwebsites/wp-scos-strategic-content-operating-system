@@ -14,6 +14,7 @@
  * Use --overwrite to fill images that already have alt text and/or a title.
  *
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-07-02 — Use wp_get_ability()->execute() instead of direct instantiation.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta\CLI
@@ -23,7 +24,6 @@ namespace SiteEssentials\Modules\SeoMeta\CLI;
 
 use WP_CLI;
 use WP_CLI_Command;
-use SiteEssentials\Modules\SeoMeta\Abilities\Fill_Image_Meta\Fill_Image_Meta;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -186,16 +186,20 @@ class Fill_Image_Meta_Command extends WP_CLI_Command {
 
 		// ── Process each group ────────────────────────────────────────────────
 
-		$ability         = new Fill_Image_Meta();
 		$grand_processed = 0;
 		$grand_skipped   = 0;
 		$grand_errors    = 0;
 		$all_results     = [];
 
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'scos/fill-image-meta' ) : null;
+		if ( ! $ability ) {
+			WP_CLI::error( 'scos/fill-image-meta is not registered. Ensure the WordPress AI plugin is active and abilities are loaded.' );
+		}
+
 		$progress = \WP_CLI\Utils\make_progress_bar( 'Processing groups', count( $groups ) );
 
 		foreach ( $groups as $group ) {
-			$result = $ability->execute_callback( [
+			$result = $ability->execute( [
 				'attachment_ids' => $group['attachment_ids'],
 				'parent_post_id' => $group['parent_post_id'],
 				'overwrite'      => $overwrite,

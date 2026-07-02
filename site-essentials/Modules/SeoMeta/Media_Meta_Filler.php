@@ -16,9 +16,12 @@
  * @subpackage Modules\SeoMeta
  *
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-07-02 — Use wp_get_ability()->execute(); fix MLA bulk action hooks.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
+
+use WP_Error;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -30,6 +33,9 @@ class Media_Meta_Filler {
 	const AJAX_RUN_BATCH = 'scos_fill_image_meta_run_batch';
 	const NONCE_ACTION   = 'scos_fill_image_meta';
 	const BULK_ACTION    = 'scos_fill_image_meta';
+
+	/** @var array<int, int[]> Groups queued during MLA begin_bulk_action. */
+	private static $mla_pending_groups = [];
 
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
@@ -43,8 +49,9 @@ class Media_Meta_Filler {
 		add_filter( 'handle_bulk_actions-upload',  [ __CLASS__, 'handle_bulk_action' ], 10, 3 );
 
 		// MLA (Media Library Assistant) bulk action.
-		add_filter( 'mla_list_table_bulk_action_list', [ __CLASS__, 'register_mla_bulk_action' ] );
-		add_filter( 'mla_list_table_custom_bulk_action', [ __CLASS__, 'handle_mla_bulk_action' ], 10, 2 );
+		add_filter( 'mla_list_table_get_bulk_actions',   [ __CLASS__, 'register_mla_bulk_action' ] );
+		add_filter( 'mla_list_table_begin_bulk_action',  [ __CLASS__, 'mla_begin_bulk_action' ], 10, 2 );
+		add_filter( 'mla_list_table_end_bulk_action',    [ __CLASS__, 'mla_end_bulk_action' ], 10, 2 );
 
 		// Inject "Fill All Empty" button + progress UI on upload.php.
 		add_action( 'admin_footer-upload.php', [ __CLASS__, 'inject_admin_ui' ] );
@@ -169,22 +176,7 @@ class Media_Meta_Filler {
 			wp_send_json_error( [ 'message' => __( 'No attachment IDs provided.', 'site-essentials' ) ] );
 		}
 
-		// Ensure ability is loaded.
-		$ability_file = __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
-		if ( file_exists( $ability_file ) ) {
-			require_once $ability_file;
-		}
-
-		if ( ! class_exists( Abilities\Fill_Image_Meta\Fill_Image_Meta::class ) ) {
-			wp_send_json_error( [ 'message' => __( 'Fill Image Meta ability not found.', 'site-essentials' ) ] );
-		}
-
-		$ability = new Abilities\Fill_Image_Meta\Fill_Image_Meta();
-		$result  = $ability->execute_callback( [
-			'attachment_ids' => $attachment_ids,
-			'parent_post_id' => $parent_post_id,
-			'overwrite'      => $overwrite,
-		] );
+		$result = self::execute_fill_image_meta( $attachment_ids, $parent_post_id, $overwrite );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( [
@@ -232,43 +224,13 @@ class Media_Meta_Filler {
 			return add_query_arg( 'scos_fim_error', 'no_ai_plugin', $redirect_to );
 		}
 
-		$ability_file = __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
-		if ( file_exists( $ability_file ) ) {
-			require_once $ability_file;
-		}
-
-		// Group selected IDs by post_parent.
-		$groups = [];
-		foreach ( array_filter( array_map( 'absint', $post_ids ) ) as $id ) {
-			$post   = get_post( $id );
-			$parent = $post ? absint( $post->post_parent ) : 0;
-
-			$groups[ $parent ][] = $id;
-		}
-
-		$total_processed = 0;
-		$total_errors    = 0;
-
-		foreach ( $groups as $parent_id => $ids ) {
-			$ability = new Abilities\Fill_Image_Meta\Fill_Image_Meta();
-			$result  = $ability->execute_callback( [
-				'attachment_ids' => $ids,
-				'parent_post_id' => $parent_id,
-				'overwrite'      => false,
-			] );
-
-			if ( ! is_wp_error( $result ) ) {
-				$total_processed += (int) ( $result['processed'] ?? 0 );
-				$total_errors    += (int) ( $result['errors'] ?? 0 );
-			} else {
-				$total_errors += count( $ids );
-			}
-		}
+		$groups = self::group_attachment_ids_by_parent( array_filter( array_map( 'absint', $post_ids ) ) );
+		$totals = self::run_groups( $groups, false );
 
 		return add_query_arg(
 			[
-				'scos_fim_processed' => $total_processed,
-				'scos_fim_errors'    => $total_errors,
+				'scos_fim_processed' => $totals['processed'],
+				'scos_fim_errors'    => $totals['errors'],
 			],
 			$redirect_to
 		);
@@ -289,74 +251,77 @@ class Media_Meta_Filler {
 	}
 
 	/**
-	 * Handle MLA custom bulk action.
-	 * MLA calls this filter with the action slug and an array of selected IDs.
+	 * MLA begin bulk action — queue selected IDs for grouped processing.
 	 *
-	 * @param mixed  $handled  False = not handled; array of results if handled.
-	 * @param string $doaction Action slug.
+	 * @param mixed  $item_content NULL when unhandled.
+	 * @param string $bulk_action  Action slug.
 	 * @return mixed
 	 */
-	public static function handle_mla_bulk_action( $handled, string $doaction ) {
-		if ( self::BULK_ACTION !== $doaction ) {
-			return $handled;
+	public static function mla_begin_bulk_action( $item_content, string $bulk_action ) {
+		if ( self::BULK_ACTION !== $bulk_action ) {
+			return $item_content;
 		}
 
 		if ( ! current_user_can( 'upload_files' ) ) {
-			return $handled;
+			return $item_content;
 		}
 
-		// MLA passes IDs via $_REQUEST['cb_attachment'].
 		$raw_ids        = isset( $_REQUEST['cb_attachment'] ) ? (array) $_REQUEST['cb_attachment'] : [];
 		$attachment_ids = array_filter( array_map( 'absint', $raw_ids ) );
 
 		if ( empty( $attachment_ids ) ) {
-			return [ 'message' => __( 'No images selected.', 'site-essentials' ), 'processed' => 0 ];
+			return [
+				'message'         => __( 'No images selected.', 'site-essentials' ),
+				'body'            => '',
+				'prevent_default' => true,
+			];
+		}
+
+		self::$mla_pending_groups = self::group_attachment_ids_by_parent( $attachment_ids );
+
+		return [
+			'message'         => '',
+			'body'            => '',
+			'prevent_default' => true,
+		];
+	}
+
+	/**
+	 * MLA end bulk action — run queued groups through the ability.
+	 *
+	 * @param mixed  $item_content NULL when unhandled.
+	 * @param string $bulk_action  Action slug.
+	 * @return mixed
+	 */
+	public static function mla_end_bulk_action( $item_content, string $bulk_action ) {
+		if ( self::BULK_ACTION !== $bulk_action || empty( self::$mla_pending_groups ) ) {
+			return $item_content;
 		}
 
 		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
-			return [ 'message' => __( 'WordPress AI plugin is required.', 'site-essentials' ), 'processed' => 0 ];
+			self::$mla_pending_groups = [];
+			return [
+				'message'         => __( 'WordPress AI plugin is required.', 'site-essentials' ),
+				'body'            => '',
+				'prevent_default' => true,
+			];
 		}
 
-		$ability_file = __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
-		if ( file_exists( $ability_file ) ) {
-			require_once $ability_file;
-		}
-
-		$groups = [];
-		foreach ( $attachment_ids as $id ) {
-			$post   = get_post( $id );
-			$parent = $post ? absint( $post->post_parent ) : 0;
-
-			$groups[ $parent ][] = $id;
-		}
-
-		$total_processed = 0;
-		$total_errors    = 0;
-
-		foreach ( $groups as $parent_id => $ids ) {
-			$ability = new Abilities\Fill_Image_Meta\Fill_Image_Meta();
-			$result  = $ability->execute_callback( [
-				'attachment_ids' => $ids,
-				'parent_post_id' => $parent_id,
-				'overwrite'      => false,
-			] );
-
-			if ( ! is_wp_error( $result ) ) {
-				$total_processed += (int) ( $result['processed'] ?? 0 );
-				$total_errors    += (int) ( $result['errors'] ?? 0 );
-			} else {
-				$total_errors += count( $ids );
-			}
-		}
+		$totals = self::run_groups( self::$mla_pending_groups, false );
+		self::$mla_pending_groups = [];
 
 		/* translators: 1: number processed, 2: number of errors */
 		$message = sprintf(
 			__( 'Fill Image Meta: %1$d updated, %2$d errors.', 'site-essentials' ),
-			$total_processed,
-			$total_errors
+			$totals['processed'],
+			$totals['errors']
 		);
 
-		return [ 'message' => $message, 'processed' => $total_processed, 'errors' => $total_errors ];
+		return [
+			'message'         => $message,
+			'body'            => '',
+			'prevent_default' => true,
+		];
 	}
 
 	// ── Admin UI ───────────────────────────────────────────────────────────────
@@ -451,5 +416,85 @@ class Media_Meta_Filler {
 			$type = $errors > 0 && 0 === $processed ? 'notice-error' : 'notice-success';
 			echo '<div class="notice ' . esc_attr( $type ) . ' is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
 		}
+	}
+
+	// ── Shared ability runner ──────────────────────────────────────────────────
+
+	/**
+	 * Execute the scos/fill-image-meta ability via the Abilities API.
+	 *
+	 * @param int[] $attachment_ids
+	 * @param int   $parent_post_id
+	 * @param bool  $overwrite
+	 * @return array<string, mixed>|WP_Error
+	 */
+	private static function execute_fill_image_meta( array $attachment_ids, int $parent_post_id, bool $overwrite ) {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			return new WP_Error(
+				'no_abilities_api',
+				__( 'WordPress Abilities API is not available.', 'site-essentials' )
+			);
+		}
+
+		$ability = wp_get_ability( 'scos/fill-image-meta' );
+		if ( ! $ability ) {
+			return new WP_Error(
+				'ability_not_registered',
+				__( 'Fill Image Meta ability is not registered. Ensure the WordPress AI plugin is active.', 'site-essentials' )
+			);
+		}
+
+		return $ability->execute( [
+			'attachment_ids' => $attachment_ids,
+			'parent_post_id' => $parent_post_id,
+			'overwrite'      => $overwrite,
+		] );
+	}
+
+	/**
+	 * Group attachment IDs by post_parent for efficient AI batching.
+	 *
+	 * @param int[] $attachment_ids
+	 * @return array<int, int[]> Map of parent_post_id => attachment IDs.
+	 */
+	private static function group_attachment_ids_by_parent( array $attachment_ids ): array {
+		$groups = [];
+		foreach ( $attachment_ids as $id ) {
+			$id     = absint( $id );
+			$post   = get_post( $id );
+			$parent = $post ? absint( $post->post_parent ) : 0;
+
+			$groups[ $parent ][] = $id;
+		}
+		return $groups;
+	}
+
+	/**
+	 * Run one or more parent groups through the ability.
+	 *
+	 * @param array<int, int[]> $groups    Map of parent_post_id => attachment IDs.
+	 * @param bool              $overwrite
+	 * @return array{processed: int, errors: int}
+	 */
+	private static function run_groups( array $groups, bool $overwrite ): array {
+		$processed = 0;
+		$errors    = 0;
+
+		foreach ( $groups as $parent_id => $ids ) {
+			$result = self::execute_fill_image_meta( $ids, (int) $parent_id, $overwrite );
+
+			if ( is_wp_error( $result ) ) {
+				$errors += count( $ids );
+				continue;
+			}
+
+			$processed += (int) ( $result['processed'] ?? 0 );
+			$errors    += (int) ( $result['errors'] ?? 0 );
+		}
+
+		return [
+			'processed' => $processed,
+			'errors'    => $errors,
+		];
 	}
 }

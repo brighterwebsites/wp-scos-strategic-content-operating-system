@@ -6,16 +6,17 @@
  *   scos_media_alt      — Alt text (shows "—" when empty; highlights empty in red)
  *   scos_media_fileinfo — MIME type + original upload dimensions + human-readable file size
  *
- * Only registered when the `extra_media_columns` toggle in Image_SEO settings
- * is enabled. Toggle path: SEO › Advanced › Image SEO → "Extra Media Library Columns".
+ * Supports both the standard WP media list table and MLA (Media Library Assistant),
+ * which replaces/enhances upload.php list mode with its own column system.
  *
- * Note: caption is already available as a standard WP core media column and
- * does not need to be added here.
+ * Only active when the `extra_media_columns` toggle in Image_SEO settings is enabled.
+ * Toggle path: SEO › Advanced › Image SEO → "Extra Media Library Columns".
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
  *
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-07-02 — Add MLA list table column hooks; gate inside callbacks not at init.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -32,15 +33,24 @@ class Media_Columns {
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
 	public static function init(): void {
-		$opts = Image_SEO::get();
-		if ( empty( $opts['extra_media_columns'] ) ) {
-			return;
-		}
-
-		add_filter( 'manage_media_columns',        [ __CLASS__, 'add_columns' ] );
-		add_action( 'manage_media_custom_column',  [ __CLASS__, 'render_column' ], 10, 2 );
+		// Standard WP media library list table.
+		add_filter( 'manage_media_columns',           [ __CLASS__, 'add_columns' ], 10, 2 );
+		add_action( 'manage_media_custom_column',     [ __CLASS__, 'render_column' ], 10, 2 );
 		add_filter( 'manage_upload_sortable_columns', [ __CLASS__, 'sortable_columns' ] );
-		add_action( 'admin_head-upload.php',       [ __CLASS__, 'column_styles' ] );
+		add_action( 'admin_head-upload.php',          [ __CLASS__, 'column_styles' ] );
+
+		// MLA (Media Library Assistant) list table — upload.php list mode + MLA submenu.
+		add_filter( 'mla_list_table_get_columns',        [ __CLASS__, 'add_columns' ] );
+		add_filter( 'mla_list_table_column_default',     [ __CLASS__, 'mla_render_column' ], 10, 3 );
+		add_filter( 'mla_list_table_get_sortable_columns', [ __CLASS__, 'sortable_columns' ] );
+	}
+
+	/**
+	 * Whether extra media columns are enabled in settings.
+	 */
+	private static function is_enabled(): bool {
+		$opts = Image_SEO::get();
+		return ! empty( $opts['extra_media_columns'] );
 	}
 
 	// ── Column definitions ────────────────────────────────────────────────────
@@ -50,15 +60,28 @@ class Media_Columns {
 	 * @return array<string, string>
 	 */
 	public static function add_columns( array $columns ): array {
-		$new = [];
+		if ( ! self::is_enabled() ) {
+			return $columns;
+		}
+
+		$new       = [];
+		$inserted  = false;
+		$after_keys = [ 'title_name', 'title', 'post_title' ];
+
 		foreach ( $columns as $key => $label ) {
 			$new[ $key ] = $label;
-			// Insert our columns after the "title" column.
-			if ( 'title' === $key ) {
+			if ( in_array( $key, $after_keys, true ) ) {
 				$new[ self::COL_ALT ]      = __( 'Alt Text', 'site-essentials' );
 				$new[ self::COL_FILEINFO ] = __( 'File Info', 'site-essentials' );
+				$inserted = true;
 			}
 		}
+
+		if ( ! $inserted ) {
+			$new[ self::COL_ALT ]      = __( 'Alt Text', 'site-essentials' );
+			$new[ self::COL_FILEINFO ] = __( 'File Info', 'site-essentials' );
+		}
+
 		return $new;
 	}
 
@@ -67,6 +90,9 @@ class Media_Columns {
 	 * @return array<string, string>
 	 */
 	public static function sortable_columns( array $columns ): array {
+		if ( ! self::is_enabled() ) {
+			return $columns;
+		}
 		$columns[ self::COL_ALT ] = self::COL_ALT;
 		return $columns;
 	}
@@ -74,10 +100,49 @@ class Media_Columns {
 	// ── Column rendering ──────────────────────────────────────────────────────
 
 	/**
+	 * Standard WP media list table column renderer.
+	 *
 	 * @param string $column_name
 	 * @param int    $post_id
 	 */
-	public static function render_column( string $column_name, int $post_id ): void {
+	public static function render_column( string $column_name, $post_id ): void {
+		if ( ! self::is_enabled() ) {
+			return;
+		}
+		self::output_column( $column_name, absint( $post_id ) );
+	}
+
+	/**
+	 * MLA list table column renderer.
+	 *
+	 * @param mixed  $content     Existing content (null when unhandled).
+	 * @param array  $item        Row data.
+	 * @param string $column_name Column slug.
+	 * @return mixed
+	 */
+	public static function mla_render_column( $content, $item, $column_name ) {
+		if ( ! self::is_enabled() ) {
+			return $content;
+		}
+
+		if ( ! in_array( $column_name, [ self::COL_ALT, self::COL_FILEINFO ], true ) ) {
+			return $content;
+		}
+
+		$post_id = isset( $item['ID'] ) ? absint( $item['ID'] ) : 0;
+		if ( ! $post_id ) {
+			return $content;
+		}
+
+		ob_start();
+		self::output_column( $column_name, $post_id );
+		return ob_get_clean();
+	}
+
+	/**
+	 * Shared output for both WP and MLA column renderers.
+	 */
+	private static function output_column( string $column_name, int $post_id ): void {
 		if ( self::COL_ALT === $column_name ) {
 			self::render_alt( $post_id );
 		} elseif ( self::COL_FILEINFO === $column_name ) {
@@ -95,7 +160,6 @@ class Media_Columns {
 			return;
 		}
 
-		// Truncate long alt text for display; show full on hover.
 		$display = mb_strlen( $alt ) > 80 ? mb_substr( $alt, 0, 77 ) . '…' : $alt;
 		echo '<span title="' . esc_attr( $alt ) . '">' . esc_html( $display ) . '</span>';
 	}
@@ -107,25 +171,19 @@ class Media_Columns {
 			return;
 		}
 
-		// Human-friendly MIME label.
 		$mime_label = strtoupper( (string) pathinfo( (string) get_attached_file( $post_id ), PATHINFO_EXTENSION ) );
 		if ( '' === $mime_label ) {
-			// Fall back to last part of MIME string (e.g. "jpeg" from "image/jpeg").
 			$parts      = explode( '/', $mime );
 			$mime_label = strtoupper( end( $parts ) );
 		}
 
 		$lines = [ $mime_label ];
 
-		// Original dimensions + file size from attachment metadata.
 		$meta = wp_get_attachment_metadata( $post_id );
-		if ( is_array( $meta ) ) {
-			if ( ! empty( $meta['width'] ) && ! empty( $meta['height'] ) ) {
-				$lines[] = absint( $meta['width'] ) . '×' . absint( $meta['height'] ) . 'px';
-			}
+		if ( is_array( $meta ) && ! empty( $meta['width'] ) && ! empty( $meta['height'] ) ) {
+			$lines[] = absint( $meta['width'] ) . '×' . absint( $meta['height'] ) . 'px';
 		}
 
-		// File size from the physical file.
 		$file = get_attached_file( $post_id );
 		if ( $file && file_exists( $file ) ) {
 			$bytes = filesize( $file );
@@ -140,9 +198,12 @@ class Media_Columns {
 	// ── Inline CSS for column widths ──────────────────────────────────────────
 
 	public static function column_styles(): void {
+		if ( ! self::is_enabled() ) {
+			return;
+		}
 		echo '<style>';
-		echo '.column-' . esc_attr( self::COL_ALT )      . '{ width:200px; }';
-		echo '.column-' . esc_attr( self::COL_FILEINFO )  . '{ width:130px; }';
+		echo '.column-' . esc_attr( self::COL_ALT )     . '{ width:200px; }';
+		echo '.column-' . esc_attr( self::COL_FILEINFO ) . '{ width:130px; }';
 		echo '</style>';
 	}
 }

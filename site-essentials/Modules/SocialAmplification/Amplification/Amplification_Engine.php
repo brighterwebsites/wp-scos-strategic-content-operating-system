@@ -17,7 +17,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
- * v1.2 | 2026-07-02
+ * v1.3 | 2026-07-02
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -341,10 +341,10 @@ class Amplification_Engine {
 		}
 
 		$source_image = self::get_featured_og_image( $post_id );
-		$shortlink    = $context['shortlink'] ?? '';
 		$permalink    = $context['permalink'] ?? '';
 		$gmb_caption  = Anthropic_Client::generate_gmb_caption( $context );
-		$cta_url      = self::build_cta_url( $permalink, $shortlink );
+		// GMB CTA always uses the permalink (never YOURLS shortlink).
+		$cta_url      = self::build_cta_url( $permalink, '' );
 
 		$image_url = '';
 		if ( $source_image !== '' ) {

@@ -21,6 +21,7 @@
  *
  * v1.1 | 2026-06-30 — Admin columns (SEO Title, SEO Desc) + Quick Edit for Title, Description, Breadcrumb.
  * v1.2 | 2026-07-01 — Register suggest-seo-meta and suggest-tldr WP-CLI commands.
+ * v1.3 | 2026-07-01 — Bootstrap Media_Meta_Filler, Media_Columns; add scos fill-image-meta CLI command.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -81,6 +82,8 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/Redirections.php';
 		require_once __DIR__ . '/Author_SEO.php';
 		require_once __DIR__ . '/Admin_Columns.php';
+		require_once __DIR__ . '/Media_Meta_Filler.php';
+		require_once __DIR__ . '/Media_Columns.php';
 
 		Meta_Fields::init();
 		Meta_Box::init();
@@ -92,6 +95,8 @@ class SeoMeta_Module implements Module_Interface {
 		Redirections::init();
 		Author_SEO::init();
 		Admin_Columns::init();
+		Media_Meta_Filler::init();
+		Media_Columns::init();
 
 		self::register_cli_commands();
 	}
@@ -109,6 +114,7 @@ class SeoMeta_Module implements Module_Interface {
 
 		require_once __DIR__ . '/CLI/Suggest_Seo_Meta_Command.php';
 		require_once __DIR__ . '/CLI/Suggest_Tldr_Command.php';
+		require_once __DIR__ . '/CLI/Fill_Image_Meta_Command.php';
 
 		\WP_CLI::add_command(
 			'scos suggest-seo-meta',
@@ -128,6 +134,18 @@ class SeoMeta_Module implements Module_Interface {
 				'longdesc'  => 'Wraps the scos/suggest-tldr ability. When the post has a linked Search Intent Goal, ' .
 					'the TLDR is written to directly answer that question. ' .
 					'Requires the WordPress AI plugin. Use --apply to auto-save the top option to scos_seo_tldr.',
+			]
+		);
+
+		\WP_CLI::add_command(
+			'scos fill-image-meta',
+			CLI\Fill_Image_Meta_Command::class,
+			[
+				'shortdesc' => 'Generate alt text and titles for images missing metadata.',
+				'longdesc'  => 'Wraps the scos/fill-image-meta ability. Images are grouped by parent post — one AI call per group. ' .
+					'Supports --attachment-id, --post-id, or no flag (all qualifying images). ' .
+					'Use --overwrite to replace existing metadata. Use --dry-run to preview without saving. ' .
+					'Requires the WordPress AI plugin.',
 			]
 		);
 	}

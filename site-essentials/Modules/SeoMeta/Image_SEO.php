@@ -4,6 +4,7 @@
  * and miscellaneous content-output settings (excerpt length).
  *
  * v1.1 | 2026-06-21
+ * v1.2 | 2026-07-01 — Add extra_media_columns toggle.
  *
  * Settings are stored as a single serialised array in the `scos_image_seo`
  * wp_option. All behaviour is gated behind individual toggles; nothing runs
@@ -34,6 +35,7 @@ class Image_SEO {
 			'rename_files'            => false,
 			'excerpt_length_enabled'  => false,
 			'excerpt_length_words'    => 20,
+			'extra_media_columns'     => false,
 		];
 	}
 
@@ -193,6 +195,7 @@ class Image_SEO {
 				'rename_files'            => ! empty( $posted['rename_files'] ),
 				'excerpt_length_enabled'  => ! empty( $posted['excerpt_length_enabled'] ),
 				'excerpt_length_words'    => max( 5, (int) ( $posted['excerpt_length_words'] ?? 20 ) ),
+				'extra_media_columns'     => ! empty( $posted['extra_media_columns'] ),
 			],
 			false
 		);

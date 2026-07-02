@@ -3,6 +3,7 @@
  * SEO — Advanced tab view
  *
  * v1.2 | 2026-06-21
+ * v1.3 | 2026-07-01 — Add extra_media_columns toggle.
  *
  * SCOS design system: scos-card per section, scos-checkbox-row, scos-input--mono,
  * scos-save-bar, scos-notice. Inline <style> block removed.
@@ -70,12 +71,21 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 				</span>
 			</label>
 
-			<label class="scos-checkbox-row" style="padding:var(--scos-s-3) 0;cursor:pointer;">
+			<label class="scos-checkbox-row" style="padding:var(--scos-s-3) 0;border-bottom:1px solid var(--scos-border);cursor:pointer;">
 				<input type="checkbox" name="scos_image_seo[rename_files]" value="1" <?php checked( $opts['rename_files'] ); ?>>
 				<span>
 					<strong><?php esc_html_e( 'Auto-rename uploaded image files', 'site-essentials' ); ?></strong>
 					<span class="description" style="display:block;margin-top:2px"><?php esc_html_e( 'At upload time, filenames are cleaned to be URL-friendly: forced lowercase, spaces and underscores replaced with hyphens. Applies to new uploads only.', 'site-essentials' ); ?></span>
 					<span class="description" style="display:block;margin-top:2px;font-style:italic"><?php esc_html_e( 'Examples: "My Photo_01.JPG" → "my-photo-01.jpg" | "hero image.PNG" → "hero-image.png"', 'site-essentials' ); ?></span>
+				</span>
+			</label>
+
+			<label class="scos-checkbox-row" style="padding:var(--scos-s-3) 0;cursor:pointer;">
+				<input type="checkbox" name="scos_image_seo[extra_media_columns]" value="1" <?php checked( ! empty( $opts['extra_media_columns'] ) ); ?>>
+				<span>
+					<strong><?php esc_html_e( 'Extra columns in Media Library list view', 'site-essentials' ); ?></strong>
+					<span class="description" style="display:block;margin-top:2px"><?php esc_html_e( 'Adds two columns to the Media Library list table: Alt Text (highlights missing in red) and File Info (type · dimensions · file size).', 'site-essentials' ); ?></span>
+					<span class="description" style="display:block;margin-top:2px;font-style:italic"><?php esc_html_e( 'scos_image_seo[extra_media_columns]', 'site-essentials' ); ?></span>
 				</span>
 			</label>
 		</div>

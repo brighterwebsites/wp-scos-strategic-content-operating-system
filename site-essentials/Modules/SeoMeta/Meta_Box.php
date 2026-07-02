@@ -25,6 +25,7 @@
  *                      and Suggest_Tldr abilities; extend enqueue_assets() with
  *                      scos-seo-suggest.js and ScosSeoSuggest localization data.
  * v1.2 | 2026-06-29 — Remove bw_tldr dual-write; consumers now read scos_seo_tldr first.
+ * v1.3 | 2026-07-01 — Register scos-media ability category; load Fill_Image_Meta ability.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -46,11 +47,12 @@ class Meta_Box {
 		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
 			require_once __DIR__ . '/Abilities/Suggest_Seo_Meta/Suggest_Seo_Meta.php';
 			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
+			require_once __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
 		}
 	}
 
 	/**
-	 * Register the scos-seo-meta ability category.
+	 * Register the scos-seo-meta and scos-media ability categories.
 	 *
 	 * @since 1.1.0
 	 * @return void
@@ -62,6 +64,10 @@ class Meta_Box {
 		wp_register_ability_category( 'scos-seo-meta', [
 			'label'       => __( 'SCOS: SEO Meta', 'site-essentials' ),
 			'description' => __( 'AI-assisted suggestions for SEO meta fields.', 'site-essentials' ),
+		] );
+		wp_register_ability_category( 'scos-media', [
+			'label'       => __( 'SCOS: Media', 'site-essentials' ),
+			'description' => __( 'AI-assisted media metadata: alt text, titles, and taxonomy assignment.', 'site-essentials' ),
 		] );
 	}
 

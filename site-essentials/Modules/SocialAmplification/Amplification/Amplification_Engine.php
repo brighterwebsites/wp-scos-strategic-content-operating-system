@@ -17,6 +17,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
+ * v1.1 | 2026-07-02
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -345,38 +346,37 @@ class Amplification_Engine {
 		$gmb_caption = Anthropic_Client::generate_gmb_caption( $context );
 		$cta_url     = self::build_cta_url( $permalink, $shortlink );
 
+		// GMB is always one post per amplification run (no multi-slot schedule like standard).
 		$post_results = [];
-		for ( $i = 0; $i < (int) $config['count']; $i++ ) {
-			try {
-				$result = $client->create_gmb_post( [
-					'gmb_caption'    => $gmb_caption,
-					'cta_url'        => $cta_url,
-					'image_url'      => $image_url,
-					'schedule_at'    => $schedule_dt,
-					'timezone'       => $timezone,
-					'gmb_channel_id' => $gmb_channel_id,
-				] );
+		try {
+			$result = $client->create_gmb_post( [
+				'gmb_caption'    => $gmb_caption,
+				'cta_url'        => $cta_url,
+				'image_url'      => $image_url,
+				'schedule_at'    => $schedule_dt,
+				'timezone'       => $timezone,
+				'gmb_channel_id' => $gmb_channel_id,
+			] );
 
-				$postly_id = $result['_id'] ?? ( $result['id'] ?? null );
-				$post_results[] = [
-					'platform'  => 'gmb',
-					'slot'      => 1,
-					'scheduled' => $schedule_dt->format( 'Y-m-d H:i' ),
-					'status'    => 'scheduled',
-					'postly_id' => $postly_id,
-					'images'    => $image_url ? 1 : 0,
-				];
-			} catch ( \RuntimeException $e ) {
-				error_log( self::LOG_PREFIX . ' GMB call failed: ' . $e->getMessage() );
-				$post_results[] = [
-					'platform'  => 'gmb',
-					'slot'      => 1,
-					'scheduled' => $schedule_dt->format( 'Y-m-d H:i' ),
-					'status'    => 'error',
-					'error'     => $e->getMessage(),
-					'images'    => $image_url ? 1 : 0,
-				];
-			}
+			$postly_id = $result['_id'] ?? ( $result['id'] ?? null );
+			$post_results[] = [
+				'platform'  => 'gmb',
+				'slot'      => 1,
+				'scheduled' => $schedule_dt->format( 'Y-m-d H:i' ),
+				'status'    => 'scheduled',
+				'postly_id' => $postly_id,
+				'images'    => $image_url ? 1 : 0,
+			];
+		} catch ( \RuntimeException $e ) {
+			error_log( self::LOG_PREFIX . ' GMB call failed: ' . $e->getMessage() );
+			$post_results[] = [
+				'platform'  => 'gmb',
+				'slot'      => 1,
+				'scheduled' => $schedule_dt->format( 'Y-m-d H:i' ),
+				'status'    => 'error',
+				'error'     => $e->getMessage(),
+				'images'    => $image_url ? 1 : 0,
+			];
 		}
 
 		return $post_results;

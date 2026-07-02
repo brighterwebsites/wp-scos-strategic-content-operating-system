@@ -7,7 +7,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.4 | 2026-06-21
+ * @version    1.5 | 2026-07-02
  * @since      1.0.0
  */
 
@@ -477,9 +477,9 @@ class Seo_Module implements Module_Interface {
         $post_ids = wp_list_pluck($posts, 'ID');
         $this->preload_noindex_meta($post_ids);
 
-        // Filter out noindex posts and non-self-canonical posts.
+        // Filter out noindex, non-self-canonical, and per-post XML exclusions.
         return array_filter($posts, function($post) {
-            return !$this->is_noindex($post->ID) && !$this->is_non_self_canonical($post->ID);
+            return $this->should_include_in_xml_sitemap($post->ID);
         });
     }
 
@@ -812,6 +812,12 @@ class Seo_Module implements Module_Interface {
      * @return bool True if noindex, false otherwise
      */
     private function is_noindex($post_id) {
+        // Check SCOS native robots meta (primary source for Site Essentials).
+        $scos_robots = get_post_meta($post_id, 'scos_seo_robots', true);
+        if (is_array($scos_robots) && in_array('noindex', $scos_robots, true)) {
+            return true;
+        }
+
         // Check Yoast SEO meta
         $yoast_noindex = get_post_meta($post_id, '_yoast_wpseo_meta-robots-noindex', true);
         if ($yoast_noindex === '1' || $yoast_noindex === 'noindex') {
@@ -846,6 +852,30 @@ class Seo_Module implements Module_Interface {
         }
 
         return false;
+    }
+
+    /**
+     * Whether a post should appear in the XML sitemap.
+     *
+     * Honors per-post scos_seo_sitemap_exclude (xml), noindex, non-self-canonical,
+     * and the "include in XML sitemap anyway" override from the SEO meta box.
+     *
+     * @since  1.5.0
+     * @param  int $post_id Post ID.
+     * @return bool True when the post should be included.
+     */
+    private function should_include_in_xml_sitemap(int $post_id): bool {
+        $sitemap_exclude = (array) get_post_meta($post_id, 'scos_seo_sitemap_exclude', true);
+        if (in_array('xml', $sitemap_exclude, true)) {
+            return false;
+        }
+
+        $override = '1' === (string) get_post_meta($post_id, 'scos_seo_sitemap_noindex_override', true);
+        if ($override) {
+            return true;
+        }
+
+        return !$this->is_noindex($post_id) && !$this->is_non_self_canonical($post_id);
     }
 
     /**

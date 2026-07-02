@@ -20,6 +20,7 @@
  * @version    1.1.0
  *
  * v1.1 | 2026-06-30 — Admin columns (SEO Title, SEO Desc) + Quick Edit for Title, Description, Breadcrumb.
+ * v1.2 | 2026-07-01 — Register suggest-seo-meta and suggest-tldr WP-CLI commands.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -91,6 +92,44 @@ class SeoMeta_Module implements Module_Interface {
 		Redirections::init();
 		Author_SEO::init();
 		Admin_Columns::init();
+
+		self::register_cli_commands();
+	}
+
+	/**
+	 * Register WP-CLI commands for SEO Meta.
+	 *
+	 * @since 1.2.0
+	 * @return void
+	 */
+	private static function register_cli_commands(): void {
+		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+			return;
+		}
+
+		require_once __DIR__ . '/CLI/Suggest_Seo_Meta_Command.php';
+		require_once __DIR__ . '/CLI/Suggest_Tldr_Command.php';
+
+		\WP_CLI::add_command(
+			'scos suggest-seo-meta',
+			CLI\Suggest_Seo_Meta_Command::class,
+			[
+				'shortdesc' => 'Suggest breadcrumb label, meta title, and meta description for a post using AI.',
+				'longdesc'  => 'Wraps the scos/suggest-seo-meta ability. All three fields are generated in a single AI call. ' .
+					'Requires the WordPress AI plugin. Use --apply to auto-save the top suggestion for each field.',
+			]
+		);
+
+		\WP_CLI::add_command(
+			'scos suggest-tldr',
+			CLI\Suggest_Tldr_Command::class,
+			[
+				'shortdesc' => 'Suggest TLDR article summary options for a post using AI.',
+				'longdesc'  => 'Wraps the scos/suggest-tldr ability. When the post has a linked Search Intent Goal, ' .
+					'the TLDR is written to directly answer that question. ' .
+					'Requires the WordPress AI plugin. Use --apply to auto-save the top option to scos_seo_tldr.',
+			]
+		);
 	}
 
 	/**

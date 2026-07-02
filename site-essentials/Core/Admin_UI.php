@@ -1035,17 +1035,21 @@ class Admin_UI {
 
         // ── Postly.ai / Anthropic pipeline settings ──────────────────────────
         // SCOS-SA-PASS1 — new scheduling/backfill fields (scos_sa_*) added.
+        // SCOS-SA-PASS2 — per-channel fields, slot-gap-days added.
         $postly_fields = [
             'bw_postly_api_key'            => 'sanitize_text_field',
             'bw_postly_workspace_id'       => 'sanitize_text_field',
             'bw_postly_channel_ids'        => 'sanitize_text_field',
-            'se_postly_gmb_channel_id'     => 'sanitize_text_field',
             'bw_social_acf_gallery_keys'   => 'sanitize_text_field',
             'bw_social_acf_featured_key'   => 'sanitize_text_field',
             'bw_social_publish_time_min'   => 'sanitize_text_field',
             'bw_social_publish_time_max'   => 'sanitize_text_field',
             'scos_sa_backfill_date_from'   => 'sanitize_text_field',
             'scos_sa_backfill_date_to'     => 'sanitize_text_field',
+            // Per-channel fields (SCOS-SA-PASS2)
+            'scos_sa_postly_fb_channel_id' => 'sanitize_text_field',
+            'scos_sa_postly_ig_channel_id' => 'sanitize_text_field',
+            'scos_sa_postly_gmb_channel_id' => 'sanitize_text_field',
         ];
         foreach ( $postly_fields as $key => $sanitizer ) {
             if ( isset( $_POST[ $key ] ) ) {
@@ -1061,6 +1065,20 @@ class Admin_UI {
             if ( isset( $_POST['scos_sa_backfill_limit'] ) ) {
                 update_option( 'scos_sa_backfill_limit', absint( $_POST['scos_sa_backfill_limit'] ) );
             }
+            if ( isset( $_POST['scos_sa_backfill_slot_gap_days'] ) ) {
+                update_option( 'scos_sa_backfill_slot_gap_days', min( 365, absint( $_POST['scos_sa_backfill_slot_gap_days'] ) ) );
+            }
+        }
+
+        // Channel enable toggles — only save on Postly tab (checkboxes absent when unchecked).
+        if ( $submitted_tab === 'postly' ) {
+            update_option( 'scos_sa_postly_fb_enabled', isset( $_POST['scos_sa_postly_fb_enabled'] ) ? '1' : '0' );
+            update_option( 'scos_sa_postly_ig_enabled', isset( $_POST['scos_sa_postly_ig_enabled'] ) ? '1' : '0' );
+        }
+
+        // Dual-write new GMB key to legacy key so CLI backfill still works with old key.
+        if ( isset( $_POST['scos_sa_postly_gmb_channel_id'] ) ) {
+            update_option( 'se_postly_gmb_channel_id', sanitize_text_field( $_POST['scos_sa_postly_gmb_channel_id'] ) );
         }
 
         // Enable toggle — only save when the Postly tab form submits.
@@ -1068,6 +1086,50 @@ class Admin_UI {
         // to avoid mistakenly writing '' when YOURLS/Make.com forms submit.
         if ( $submitted_tab === 'postly' ) {
             update_option( 'bw_social_enabled', isset( $_POST['bw_social_enabled'] ) ? '1' : '' );
+        }
+
+        // ── Posting Settings tab (SCOS-SA-PASS2) ─────────────────────────────
+        if ( $submitted_tab === 'posting' ) {
+            // Global framing angles — stored as JSON array
+            $frames_raw = isset( $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::FRAMES_OPTION ] )
+                ? (array) $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::FRAMES_OPTION ]
+                : [];
+            $frames_clean = [];
+            foreach ( $frames_raw as $frame ) {
+                $frame = sanitize_textarea_field( (string) $frame );
+                if ( '' !== $frame ) {
+                    $frames_clean[] = $frame;
+                }
+            }
+            update_option(
+                \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::FRAMES_OPTION,
+                wp_json_encode( $frames_clean )
+            );
+
+            // Global image settings
+            update_option(
+                \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::MAX_IMAGES_OPTION,
+                max( 1, absint( $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::MAX_IMAGES_OPTION ] ?? 4 ) )
+            );
+            update_option(
+                \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_FEATURED_OPTION,
+                isset( $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_FEATURED_OPTION ] ) ? '1' : '0'
+            );
+            update_option(
+                \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_ATTACH_OPTION,
+                isset( $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_ATTACH_OPTION ] ) ? '1' : '0'
+            );
+
+            // Per post type config
+            if ( isset( $_POST['scos_sa_pt_config'] ) && is_array( $_POST['scos_sa_pt_config'] ) ) {
+                \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::save_all(
+                    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput — sanitized inside save_all()
+                    (array) $_POST['scos_sa_pt_config']
+                );
+            } else {
+                // No per-type data submitted — save empty array to clear any existing config.
+                update_option( \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::OPTION_KEY, [] );
+            }
         }
 
         // Webhook secret: auto-generate if not already set; allow manual value if posted

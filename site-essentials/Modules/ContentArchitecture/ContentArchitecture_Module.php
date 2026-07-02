@@ -13,6 +13,7 @@
  * @since      1.0.0
  *
  * v1.1 | 2026-05-22 — Load Intent_Goal_Resolver.
+ * v1.2 | 2026-07-01 — Register suggest-intent-goal and suggest-topics WP-CLI commands.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -100,6 +101,8 @@ class ContentArchitecture_Module implements Module_Interface {
 		}
 
 		require_once __DIR__ . '/CLI/Content_Inventory_Command.php';
+		require_once __DIR__ . '/CLI/Suggest_Intent_Goal_Command.php';
+		require_once __DIR__ . '/CLI/Suggest_Topics_Command.php';
 
 		\WP_CLI::add_command(
 			'scos content-inventory',
@@ -108,6 +111,26 @@ class ContentArchitecture_Module implements Module_Interface {
 				'shortdesc' => 'Gather WordPress content inventory with analysis metadata.',
 				'longdesc'  => 'Collects all published posts/pages with analysis metadata, taxonomies, and URLs. ' .
 					'Supports incremental collection via --since.',
+			]
+		);
+
+		\WP_CLI::add_command(
+			'scos suggest-intent-goal',
+			CLI\Suggest_Intent_Goal_Command::class,
+			[
+				'shortdesc' => 'Suggest search intent goal phrasings for a post using AI.',
+				'longdesc'  => 'Wraps the scos/suggest-intent-goal ability. Requires the WordPress AI plugin. ' .
+					'Use --apply to auto-save the top suggestion to scos_ca_intent_goal.',
+			]
+		);
+
+		\WP_CLI::add_command(
+			'scos suggest-topics',
+			CLI\Suggest_Topics_Command::class,
+			[
+				'shortdesc' => 'Suggest scos_topic taxonomy terms for a post using AI.',
+				'longdesc'  => 'Wraps the scos/suggest-topics ability. Requires the WordPress AI plugin. ' .
+					'Use --apply to auto-assign the top-confidence topic to the post.',
 			]
 		);
 	}

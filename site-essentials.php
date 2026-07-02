@@ -213,27 +213,40 @@ add_action('init', function() {
 
 /**
  * WP-CLI commands — registered early and independently of module enable/disable state.
- * This ensures `wp bw-social backfill` is always available when the plugin is present,
- * regardless of whether the module loaded cleanly via Module_Loader.
+ * This ensures `wp scos-social backfill` and `wp scos-social sendpost` are always
+ * available when the plugin is present, regardless of whether the module loaded
+ * cleanly via Module_Loader.
  */
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	add_action( 'plugins_loaded', static function () {
-		$cli_file = __DIR__ . '/site-essentials/Modules/SocialAmplification/CLI/Backfill_Command.php';
-		$engine   = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Amplification_Engine.php';
-		$postly   = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Postly_Client.php';
-		$anthropic = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php';
-		$hook     = __DIR__ . '/site-essentials/Modules/SocialAmplification/Publish_Hook.php';
+		$backfill_file  = __DIR__ . '/site-essentials/Modules/SocialAmplification/CLI/Backfill_Command.php';
+		$sendpost_file  = __DIR__ . '/site-essentials/Modules/SocialAmplification/CLI/Send_Post_Command.php';
+		$pt_config_file = __DIR__ . '/site-essentials/Modules/SocialAmplification/Post_Type_Config.php';
+		$engine         = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Amplification_Engine.php';
+		$postly         = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Postly_Client.php';
+		$anthropic      = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php';
+		$hook           = __DIR__ . '/site-essentials/Modules/SocialAmplification/Publish_Hook.php';
 
-		if ( file_exists( $cli_file ) ) {
-			// Ensure all dependencies the CLI command uses are loaded.
-			foreach ( [ $anthropic, $postly, $engine, $hook, $cli_file ] as $f ) {
-				if ( file_exists( $f ) ) {
-					require_once $f;
-				}
+		// Ensure all dependencies the CLI commands use are loaded.
+		foreach ( [ $pt_config_file, $anthropic, $postly, $engine, $hook ] as $f ) {
+			if ( file_exists( $f ) ) {
+				require_once $f;
 			}
+		}
+
+		if ( file_exists( $backfill_file ) ) {
+			require_once $backfill_file;
 			\WP_CLI::add_command(
-				'bw-social backfill',
+				'scos-social backfill',
 				\SiteEssentials\Modules\SocialAmplification\CLI\Backfill_Command::class
+			);
+		}
+
+		if ( file_exists( $sendpost_file ) ) {
+			require_once $sendpost_file;
+			\WP_CLI::add_command(
+				'scos-social sendpost',
+				\SiteEssentials\Modules\SocialAmplification\CLI\Send_Post_Command::class
 			);
 		}
 	}, 20 );

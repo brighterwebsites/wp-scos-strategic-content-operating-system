@@ -27,7 +27,7 @@ class Anthropic_Client {
 	const API_URL         = 'https://api.anthropic.com/v1/messages';
 	const API_VERSION     = '2023-06-01';
 	const DEFAULT_MODEL   = 'claude-haiku-4-5-20251001';
-	const MAX_TOKENS      = 1500;
+	const MAX_TOKENS      = 2500;
 	const LOG_PREFIX      = '[SCOS SMA Anthropic]';
 
 	/** Knowledge files relative to WP_CONTENT_DIR/ai-knowledge/ */
@@ -39,9 +39,9 @@ class Anthropic_Client {
 	];
 
 	/**
-	 * Generate three social media captions for the given post context.
+	 * Generate N social media captions for the given post context.
 	 *
-	 * @param  array  $post_context {
+	 * @param  array    $post_context {
 	 *     @type int    $post_id
 	 *     @type string $title
 	 *     @type string $excerpt
@@ -49,10 +49,12 @@ class Anthropic_Client {
 	 *     @type string $shortlink
 	 *     @type string $content_type
 	 * }
-	 * @return array{post_1: string, post_2: string, post_3: string}
+	 * @param  string[] $frames  Framing angle strings. Cycled via modulo for post_count > count($frames).
+	 * @param  int      $count   Number of captions to generate (default 3).
+	 * @return array<string, string>  Keys post_1 … post_N.
 	 * @throws \RuntimeException on API error or bad response.
 	 */
-	public static function generate_captions( array $post_context ): array {
+	public static function generate_captions( array $post_context, array $frames = [], int $count = 3 ): array {
 		$api_key = get_option( 'bw_anthropic_api_key', '' );
 		if ( ! $api_key ) {
 			$msg = 'Anthropic API key is not configured.';
@@ -62,13 +64,23 @@ class Anthropic_Client {
 
 		self::maybe_create_htaccess();
 
+		$count  = max( 1, $count );
+		$frames = array_values( array_filter( $frames, 'strlen' ) );
+		if ( empty( $frames ) ) {
+			$frames = [
+				'Storytelling angle — draw the reader into the project.',
+				'Results / outcome angle — focus on what was delivered and why it holds up.',
+				'Behind-the-scenes / process angle — tease the craft or a specific build decision.',
+			];
+		}
+
 		$model     = (string) get_option( 'bw_anthropic_model', self::DEFAULT_MODEL ) ?: self::DEFAULT_MODEL;
 		$knowledge = self::read_knowledge_files();
-		$system    = self::system_prompt( $knowledge );
-		$prompt    = self::build_prompt( $post_context );
+		$system    = self::system_prompt( $knowledge, $count );
+		$prompt    = self::build_prompt( $post_context, $frames, $count );
 
 		$post_id = $post_context['post_id'] ?? '?';
-		error_log( self::LOG_PREFIX . " Generating captions for post #{$post_id} using model {$model}" );
+		error_log( self::LOG_PREFIX . " Generating {$count} captions for post #{$post_id} using model {$model}" );
 
 		$payload = [
 			'model'      => $model,
@@ -111,8 +123,8 @@ class Anthropic_Client {
 		$text = $data['content'][0]['text'] ?? '';
 		error_log( self::LOG_PREFIX . " Raw caption response for post #{$post_id}: " . substr( $text, 0, 500 ) );
 
-		$captions = self::parse_captions( $text );
-		error_log( self::LOG_PREFIX . " Captions parsed successfully for post #{$post_id}" );
+		$captions = self::parse_captions( $text, $count );
+		error_log( self::LOG_PREFIX . " Captions parsed successfully for post #{$post_id} (count={$count})" );
 
 		return $captions;
 	}
@@ -191,8 +203,9 @@ class Anthropic_Client {
 	 * which improves Claude's instruction-following.
 	 *
 	 * @param  array{brand_core: string, vocabulary: string, social_media: string} $knowledge
+	 * @param  int $count  Number of captions to generate (used to declare expected keys).
 	 */
-	private static function system_prompt( array $knowledge ): string {
+	private static function system_prompt( array $knowledge, int $count = 3 ): string {
 		$business_name = (string) get_option( 'scos_biz_business_name', get_bloginfo( 'name' ) );
 		$service_desc  = (string) get_option( 'scos_biz_service_description', '' );
 
@@ -219,32 +232,45 @@ class Anthropic_Client {
 			? "\n\nBefore writing anything, apply the following guidelines precisely:\n\n" . implode( "\n\n", $parts )
 			: '';
 
+		$key_list = implode( ', ', array_map( static fn( $i ) => '"post_' . $i . '"', range( 1, $count ) ) );
+
 		return "You are a social media copywriter for {$identity}.{$guidelines}\n\n"
 			. "Return valid JSON only. No preamble, no explanation, no markdown fences.\n"
-			. 'The JSON must have exactly these keys: "post_1", "post_2", "post_3". '
+			. "The JSON must have exactly these keys: {$key_list}. "
 			. 'Each value is a complete, ready-to-publish social media caption string.';
 	}
 
 	/**
-	 * Build the per-post user prompt.
-	 * Rules stay in the system prompt — keep this as short as possible.
+	 * Build the per-post user prompt with dynamic frame angles.
+	 * Frames are cycled via modulo when $count > count($frames).
+	 *
+	 * @param  array    $ctx    Post context.
+	 * @param  string[] $frames Framing angle strings.
+	 * @param  int      $count  Number of captions to generate.
 	 */
-	private static function build_prompt( array $ctx ): string {
+	private static function build_prompt( array $ctx, array $frames, int $count ): string {
 		$title        = $ctx['title']        ?? '';
 		$excerpt      = $ctx['excerpt']      ?? '';
 		$shortlink    = $ctx['shortlink']    ?? ( $ctx['permalink'] ?? '' );
 		$content_type = $ctx['content_type'] ?? 'project';
 
-		return "Create 3 social media captions for this {$content_type}:\n\n"
+		$frame_count = count( $frames );
+		$frame_lines = '';
+		for ( $i = 1; $i <= $count; $i++ ) {
+			$frame       = $frames[ ( $i - 1 ) % $frame_count ];
+			$frame_lines .= "post_{$i}: {$frame}\n";
+		}
+
+		$json_example = '{' . implode( ', ', array_map( static fn( $i ) => '"post_' . $i . '": "caption here"', range( 1, $count ) ) ) . '}';
+
+		return "Create {$count} social media captions for this {$content_type}:\n\n"
 			. "Title: {$title}\n"
 			. "Description: {$excerpt}\n"
 			. "Link: {$shortlink}\n\n"
-			. "post_1: Storytelling angle — draw the reader into the project.\n"
-			. "post_2: Results / outcome angle — focus on what was delivered and why it holds up.\n"
-			. "post_3: Behind-the-scenes / process angle — tease the craft or a specific build decision.\n\n"
-			. "Each caption: 2–4 sentences, link included naturally, 3–5 hashtags at the end.\n\n"
+			. $frame_lines
+			. "\nEach caption: 2–4 sentences, link included naturally, 3–5 hashtags at the end.\n\n"
 			. "Respond with ONLY this exact JSON structure, no other text:\n"
-			. '{"post_1": "caption one here", "post_2": "caption two here", "post_3": "caption three here"}';
+			. $json_example;
 	}
 
 	private static function build_gmb_prompt( array $ctx ): string {
@@ -269,12 +295,15 @@ class Anthropic_Client {
 	}
 
 	/**
-	 * Parse the model's text response into the expected array.
+	 * Parse the model's text response into an array of N captions.
 	 * Handles JSON that may be wrapped in markdown fences despite the instruction.
 	 *
+	 * @param  string $text  Raw model output.
+	 * @param  int    $count Expected number of captions.
+	 * @return array<string, string>  Keys post_1 … post_N.
 	 * @throws \RuntimeException if captions cannot be parsed.
 	 */
-	private static function parse_captions( string $text ): array {
+	private static function parse_captions( string $text, int $count = 3 ): array {
 		// Strip markdown fences
 		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
 		$text = preg_replace( '/\s*```$/', '', $text );
@@ -282,13 +311,31 @@ class Anthropic_Client {
 
 		$data = json_decode( $text, true );
 
-		// ── Happy path: expected {post_1, post_2, post_3} object ─────────────
-		if ( is_array( $data ) && ! empty( $data['post_1'] ) && ! empty( $data['post_2'] ) && ! empty( $data['post_3'] ) ) {
-			return [
-				'post_1' => (string) $data['post_1'],
-				'post_2' => (string) $data['post_2'],
-				'post_3' => (string) $data['post_3'],
-			];
+		// ── Happy path: {post_1, …, post_N} object ───────────────────────────
+		if ( is_array( $data ) && ! isset( $data[0] ) ) {
+			$result   = [];
+			$all_good = true;
+			for ( $i = 1; $i <= $count; $i++ ) {
+				$key = "post_{$i}";
+				if ( ! empty( $data[ $key ] ) ) {
+					$result[ $key ] = (string) $data[ $key ];
+				} else {
+					$all_good = false;
+					break;
+				}
+			}
+			if ( $all_good && count( $result ) === $count ) {
+				return $result;
+			}
+			// Partial match: if at least post_1 exists, fill missing slots by cycling.
+			if ( ! empty( $result ) ) {
+				$keys = array_keys( $result );
+				for ( $i = count( $result ) + 1; $i <= $count; $i++ ) {
+					$fallback_key    = $keys[ ( $i - 1 ) % count( $keys ) ];
+					$result["post_{$i}"] = $result[ $fallback_key ];
+				}
+				return $result;
+			}
 		}
 
 		// ── Fallback: model returned an array of objects ─────────────────────
@@ -296,24 +343,23 @@ class Anthropic_Client {
 		if ( is_array( $data ) && isset( $data[0] ) && is_array( $data[0] ) ) {
 			$captions = [];
 			foreach ( $data as $item ) {
-				// Accept any key that looks like text content
 				$caption = $item['caption'] ?? $item['text'] ?? $item['content'] ?? $item['post'] ?? '';
 				if ( $caption ) {
 					$captions[] = (string) $caption;
 				}
 			}
-			if ( count( $captions ) >= 3 ) {
-				return [
-					'post_1' => $captions[0],
-					'post_2' => $captions[1],
-					'post_3' => $captions[2],
-				];
+			if ( count( $captions ) >= $count ) {
+				$result = [];
+				for ( $i = 1; $i <= $count; $i++ ) {
+					$result["post_{$i}"] = $captions[ $i - 1 ];
+				}
+				return $result;
 			}
 		}
 
 		// ── Nothing worked ────────────────────────────────────────────────────
 		throw new \RuntimeException(
-			'Anthropic response did not contain expected caption keys. Raw: ' . substr( $text, 0, 400 )
+			"Anthropic response did not contain expected post_1…post_{$count} keys. Raw: " . substr( $text, 0, 400 )
 		);
 	}
 

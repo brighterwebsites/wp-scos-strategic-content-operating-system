@@ -15,7 +15,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
- * @version    1.2 | 2026-06-24
+ * @version    1.3 | 2026-07-01
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -57,6 +57,7 @@ class SocialAmplification_Module implements Module_Interface {
 			define( 'SCOS_SA_ACTIVE', true );
 		}
 
+		require_once __DIR__ . '/Post_Type_Config.php';
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Meta_Box.php';
 		require_once __DIR__ . '/Post_Framing.php';
@@ -82,14 +83,35 @@ class SocialAmplification_Module implements Module_Interface {
 		// AJAX: fetch Postly channel IDs (admin-only)
 		add_action( 'wp_ajax_scos_sa_fetch_postly_channels', [ $this, 'ajax_fetch_postly_channels' ] );
 
-		// WP-CLI backfill command
+		// WP-CLI commands (scos-social namespace)
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			require_once __DIR__ . '/CLI/Backfill_Command.php';
-			\WP_CLI::add_command( 'bw-social backfill', CLI\Backfill_Command::class );
+			require_once __DIR__ . '/CLI/Send_Post_Command.php';
+			\WP_CLI::add_command( 'scos-social backfill', CLI\Backfill_Command::class );
+			\WP_CLI::add_command( 'scos-social sendpost', CLI\Send_Post_Command::class );
+		}
+
+		// WP Abilities API — category + send-social-post ability
+		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
+		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+			require_once __DIR__ . '/Abilities/Send_Social_Post/Send_Social_Post.php';
 		}
 
 		// One-time migration: copy bw_* option values → scos_sma_* on first load
 		add_action( 'admin_init', [ $this, 'maybe_migrate_options' ] );
+	}
+
+	/**
+	 * Register the Social Amplification ability category.
+	 */
+	public static function register_ability_category(): void {
+		if ( ! function_exists( 'wp_register_ability_category' ) ) {
+			return;
+		}
+		wp_register_ability_category( 'scos-social-amplification', [
+			'label'       => __( 'SCOS: Social Amplification', 'site-essentials' ),
+			'description' => __( 'Abilities for generating and scheduling social media posts from WordPress content.', 'site-essentials' ),
+		] );
 	}
 
 	/**

@@ -4,13 +4,16 @@
  *
  * Rendered by SocialAmplification_Module::render_settings() via Admin_UI.
  * SCOS-SA-PASS1 — full UI rebuild to SCOS design system (Template A: tabbed settings).
+ * SCOS-SA-PASS2 — per-post-type config tab, channel split, global framing, slot-gap-days.
  *
  * @package SiteEssentials
+ * v1.2 | 2026-07-01
  */
 
 defined( 'ABSPATH' ) || exit;
 
 use SiteEssentials\Modules\SocialAmplification\Post_Framing;
+use SiteEssentials\Modules\SocialAmplification\Post_Type_Config;
 use SiteEssentials\Modules\SocialAmplification\SocialAmplification_Module as SMA;
 
 // SCOS-SA-PASS1 — option reader: existing keys preserved; scos_sa_ prefix is target migration state.
@@ -24,7 +27,6 @@ $yourls_pass = SMA::get_option( 'scos_sma_yourls_password',  'bw_yourls_password
 $postly_api_key        = get_option( 'bw_postly_api_key', '' );
 $postly_workspace_id   = get_option( 'bw_postly_workspace_id', '' );
 $postly_channel_ids    = get_option( 'bw_postly_channel_ids', '' );
-$postly_gmb_channel_id = get_option( 'se_postly_gmb_channel_id', '' );
 $acf_gallery_keys      = get_option( 'bw_social_acf_gallery_keys', '' );
 $acf_featured_key      = get_option( 'bw_social_acf_featured_key', '' );
 $webhook_secret        = get_option( 'bw_social_webhook_secret', '' );
@@ -37,6 +39,24 @@ $postly_post_count    = get_option( 'scos_sa_postly_post_count', 3 );
 $backfill_date_from   = get_option( 'scos_sa_backfill_date_from', '' );
 $backfill_date_to     = get_option( 'scos_sa_backfill_date_to', '' );
 $backfill_limit       = get_option( 'scos_sa_backfill_limit', 5 );
+$backfill_slot_gap    = get_option( 'scos_sa_backfill_slot_gap_days', 0 );
+
+// Per-channel fields
+$fb_channel_id    = get_option( 'scos_sa_postly_fb_channel_id', '' );
+$fb_enabled       = get_option( 'scos_sa_postly_fb_enabled', '1' );
+$ig_channel_id    = get_option( 'scos_sa_postly_ig_channel_id', '' );
+$ig_enabled       = get_option( 'scos_sa_postly_ig_enabled', '1' );
+$gmb_channel_id   = get_option( 'scos_sa_postly_gmb_channel_id', get_option( 'se_postly_gmb_channel_id', '' ) );
+
+// Global posting settings
+$global_frames      = Post_Type_Config::get_global_frames();
+$global_max_images  = get_option( Post_Type_Config::MAX_IMAGES_OPTION, Post_Type_Config::DEFAULT_MAX_IMAGES );
+$global_no_featured = get_option( Post_Type_Config::NO_FEATURED_OPTION, 0 );
+$global_no_attach   = get_option( Post_Type_Config::NO_ATTACH_OPTION, 0 );
+
+// Per post type config
+$pt_all_configs   = Post_Type_Config::get_all_configs();
+$registered_types = Post_Type_Config::get_all_registered();
 
 // TODO: migrate key to scos_sa_ prefix — SCOS-SA-PASS1
 $make_webhook_url    = SMA::get_option( 'scos_sma_webhook_url',     'bw_social_webhook_url' );
@@ -69,14 +89,15 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
   <a href="#settings" class="scos__tab" data-tab="settings"><?php esc_html_e( 'Settings', 'site-essentials' ); ?></a>
   <a href="#yourls"   class="scos__tab" data-tab="yourls"><?php esc_html_e( 'Short link – YOURLS', 'site-essentials' ); ?></a>
   <a href="#postly"   class="scos__tab" data-tab="postly"><?php esc_html_e( 'Postly.ai API settings', 'site-essentials' ); ?></a>
+  <a href="#posting"  class="scos__tab" data-tab="posting"><?php esc_html_e( 'Posting Settings', 'site-essentials' ); ?></a>
   <a href="#make"     class="scos__tab" data-tab="make"><?php esc_html_e( 'Make.com settings', 'site-essentials' ); ?></a>
 </nav>
 
-<?php // SCOS-SA-PASS1 — minimal hash-based tab switcher ?>
+<?php // SCOS-SA-PASS2 — hash-based tab switcher updated for 'posting' tab ?>
 <script>
 (function() {
-  var TABS     = ['settings','yourls','postly','make'];
-  var FORMS    = { yourls: 'scos-sa-form-yourls', postly: 'scos-sa-form-postly', make: 'scos-sa-form-make' };
+  var TABS     = ['settings','yourls','postly','posting','make'];
+  var FORMS    = { yourls: 'scos-sa-form-yourls', postly: 'scos-sa-form-postly', posting: 'scos-sa-form-posting', make: 'scos-sa-form-make' };
   var panels   = {};
   var links    = {};
   var saveBtn;
@@ -394,7 +415,8 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
         ?>
         <div id="scos-sa-backfill-wrap"
              data-secret="<?php echo esc_attr( $bw_secret ); ?>"
-             data-rest="<?php echo esc_attr( rest_url( 'bw-social/v1/backfill' ) ); ?>">
+             data-rest="<?php echo esc_attr( rest_url( 'bw-social/v1/backfill' ) ); ?>"
+             data-slot-gap-field="scos_sa_backfill_slot_gap_days">
 
           <table class="scos-form">
             <tbody>
@@ -427,11 +449,20 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
                          type="number" class="scos-input" style="width:80px" min="1"
                          value="<?php echo esc_attr( $backfill_limit ); ?>">
                   <p class="description"><?php esc_html_e( 'Maximum number of posts to process in this backfill run.', 'site-essentials' ); ?></p>
-                  <div class="scos-notice scos-notice--info" style="margin-top:var(--scos-s-3)">
-                    <?php esc_html_e( 'Additional scheduling options (days between posts, start date offset, per-post count) are available via CLI.', 'site-essentials' ); ?>
-                    <a href="https://brighterwebsites.com.au/software/social-amplification/social-amplification-technical-documentation/"
-                       target="_blank" rel="noopener"><?php esc_html_e( 'View CLI reference &rarr;', 'site-essentials' ); ?></a>
-                  </div>
+                </td>
+              </tr>
+              <tr>
+                <th>
+                  <label for="scos_sa_backfill_slot_gap_days"><?php esc_html_e( 'Slot gap (days)', 'site-essentials' ); ?></label>
+                  <div class="scos-form__slug">scos_sa_backfill_slot_gap_days</div>
+                </th>
+                <td>
+                  <input id="scos_sa_backfill_slot_gap_days" name="scos_sa_backfill_slot_gap_days"
+                         type="number" class="scos-input" style="width:80px" min="0" max="365"
+                         value="<?php echo esc_attr( $backfill_slot_gap ); ?>">
+                  <p class="description">
+                    <?php esc_html_e( 'Minimum calendar days between consecutive slots in this backfill run. 0 = pack into the next available Mon/Wed/Fri slots. 7 = space slots at least 1 week apart.', 'site-essentials' ); ?>
+                  </p>
                 </td>
               </tr>
             </tbody>
@@ -513,12 +544,73 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 
         <p class="scos__section-label"><?php esc_html_e( 'Social channel settings', 'site-essentials' ); ?></p>
 
+        <p class="description" style="margin-bottom:var(--scos-s-4)">
+          <?php esc_html_e( 'Configure each platform separately. Use "Fetch channel IDs" above to find the IDs. Leave a channel ID blank to exclude that platform. Toggle enables/disables without clearing the ID.', 'site-essentials' ); ?>
+          <?php esc_html_e( 'Migrate existing Facebook/Instagram IDs from the legacy field below to their dedicated fields.', 'site-essentials' ); ?>
+        </p>
+
         <table class="scos-form">
           <tbody>
-            <?php // TODO: migrate key bw_postly_channel_ids → scos_sa_postly_channel_ids — SCOS-SA-PASS1 ?>
+
             <tr>
               <th>
-                <label for="bw_postly_channel_ids"><?php esc_html_e( 'Target channel IDs', 'site-essentials' ); ?></label>
+                <label for="scos_sa_postly_fb_channel_id"><?php esc_html_e( 'Facebook channel ID', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_fb_channel_id</div>
+              </th>
+              <td>
+                <div style="display:flex;align-items:center;gap:var(--scos-s-3)">
+                  <label class="scos-checkbox-row" style="margin:0">
+                    <input type="checkbox" name="scos_sa_postly_fb_enabled" value="1"
+                           <?php checked( $fb_enabled, '1' ); ?>>
+                    <?php esc_html_e( 'Enabled', 'site-essentials' ); ?>
+                  </label>
+                  <input id="scos_sa_postly_fb_channel_id" name="scos_sa_postly_fb_channel_id"
+                         type="text" class="scos-input scos-input--mono" style="flex:1"
+                         placeholder="ch_xxxxxxxxxxxxxxxxxx"
+                         value="<?php echo esc_attr( $fb_channel_id ); ?>">
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <th>
+                <label for="scos_sa_postly_ig_channel_id"><?php esc_html_e( 'Instagram channel ID', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_ig_channel_id</div>
+              </th>
+              <td>
+                <div style="display:flex;align-items:center;gap:var(--scos-s-3)">
+                  <label class="scos-checkbox-row" style="margin:0">
+                    <input type="checkbox" name="scos_sa_postly_ig_enabled" value="1"
+                           <?php checked( $ig_enabled, '1' ); ?>>
+                    <?php esc_html_e( 'Enabled', 'site-essentials' ); ?>
+                  </label>
+                  <input id="scos_sa_postly_ig_channel_id" name="scos_sa_postly_ig_channel_id"
+                         type="text" class="scos-input scos-input--mono" style="flex:1"
+                         placeholder="ch_xxxxxxxxxxxxxxxxxx"
+                         value="<?php echo esc_attr( $ig_channel_id ); ?>">
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <th>
+                <label for="scos_sa_postly_gmb_channel_id"><?php esc_html_e( 'GMB channel ID', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_gmb_channel_id</div>
+              </th>
+              <td>
+                <input id="scos_sa_postly_gmb_channel_id" name="scos_sa_postly_gmb_channel_id"
+                       type="text" class="scos-input scos-input--mono"
+                       placeholder="ch_xxxxxxxxxxxxxxxxxx"
+                       value="<?php echo esc_attr( $gmb_channel_id ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Google Business Profile channel. Scheduled to Tue/Thu slots. Only one GMB profile per workspace is supported.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <th>
+                <label for="bw_postly_channel_ids"><?php esc_html_e( 'Others (legacy / additional)', 'site-essentials' ); ?></label>
                 <div class="scos-form__slug">scos_sa_postly_channel_ids</div>
               </th>
               <td>
@@ -526,40 +618,11 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
                        class="scos-input scos-input--mono" placeholder="id1, id2, id3"
                        value="<?php echo esc_attr( $postly_channel_ids ); ?>">
                 <p class="description">
-                  <?php esc_html_e( 'Comma-separated Postly channel IDs. Leave blank to disable standard social posting.', 'site-essentials' ); ?>
+                  <?php esc_html_e( 'Comma-separated Postly channel IDs for Pinterest and any other platforms. If you previously entered Facebook/Instagram IDs here, move them to the dedicated fields above.', 'site-essentials' ); ?>
                 </p>
-                <div class="scos-notice scos-notice--info" style="margin-top:var(--scos-s-3)">
-                  <?php esc_html_e( 'Use this field for', 'site-essentials' ); ?>
-                  <strong><?php esc_html_e( 'Facebook and Instagram only.', 'site-essentials' ); ?></strong>
-                  <?php esc_html_e( 'Pinterest and GMB require additional channel configuration — use the GMB field below.', 'site-essentials' ); ?>
-                </div>
               </td>
             </tr>
-            <?php // TODO: migrate key se_postly_gmb_channel_id → scos_sa_postly_gmb_channel_id — SCOS-SA-PASS1 ?>
-            <tr>
-              <th>
-                <label for="se_postly_gmb_channel_id"><?php esc_html_e( 'GMB channel ID', 'site-essentials' ); ?></label>
-                <div class="scos-form__slug">scos_sa_postly_gmb_channel_id</div>
-              </th>
-              <td>
-                <input id="se_postly_gmb_channel_id" name="se_postly_gmb_channel_id" type="text"
-                       class="scos-input scos-input--mono"
-                       value="<?php echo esc_attr( $postly_gmb_channel_id ); ?>">
-                <p class="description">
-                  <?php esc_html_e( 'Your GMB channel ID from Postly &rarr; Channels. Only one GMB profile per workspace is supported.', 'site-essentials' ); ?>
-                </p>
-                <div class="scos-notice scos-notice--warning" style="margin-top:var(--scos-s-3)">
-                  <strong class="scos-notice__title"><?php esc_html_e( 'In development', 'site-essentials' ); ?></strong>
-                  <?php esc_html_e( 'GMB posting is functional but not yet self-service. Full setup currently requires CLI commands.', 'site-essentials' ); ?>
-                  <a href="https://brighterwebsites.com.au/software/social-amplification/postly-ai-integration/"
-                     target="_blank" rel="noopener"><?php esc_html_e( 'Check for updates &rarr;', 'site-essentials' ); ?></a>
-                  <?php esc_html_e( 'or', 'site-essentials' ); ?>
-                  <a href="https://brighterwebsites.com.au/software/social-amplification/"
-                     target="_blank" rel="noopener"><?php esc_html_e( 'contact Brighter Websites', 'site-essentials' ); ?></a>
-                  <?php esc_html_e( 'for assisted setup.', 'site-essentials' ); ?>
-                </div>
-              </td>
-            </tr>
+
           </tbody>
         </table>
 
@@ -753,7 +816,237 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 </div><!-- /#scos-sa-panel-postly -->
 
 <?php // ──────────────────────────────────────────────────────────────────────────── ?>
-<?php // Tab 4 — Make.com settings                                                   ?>
+<?php // Tab 4 — Posting Settings (NEW)                                              ?>
+<?php // SCOS-SA-PASS2 — global framing angles + per-post-type config accordion     ?>
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+
+<div id="scos-sa-panel-posting">
+
+  <form id="scos-sa-form-posting" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+    <?php wp_nonce_field( 'scos_sma_save', 'scos_sma_nonce' ); ?>
+    <input type="hidden" name="action" value="site_essentials_save_sma">
+    <input type="hidden" name="_scos_sma_tab" value="posting">
+
+    <?php // ── Card 1: Global defaults ──────────────────────────────────────── ?>
+
+    <div class="scos-card">
+      <div class="scos-card__header">
+        <h3 class="scos-card__title"><?php esc_html_e( 'All posts — global defaults', 'site-essentials' ); ?></h3>
+        <p class="scos-card__desc">
+          <?php esc_html_e( 'Applied to all post types unless overridden by a per-post-type configuration below.', 'site-essentials' ); ?>
+        </p>
+      </div>
+      <div class="scos-card__body">
+
+        <p class="scos__section-label"><?php esc_html_e( 'How to frame social posts', 'site-essentials' ); ?></p>
+
+        <p class="description" style="margin-bottom:var(--scos-s-4)">
+          <?php esc_html_e( 'Each input is one framing angle injected into the AI prompt as post_1, post_2, post_3. When post count exceeds 3, angles cycle from the beginning.', 'site-essentials' ); ?>
+        </p>
+
+        <?php for ( $f = 0; $f < 3; $f++ ) : ?>
+        <div style="margin-bottom:var(--scos-s-3)">
+          <textarea name="<?php echo esc_attr( Post_Type_Config::FRAMES_OPTION ); ?>[<?php echo $f; ?>]"
+                    rows="2" class="scos-input" style="width:100%"><?php echo esc_textarea( $global_frames[ $f ] ?? '' ); ?></textarea>
+        </div>
+        <?php endfor; ?>
+
+        <hr style="border:none;border-top:1px solid var(--scos-border);margin:var(--scos-s-5) 0">
+
+        <p class="scos__section-label"><?php esc_html_e( 'Image settings', 'site-essentials' ); ?></p>
+
+        <table class="scos-form">
+          <tbody>
+            <tr>
+              <th>
+                <label><?php esc_html_e( 'Image sources', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_no_featured / _no_attachments</div>
+              </th>
+              <td>
+                <label class="scos-checkbox-row">
+                  <input type="checkbox" name="<?php echo esc_attr( Post_Type_Config::NO_FEATURED_OPTION ); ?>"
+                         value="1" <?php checked( $global_no_featured, '1' ); ?>>
+                  <?php esc_html_e( "Don't use featured image", 'site-essentials' ); ?>
+                </label>
+                <label class="scos-checkbox-row" style="margin-top:var(--scos-s-2)">
+                  <input type="checkbox" name="<?php echo esc_attr( Post_Type_Config::NO_ATTACH_OPTION ); ?>"
+                         value="1" <?php checked( $global_no_attach, '1' ); ?>>
+                  <?php esc_html_e( "Don't use post image attachments", 'site-essentials' ); ?>
+                </label>
+                <p class="description" style="margin-top:var(--scos-s-2)">
+                  <?php esc_html_e( 'Featured image and image attachments are used by default. Add ACF image or gallery field keys in Postly API settings → ACF field settings.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <th>
+                <label for="scos_sa_postly_max_images"><?php esc_html_e( 'Max images per social post', 'site-essentials' ); ?></label>
+                <div class="scos-form__slug">scos_sa_postly_max_images</div>
+              </th>
+              <td>
+                <input id="scos_sa_postly_max_images" name="<?php echo esc_attr( Post_Type_Config::MAX_IMAGES_OPTION ); ?>"
+                       type="number" class="scos-input" style="width:80px" min="1" max="20"
+                       value="<?php echo esc_attr( $global_max_images ); ?>">
+                <p class="description">
+                  <?php esc_html_e( 'Maximum number of images uploaded to Postly per individual social post slot. Default: 4.', 'site-essentials' ); ?>
+                </p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div>
+      <div class="scos-card__footer">
+        <button type="submit" class="scos-btn scos-btn--primary">
+          <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+        </button>
+      </div>
+    </div><!-- /.scos-card Global defaults -->
+
+    <?php // ── Card 2: Per post type ────────────────────────────────────────── ?>
+
+    <div class="scos-card">
+      <div class="scos-card__header">
+        <h3 class="scos-card__title"><?php esc_html_e( 'Configure social posts per post type', 'site-essentials' ); ?></h3>
+        <p class="scos-card__desc">
+          <?php esc_html_e( 'When per-post-type settings are enabled, they override all global defaults for that post type.', 'site-essentials' ); ?>
+        </p>
+      </div>
+      <div class="scos-card__body" style="padding:0">
+
+        <?php if ( empty( $registered_types ) ) : ?>
+          <div class="scos-empty" style="padding:var(--scos-s-5)">
+            <p class="scos-empty__desc"><?php esc_html_e( 'No publicly queryable post types found.', 'site-essentials' ); ?></p>
+          </div>
+        <?php else : ?>
+
+          <?php foreach ( $registered_types as $pt_slug => $pt_label ) :
+            $pt_cfg     = $pt_all_configs[ $pt_slug ] ?? [];
+            $pt_enabled = ! empty( $pt_cfg['enabled'] );
+            $pt_count   = (int) ( $pt_cfg['post_count'] ?? 3 );
+            $pt_frames  = ( ! empty( $pt_cfg['frames'] ) && is_array( $pt_cfg['frames'] ) ) ? $pt_cfg['frames'] : $global_frames;
+            // Pad frames array to 3 slots
+            while ( count( $pt_frames ) < 3 ) {
+              $pt_frames[] = '';
+            }
+            $row_id = 'scos-sa-pt-' . sanitize_html_class( $pt_slug );
+          ?>
+          <div class="scos-sa-pt-row" style="border-bottom:1px solid var(--scos-border)">
+
+            <div class="scos-sa-pt-header" style="display:flex;align-items:center;gap:var(--scos-s-3);padding:var(--scos-s-4) var(--scos-s-5);cursor:pointer"
+                 onclick="scosTogglePTRow('<?php echo esc_js( $row_id ); ?>')">
+              <label class="scos-checkbox-row" style="margin:0" onclick="event.stopPropagation()">
+                <input type="checkbox"
+                       name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][enabled]"
+                       value="1"
+                       id="<?php echo esc_attr( $row_id ); ?>-enable"
+                       <?php checked( $pt_enabled ); ?>
+                       onchange="scosTogglePTRow('<?php echo esc_js( $row_id ); ?>', this.checked)">
+              </label>
+              <span style="font-weight:500;flex:1"><?php echo esc_html( $pt_label ); ?>
+                <code style="font-size:var(--scos-fs-sm);font-weight:400;color:var(--scos-ink-subtle);margin-left:var(--scos-s-2)"><?php echo esc_html( $pt_slug ); ?></code>
+              </span>
+              <div style="display:flex;align-items:center;gap:var(--scos-s-2);color:var(--scos-ink-subtle);font-size:var(--scos-fs-sm)" onclick="event.stopPropagation()">
+                <input type="number"
+                       name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][post_count]"
+                       class="scos-input" style="width:60px;font-size:var(--scos-fs-sm)"
+                       min="1" max="10" value="<?php echo esc_attr( $pt_count ); ?>"
+                       aria-label="<?php esc_attr_e( 'Number of social posts', 'site-essentials' ); ?>">
+                <span><?php esc_html_e( 'posts to create', 'site-essentials' ); ?></span>
+              </div>
+              <span class="dashicons dashicons-arrow-down-alt2" style="color:var(--scos-ink-subtle)"></span>
+            </div>
+
+            <div id="<?php echo esc_attr( $row_id ); ?>-panel"
+                 style="padding:var(--scos-s-4) var(--scos-s-5) var(--scos-s-5);background:var(--scos-surface-2);<?php echo $pt_enabled ? '' : 'display:none'; ?>">
+
+              <p class="scos__section-label" style="margin-bottom:var(--scos-s-3)"><?php esc_html_e( 'Images', 'site-essentials' ); ?></p>
+
+              <label class="scos-checkbox-row">
+                <input type="checkbox"
+                       name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][no_featured]"
+                       value="1" <?php checked( ! empty( $pt_cfg['no_featured'] ) ); ?>>
+                <?php esc_html_e( "Don't use featured image", 'site-essentials' ); ?>
+              </label>
+              <label class="scos-checkbox-row" style="margin-top:var(--scos-s-2)">
+                <input type="checkbox"
+                       name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][no_attachments]"
+                       value="1" <?php checked( ! empty( $pt_cfg['no_attachments'] ) ); ?>>
+                <?php esc_html_e( "Don't use post image attachments", 'site-essentials' ); ?>
+              </label>
+
+              <div style="display:flex;align-items:center;gap:var(--scos-s-3);margin-top:var(--scos-s-3)">
+                <label class="scos-checkbox-row" style="margin:0">
+                  <input type="checkbox"
+                         id="<?php echo esc_attr( $row_id ); ?>-use-acf"
+                         onchange="document.getElementById('<?php echo esc_js( $row_id ); ?>-acf-wrap').style.display=this.checked?'':'none'"
+                         <?php checked( ! empty( $pt_cfg['acf_gallery_keys'] ) ); ?>>
+                  <?php esc_html_e( 'Use ACF gallery', 'site-essentials' ); ?>
+                </label>
+                <div id="<?php echo esc_attr( $row_id ); ?>-acf-wrap"
+                     style="flex:1;<?php echo empty( $pt_cfg['acf_gallery_keys'] ) ? 'display:none' : ''; ?>">
+                  <input type="text"
+                         name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][acf_gallery_keys]"
+                         class="scos-input scos-input--mono" style="width:100%"
+                         placeholder="galleryfield1, galleryfield2"
+                         value="<?php echo esc_attr( $pt_cfg['acf_gallery_keys'] ?? '' ); ?>">
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:var(--scos-s-3);margin-top:var(--scos-s-3)">
+                <label style="font-size:var(--scos-fs-sm);color:var(--scos-ink-subtle)">
+                  <?php esc_html_e( 'Max images per post', 'site-essentials' ); ?>
+                </label>
+                <input type="number"
+                       name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][max_images]"
+                       class="scos-input" style="width:70px"
+                       min="1" max="20"
+                       value="<?php echo esc_attr( $pt_cfg['max_images'] ?? $global_max_images ); ?>">
+              </div>
+
+              <p class="scos__section-label" style="margin-top:var(--scos-s-4);margin-bottom:var(--scos-s-3)"><?php esc_html_e( 'How to frame social posts', 'site-essentials' ); ?></p>
+
+              <?php for ( $f = 0; $f < 3; $f++ ) : ?>
+              <div style="margin-bottom:var(--scos-s-3)">
+                <textarea name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][frames][<?php echo $f; ?>]"
+                          rows="2" class="scos-input" style="width:100%"><?php echo esc_textarea( $pt_frames[ $f ] ?? '' ); ?></textarea>
+              </div>
+              <?php endfor; ?>
+
+            </div><!-- /.panel -->
+
+          </div><!-- /.scos-sa-pt-row -->
+          <?php endforeach; ?>
+
+        <?php endif; ?>
+
+      </div>
+      <div class="scos-card__footer">
+        <button type="submit" class="scos-btn scos-btn--primary">
+          <span class="dashicons dashicons-saved"></span> <?php esc_html_e( 'Save changes', 'site-essentials' ); ?>
+        </button>
+      </div>
+    </div><!-- /.scos-card Per post type -->
+
+  </form>
+
+</div><!-- /#scos-sa-panel-posting -->
+
+<script>
+(function() {
+  function scosTogglePTRow(rowId, forceState) {
+    var panel = document.getElementById(rowId + '-panel');
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    var nextState = (forceState !== undefined) ? forceState : !isOpen;
+    panel.style.display = nextState ? '' : 'none';
+  }
+  window.scosTogglePTRow = scosTogglePTRow;
+})();
+</script>
+
+<?php // ──────────────────────────────────────────────────────────────────────────── ?>
+<?php // Tab 5 — Make.com settings                                                   ?>
 <?php // SCOS-SA-PASS1 — single scos-card; tab slug changed from makecom to make    ?>
 <?php // ──────────────────────────────────────────────────────────────────────────── ?>
 

@@ -51,6 +51,16 @@
 			payload.date_to = (document.getElementById('scos_sa_backfill_to') || {}).value || '';
 			payload.limit = parseInt((document.getElementById('scos_sa_backfill_limit') || {}).value || '5', 10);
 		}
+
+		var gapField = wrap.getAttribute('data-slot-gap-field');
+		if (gapField) {
+			var gapEl = document.getElementById(gapField);
+			if (gapEl) {
+				var gapVal = parseInt(gapEl.value || '0', 10);
+				if (gapVal > 0) { payload.slot_gap_days = gapVal; }
+			}
+		}
+
 		return payload;
 	}
 

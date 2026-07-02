@@ -17,7 +17,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
- * v1.1 | 2026-07-02
+ * v1.2 | 2026-07-02
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -340,11 +340,22 @@ class Amplification_Engine {
 			$schedule_dt = $now->modify( '+60 minutes' );
 		}
 
-		$image_url  = self::get_featured_og_image( $post_id );
-		$shortlink  = $context['shortlink'] ?? '';
-		$permalink  = $context['permalink'] ?? '';
-		$gmb_caption = Anthropic_Client::generate_gmb_caption( $context );
-		$cta_url     = self::build_cta_url( $permalink, $shortlink );
+		$source_image = self::get_featured_og_image( $post_id );
+		$shortlink    = $context['shortlink'] ?? '';
+		$permalink    = $context['permalink'] ?? '';
+		$gmb_caption  = Anthropic_Client::generate_gmb_caption( $context );
+		$cta_url      = self::build_cta_url( $permalink, $shortlink );
+
+		$image_url = '';
+		if ( $source_image !== '' ) {
+			try {
+				$file_name = basename( (string) wp_parse_url( $source_image, PHP_URL_PATH ) ) ?: 'gmb-image.jpg';
+				$image_url = $client->upload_image( $source_image, $file_name );
+				error_log( self::LOG_PREFIX . ' GMB image uploaded to Postly CDN: ' . $image_url );
+			} catch ( \RuntimeException $e ) {
+				error_log( self::LOG_PREFIX . ' GMB image upload failed (continuing without image): ' . $e->getMessage() );
+			}
+		}
 
 		// GMB is always one post per amplification run (no multi-slot schedule like standard).
 		$post_results = [];

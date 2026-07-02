@@ -2,14 +2,14 @@
 /**
  * Media Library — Extra Admin Columns
  *
- * Adds opt-in columns to the media library list table (upload.php):
+ * Adds opt-in columns to the WordPress media library list table (upload.php):
  *   scos_media_alt      — Alt text (shows "—" when empty; highlights empty in red)
  *   scos_media_fileinfo — MIME type + original upload dimensions + human-readable file size
  *
- * Supports both the standard WP media list table and MLA (Media Library Assistant),
- * which replaces/enhances upload.php list mode with its own column system.
+ * When Media Library Assistant (MLA) controls the upload.php list table, only the
+ * File Info column is added here — MLA already provides a native Alt Text column
+ * in Screen Options. Enable MLA's Alt Text column there instead of duplicating it.
  *
- * Only active when the `extra_media_columns` toggle in Image_SEO settings is enabled.
  * Toggle path: SEO › Advanced › Image SEO → "Extra Media Library Columns".
  *
  * @package    SiteEssentials
@@ -17,6 +17,7 @@
  *
  * v1.0 | 2026-07-01
  * v1.1 | 2026-07-02 — Add MLA list table column hooks; gate inside callbacks not at init.
+ * v1.2 | 2026-07-02 — WP core table: Alt + File Info. MLA table: File Info only.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -33,16 +34,25 @@ class Media_Columns {
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
 	public static function init(): void {
-		// Standard WP media library list table.
-		add_filter( 'manage_media_columns',           [ __CLASS__, 'add_columns' ], 10, 2 );
+		// Standard WP media library list table (upload.php when MLA view support is off).
+		add_filter( 'manage_media_columns',           [ __CLASS__, 'add_wp_columns' ], 10, 2 );
 		add_action( 'manage_media_custom_column',     [ __CLASS__, 'render_column' ], 10, 2 );
 		add_filter( 'manage_upload_sortable_columns', [ __CLASS__, 'sortable_columns' ] );
 		add_action( 'admin_head-upload.php',          [ __CLASS__, 'column_styles' ] );
 
-		// MLA (Media Library Assistant) list table — upload.php list mode + MLA submenu.
-		add_filter( 'mla_list_table_get_columns',        [ __CLASS__, 'add_columns' ] );
-		add_filter( 'mla_list_table_column_default',     [ __CLASS__, 'mla_render_column' ], 10, 3 );
+		// MLA list table — upload.php (when MLA view is on) and Media/Assistant submenu.
+		// Register on init priority 0 so MLA picks up columns on first table build.
+		add_action( 'init', [ __CLASS__, 'register_mla_column_hooks' ], 0 );
+	}
+
+	/**
+	 * Register MLA column hooks early on init (MLA recommendation).
+	 */
+	public static function register_mla_column_hooks(): void {
+		add_filter( 'mla_list_table_get_columns',          [ __CLASS__, 'add_mla_columns' ] );
+		add_filter( 'mla_list_table_column_default',       [ __CLASS__, 'mla_render_column' ], 10, 3 );
 		add_filter( 'mla_list_table_get_sortable_columns', [ __CLASS__, 'sortable_columns' ] );
+		add_action( 'admin_head-media_page_mla-menu',      [ __CLASS__, 'column_styles' ] );
 	}
 
 	/**
@@ -56,30 +66,62 @@ class Media_Columns {
 	// ── Column definitions ────────────────────────────────────────────────────
 
 	/**
+	 * Core WP media list table — Alt Text + File Info.
+	 *
 	 * @param array<string, string> $columns
 	 * @return array<string, string>
 	 */
-	public static function add_columns( array $columns ): array {
+	public static function add_wp_columns( array $columns ): array {
 		if ( ! self::is_enabled() ) {
 			return $columns;
 		}
 
-		$new       = [];
-		$inserted  = false;
+		return self::insert_columns_after_title( $columns, [
+			self::COL_ALT      => __( 'Alt Text', 'site-essentials' ),
+			self::COL_FILEINFO => __( 'File Info', 'site-essentials' ),
+		] );
+	}
+
+	/**
+	 * MLA list table — File Info only (MLA provides Alt Text via Screen Options).
+	 *
+	 * @param array<string, string> $columns
+	 * @return array<string, string>
+	 */
+	public static function add_mla_columns( array $columns ): array {
+		if ( ! self::is_enabled() ) {
+			return $columns;
+		}
+
+		return self::insert_columns_after_title( $columns, [
+			self::COL_FILEINFO => __( 'File Info', 'site-essentials' ),
+		] );
+	}
+
+	/**
+	 * Insert columns after the title column (WP or MLA slug).
+	 *
+	 * @param array<string, string> $columns
+	 * @param array<string, string> $to_add
+	 * @return array<string, string>
+	 */
+	private static function insert_columns_after_title( array $columns, array $to_add ): array {
+		$new        = [];
+		$inserted   = false;
 		$after_keys = [ 'title_name', 'title', 'post_title' ];
 
 		foreach ( $columns as $key => $label ) {
 			$new[ $key ] = $label;
 			if ( in_array( $key, $after_keys, true ) ) {
-				$new[ self::COL_ALT ]      = __( 'Alt Text', 'site-essentials' );
-				$new[ self::COL_FILEINFO ] = __( 'File Info', 'site-essentials' );
+				foreach ( $to_add as $col_key => $col_label ) {
+					$new[ $col_key ] = $col_label;
+				}
 				$inserted = true;
 			}
 		}
 
 		if ( ! $inserted ) {
-			$new[ self::COL_ALT ]      = __( 'Alt Text', 'site-essentials' );
-			$new[ self::COL_FILEINFO ] = __( 'File Info', 'site-essentials' );
+			$new = array_merge( $new, $to_add );
 		}
 
 		return $new;
@@ -102,8 +144,8 @@ class Media_Columns {
 	/**
 	 * Standard WP media list table column renderer.
 	 *
-	 * @param string $column_name
-	 * @param int    $post_id
+	 * @param string     $column_name
+	 * @param int|string $post_id
 	 */
 	public static function render_column( string $column_name, $post_id ): void {
 		if ( ! self::is_enabled() ) {
@@ -121,11 +163,7 @@ class Media_Columns {
 	 * @return mixed
 	 */
 	public static function mla_render_column( $content, $item, $column_name ) {
-		if ( ! self::is_enabled() ) {
-			return $content;
-		}
-
-		if ( ! in_array( $column_name, [ self::COL_ALT, self::COL_FILEINFO ], true ) ) {
+		if ( ! self::is_enabled() || self::COL_FILEINFO !== $column_name ) {
 			return $content;
 		}
 
@@ -135,12 +173,12 @@ class Media_Columns {
 		}
 
 		ob_start();
-		self::output_column( $column_name, $post_id );
+		self::render_fileinfo( $post_id );
 		return ob_get_clean();
 	}
 
 	/**
-	 * Shared output for both WP and MLA column renderers.
+	 * Shared output for WP column renderer.
 	 */
 	private static function output_column( string $column_name, int $post_id ): void {
 		if ( self::COL_ALT === $column_name ) {

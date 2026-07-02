@@ -17,6 +17,7 @@
  *
  * v1.0 | 2026-07-01
  * v1.1 | 2026-07-02 — Use wp_get_ability()->execute(); fix MLA bulk action hooks.
+ * v1.2 | 2026-07-02 — Register MLA hooks on init; MLA bulk via custom_bulk_action; UI on Assistant page.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -34,8 +35,8 @@ class Media_Meta_Filler {
 	const NONCE_ACTION   = 'scos_fill_image_meta';
 	const BULK_ACTION    = 'scos_fill_image_meta';
 
-	/** @var array<int, int[]> Groups queued during MLA begin_bulk_action. */
-	private static $mla_pending_groups = [];
+	/** @var bool Whether the current MLA bulk run has already been handled. */
+	private static $mla_bulk_handled = false;
 
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
@@ -44,20 +45,30 @@ class Media_Meta_Filler {
 		add_action( 'wp_ajax_' . self::AJAX_GET_IDS,   [ __CLASS__, 'ajax_get_ids' ] );
 		add_action( 'wp_ajax_' . self::AJAX_RUN_BATCH, [ __CLASS__, 'ajax_run_batch' ] );
 
-		// Standard WP media library bulk action.
-		add_filter( 'bulk_actions-upload',         [ __CLASS__, 'register_bulk_action' ] );
-		add_filter( 'handle_bulk_actions-upload',  [ __CLASS__, 'handle_bulk_action' ], 10, 3 );
+		// Standard WP media library bulk action (core upload.php list table).
+		add_filter( 'bulk_actions-upload',        [ __CLASS__, 'register_bulk_action' ] );
+		add_filter( 'handle_bulk_actions-upload', [ __CLASS__, 'handle_bulk_action' ], 10, 3 );
 
-		// MLA (Media Library Assistant) bulk action.
-		add_filter( 'mla_list_table_get_bulk_actions',   [ __CLASS__, 'register_mla_bulk_action' ] );
-		add_filter( 'mla_list_table_begin_bulk_action',  [ __CLASS__, 'mla_begin_bulk_action' ], 10, 2 );
-		add_filter( 'mla_list_table_end_bulk_action',    [ __CLASS__, 'mla_end_bulk_action' ], 10, 2 );
+		// MLA hooks — register early on init so MLA picks them up (see MLA docs).
+		add_action( 'init', [ __CLASS__, 'register_mla_hooks' ], 0 );
 
-		// Inject "Fill All Empty" button + progress UI on upload.php.
-		add_action( 'admin_footer-upload.php', [ __CLASS__, 'inject_admin_ui' ] );
+		// "Fill All Empty" button on upload.php and Media/Assistant submenu.
+		add_action( 'admin_footer-upload.php',              [ __CLASS__, 'inject_admin_ui' ] );
+		add_action( 'admin_footer-media_page_mla-menu',     [ __CLASS__, 'inject_admin_ui' ] );
 
-		// Bulk action result notice.
+		// Bulk action result notice (core upload.php redirect flow).
 		add_action( 'admin_notices', [ __CLASS__, 'maybe_show_bulk_notice' ] );
+	}
+
+	/**
+	 * Register MLA list-table hooks on init priority 0.
+	 *
+	 * MLA documents these hooks in class-mla-list-table.php; registering early
+	 * ensures bulk actions appear on Media/Assistant and MLA-enhanced upload.php.
+	 */
+	public static function register_mla_hooks(): void {
+		add_filter( 'mla_list_table_get_bulk_actions',   [ __CLASS__, 'register_mla_bulk_action' ] );
+		add_filter( 'mla_list_table_custom_bulk_action', [ __CLASS__, 'mla_custom_bulk_action' ], 10, 3 );
 	}
 
 	// ── AJAX: get IDs ─────────────────────────────────────────────────────────
@@ -251,22 +262,45 @@ class Media_Meta_Filler {
 	}
 
 	/**
-	 * MLA begin bulk action — queue selected IDs for grouped processing.
+	 * Process Fill Image Meta as an MLA custom bulk action.
+	 *
+	 * MLA calls this filter once per selected item. We handle the full batch on
+	 * the first call using all IDs in $_REQUEST['cb_attachment'], matching the
+	 * pattern used by MLA_Thumbnail.
 	 *
 	 * @param mixed  $item_content NULL when unhandled.
 	 * @param string $bulk_action  Action slug.
+	 * @param int    $post_id      Current attachment ID in the loop.
 	 * @return mixed
 	 */
-	public static function mla_begin_bulk_action( $item_content, string $bulk_action ) {
+	public static function mla_custom_bulk_action( $item_content, string $bulk_action, int $post_id ) {
 		if ( self::BULK_ACTION !== $bulk_action ) {
 			return $item_content;
 		}
 
-		if ( ! current_user_can( 'upload_files' ) ) {
+		if ( self::$mla_bulk_handled ) {
 			return $item_content;
 		}
 
-		$raw_ids        = isset( $_REQUEST['cb_attachment'] ) ? (array) $_REQUEST['cb_attachment'] : [];
+		self::$mla_bulk_handled = true;
+
+		if ( ! current_user_can( 'upload_files' ) ) {
+			return [
+				'message'         => __( 'Insufficient permissions.', 'site-essentials' ),
+				'body'            => '',
+				'prevent_default' => true,
+			];
+		}
+
+		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+			return [
+				'message'         => __( 'WordPress AI plugin is required.', 'site-essentials' ),
+				'body'            => '',
+				'prevent_default' => true,
+			];
+		}
+
+		$raw_ids        = isset( $_REQUEST['cb_attachment'] ) ? (array) $_REQUEST['cb_attachment'] : [ $post_id ];
 		$attachment_ids = array_filter( array_map( 'absint', $raw_ids ) );
 
 		if ( empty( $attachment_ids ) ) {
@@ -277,38 +311,8 @@ class Media_Meta_Filler {
 			];
 		}
 
-		self::$mla_pending_groups = self::group_attachment_ids_by_parent( $attachment_ids );
-
-		return [
-			'message'         => '',
-			'body'            => '',
-			'prevent_default' => true,
-		];
-	}
-
-	/**
-	 * MLA end bulk action — run queued groups through the ability.
-	 *
-	 * @param mixed  $item_content NULL when unhandled.
-	 * @param string $bulk_action  Action slug.
-	 * @return mixed
-	 */
-	public static function mla_end_bulk_action( $item_content, string $bulk_action ) {
-		if ( self::BULK_ACTION !== $bulk_action || empty( self::$mla_pending_groups ) ) {
-			return $item_content;
-		}
-
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
-			self::$mla_pending_groups = [];
-			return [
-				'message'         => __( 'WordPress AI plugin is required.', 'site-essentials' ),
-				'body'            => '',
-				'prevent_default' => true,
-			];
-		}
-
-		$totals = self::run_groups( self::$mla_pending_groups, false );
-		self::$mla_pending_groups = [];
+		$groups = self::group_attachment_ids_by_parent( $attachment_ids );
+		$totals = self::run_groups( $groups, false );
 
 		/* translators: 1: number processed, 2: number of errors */
 		$message = sprintf(

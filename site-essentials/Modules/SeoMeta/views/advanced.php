@@ -84,7 +84,7 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 				<input type="checkbox" name="scos_image_seo[extra_media_columns]" value="1" <?php checked( ! empty( $opts['extra_media_columns'] ) ); ?>>
 				<span>
 					<strong><?php esc_html_e( 'Extra columns in Media Library list view', 'site-essentials' ); ?></strong>
-					<span class="description" style="display:block;margin-top:2px"><?php esc_html_e( 'Adds two columns to the Media Library list table: Alt Text (highlights missing in red) and File Info (type · dimensions · file size).', 'site-essentials' ); ?></span>
+					<span class="description" style="display:block;margin-top:2px"><?php esc_html_e( 'Core upload.php list table: adds Alt Text (missing highlighted in red) and File Info (type · dimensions · file size). When Media Library Assistant controls the list table, only File Info is added — enable MLA\'s Alt Text column in Screen Options for alt on that view.', 'site-essentials' ); ?></span>
 					<span class="description" style="display:block;margin-top:2px;font-style:italic"><?php esc_html_e( 'scos_image_seo[extra_media_columns]', 'site-essentials' ); ?></span>
 				</span>
 			</label>

@@ -279,11 +279,11 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 		$pt_config_file = __DIR__ . '/site-essentials/Modules/SocialAmplification/Post_Type_Config.php';
 		$engine         = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Amplification_Engine.php';
 		$postly         = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Postly_Client.php';
-		$anthropic      = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php';
+		$captions       = __DIR__ . '/site-essentials/Modules/SocialAmplification/Amplification/Caption_Generator.php';
 		$hook           = __DIR__ . '/site-essentials/Modules/SocialAmplification/Publish_Hook.php';
 
 		// Ensure all dependencies the CLI commands use are loaded.
-		foreach ( [ $pt_config_file, $anthropic, $postly, $engine, $hook ] as $f ) {
+		foreach ( [ $pt_config_file, $captions, $postly, $engine, $hook ] as $f ) {
 			if ( file_exists( $f ) ) {
 				require_once $f;
 			}

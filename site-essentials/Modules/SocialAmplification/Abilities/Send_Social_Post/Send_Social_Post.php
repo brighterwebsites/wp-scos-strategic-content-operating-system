@@ -46,7 +46,7 @@ class Send_Social_Post extends Abstract_Ability {
 		}
 		wp_register_ability( 'scos/send-social-post', [
 			'label'         => __( 'SCOS: Send Social Post', 'site-essentials' ),
-			'description'   => __( 'Runs the SCOS Social Amplification pipeline for a published post — generates AI captions and schedules them to the configured Postly.ai channels.', 'site-essentials' ),
+			'description'   => __( 'Runs the SCOS Social Amplification pipeline for a published post — schedules captions to the configured Postly.ai channels. Pass captions you have written to have them scheduled as-is; omit them and they are generated from the site brand knowledge.', 'site-essentials' ),
 			'category'      => 'scos-social-amplification',
 			'ability_class' => self::class,
 			'meta'          => [
@@ -93,6 +93,16 @@ class Send_Social_Post extends Abstract_Ability {
 					'type'        => 'boolean',
 					'description' => 'Run even if the post has already been amplified.',
 					'default'     => false,
+				],
+				'captions'   => [
+					'type'        => 'array',
+					'description' => 'Optional. Captions you have already written, in order, one per scheduled slot. Supply these and no AI generation happens — they are scheduled as-is. Omit them and captions are generated server-side from the site brand knowledge.',
+					'items'       => [ 'type' => 'string' ],
+					'maxItems'    => 10,
+				],
+				'gmb_caption' => [
+					'type'        => 'string',
+					'description' => 'Optional. A Google Business Profile caption you have already written. Supply it and no AI generation happens for GMB. Must contain no URLs, phone numbers or hashtags, and stay between 150 and 300 characters.',
 				],
 			],
 		];
@@ -214,6 +224,34 @@ class Send_Social_Post extends Abstract_Ability {
 			'run_standard' => $run_standard,
 			'run_gmb'      => $run_gmb,
 		];
+
+		// Caller-supplied captions (agent-authored) bypass generation entirely.
+		// The engine keys standard captions post_1…post_N, so map the ordered list.
+		$supplied = [];
+		foreach ( (array) ( $input['captions'] ?? [] ) as $caption ) {
+			$caption = trim( (string) $caption );
+			if ( '' !== $caption ) {
+				$supplied[] = $caption;
+			}
+		}
+		if ( ! empty( $supplied ) ) {
+			$keyed = [];
+			foreach ( array_values( $supplied ) as $i => $caption ) {
+				$keyed[ 'post_' . ( $i + 1 ) ] = $caption;
+			}
+			$options['captions'] = $keyed;
+
+			// Without an explicit override, schedule exactly as many slots as captions given.
+			if ( null === $post_count ) {
+				$post_count = count( $supplied );
+			}
+		}
+
+		$gmb_caption = trim( (string) ( $input['gmb_caption'] ?? '' ) );
+		if ( '' !== $gmb_caption ) {
+			$options['gmb_caption'] = $gmb_caption;
+		}
+
 		if ( $post_count !== null ) {
 			$options['post_count'] = $post_count;
 		}

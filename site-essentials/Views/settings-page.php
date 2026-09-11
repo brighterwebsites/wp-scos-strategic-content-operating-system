@@ -52,7 +52,7 @@ $deploy_info = Admin_UI::get_deployment_info();
 		</a>
 		<a href="?page=<?php echo esc_attr( $page_slug ); ?>&tab=ai-keys"
 		   class="scos__tab<?php echo 'ai-keys' === $active_tab ? ' scos__tab--active' : ''; ?>">
-			<?php esc_html_e( 'AI API Keys', 'site-essentials' ); ?>
+			<?php esc_html_e( 'AI Providers', 'site-essentials' ); ?>
 		</a>
 		<a href="?page=<?php echo esc_attr( $page_slug ); ?>&tab=email"
 		   class="scos__tab<?php echo 'email' === $active_tab ? ' scos__tab--active' : ''; ?>">
@@ -132,89 +132,51 @@ $deploy_info = Admin_UI::get_deployment_info();
 	<?php elseif ( 'ai-keys' === $active_tab ) : ?>
 
 		<?php
-		// TODO: migrate to se_ prefix (shared across modules) — see CLAUDE.md §3.
-		$anthropic_opt      = get_option( 'bw_anthropic_api_key', '' );
-		$anthropic_model    = get_option( 'bw_anthropic_model', '' );
-		$anthropic_constant = defined( 'SE_ANTHROPIC_API_KEY' ) && is_string( SE_ANTHROPIC_API_KEY ) && SE_ANTHROPIC_API_KEY !== '';
-		// Never render the key itself. type="password" only masks it on screen —
-		// the cleartext value stays in the page source, readable by anything that
-		// can see the DOM of this admin page.
-		$anthropic_has_key  = $anthropic_constant || ( is_string( $anthropic_opt ) && $anthropic_opt !== '' );
+		// SCOS stores no AI provider credentials. The AI Provider plugins own the keys
+		// (connectors_ai_*) and the WP AI Client resolves the model; access is granted
+		// per plugin in the connector approval registry. See CLAUDE.md section 6.
+		$scos_ai_approvals = (array) get_option( 'wpai_connector_approvals', [] );
+		$scos_ai_approved  = (array) ( $scos_ai_approvals['site-essentials'] ?? [] );
+		$scos_ai_approved  = array_keys( array_filter( $scos_ai_approved ) );
+		$scos_ai_client_ok = function_exists( 'wp_ai_client_prompt' );
 		?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'scos_save_ai_keys', 'scos_ai_keys_nonce' ); ?>
-			<input type="hidden" name="action" value="scos_save_ai_keys">
 
 			<div class="scos-card">
 				<div class="scos-card__header">
 					<div>
-						<h2 class="scos-card__title"><?php esc_html_e( 'AI API Keys', 'site-essentials' ); ?></h2>
-						<p class="scos-card__desc"><?php esc_html_e( 'Third-party AI provider credentials. Stored as WordPress options and never exposed to the front end.', 'site-essentials' ); ?></p>
+						<h2 class="scos-card__title"><?php esc_html_e( 'AI Providers', 'site-essentials' ); ?></h2>
+						<p class="scos-card__desc"><?php esc_html_e( 'Site Essentials stores no AI credentials and pins no model. Keys belong to the AI Provider plugins, and the WordPress AI Client picks the model at runtime — so every ability works with whichever provider you approve.', 'site-essentials' ); ?></p>
 					</div>
 				</div>
 				<div class="scos-card__body">
-					<table class="scos-form">
-						<tbody>
-							<tr>
-								<th>
-									<label for="bw_anthropic_api_key"><?php esc_html_e( 'Anthropic API Key', 'site-essentials' ); ?></label>
-									<div class="scos-form__slug">bw_anthropic_api_key</div>
-								</th>
-								<td>
-									<input type="password" id="bw_anthropic_api_key" name="bw_anthropic_api_key"
-									       value=""
-									       class="scos-input scos-input--mono"
-									       autocomplete="new-password"
-									       <?php disabled( $anthropic_constant ); ?>
-									       placeholder="<?php echo esc_attr( $anthropic_has_key ? __( 'Saved — leave blank to keep', 'site-essentials' ) : __( 'sk-ant-...', 'site-essentials' ) ); ?>">
-									<p class="description">
-										<?php esc_html_e( 'Used by Social Amplification (caption generation via Claude) and future AI integrations. Obtain from', 'site-essentials' ); ?>
-										<a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>.
-									</p>
-									<?php if ( $anthropic_constant ) : ?>
-										<p class="description">
-											<?php esc_html_e( 'Set via the SE_ANTHROPIC_API_KEY constant in wp-config.php. Remove the constant to manage the key here.', 'site-essentials' ); ?>
-										</p>
-									<?php elseif ( $anthropic_has_key ) : ?>
-										<p class="description" style="color:var(--scos-success);margin-top:var(--scos-s-1)">
-											✓ <?php esc_html_e( 'Key is saved. Leave blank to keep it, or enter a new value to replace it.', 'site-essentials' ); ?>
-										</p>
-										<label class="description" for="bw_anthropic_api_key_clear">
-											<input type="checkbox" id="bw_anthropic_api_key_clear" name="bw_anthropic_api_key_clear" value="1">
-											<?php esc_html_e( 'Delete the stored key', 'site-essentials' ); ?>
-										</label>
-									<?php endif; ?>
-								</td>
-							</tr>
-							<tr>
-								<th>
-									<label for="bw_anthropic_model"><?php esc_html_e( 'Claude Model', 'site-essentials' ); ?></label>
-									<div class="scos-form__slug">bw_anthropic_model</div>
-								</th>
-								<td>
-									<input type="text" id="bw_anthropic_model" name="bw_anthropic_model"
-									       value="<?php echo esc_attr( $anthropic_model ); ?>"
-									       class="scos-input scos-input--mono"
-									       placeholder="claude-haiku-4-5-20251001">
-									<p class="description">
-										<?php esc_html_e( 'Default:', 'site-essentials' ); ?> <code>claude-haiku-4-5-20251001</code>
-										<?php esc_html_e( '(Claude Haiku 4.5). Enter the exact API model string — e.g.', 'site-essentials' ); ?>
-										<code>claude-3-5-sonnet-20241022</code>.
-										<?php esc_html_e( 'A 404 error means the model name is wrong or not on your plan — check', 'site-essentials' ); ?>
-										<a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" rel="noopener">docs.anthropic.com/models</a>.
-									</p>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-				<div class="scos-card__footer">
-					<button type="submit" class="scos-btn scos-btn--primary">
-						<?php esc_html_e( 'Save AI API Keys', 'site-essentials' ); ?>
-					</button>
+					<?php if ( ! $scos_ai_client_ok ) : ?>
+						<div class="scos-notice scos-notice--warning">
+							<p>
+								<?php esc_html_e( 'The WordPress AI Client is not available. Install and activate the AI plugin plus at least one AI Provider plugin before using any SCOS AI ability.', 'site-essentials' ); ?>
+							</p>
+						</div>
+					<?php elseif ( empty( $scos_ai_approved ) ) : ?>
+						<div class="scos-notice scos-notice--warning">
+							<p>
+								<?php esc_html_e( 'No AI provider is approved for Site Essentials yet. The first time an ability runs, WordPress will raise an approval request — approve it and generation starts working.', 'site-essentials' ); ?>
+							</p>
+						</div>
+					<?php else : ?>
+						<p class="description">
+							<?php esc_html_e( 'Approved for Site Essentials:', 'site-essentials' ); ?>
+							<strong><?php echo esc_html( implode( ', ', $scos_ai_approved ) ); ?></strong>
+						</p>
+					<?php endif; ?>
+
+					<p class="description">
+						<?php esc_html_e( 'Manage credentials under Settings → AI, and grant or revoke per-plugin provider access under', 'site-essentials' ); ?>
+						<a href="<?php echo esc_url( admin_url( 'tools.php?page=ai-connector-approval' ) ); ?>"><?php esc_html_e( 'Tools → AI Connector Approval', 'site-essentials' ); ?></a>.
+					</p>
+					<p class="description">
+						<?php esc_html_e( 'Note: approval is granted per calling plugin. An ability invoked through an agent connector is attributed to that connector, not to Site Essentials, so it needs its own approval.', 'site-essentials' ); ?>
+					</p>
 				</div>
 			</div>
-		</form>
 
 	<?php elseif ( 'email' === $active_tab ) : ?>
 

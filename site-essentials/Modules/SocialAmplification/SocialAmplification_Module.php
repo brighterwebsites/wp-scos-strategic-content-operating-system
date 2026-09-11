@@ -62,7 +62,7 @@ class SocialAmplification_Module implements Module_Interface {
 		require_once __DIR__ . '/Admin_Columns.php';
 
 		// ── Postly.ai amplification pipeline ──────────────────────────────
-		require_once __DIR__ . '/Amplification/Anthropic_Client.php';
+		require_once __DIR__ . '/Amplification/Caption_Generator.php';
 		require_once __DIR__ . '/Amplification/Postly_Client.php';
 		require_once __DIR__ . '/Amplification/Amplification_Engine.php';
 		require_once __DIR__ . '/Amplification/REST_Endpoint.php';

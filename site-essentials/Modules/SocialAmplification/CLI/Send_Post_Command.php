@@ -135,7 +135,6 @@ class Send_Post_Command {
 	private function validate_settings(): void {
 		$missing  = [];
 		$required = [
-			'bw_anthropic_api_key'    => 'Anthropic API key',
 			'bw_postly_api_key'       => 'Postly API key',
 			'bw_postly_workspace_id'  => 'Postly Workspace ID',
 			'bw_social_webhook_secret' => 'Webhook secret',

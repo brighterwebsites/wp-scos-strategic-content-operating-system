@@ -5,10 +5,14 @@
  * Orchestrates the full publish-to-Postly workflow for a single post:
  *  1. Gather post data (title, excerpt, permalink, images)
  *  2. Create YOURLS shortlink (falls back to permalink)
- *  3. Call Anthropic for 3 captions
+ *  3. Use caller-supplied captions, or generate them via Caption_Generator
  *  4. Upload images to Postly CDN
  *  5. Schedule 3 posts (T+0, T+42d, T+84d — Mon/Wed/Fri aligned)
  *  6. Log results to wp_option `scos_sa_amplify_log`
+ *
+ * Captions: pass `captions` (post_1…post_N) and/or `gmb_caption` in $options to
+ * schedule text the caller already wrote — no AI call is made. Omit them and the
+ * text is generated through the WP AI Client. See CLAUDE.md § 6.
  *
  * Image-selection rules:
  *  - Collect featured image + ACF gallery images, deduplicate.
@@ -17,7 +21,8 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
- * v1.3 | 2026-07-02
+ * v1.4 | 2026-09-11 — Anthropic_Client replaced by Caption_Generator (WP AI Client);
+ *                      added caller-supplied caption pass-through.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -177,7 +182,8 @@ class Amplification_Engine {
 				$context,
 				$pt_config,
 				$timezone,
-				$options['standard_schedule_at'] ?? $base_dt
+				$options['standard_schedule_at'] ?? $base_dt,
+				$options['captions'] ?? null
 			);
 		}
 
@@ -186,7 +192,8 @@ class Amplification_Engine {
 				$post_id,
 				$context,
 				$timezone,
-				$options['gmb_schedule_at'] ?? null
+				$options['gmb_schedule_at'] ?? null,
+				$options['gmb_caption'] ?? null
 			);
 		}
 
@@ -247,7 +254,8 @@ class Amplification_Engine {
 		array $context,
 		array $pt_config,
 		string $timezone,
-		\DateTimeImmutable $base_dt
+		\DateTimeImmutable $base_dt,
+		?array $preset_captions = null
 	): array {
 		$channel_ids = self::get_standard_channel_ids();
 
@@ -267,9 +275,17 @@ class Amplification_Engine {
 		error_log( self::LOG_PREFIX . ' Standard images collected: ' . count( $all_images ) . ' — ' . implode( ', ', array_map( 'basename', $all_images ) ) );
 		$image_sets = self::build_image_sets( $all_images, $post_count, (int) ( $pt_config['max_images'] ?? self::IMAGES_PER_POST ) );
 
-		error_log( self::LOG_PREFIX . " Calling Anthropic for {$post_count} standard captions…" );
-		$captions = Anthropic_Client::generate_captions( $context, $frames, $post_count );
-		$client   = new Postly_Client( $api_key, $workspace_id, $channel_ids );
+		// Captions supplied by the caller (agent-authored) are used as-is; otherwise
+		// generate them through the WP AI Client. See CLAUDE.md § 6 — hybrid ability.
+		if ( ! empty( $preset_captions ) ) {
+			error_log( self::LOG_PREFIX . ' Using ' . count( $preset_captions ) . ' caller-supplied standard captions (no AI call).' );
+			$captions = $preset_captions;
+		} else {
+			error_log( self::LOG_PREFIX . " Generating {$post_count} standard captions…" );
+			$captions = Caption_Generator::generate_captions( $context, $frames, $post_count );
+		}
+
+		$client = new Postly_Client( $api_key, $workspace_id, $channel_ids );
 
 		$post_results = [];
 
@@ -322,7 +338,8 @@ class Amplification_Engine {
 		int $post_id,
 		array $context,
 		string $timezone,
-		?\DateTimeImmutable $base_dt = null
+		?\DateTimeImmutable $base_dt = null,
+		?string $preset_caption = null
 	): array {
 		$gmb_channel_id = self::get_gmb_channel_id();
 		if ( '' === $gmb_channel_id ) {
@@ -342,7 +359,13 @@ class Amplification_Engine {
 
 		$source_image = self::get_featured_og_image( $post_id );
 		$permalink    = $context['permalink'] ?? '';
-		$gmb_caption  = Anthropic_Client::generate_gmb_caption( $context );
+		// Caller-supplied caption (agent-authored) wins; otherwise generate. See CLAUDE.md § 6.
+		if ( null !== $preset_caption && '' !== trim( $preset_caption ) ) {
+			error_log( self::LOG_PREFIX . ' Using caller-supplied GMB caption (no AI call).' );
+			$gmb_caption = trim( $preset_caption );
+		} else {
+			$gmb_caption = Caption_Generator::generate_gmb_caption( $context );
+		}
 		// GMB CTA always uses the permalink (never YOURLS shortlink).
 		$cta_url      = self::build_cta_url( $permalink, '' );
 

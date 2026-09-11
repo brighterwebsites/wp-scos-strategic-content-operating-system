@@ -8,8 +8,8 @@
  *  - scos_ca_optimization_progress contains 'amplification'
  *  - _scos_sa_amplified is not already '1' (prevents re-runs)
  *  - bw_social_enabled == '1'
- *  - bw_anthropic_api_key, bw_postly_api_key, bw_postly_workspace_id,
- *    and bw_social_webhook_secret are all configured
+ *  - bw_postly_api_key, bw_postly_workspace_id and bw_social_webhook_secret
+ *    are all configured (AI credentials belong to the AI Provider plugins)
  *
  * Fires an internal loopback request to the REST endpoint so the
  * amplification runs asynchronously and does not block the save.
@@ -88,7 +88,6 @@ class Publish_Hook {
 	private static function settings_complete(): bool {
 		$required = [
 			'bw_social_enabled',
-			'bw_anthropic_api_key',
 			'bw_postly_api_key',
 			'bw_postly_workspace_id',
 			'bw_social_webhook_secret',

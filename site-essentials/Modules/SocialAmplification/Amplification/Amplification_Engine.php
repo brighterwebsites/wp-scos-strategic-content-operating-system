@@ -33,11 +33,16 @@
  * v1.5 | 2026-09-11 — Failed slots are queued and retried (WP-Cron for temporary
  *                      failures, retry_failed_slots() on demand); run outcome;
  *                      run history instead of overwriting; Postly post IDs captured.
+ * v1.6 | 2026-09-11 — Images pass through Postly_Image_Guard so Postly never
+ *                      receives WebP/AVIF (Facebook rejected a .jpg the server
+ *                      answered with WebP).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
 
 defined( 'ABSPATH' ) || exit;
+
+require_once __DIR__ . '/Postly_Image_Guard.php';
 
 class Amplification_Engine {
 
@@ -515,7 +520,7 @@ class Amplification_Engine {
 	 */
 	private static function attempt_gmb_slot( Postly_Client $client, array $item, string $gmb_channel_id, string $timezone ): array {
 		$attempts  = (int) ( $item['attempts'] ?? 0 ) + 1;
-		$source    = (string) ( $item['source_image'] ?? '' );
+		$source    = Postly_Image_Guard::safe_url( (string) ( $item['source_image'] ?? '' ) ) ?? '';
 		$image_url = '';
 
 		if ( '' !== $source ) {
@@ -1021,6 +1026,8 @@ class Amplification_Engine {
 	/**
 	 * Upload each image in the set to Postly CDN.
 	 * Skips images that fail to upload (logs warning, does not throw).
+	 * Each URL goes through Postly_Image_Guard first, so a queued slot that
+	 * failed on a WebP gets the JPEG copy when it's resent.
 	 *
 	 * @param  Postly_Client $client
 	 * @param  string[]      $image_urls
@@ -1029,6 +1036,10 @@ class Amplification_Engine {
 	private static function upload_images( Postly_Client $client, array $image_urls ): array {
 		$uploaded = [];
 		foreach ( $image_urls as $url ) {
+			$url = Postly_Image_Guard::safe_url( (string) $url );
+			if ( null === $url ) {
+				continue; // The guard logged why.
+			}
 			try {
 				$uploaded[] = $client->upload_image( $url );
 			} catch ( \RuntimeException $e ) {

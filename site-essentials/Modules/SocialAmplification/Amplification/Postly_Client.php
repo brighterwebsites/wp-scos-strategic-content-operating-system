@@ -9,18 +9,49 @@
  * Auth: X-API-KEY header.
  * Base: https://openapi.postly.ai/v1/
  *
+ * Failures throw Postly_Exception (a RuntimeException) carrying a one-line reason,
+ * whether the failure is temporary, and how long Postly asked us to wait.
+ *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
  * v1.1 | 2026-07-02
+ * v1.2 | 2026-09-11 — 60 s timeout; one inline retry for fast temporary failures;
+ *                      honour 429 "Try again in N seconds" across the request;
+ *                      readable error text instead of Cloudflare HTML; GMB sends the
+ *                      caption as text when there is no image; extract_post_id().
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/Postly_Exception.php';
+
 class Postly_Client {
 
-	const BASE_URL = 'https://openapi.postly.ai/v1';
+	const BASE_URL   = 'https://openapi.postly.ai/v1';
+	const LOG_PREFIX = '[SCOS SMA Postly]';
+
+	/** Seconds per request. Was 30 — Postly took longer than that on 2026-09-11. */
+	const TIMEOUT = 60;
+
+	/** Longest back-off we will sleep through inside a request before handing over to the retry queue. */
+	const MAX_INLINE_WAIT = 20;
+
+	/** Only retry inline when the failed attempt came back within this many seconds. */
+	const FAST_FAIL = 15;
+
+	/** Longest error text kept in logs and slot rows. */
+	const ERROR_MAX_CHARS = 200;
+
+	/**
+	 * Workspace ID => unix time until which Postly has rate-limited us.
+	 * Once one call gets a 429, later calls in the same PHP request fail fast
+	 * instead of spending the rest of the quota window hitting the limit.
+	 *
+	 * @var array<string,int>
+	 */
+	private static array $blocked_until = [];
 
 	/** @var string */
 	private string $api_key;
@@ -154,7 +185,9 @@ class Postly_Client {
 		];
 
 		$body = [
-			'text'             => '',
+			// Postly rejects a post with neither text nor media ("Post content must include
+			// text or media"), so without an image the caption goes in as text as well.
+			'text'             => '' === $image_url ? $caption : '',
 			'workspace'        => $this->workspace_id,
 			'target_platforms' => $gmb_channel_id,
 			'platform_posts'   => [
@@ -227,14 +260,94 @@ class Postly_Client {
 		return is_array( $data ) ? $data : [];
 	}
 
+	/**
+	 * Find the Postly post ID in a create-post response.
+	 *
+	 * The response shape isn't documented, so check the likely places and log the
+	 * keys when none match — the next run's log then shows where the ID lives.
+	 */
+	public static function extract_post_id( array $response ): ?string {
+		$paths = [
+			[ '_id' ],
+			[ 'id' ],
+			[ 'data', '_id' ],
+			[ 'data', 'id' ],
+			[ 'data', 'post', '_id' ],
+			[ 'data', 'post', 'id' ],
+			[ 'post', '_id' ],
+			[ 'post', 'id' ],
+			[ 'data', 0, '_id' ],
+			[ 'data', 0, 'id' ],
+		];
+
+		foreach ( $paths as $path ) {
+			$value = $response;
+			foreach ( $path as $segment ) {
+				if ( ! is_array( $value ) || ! array_key_exists( $segment, $value ) ) {
+					$value = null;
+					break;
+				}
+				$value = $value[ $segment ];
+			}
+			if ( is_scalar( $value ) && '' !== (string) $value ) {
+				return (string) $value;
+			}
+		}
+
+		$keys = implode( ',', array_keys( $response ) );
+		if ( isset( $response['data'] ) && is_array( $response['data'] ) ) {
+			$keys .= ' | data: ' . implode( ',', array_keys( $response['data'] ) );
+		}
+		error_log( self::LOG_PREFIX . " No post ID found in the create-post response. Keys: {$keys}" );
+		return null;
+	}
+
 	// ──────────────────────────────────────────────────────────────────────────
 	// HTTP helper
 	// ──────────────────────────────────────────────────────────────────────────
 
 	/**
-	 * @throws \RuntimeException
+	 * Send a request, retrying once inline when the failure was quick and temporary.
+	 *
+	 * Slow failures (a 60 s timeout) and long waits (a 429 asking for 144 s) are
+	 * thrown straight back — the engine queues those for a WP-Cron retry rather
+	 * than holding an admin-ajax request open.
+	 *
+	 * @throws Postly_Exception
 	 */
 	private function request( string $method, string $endpoint, array $body = [], array $query = [] ): array {
+		$blocked_for = ( self::$blocked_until[ $this->workspace_id ] ?? 0 ) - time();
+		if ( $blocked_for > 0 ) {
+			throw new Postly_Exception(
+				"Postly rate limit still active — skipped {$method} {$endpoint} (try again in {$blocked_for} seconds)",
+				429,
+				true,
+				$blocked_for
+			);
+		}
+
+		$started = microtime( true );
+		try {
+			return $this->send( $method, $endpoint, $body, $query );
+		} catch ( Postly_Exception $e ) {
+			$elapsed = microtime( true ) - $started;
+			if ( ! $e->is_retryable() || $e->retry_after() > self::MAX_INLINE_WAIT || $elapsed > self::FAST_FAIL ) {
+				throw $e;
+			}
+			error_log( self::LOG_PREFIX . ' ' . $e->getMessage() . " — retrying once in {$e->retry_after()}s." );
+			if ( $e->retry_after() > 0 ) {
+				sleep( $e->retry_after() );
+			}
+			return $this->send( $method, $endpoint, $body, $query );
+		}
+	}
+
+	/**
+	 * One HTTP round trip. Classifies failures into Postly_Exception.
+	 *
+	 * @throws Postly_Exception
+	 */
+	private function send( string $method, string $endpoint, array $body, array $query ): array {
 		$url = self::BASE_URL . $endpoint;
 		if ( ! empty( $query ) ) {
 			$url = add_query_arg( $query, $url );
@@ -242,7 +355,7 @@ class Postly_Client {
 
 		$args = [
 			'method'  => strtoupper( $method ),
-			'timeout' => 30,
+			'timeout' => self::TIMEOUT,
 			'headers' => [
 				'X-API-KEY'    => $this->api_key,
 				'Content-Type' => 'application/json',
@@ -256,18 +369,97 @@ class Postly_Client {
 		$response = wp_remote_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
-			throw new \RuntimeException( 'Postly API request failed: ' . $response->get_error_message() );
+			// No HTTP response. A timeout or dropped connection may still have reached
+			// Postly; a DNS or connect failure never did.
+			$reason    = $response->get_error_message();
+			$uncertain = (bool) preg_match( '/timed out|cURL error (28|52|56)\b/i', $reason );
+			throw new Postly_Exception(
+				"Postly API request failed on {$method} {$endpoint}: " . self::clip( $reason ),
+				0,
+				true,
+				$uncertain ? 120 : 5,
+				$uncertain
+			);
 		}
 
 		$code     = (int) wp_remote_retrieve_response_code( $response );
-		$raw_body = wp_remote_retrieve_body( $response );
+		$raw_body = (string) wp_remote_retrieve_body( $response );
 		$decoded  = json_decode( $raw_body, true );
 
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $decoded ) ? ( $decoded['message'] ?? $raw_body ) : $raw_body;
-			throw new \RuntimeException( "Postly API error ({$code}) on {$method} {$endpoint}: {$msg}" );
+		if ( $code >= 200 && $code < 300 ) {
+			return is_array( $decoded ) ? $decoded : [];
 		}
 
-		return is_array( $decoded ) ? $decoded : [];
+		$message = "Postly API error ({$code}) on {$method} {$endpoint}: " . self::summarise_error( $decoded, $raw_body );
+
+		if ( 429 === $code ) {
+			$wait = self::parse_retry_after( $response, $message );
+			self::$blocked_until[ $this->workspace_id ] = time() + $wait;
+			throw new Postly_Exception( $message, $code, true, $wait );
+		}
+
+		if ( in_array( $code, [ 500, 502, 503, 504 ], true ) ) {
+			// 503 means Postly refused the request; 500/502/504 may have processed it.
+			throw new Postly_Exception( $message, $code, true, 10, 503 !== $code );
+		}
+
+		throw new Postly_Exception( $message, $code );
+	}
+
+	/**
+	 * Seconds to wait after a 429: the Retry-After header, else Postly's
+	 * "Rate limit exceeded. Try again in 144 seconds", else 60.
+	 *
+	 * @param array|\WP_Error $response
+	 */
+	private static function parse_retry_after( $response, string $message ): int {
+		$header = wp_remote_retrieve_header( $response, 'retry-after' );
+		if ( is_array( $header ) ) {
+			$header = reset( $header );
+		}
+		if ( is_string( $header ) && ctype_digit( trim( $header ) ) ) {
+			return max( 1, (int) trim( $header ) );
+		}
+
+		if ( preg_match( '/try again in (\d+)\s*(minutes?|mins?)?/i', $message, $m ) ) {
+			$seconds = (int) $m[1] * ( empty( $m[2] ) ? 1 : 60 );
+			return max( 1, $seconds );
+		}
+
+		return 60;
+	}
+
+	/**
+	 * One readable line from an error response: the JSON message, the HTML page
+	 * title (Cloudflare error pages), or the stripped text — never the whole page.
+	 *
+	 * @param mixed $decoded json_decode() of the body.
+	 */
+	private static function summarise_error( $decoded, string $raw_body ): string {
+		if ( is_array( $decoded ) ) {
+			$message = $decoded['message'] ?? ( $decoded['error'] ?? '' );
+			if ( is_array( $message ) ) {
+				$message = wp_json_encode( $message );
+			}
+			$message = trim( (string) $message );
+			return self::clip( '' !== $message ? $message : (string) wp_json_encode( $decoded ) );
+		}
+
+		if ( preg_match( '#<title[^>]*>(.*?)</title>#is', $raw_body, $m ) ) {
+			$title = trim( html_entity_decode( wp_strip_all_tags( $m[1] ), ENT_QUOTES ) );
+			if ( '' !== $title ) {
+				return self::clip( $title . ' (HTML error page)' );
+			}
+		}
+
+		$text = trim( (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( $raw_body ) ) );
+		return '' !== $text ? self::clip( $text ) : '(empty response body)';
+	}
+
+	private static function clip( string $text ): string {
+		if ( function_exists( 'mb_strlen' ) ) {
+			return mb_strlen( $text ) > self::ERROR_MAX_CHARS ? mb_substr( $text, 0, self::ERROR_MAX_CHARS - 1 ) . '…' : $text;
+		}
+		return strlen( $text ) > self::ERROR_MAX_CHARS ? substr( $text, 0, self::ERROR_MAX_CHARS - 3 ) . '...' : $text;
 	}
 }

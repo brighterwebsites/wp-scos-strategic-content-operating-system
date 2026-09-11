@@ -13,6 +13,7 @@
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\CLI
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-09-11 — Warns instead of reporting success when some slots failed.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\CLI;
@@ -109,6 +110,7 @@ class Send_Post_Command {
 		$options = [
 			'run_standard' => $run_standard,
 			'run_gmb'      => $run_gmb,
+			'trigger'      => 'cli',
 		];
 		if ( $post_count !== null ) {
 			$options['post_count'] = max( 1, absint( $post_count ) );
@@ -120,13 +122,16 @@ class Send_Post_Command {
 
 			$scheduled_standard = array_column( $result['standard_posts'] ?? [], 'scheduled' );
 			$scheduled_gmb      = array_column( $result['gmb_posts'] ?? [], 'scheduled' );
-
-			\WP_CLI::success(
-				"Post #{$post_id} amplified — standard: "
+			$summary            = 'standard: '
 				. ( $scheduled_standard ? implode( ', ', $scheduled_standard ) : 'none' )
 				. ' | gmb: '
-				. ( $scheduled_gmb ? implode( ', ', $scheduled_gmb ) : 'none' )
-			);
+				. ( $scheduled_gmb ? implode( ', ', $scheduled_gmb ) : 'none' );
+
+			if ( 'complete' === ( $result['outcome'] ?? '' ) ) {
+				\WP_CLI::success( "Post #{$post_id} amplified — {$summary}" );
+			} else {
+				\WP_CLI::warning( "Post #{$post_id}: " . Amplification_Engine::describe_outcome( $result ) . " ({$summary})" );
+			}
 		} catch ( \RuntimeException $e ) {
 			\WP_CLI::error( 'Amplification failed: ' . $e->getMessage() );
 		}

@@ -10,6 +10,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
+ * v1.1 | 2026-09-11 — Labels its runs `publish` in the run history.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -66,7 +67,8 @@ class REST_Endpoint {
 		$post_id     = (int) $request->get_param( 'post_id' );
 		$schedule_at = $request->get_param( 'schedule_at' );
 
-		$options = [];
+		// The publish hook's loopback is this endpoint's only caller.
+		$options = [ 'trigger' => 'publish' ];
 		if ( $schedule_at ) {
 			try {
 				$options['schedule_at'] = new \DateTimeImmutable(

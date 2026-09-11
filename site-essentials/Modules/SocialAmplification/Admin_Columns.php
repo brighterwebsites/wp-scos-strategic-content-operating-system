@@ -7,6 +7,7 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
+ * v1.1 | 2026-09-11 — Shows Partial / Failed from the last run's outcome.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -43,19 +44,37 @@ class Admin_Columns {
 		}
 
 		$is_amplified = get_post_meta( $post_id, Publish_Hook::AMPLIFIED_META, true ) === '1';
-		if ( ! $is_amplified ) {
+		$entry        = Amplification\Amplification_Engine::get_log( $post_id );
+		$outcome      = $entry ? Amplification\Amplification_Engine::outcome_of( $entry ) : '';
+
+		if ( ! $is_amplified && ! in_array( $outcome, [ 'partial', 'failed' ], true ) ) {
 			echo '—';
 			return;
 		}
 
-		$log   = get_option( Amplification\Amplification_Engine::LOG_OPTION, [] );
-		$entry = is_array( $log ) ? ( $log[ $post_id ] ?? [] ) : [];
-		$ran   = (string) ( $entry['ran_at'] ?? '' );
-		$when  = $ran ? mysql2date( 'j M Y', $ran ) : __( 'date unknown', 'site-essentials' );
+		$ran    = (string) ( $entry['ran_at'] ?? '' );
+		$when   = $ran ? mysql2date( 'j M Y', $ran ) : __( 'date unknown', 'site-essentials' );
+		$counts = Amplification\Amplification_Engine::slot_counts( $entry );
+
+		if ( 'partial' === $outcome ) {
+			$label = sprintf(
+				/* translators: %d: number of failed posts */
+				__( 'Partial (%d failed)', 'site-essentials' ),
+				$counts['total'] - $counts['scheduled']
+			);
+			$color = '#854d0e';
+		} elseif ( 'failed' === $outcome ) {
+			$label = __( 'Failed', 'site-essentials' );
+			$color = '#b32d2e';
+		} else {
+			$label = __( 'Yes', 'site-essentials' );
+			$color = '';
+		}
 
 		printf(
-			'%s <span style="color:#6b7280;">%s %s</span>',
-			esc_html__( 'Yes', 'site-essentials' ),
+			'<span%s>%s</span> <span style="color:#6b7280;">%s %s</span>',
+			$color ? ' style="color:' . esc_attr( $color ) . ';font-weight:600;"' : '',
+			esc_html( $label ),
 			esc_html__( 'ran', 'site-essentials' ),
 			esc_html( $when )
 		);

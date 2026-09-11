@@ -14,9 +14,13 @@
  * v1.0 | 2026-05-01
  * v1.1 | 2026-06-29 — Remove _bw_breadcrumb dual-write; consumers now read scos_sa_shortlink_slug first.
  * v1.2 | 2026-07-21 — Remove Make.com webhook trigger button/UI (deprecated, unused on all sites).
+ * v1.3 | 2026-09-11 — Status shows the run outcome (partial/failed), Google Business
+ *                      slots, errors and run history; "Retry failed posts" action.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
+
+use SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -30,6 +34,7 @@ class Meta_Box {
 		add_action( 'save_post',             [ __CLASS__, 'save' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 		add_action( 'wp_ajax_scos_sa_amplify', [ __CLASS__, 'ajax_re_amplify' ] );
+		add_action( 'wp_ajax_scos_sa_retry_failed', [ __CLASS__, 'ajax_retry_failed' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -74,18 +79,36 @@ class Meta_Box {
 			$shortlink_slug = get_post_meta( $post->ID, '_bw_breadcrumb', true );
 		}
 
-		$is_published   = ( 'publish' === $post->post_status );
 		$yourls_api_url = rtrim( SocialAmplification_Module::get_option( 'scos_sma_yourls_url', 'bw_yourls_api_url' ), '/' );
 		$yourls_base    = $yourls_api_url
 			? preg_replace( '#/yourls-api\.php$#', '', $yourls_api_url )
 			: '';
-		$amplified      = get_post_meta( $post->ID, '_scos_sa_amplified', true ) === '1';
-		$log            = get_option( \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::LOG_OPTION, [] );
-		$log_entry      = is_array( $log ) ? ( $log[ $post->ID ] ?? [] ) : [];
-		$ran_at         = (string) ( $log_entry['ran_at'] ?? '' );
-		$log_posts      = (array) ( $log_entry['posts'] ?? [] );
+		$status_html    = self::render_status( $post );
 
 		include __DIR__ . '/views/meta-box.php';
+	}
+
+	/**
+	 * The Postly status block. Rendered in the meta box and returned by the
+	 * AJAX actions, so the page updates in place after a run or retry.
+	 */
+	public static function render_status( \WP_Post $post ): string {
+		$is_published = ( 'publish' === $post->post_status );
+		$amplified    = get_post_meta( $post->ID, Publish_Hook::AMPLIFIED_META, true ) === '1';
+		$log_entry    = Amplification_Engine::get_log( $post->ID );
+		$outcome      = $log_entry ? Amplification_Engine::outcome_of( $log_entry ) : '';
+		$counts       = Amplification_Engine::slot_counts( $log_entry );
+		$slot_rows    = array_merge(
+			(array) ( $log_entry['standard_posts'] ?? $log_entry['posts'] ?? [] ),
+			(array) ( $log_entry['gmb_posts'] ?? [] )
+		);
+		$queue        = Amplification_Engine::get_retry_queue( $post->ID );
+		$next_retry   = (int) wp_next_scheduled( Amplification_Engine::RETRY_HOOK, [ $post->ID ] );
+		$history      = Amplification_Engine::get_history( $post->ID );
+
+		ob_start();
+		include __DIR__ . '/views/amplify-status.php';
+		return (string) ob_get_clean();
 	}
 
 	// -------------------------------------------------------------------------
@@ -138,17 +161,21 @@ class Meta_Box {
 			'ajaxurl'      => admin_url( 'admin-ajax.php' ),
 			'settingsUrl'  => admin_url( 'admin.php?page=site-essentials-social-amplification&scos_sma_tab=postly#postly' ),
 			'i18n'         => [
-				'error'      => __( 'Error', 'site-essentials' ),
-				'reAmplify'  => __( 'Reset & Re-amplify', 'site-essentials' ),
-				'create'     => __( 'Create Social Post', 'site-essentials' ),
-				'amplifying' => __( 'Running…', 'site-essentials' ),
-				'configError' => __( 'AI knowledge not configured. Set up Anthropic API key and knowledge files in', 'site-essentials' ),
+				'error'        => __( 'Error', 'site-essentials' ),
+				'amplifying'   => __( 'Running… this can take a few minutes.', 'site-essentials' ),
+				'retrying'     => __( 'Resending failed posts…', 'site-essentials' ),
+				'requestFailed' => __( 'The request failed before the server replied. Reload the page to see whether anything was scheduled.', 'site-essentials' ),
+				'confirmRerun' => __( 'This schedules a new set of posts. Posts already scheduled in Postly by the last run stay there — delete any duplicates in Postly. Continue?', 'site-essentials' ),
+				'configError'  => __( 'Captions could not be generated. Check the AI provider connection and the knowledge files in', 'site-essentials' ),
 				'settingsLink' => __( 'Social Amplification settings', 'site-essentials' ),
 			],
 		] );
 	}
 
-	public static function ajax_re_amplify(): void {
+	/**
+	 * Check the nonce and edit capability; returns the post ID or ends the request.
+	 */
+	private static function verify_ajax_request(): int {
 		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 		$nonce   = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
 
@@ -158,13 +185,43 @@ class Meta_Box {
 		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'site-essentials' ) ], 403 );
 		}
+		return $post_id;
+	}
 
-		delete_post_meta( $post_id, \SiteEssentials\Modules\SocialAmplification\Publish_Hook::AMPLIFIED_META );
+	/** Reply with the outcome, a readable summary and the refreshed status block. */
+	private static function send_status( int $post_id, array $result ): void {
+		$post = get_post( $post_id );
+		wp_send_json_success( [
+			'outcome' => (string) ( $result['outcome'] ?? '' ),
+			'message' => Amplification_Engine::describe_outcome( $result ),
+			'html'    => $post ? self::render_status( $post ) : '',
+			'result'  => $result,
+		] );
+	}
+
+	public static function ajax_retry_failed(): void {
+		$post_id = self::verify_ajax_request();
 
 		try {
-			$result = \SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine::run( $post_id );
-			update_post_meta( $post_id, \SiteEssentials\Modules\SocialAmplification\Publish_Hook::AMPLIFIED_META, '1' );
-			wp_send_json_success( [ 'result' => $result ] );
+			self::send_status( $post_id, Amplification_Engine::retry_failed_slots( $post_id, true ) );
+		} catch ( \RuntimeException $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage(), 'code' => 'error' ], 500 );
+		}
+	}
+
+	public static function ajax_re_amplify(): void {
+		$post_id = self::verify_ajax_request();
+
+		delete_post_meta( $post_id, Publish_Hook::AMPLIFIED_META );
+
+		try {
+			$result = Amplification_Engine::run( $post_id, [ 'trigger' => 'button' ] );
+			// The flag is the re-run lock (it stops the publish hook firing again);
+			// how the run went lives in the log's outcome.
+			if ( 'skipped' !== ( $result['outcome'] ?? '' ) ) {
+				update_post_meta( $post_id, Publish_Hook::AMPLIFIED_META, '1' );
+			}
+			self::send_status( $post_id, $result );
 		} catch ( \RuntimeException $e ) {
 			$message = $e->getMessage();
 			// Classify config-type failures so the JS can render a targeted help message.

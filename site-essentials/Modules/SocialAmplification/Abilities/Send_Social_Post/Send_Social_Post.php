@@ -12,6 +12,9 @@
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Abilities\Send_Social_Post
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-09-11 — `retry_failed` resends only the slots that failed; the result
+ *                      reports the run outcome, and `success` is true only when
+ *                      every slot was scheduled.
  */
 
 declare( strict_types=1 );
@@ -104,39 +107,52 @@ class Send_Social_Post extends Abstract_Ability {
 					'type'        => 'string',
 					'description' => 'Optional. A Google Business Profile caption you have already written. Supply it and no AI generation happens for GMB. Must contain no URLs, phone numbers or hashtags, and stay between 150 and 300 characters.',
 				],
+				'retry_failed' => [
+					'type'        => 'boolean',
+					'description' => 'Resend only the posts that failed in the last run (rate limit, Postly outage) — posts that were scheduled are left alone. Ignores channel, post_count, captions and force. Use this rather than force after a partial run, which would schedule duplicates.',
+					'default'     => false,
+				],
 			],
 		];
 	}
 
 	public function output_schema(): array {
+		$slot = [
+			'type'       => 'object',
+			'properties' => [
+				'slot'      => [ 'type' => 'integer' ],
+				'scheduled' => [ 'type' => 'string' ],
+				'status'    => [
+					'type'        => 'string',
+					'description' => 'scheduled, retry_scheduled (failed; an automatic retry is queued) or error (failed; needs retry_failed).',
+				],
+				'postly_id' => [ 'type' => [ 'string', 'null' ] ],
+				'error'     => [ 'type' => 'string' ],
+				'note'      => [ 'type' => 'string' ],
+			],
+		];
+
 		return [
 			'type'       => 'object',
 			'properties' => [
-				'success'        => [ 'type' => 'boolean' ],
-				'post_id'        => [ 'type' => 'integer' ],
-				'standard_posts' => [
-					'type'  => 'array',
-					'items' => [
-						'type'       => 'object',
-						'properties' => [
-							'slot'      => [ 'type' => 'integer' ],
-							'scheduled' => [ 'type' => 'string' ],
-							'status'    => [ 'type' => 'string' ],
-						],
-					],
+				'success'         => [
+					'type'        => 'boolean',
+					'description' => 'True only when every post was scheduled.',
 				],
-				'gmb_posts'      => [
-					'type'  => 'array',
-					'items' => [
-						'type'       => 'object',
-						'properties' => [
-							'slot'      => [ 'type' => 'integer' ],
-							'scheduled' => [ 'type' => 'string' ],
-							'status'    => [ 'type' => 'string' ],
-						],
-					],
+				'post_id'         => [ 'type' => 'integer' ],
+				'outcome'         => [
+					'type'        => 'string',
+					'description' => 'complete, partial, failed (nothing scheduled) or skipped (no channels configured).',
 				],
-				'error'          => [ 'type' => 'string' ],
+				'message'         => [ 'type' => 'string' ],
+				'retry_at'        => [
+					'type'        => 'string',
+					'description' => 'Site-time Y-m-d H:i of the automatic retry of failed posts, or empty.',
+				],
+				'pending_retries' => [ 'type' => 'integer' ],
+				'standard_posts'  => [ 'type' => 'array', 'items' => $slot ],
+				'gmb_posts'       => [ 'type' => 'array', 'items' => $slot ],
+				'error'           => [ 'type' => 'string' ],
 			],
 		];
 	}
@@ -200,10 +216,21 @@ class Send_Social_Post extends Abstract_Ability {
 			);
 		}
 
+		if ( ! empty( $input['retry_failed'] ) ) {
+			try {
+				return self::result( $post_id, Amplification_Engine::retry_failed_slots( $post_id, true ) );
+			} catch ( \RuntimeException $e ) {
+				return new WP_Error( 'scos_send_retry_failed', $e->getMessage(), [ 'status' => 409 ] );
+			}
+		}
+
 		if ( ! $force && get_post_meta( $post_id, Publish_Hook::AMPLIFIED_META, true ) === '1' ) {
+			$queued = count( Amplification_Engine::get_retry_queue( $post_id ) );
 			return new WP_Error(
 				'scos_send_already_amplified',
-				sprintf( __( 'Post #%d has already been amplified. Pass force: true to override.', 'site-essentials' ), $post_id ),
+				$queued
+					? sprintf( __( 'Post #%1$d has already been amplified, and %2$d failed post(s) are waiting. Pass retry_failed: true to resend just those, or force: true to schedule a whole new set.', 'site-essentials' ), $post_id, $queued )
+					: sprintf( __( 'Post #%d has already been amplified. Pass force: true to override.', 'site-essentials' ), $post_id ),
 				[ 'status' => 409 ]
 			);
 		}
@@ -256,16 +283,16 @@ class Send_Social_Post extends Abstract_Ability {
 			$options['post_count'] = $post_count;
 		}
 
+		$options['trigger'] = 'ability';
+
 		try {
 			$result = Amplification_Engine::run( $post_id, $options );
-			update_post_meta( $post_id, Publish_Hook::AMPLIFIED_META, '1' );
+			// The flag is the re-run lock; the outcome in the result says how it went.
+			if ( 'skipped' !== ( $result['outcome'] ?? '' ) ) {
+				update_post_meta( $post_id, Publish_Hook::AMPLIFIED_META, '1' );
+			}
 
-			return [
-				'success'        => true,
-				'post_id'        => $post_id,
-				'standard_posts' => $result['standard_posts'] ?? [],
-				'gmb_posts'      => $result['gmb_posts'] ?? [],
-			];
+			return self::result( $post_id, $result );
 		} catch ( \RuntimeException $e ) {
 			return new WP_Error(
 				'scos_send_amplification_failed',
@@ -273,6 +300,24 @@ class Send_Social_Post extends Abstract_Ability {
 				[ 'status' => 500 ]
 			);
 		}
+	}
+
+	/**
+	 * Shape a run or retry log entry for the caller.
+	 */
+	private static function result( int $post_id, array $entry ): array {
+		$outcome = (string) ( $entry['outcome'] ?? Amplification_Engine::outcome_of( $entry ) );
+
+		return [
+			'success'         => 'complete' === $outcome,
+			'post_id'         => $post_id,
+			'outcome'         => $outcome,
+			'message'         => Amplification_Engine::describe_outcome( $entry ),
+			'retry_at'        => (string) ( $entry['retry_at'] ?? '' ),
+			'pending_retries' => count( Amplification_Engine::get_retry_queue( $post_id ) ),
+			'standard_posts'  => $entry['standard_posts'] ?? [],
+			'gmb_posts'       => $entry['gmb_posts'] ?? [],
+		];
 	}
 }
 

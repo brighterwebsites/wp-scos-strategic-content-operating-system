@@ -107,7 +107,6 @@ class Admin_UI {
         add_action('admin_post_scos_save_redirections',            ['\SiteEssentials\Modules\SeoMeta\Redirections', 'handle_save']);
         add_action('admin_post_site_essentials_save_cpt', [$this, 'save_cpt_settings']);
         add_action('admin_post_site_essentials_save_sma', [$this, 'save_sma_settings']);
-        add_action('admin_post_scos_save_ai_keys',        [$this, 'save_ai_keys']);
         add_action('admin_post_scos_save_email_settings',   [$this, 'save_email_settings']);
         add_action('wp_ajax_scos_send_test_email',          [$this, 'ajax_send_test_email']);
         add_action('admin_notices',                         [$this, 'maybe_notice_email_no_api_key']);
@@ -1179,40 +1178,6 @@ class Admin_UI {
 
         // SCOS-SA-PASS1 — scos_sma_tab param used by hash-based JS tab switcher after redirect.
         wp_redirect( add_query_arg( [ 'page' => self::SMA_PAGE_SLUG, 'scos_sma_tab' => ( $submitted_tab ?: 'yourls' ), 'scos_sma_saved' => '1' ], admin_url( 'admin.php' ) ) );
-        exit;
-    }
-
-    /**
-     * Save AI API Keys (Anthropic, etc.) from Settings → AI API Keys tab.
-     *
-     * @since 1.4.0
-     * @return void
-     */
-    public function save_ai_keys(): void {
-        if ( ! isset( $_POST['scos_ai_keys_nonce'] )
-            || ! wp_verify_nonce( $_POST['scos_ai_keys_nonce'], 'scos_save_ai_keys' ) ) {
-            wp_die( __( 'Security check failed.', 'site-essentials' ) );
-        }
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( __( 'Insufficient permissions.', 'site-essentials' ) );
-        }
-
-        // The key field is rendered empty so the stored secret never reaches the
-        // page source, so an empty submission means "unchanged", not "clear".
-        // Clearing is an explicit checkbox.
-        if ( ! empty( $_POST['bw_anthropic_api_key_clear'] ) ) {
-            delete_option( 'bw_anthropic_api_key' );
-        } elseif ( isset( $_POST['bw_anthropic_api_key'] ) ) {
-            $submitted_key = sanitize_text_field( wp_unslash( $_POST['bw_anthropic_api_key'] ) );
-            if ( '' !== $submitted_key ) {
-                update_option( 'bw_anthropic_api_key', $submitted_key );
-            }
-        }
-        if ( isset( $_POST['bw_anthropic_model'] ) ) {
-            update_option( 'bw_anthropic_model', sanitize_text_field( wp_unslash( $_POST['bw_anthropic_model'] ) ) );
-        }
-
-        wp_redirect( add_query_arg( [ 'page' => self::SETTINGS_PAGE_SLUG, 'tab' => 'ai-keys', 'updated' => '1' ], admin_url( 'admin.php' ) ) );
         exit;
     }
 

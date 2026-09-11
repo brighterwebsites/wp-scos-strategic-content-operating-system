@@ -11,10 +11,11 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
- * @version    1.4 | 2026-07-21
+ * @version    1.5 | 2026-09-11
  *
  * v1.4 | 2026-07-21 — Removed Post Framing CPT + Make.com webhook trigger
  *                      (deprecated, unused on all sites). Postly pipeline unaffected.
+ * v1.5 | 2026-09-11 — Registers the WP-Cron retry of failed Postly slots.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -62,7 +63,7 @@ class SocialAmplification_Module implements Module_Interface {
 		require_once __DIR__ . '/Admin_Columns.php';
 
 		// ── Postly.ai amplification pipeline ──────────────────────────────
-		require_once __DIR__ . '/Amplification/Anthropic_Client.php';
+		require_once __DIR__ . '/Amplification/Caption_Generator.php';
 		require_once __DIR__ . '/Amplification/Postly_Client.php';
 		require_once __DIR__ . '/Amplification/Amplification_Engine.php';
 		require_once __DIR__ . '/Amplification/REST_Endpoint.php';
@@ -72,6 +73,7 @@ class SocialAmplification_Module implements Module_Interface {
 		Meta_Fields::init();
 		Meta_Box::init();
 		Admin_Columns::init();
+		Amplification\Amplification_Engine::init(); // WP-Cron retry of failed slots.
 		Amplification\REST_Endpoint::init();
 		Amplification\Backfill_Endpoint::init();
 		Publish_Hook::init();

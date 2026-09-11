@@ -224,7 +224,7 @@ Canonical reference: `mu-brighter-support-main/Naming-conventions.md` — that d
 | `scos_ca_` | Content Architecture module | `scos_ca_topic` |
 | `scos_sa_` | Social Amplification module | `scos_sa_generated_caption` |
 | `scos_cpt_` | CPT customisation | `scos_cpt_icon` |
-| `se_` | Site-wide / shared across modules | `se_anthropic_api_key` |
+| `se_` | Site-wide / shared across modules | `se_ga4_id` |
 
 ### Options Prefixes
 
@@ -243,7 +243,8 @@ Canonical reference: `mu-brighter-support-main/Naming-conventions.md` — that d
 - Format: always lowercase, words separated by underscores
 - Transients: `se_[name]`
 - ACF field keys: `field_scos_[module]_[fieldname]`
-- If a setting will clearly be shared across modules (e.g. API keys), use `se_` from the start
+- If a setting will clearly be shared across modules (e.g. a third-party service ID), use `se_` from the start
+- **AI provider keys and model strings are not SCOS options** — never store them under any prefix. Credentials belong to the AI Provider plugins (`connectors_ai_*`); the model is resolved by the WP AI Client. See Section 6
 
 ---
 
@@ -445,3 +446,149 @@ Before considering any admin page complete:
 - [ ] CSS enqueued only on SCOS pages, `scos-tokens` as dependency of `scos-ui`
 - [ ] One primary button per card footer max
 - [ ] Markup matched to a pattern in `snippets.html`
+
+---
+
+## 6. AI Integration — Provider & Model Agnostic
+
+Canonical reference for all AI work. `.cursor/rules/ai-integration.mdc` mirrors this file —
+this one wins on conflict. Update both together.
+
+### The one rule
+
+**No provider name, model string, API endpoint, or AI API key may appear in SCOS code or in a
+SCOS-owned option.**
+
+SCOS supplies *instructions* and *tools*. The provider and model are resolved at runtime by the
+WordPress AI Client and governed by the site's connector approvals.
+
+### Why — this is not stylistic
+
+Breakdance's agent connector calls SCOS abilities from inside its own AI chat. Cursor, Claude Code,
+WP-CLI and REST call the same abilities. Every caller arrives with its own model already chosen.
+
+An ability that pins a model does three bad things: it runs a second, hidden inference the caller
+did not ask for and cannot see; it bills to a key the site owner cannot govern from one place; and
+it goes stale the moment that model is retired. A model string in SCOS is a defect, not a setting.
+
+### Ownership — who owns what
+
+| Concern | Owned by | Never in SCOS |
+|---|---|---|
+| Credentials | AI Provider plugins — `connectors_ai_anthropic_api_key`, `connectors_ai_openai_api_key` | any `*_api_key` option for an AI provider |
+| Provider + model selection | WP AI Client — `get_preferred_models_for_text_generation()` | model strings, `DEFAULT_MODEL` constants, model settings fields |
+| Per-plugin provider access | `wpai_connector_approvals` (connector → provider → bool) | a private key that bypasses approval |
+| Transport | `wp_ai_client_prompt()` | `wp_remote_post()` to a provider endpoint |
+| Instructions | `system-instruction.php` beside the ability class | prompt text embedded in engine or client classes |
+
+Required stack on a site that runs SCOS generation: the `ai` plugin, at least one AI Provider
+plugin, a provider key, and an approval row for `site-essentials`.
+
+### Decide which kind of ability you are building
+
+**1. Tool ability — no AI inside. Prefer this.**
+A deterministic action: fetch, compute, write meta, schedule, publish. Callable by any agent.
+The calling agent brings the intelligence; the ability brings the capability.
+
+**2. Generation ability — AI inside, because there is no calling agent.**
+In-admin "Suggest" buttons, cron, publish hooks. Must route through `wp_ai_client_prompt()`.
+
+**3. Hybrid — accepts pre-generated content, generates only as fallback.**
+Use when the same operation runs both agent-initiated and unattended.
+
+```php
+// Agent supplied the content → use it.
+// Nothing supplied (cron / publish hook) → generate via the WP AI Client.
+$captions = ! empty( $input['captions'] )
+    ? $input['captions']
+    : $this->generate_captions( $context ); // wp_ai_client_prompt()
+```
+
+**Test:** if a calling agent could reasonably write the content itself, accept it as an input
+*before* you generate it server-side.
+
+### Canonical generation pattern
+
+Reference implementation: `site-essentials/Modules/SeoMeta/Abilities/Suggest_Tldr/Suggest_Tldr.php`.
+
+```php
+use function WordPress\AI\get_preferred_models_for_text_generation;
+
+$prompt_builder = wp_ai_client_prompt( $prompt )
+    ->using_system_instruction( $this->get_system_instruction() )
+    ->using_temperature( 0.4 )
+    ->using_model_preference( ...get_preferred_models_for_text_generation() );
+
+$prompt_builder = $this->ensure_text_generation_supported(
+    $prompt_builder,
+    esc_html__( 'Suggestion failed. Please ensure you have a connected provider that supports text generation.', 'site-essentials' )
+);
+if ( is_wp_error( $prompt_builder ) ) {
+    return $prompt_builder;
+}
+
+$result = $prompt_builder->generate_text();
+if ( is_wp_error( $result ) ) {
+    return $result;
+}
+```
+
+Always spread `...get_preferred_models_for_text_generation()`. Never hand-write a model list.
+
+### Prohibited
+
+```php
+// ❌ Hardcoded endpoint, model and key — bypasses the approval layer entirely
+const API_URL       = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+$api_key = get_option( 'bw_anthropic_api_key', '' );
+wp_remote_post( self::API_URL, [ ... ] );
+
+// ❌ A SCOS-owned model setting is still a hardcode — it has only moved to the DB
+$model = get_option( 'scos_ai_model', 'gpt-5.6-luna' );
+
+// ❌ Naming a provider inside a system instruction
+'…that is handled by the Anthropic API within the amplification engine.'
+```
+
+Named anti-pattern in this codebase:
+`site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php` (pending removal).
+Do not copy it, extend it, or add a second provider client beside it.
+
+### Credentials & approval
+
+- Never read, write, or add a settings field for an AI provider key. The provider plugins own them.
+- Access is granted per connector in `wpai_connector_approvals`, e.g. `{"site-essentials":{"openai":true}}`.
+- On a connector's first AI call the request is queued in `wpai_connector_approval_pending` and
+  WordPress raises an admin notice that persists until approved or dismissed. Do **not** build a
+  parallel approval prompt, preflight gate, or status panel — the platform already handles it.
+- An unapproved or unconfigured provider returns `WP_Error`. Surface it; never fatal.
+- A provider approved for one connector is not approved for another. Approvals are per plugin,
+  which is the point: it is the single place a site owner governs what SCOS may spend.
+
+### System instructions
+
+- Must live in `system-instruction.php` **in the same directory as the ability class** —
+  `Abstract_Ability` locates it by reflection.
+- Must `return` a string. Never echo.
+- All prompt rules, tone and formatting belong there, or in `wp-content/ai-knowledge/*.md` —
+  never inline in an engine or client class.
+- Write them provider-neutral: describe the task and the output contract, never the model or vendor.
+
+### Unattended contexts (cron, publish hooks, WP-CLI)
+
+- No user is present. Never depend on `current_user_can()` inside the generation path.
+- A missing plugin, provider or approval must log and skip cleanly. Never throw out of a hook.
+- Connector approval is site-level (a stored option), so it does carry into cron — but the *first*
+  call on a fresh site may sit pending. Treat pending/unapproved as a normal skip, not an error state.
+
+### Checklist — before any AI-touching change
+
+- [ ] No provider name, model string, endpoint or API key anywhere in the diff
+- [ ] Generation routes through `wp_ai_client_prompt()` with `get_preferred_models_for_text_generation()`
+- [ ] Ability type chosen deliberately — tool / generation / hybrid
+- [ ] Agent-supplyable content accepted as input before being generated server-side
+- [ ] Instructions in `system-instruction.php`, provider-neutral, returns a string
+- [ ] `WP_Error` from the AI client returned, not swallowed or thrown
+- [ ] Unattended path degrades to a logged skip
+- [ ] No new settings field for a key or a model

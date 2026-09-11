@@ -1,9 +1,16 @@
 <?php
 /**
- * Anthropic API Client
+ * Caption Generator
  *
- * Reads knowledge files from wp-content/ai-knowledge/, builds a structured
- * prompt, calls the Anthropic Messages API, and parses the JSON caption response.
+ * Builds social captions for the amplification pipeline. Reads brand knowledge
+ * from wp-content/ai-knowledge/, assembles the prompt, and generates through
+ * the WordPress AI Client — provider and model resolved at runtime and
+ * governed by the site's connector approvals.
+ *
+ * Replaces Anthropic_Client, which hardcoded an endpoint, a model constant and
+ * a private API key. That key was not a registered connector credential, so
+ * Connector_Approval\Http_Guard could not attribute the request and the calls
+ * bypassed the approval layer entirely. See CLAUDE.md § 6.
  *
  * Knowledge files (all optional — missing files are silently skipped):
  *   301-social-brand-voice.md — brand identity, tone, positioning
@@ -11,24 +18,25 @@
  *   303-social-media-gmb.md   — Google Business post rules
  *   304-brand-vocabulary.md   — approved / banned word list
  *
- * Automatically writes wp-content/ai-knowledge/.htaccess if the folder
- * exists but the file does not, so HTTP access is blocked from day one.
+ * Guards wp-content/ai-knowledge/ against HTTP access on every call: creates
+ * the folder if needed, writes an Apache 2.2 + 2.4 deny .htaccess, and drops
+ * an index.php fallback (hardening carried over from Anthropic_Client 1.1.0).
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
+ * v1.0 | 2026-09-11
+ * v1.1 | 2026-09-11 — Normalise ai-knowledge files to UTF-8 (Windows-1252 files
+ *                      broke the strict AI Client JSON encoding); scrub prompts.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
 
 defined( 'ABSPATH' ) || exit;
 
-class Anthropic_Client {
+class Caption_Generator {
 
-	const API_URL         = 'https://api.anthropic.com/v1/messages';
-	const API_VERSION     = '2023-06-01';
-	const DEFAULT_MODEL   = 'claude-haiku-4-5-20251001';
-	const MAX_TOKENS      = 2500;
-	const LOG_PREFIX      = '[SCOS SMA Anthropic]';
+	const MAX_TOKENS  = 2500;
+	const LOG_PREFIX  = '[SCOS SMA Captions]';
 
 	/** Knowledge files relative to WP_CONTENT_DIR/ai-knowledge/ */
 	const KNOWLEDGE_FILES = [
@@ -41,27 +49,13 @@ class Anthropic_Client {
 	/**
 	 * Generate N social media captions for the given post context.
 	 *
-	 * @param  array    $post_context {
-	 *     @type int    $post_id
-	 *     @type string $title
-	 *     @type string $excerpt
-	 *     @type string $permalink
-	 *     @type string $shortlink
-	 *     @type string $content_type
-	 * }
-	 * @param  string[] $frames  Framing angle strings. Cycled via modulo for post_count > count($frames).
-	 * @param  int      $count   Number of captions to generate (default 3).
+	 * @param  array    $post_context post_id, title, excerpt, permalink, shortlink, content_type.
+	 * @param  string[] $frames       Framing angle strings. Cycled via modulo when count > frames.
+	 * @param  int      $count        Number of captions to generate (default 3).
 	 * @return array<string, string>  Keys post_1 … post_N.
-	 * @throws \RuntimeException on API error or bad response.
+	 * @throws \RuntimeException on generation error or unparseable response.
 	 */
 	public static function generate_captions( array $post_context, array $frames = [], int $count = 3 ): array {
-		$api_key = self::get_api_key();
-		if ( ! $api_key ) {
-			$msg = 'Anthropic API key is not configured.';
-			error_log( self::LOG_PREFIX . ' ' . $msg );
-			throw new \RuntimeException( $msg );
-		}
-
 		self::maybe_create_htaccess();
 
 		$count  = max( 1, $count );
@@ -74,53 +68,15 @@ class Anthropic_Client {
 			];
 		}
 
-		$model     = (string) get_option( 'bw_anthropic_model', self::DEFAULT_MODEL ) ?: self::DEFAULT_MODEL;
 		$knowledge = self::read_knowledge_files();
 		$system    = self::system_prompt( $knowledge, $count );
 		$prompt    = self::build_prompt( $post_context, $frames, $count );
 
 		$post_id = $post_context['post_id'] ?? '?';
-		error_log( self::LOG_PREFIX . " Generating {$count} captions for post #{$post_id} using model {$model}" );
+		error_log( self::LOG_PREFIX . " Generating {$count} captions for post #{$post_id}" );
 
-		$payload = [
-			'model'      => $model,
-			'max_tokens' => self::MAX_TOKENS,
-			'system'     => $system,
-			'messages'   => [
-				[ 'role' => 'user', 'content' => $prompt ],
-			],
-		];
+		$text = self::generate( $prompt, $system, 0.7 );
 
-		$response = wp_remote_post( self::API_URL, [
-			'timeout' => 60,
-			'headers' => [
-				'x-api-key'         => $api_key,
-				'anthropic-version' => self::API_VERSION,
-				'content-type'      => 'application/json',
-			],
-			'body' => wp_json_encode( $payload ),
-		] );
-
-		if ( is_wp_error( $response ) ) {
-			$msg = 'Anthropic API request failed: ' . $response->get_error_message();
-			error_log( self::LOG_PREFIX . ' ' . $msg );
-			throw new \RuntimeException( $msg );
-		}
-
-		$code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( $code !== 200 ) {
-			$err = $data['error']['message'] ?? $body;
-			$msg = "Anthropic API error ({$code}): {$err}";
-			// Log the full raw body so nothing is hidden
-			error_log( self::LOG_PREFIX . ' ' . $msg );
-			error_log( self::LOG_PREFIX . ' Full response body: ' . $body );
-			throw new \RuntimeException( $msg );
-		}
-
-		$text = $data['content'][0]['text'] ?? '';
 		error_log( self::LOG_PREFIX . " Raw caption response for post #{$post_id}: " . substr( $text, 0, 500 ) );
 
 		$captions = self::parse_captions( $text, $count );
@@ -135,75 +91,86 @@ class Anthropic_Client {
 	 * @throws \RuntimeException
 	 */
 	public static function generate_gmb_caption( array $post_context ): string {
-		$api_key = self::get_api_key();
-		if ( ! $api_key ) {
-			$msg = 'Anthropic API key is not configured.';
-			error_log( self::LOG_PREFIX . ' ' . $msg );
-			throw new \RuntimeException( $msg );
-		}
-
 		self::maybe_create_htaccess();
 
-		$model     = (string) get_option( 'bw_anthropic_model', self::DEFAULT_MODEL ) ?: self::DEFAULT_MODEL;
 		$knowledge = self::read_knowledge_files();
 		$system    = self::system_prompt_gmb( $knowledge );
 		$prompt    = self::build_gmb_prompt( $post_context );
 		$post_id   = $post_context['post_id'] ?? '?';
 
-		error_log( self::LOG_PREFIX . " Generating GMB caption for post #{$post_id} using model {$model}" );
+		error_log( self::LOG_PREFIX . " Generating GMB caption for post #{$post_id}" );
 
-		$payload = [
-			'model'      => $model,
-			'max_tokens' => 500,
-			'system'     => $system,
-			'messages'   => [
-				[ 'role' => 'user', 'content' => $prompt ],
-			],
-		];
+		$text = self::generate( $prompt, $system, 0.7 );
 
-		$response = wp_remote_post( self::API_URL, [
-			'timeout' => 60,
-			'headers' => [
-				'x-api-key'         => $api_key,
-				'anthropic-version' => self::API_VERSION,
-				'content-type'      => 'application/json',
-			],
-			'body' => wp_json_encode( $payload ),
-		] );
-
-		if ( is_wp_error( $response ) ) {
-			$msg = 'Anthropic API request failed (GMB): ' . $response->get_error_message();
-			error_log( self::LOG_PREFIX . ' ' . $msg );
-			throw new \RuntimeException( $msg );
-		}
-
-		$code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( $code !== 200 ) {
-			$err = $data['error']['message'] ?? $body;
-			$msg = "Anthropic API error (GMB, {$code}): {$err}";
-			error_log( self::LOG_PREFIX . ' ' . $msg );
-			error_log( self::LOG_PREFIX . ' Full GMB response body: ' . $body );
-			throw new \RuntimeException( $msg );
-		}
-
-		$text = $data['content'][0]['text'] ?? '';
 		return self::parse_gmb_caption( $text );
 	}
 
+	// ──────────────────────────────────────────────────────────────────────────
+	// Generation
+	// ──────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Run a prompt through the WordPress AI Client.
+	 *
+	 * No provider, model, endpoint or credential is named here by design — the
+	 * client resolves them from the site's configured providers and the
+	 * connector approval registry.
+	 *
+	 * @param  string $prompt      User turn.
+	 * @param  string $system      System instruction.
+	 * @param  float  $temperature Sampling temperature.
+	 * @return string Raw model output.
+	 * @throws \RuntimeException when the AI client is unavailable or returns an error.
+	 */
+	private static function generate( string $prompt, string $system, float $temperature ): string {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+			$msg = 'WordPress AI Client is not available. Activate the AI plugin and at least one AI Provider plugin.';
+			error_log( self::LOG_PREFIX . ' ' . $msg );
+			throw new \RuntimeException( $msg );
+		}
+
+		// The AI Client JSON-encodes strictly, so a single invalid byte from any
+		// input fails the whole request ("Malformed UTF-8 characters"). Knowledge
+		// files are converted at read time; this catches anything else.
+		if ( function_exists( 'mb_scrub' ) ) {
+			$prompt = mb_scrub( $prompt, 'UTF-8' );
+			$system = mb_scrub( $system, 'UTF-8' );
+		}
+
+		$builder = wp_ai_client_prompt( $prompt )
+			->using_system_instruction( $system )
+			->using_temperature( $temperature )
+			->using_max_tokens( self::MAX_TOKENS );
+
+		if ( function_exists( 'WordPress\AI\get_preferred_models_for_text_generation' ) ) {
+			$builder = $builder->using_model_preference(
+				...\WordPress\AI\get_preferred_models_for_text_generation()
+			);
+		}
+
+		$result = $builder->generate_text();
+
+		if ( is_wp_error( $result ) ) {
+			$msg = 'AI generation failed: ' . $result->get_error_message();
+			error_log( self::LOG_PREFIX . ' ' . $msg . ' [' . $result->get_error_code() . ']' );
+			throw new \RuntimeException( $msg );
+		}
+
+		return (string) $result;
+	}
+
+	// ──────────────────────────────────────────────────────────────────────────
+	// Prompts
 	// ──────────────────────────────────────────────────────────────────────────
 
 	/**
 	 * Build the system prompt.
 	 *
-	 * Includes business identity from scos_biz_* options and all knowledge
-	 * file contents. All rule content lives here so the user turn stays short,
-	 * which improves Claude's instruction-following.
+	 * Business identity comes from scos_biz_* options; all tone and rule content
+	 * comes from the ai-knowledge files so none of it is hardcoded here.
 	 *
-	 * @param  array{brand_core: string, vocabulary: string, social_media: string} $knowledge
-	 * @param  int $count  Number of captions to generate (used to declare expected keys).
+	 * @param  array $knowledge Knowledge file contents keyed by type.
+	 * @param  int   $count     Number of captions (used to declare expected keys).
 	 */
 	private static function system_prompt( array $knowledge, int $count = 3 ): string {
 		$business_name = (string) get_option( 'scos_biz_business_name', get_bloginfo( 'name' ) );
@@ -243,10 +210,6 @@ class Anthropic_Client {
 	/**
 	 * Build the per-post user prompt with dynamic frame angles.
 	 * Frames are cycled via modulo when $count > count($frames).
-	 *
-	 * @param  array    $ctx    Post context.
-	 * @param  string[] $frames Framing angle strings.
-	 * @param  int      $count  Number of captions to generate.
 	 */
 	private static function build_prompt( array $ctx, array $frames, int $count ): string {
 		$title        = $ctx['title']        ?? '';
@@ -294,117 +257,6 @@ class Anthropic_Client {
 			. "{\"gmb_caption\": \"...\"}";
 	}
 
-	/**
-	 * Parse the model's text response into an array of N captions.
-	 * Handles JSON that may be wrapped in markdown fences despite the instruction.
-	 *
-	 * @param  string $text  Raw model output.
-	 * @param  int    $count Expected number of captions.
-	 * @return array<string, string>  Keys post_1 … post_N.
-	 * @throws \RuntimeException if captions cannot be parsed.
-	 */
-	private static function parse_captions( string $text, int $count = 3 ): array {
-		// Strip markdown fences
-		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
-		$text = preg_replace( '/\s*```$/', '', $text );
-		$text = trim( $text );
-
-		$data = json_decode( $text, true );
-
-		// ── Happy path: {post_1, …, post_N} object ───────────────────────────
-		if ( is_array( $data ) && ! isset( $data[0] ) ) {
-			$result   = [];
-			$all_good = true;
-			for ( $i = 1; $i <= $count; $i++ ) {
-				$key = "post_{$i}";
-				if ( ! empty( $data[ $key ] ) ) {
-					$result[ $key ] = (string) $data[ $key ];
-				} else {
-					$all_good = false;
-					break;
-				}
-			}
-			if ( $all_good && count( $result ) === $count ) {
-				return $result;
-			}
-			// Partial match: if at least post_1 exists, fill missing slots by cycling.
-			if ( ! empty( $result ) ) {
-				$keys = array_keys( $result );
-				for ( $i = count( $result ) + 1; $i <= $count; $i++ ) {
-					$fallback_key    = $keys[ ( $i - 1 ) % count( $keys ) ];
-					$result["post_{$i}"] = $result[ $fallback_key ];
-				}
-				return $result;
-			}
-		}
-
-		// ── Fallback: model returned an array of objects ─────────────────────
-		// e.g. [{"angle":"storytelling","caption":"..."}, ...]
-		if ( is_array( $data ) && isset( $data[0] ) && is_array( $data[0] ) ) {
-			$captions = [];
-			foreach ( $data as $item ) {
-				$caption = $item['caption'] ?? $item['text'] ?? $item['content'] ?? $item['post'] ?? '';
-				if ( $caption ) {
-					$captions[] = (string) $caption;
-				}
-			}
-			if ( count( $captions ) >= $count ) {
-				$result = [];
-				for ( $i = 1; $i <= $count; $i++ ) {
-					$result["post_{$i}"] = $captions[ $i - 1 ];
-				}
-				return $result;
-			}
-		}
-
-		// ── Nothing worked ────────────────────────────────────────────────────
-		throw new \RuntimeException(
-			"Anthropic response did not contain expected post_1…post_{$count} keys. Raw: " . substr( $text, 0, 400 )
-		);
-	}
-
-	private static function parse_gmb_caption( string $text ): string {
-		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
-		$text = preg_replace( '/\s*```$/', '', $text );
-		$text = trim( $text );
-
-		$data = json_decode( $text, true );
-		if ( is_array( $data ) && ! empty( $data['gmb_caption'] ) ) {
-			return trim( (string) $data['gmb_caption'] );
-		}
-
-		throw new \RuntimeException(
-			'Anthropic GMB response did not contain expected gmb_caption key. Raw: ' . substr( $text, 0, 400 )
-		);
-	}
-
-	// ──────────────────────────────────────────────────────────────────────────
-	// Knowledge file helpers
-	// ──────────────────────────────────────────────────────────────────────────
-
-	/**
-	 * Read all knowledge files and return their contents keyed by type.
-	 * Missing files return an empty string — non-fatal.
-	 *
-	 * @return array{brand_core: string, vocabulary: string, social_media: string}
-	 */
-	private static function read_knowledge_files(): array {
-		$base   = WP_CONTENT_DIR . '/ai-knowledge/';
-		$result = [];
-
-		foreach ( self::KNOWLEDGE_FILES as $key => $filename ) {
-			$path = $base . $filename;
-			if ( file_exists( $path ) ) {
-				$content = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-				$result[ $key ] = ( false !== $content ) ? $content : '';
-			} else {
-				$result[ $key ] = '';
-			}
-		}
-
-		return $result;
-	}
-
 	private static function system_prompt_gmb( array $knowledge ): string {
 		$business_name = (string) get_option( 'scos_biz_business_name', get_bloginfo( 'name' ) );
 		$service_desc  = (string) get_option( 'scos_biz_service_description', '' );
@@ -438,23 +290,137 @@ class Anthropic_Client {
 			. 'The JSON must have exactly this key: "gmb_caption".';
 	}
 
+	// ──────────────────────────────────────────────────────────────────────────
+	// Parsing
+	// ──────────────────────────────────────────────────────────────────────────
+
 	/**
-	 * Resolve the Anthropic API key.
+	 * Parse the model's text response into an array of N captions.
+	 * Handles JSON that may be wrapped in markdown fences despite the instruction.
 	 *
-	 * A wp-config.php constant takes precedence over the stored option, so the
-	 * key can be kept out of the database (and out of any database dump) on
-	 * sites that prefer it. Mirrors the Email Delivery module's handling.
-	 *
-	 * @since 1.1.0
-	 * @return string Empty string when no key is configured.
+	 * @return array<string, string> Keys post_1 … post_N.
+	 * @throws \RuntimeException if captions cannot be parsed.
 	 */
-	private static function get_api_key(): string {
-		if ( defined( 'SE_ANTHROPIC_API_KEY' ) && is_string( SE_ANTHROPIC_API_KEY ) && SE_ANTHROPIC_API_KEY !== '' ) {
-			return SE_ANTHROPIC_API_KEY;
+	private static function parse_captions( string $text, int $count = 3 ): array {
+		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
+		$text = preg_replace( '/\s*```$/', '', $text );
+		$text = trim( $text );
+
+		$data = json_decode( $text, true );
+
+		// ── Happy path: {post_1, …, post_N} object ───────────────────────────
+		if ( is_array( $data ) && ! isset( $data[0] ) ) {
+			$result   = [];
+			$all_good = true;
+			for ( $i = 1; $i <= $count; $i++ ) {
+				$key = "post_{$i}";
+				if ( ! empty( $data[ $key ] ) ) {
+					$result[ $key ] = (string) $data[ $key ];
+				} else {
+					$all_good = false;
+					break;
+				}
+			}
+			if ( $all_good && count( $result ) === $count ) {
+				return $result;
+			}
+			// Partial match: if at least post_1 exists, fill missing slots by cycling.
+			if ( ! empty( $result ) ) {
+				$keys = array_keys( $result );
+				for ( $i = count( $result ) + 1; $i <= $count; $i++ ) {
+					$fallback_key        = $keys[ ( $i - 1 ) % count( $keys ) ];
+					$result["post_{$i}"] = $result[ $fallback_key ];
+				}
+				return $result;
+			}
 		}
-		// TODO: migrate to se_ prefix (shared across modules) — see CLAUDE.md §3.
-		$stored = get_option( 'bw_anthropic_api_key', '' );
-		return is_string( $stored ) ? $stored : '';
+
+		// ── Fallback: model returned an array of objects ─────────────────────
+		if ( is_array( $data ) && isset( $data[0] ) && is_array( $data[0] ) ) {
+			$captions = [];
+			foreach ( $data as $item ) {
+				$caption = $item['caption'] ?? $item['text'] ?? $item['content'] ?? $item['post'] ?? '';
+				if ( $caption ) {
+					$captions[] = (string) $caption;
+				}
+			}
+			if ( count( $captions ) >= $count ) {
+				$result = [];
+				for ( $i = 1; $i <= $count; $i++ ) {
+					$result["post_{$i}"] = $captions[ $i - 1 ];
+				}
+				return $result;
+			}
+		}
+
+		throw new \RuntimeException(
+			"AI response did not contain expected post_1…post_{$count} keys. Raw: " . substr( $text, 0, 400 )
+		);
+	}
+
+	private static function parse_gmb_caption( string $text ): string {
+		$text = preg_replace( '/^```(?:json)?\s*/i', '', trim( $text ) );
+		$text = preg_replace( '/\s*```$/', '', $text );
+		$text = trim( $text );
+
+		$data = json_decode( $text, true );
+		if ( is_array( $data ) && ! empty( $data['gmb_caption'] ) ) {
+			return trim( (string) $data['gmb_caption'] );
+		}
+
+		throw new \RuntimeException(
+			'AI response did not contain expected gmb_caption key. Raw: ' . substr( $text, 0, 400 )
+		);
+	}
+
+	// ──────────────────────────────────────────────────────────────────────────
+	// Knowledge file helpers
+	// ──────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Return a knowledge file's contents as valid UTF-8.
+	 *
+	 * Files saved from Windows as "ANSI" (Windows-1252) carry em/en dashes,
+	 * smart quotes and ® as single bytes (0x96, 0x97, 0xAE …) that are not valid
+	 * UTF-8, and the WP AI Client rejects the whole request because of them.
+	 * A file is saved in one encoding, so converting it as a whole is safe —
+	 * unlike the assembled prompt, which mixes these files with genuine UTF-8.
+	 *
+	 * @param  string $content  Raw file contents.
+	 * @param  string $filename For the log line only.
+	 * @return string
+	 */
+	private static function to_utf8( string $content, string $filename ): string {
+		if ( '' === $content || ! function_exists( 'mb_check_encoding' ) || mb_check_encoding( $content, 'UTF-8' ) ) {
+			return $content;
+		}
+
+		error_log( self::LOG_PREFIX . " ai-knowledge/{$filename} is not UTF-8 — converted from Windows-1252. Resave it as UTF-8 to silence this." );
+
+		$converted = mb_convert_encoding( $content, 'UTF-8', 'Windows-1252' );
+		return is_string( $converted ) ? $converted : $content;
+	}
+
+	/**
+	 * Read all knowledge files and return their contents keyed by type.
+	 * Missing files return an empty string — non-fatal. Contents are normalised
+	 * to UTF-8 (see to_utf8()).
+	 */
+	private static function read_knowledge_files(): array {
+		$base   = WP_CONTENT_DIR . '/ai-knowledge/';
+		$result = [];
+
+		foreach ( self::KNOWLEDGE_FILES as $key => $filename ) {
+			$path = $base . $filename;
+			if ( file_exists( $path ) ) {
+				$content        = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$result[ $key ] = ( false !== $content ) ? self::to_utf8( $content, $filename ) : '';
+			} else {
+				$result[ $key ] = '';
+			}
+		}
+
+		return $result;
 	}
 
 	/**

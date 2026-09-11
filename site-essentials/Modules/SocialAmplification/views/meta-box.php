@@ -5,11 +5,8 @@
  * Variables from Meta_Box::render():
  *   $post             WP_Post
  *   $shortlink_slug   string
- *   $is_published     bool
  *   $yourls_base      string  base URL e.g. https://bweb1.com.au (or empty)
- *   $amplified        bool
- *   $ran_at           string
- *   $log_posts        array
+ *   $status_html      string  Postly status block (views/amplify-status.php, already escaped)
  *
  * @package SiteEssentials
  */
@@ -48,69 +45,10 @@ defined( 'ABSPATH' ) || exit;
 
 	<!-- ── Amplification Status / Re-run ── -->
 	<div class="scos-sa-section scos-sa-section--amplify">
-		<div class="scos-sa-amplify-header">
-			<strong><?php esc_html_e( 'Postly Amplification Status', 'site-essentials' ); ?></strong>
-			<span class="scos-sa-amplify-badge <?php echo $amplified ? 'is-yes' : 'is-no'; ?>">
-				<?php if ( $amplified ) : ?>
-					<?php esc_html_e( 'Amplified', 'site-essentials' ); ?>
-				<?php else : ?>
-					<?php esc_html_e( 'Not yet amplified', 'site-essentials' ); ?>
-				<?php endif; ?>
-			</span>
+		<div id="scos-sa-amplify-status">
+			<?php echo $status_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in views/amplify-status.php ?>
 		</div>
-
-		<?php if ( $ran_at ) : ?>
-			<p class="scos-sa-help">
-				<?php
-				printf(
-					/* translators: %s date */
-					esc_html__( 'Last ran: %s', 'site-essentials' ),
-					esc_html( mysql2date( 'j M Y g:i a', $ran_at ) )
-				);
-				?>
-			</p>
-		<?php endif; ?>
-
-		<?php if ( ! empty( $log_posts ) ) : ?>
-			<table class="widefat striped scos-sa-slot-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Slot', 'site-essentials' ); ?></th>
-						<th><?php esc_html_e( 'Scheduled', 'site-essentials' ); ?></th>
-						<th><?php esc_html_e( 'Status', 'site-essentials' ); ?></th>
-						<th><?php esc_html_e( 'Postly ID', 'site-essentials' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-				<?php foreach ( $log_posts as $slot_row ) : ?>
-					<tr>
-						<td><?php echo esc_html( (string) ( $slot_row['slot'] ?? '—' ) ); ?></td>
-						<td><?php echo esc_html( (string) ( $slot_row['scheduled'] ?? '—' ) ); ?></td>
-						<td><?php echo esc_html( (string) ( $slot_row['status'] ?? '—' ) ); ?></td>
-						<td><?php echo esc_html( (string) ( $slot_row['postly_id'] ?? '—' ) ); ?></td>
-					</tr>
-				<?php endforeach; ?>
-				</tbody>
-			</table>
-		<?php endif; ?>
-
-		<?php if ( $is_published ) : ?>
-			<p style="margin-top:12px;">
-				<button type="button"
-					id="scos-sa-reamp-btn"
-					class="button <?php echo $amplified ? 'button-secondary' : 'button-primary'; ?>"
-					data-post-id="<?php echo esc_attr( $post->ID ); ?>"
-					data-amplified="<?php echo $amplified ? '1' : '0'; ?>">
-					<?php if ( $amplified ) : ?>
-						<?php esc_html_e( 'Reset & Re-amplify', 'site-essentials' ); ?>
-					<?php else : ?>
-						<?php esc_html_e( 'Create Social Post', 'site-essentials' ); ?>
-					<?php endif; ?>
-				</button>
-			</p>
-		<?php endif; ?>
 		<div id="scos-sa-reamp-msg" class="scos-sa-result" hidden></div>
-		<div id="scos-sa-reamp-results"></div>
 	</div>
 
 </div><!-- /scos-sa-wrap -->

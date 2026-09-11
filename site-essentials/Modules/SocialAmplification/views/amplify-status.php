@@ -142,7 +142,8 @@ $auto_count = count( array_filter( $queue, static function ( $item ): bool {
 				<td>
 					<?php echo esc_html( $status_labels[ $row_status ] ?? ( $row_status ?: '—' ) ); ?>
 					<?php if ( ! empty( $slot_row['error'] ) ) : ?>
-						<div class="scos-sa-slot-error"><?php echo esc_html( (string) $slot_row['error'] ); ?></div>
+						<?php // Entries logged before v1.5 can hold a whole Cloudflare error page. ?>
+						<div class="scos-sa-slot-error"><?php echo esc_html( wp_html_excerpt( (string) $slot_row['error'], 300, '…' ) ); ?></div>
 					<?php endif; ?>
 					<?php if ( ! empty( $slot_row['note'] ) ) : ?>
 						<div class="scos-sa-slot-note"><?php echo esc_html( (string) $slot_row['note'] ); ?></div>

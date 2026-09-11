@@ -25,6 +25,8 @@
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
  * v1.0 | 2026-09-11
+ * v1.1 | 2026-09-11 — Normalise ai-knowledge files to UTF-8 (Windows-1252 files
+ *                      broke the strict AI Client JSON encoding); scrub prompts.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -125,6 +127,14 @@ class Caption_Generator {
 			$msg = 'WordPress AI Client is not available. Activate the AI plugin and at least one AI Provider plugin.';
 			error_log( self::LOG_PREFIX . ' ' . $msg );
 			throw new \RuntimeException( $msg );
+		}
+
+		// The AI Client JSON-encodes strictly, so a single invalid byte from any
+		// input fails the whole request ("Malformed UTF-8 characters"). Knowledge
+		// files are converted at read time; this catches anything else.
+		if ( function_exists( 'mb_scrub' ) ) {
+			$prompt = mb_scrub( $prompt, 'UTF-8' );
+			$system = mb_scrub( $system, 'UTF-8' );
 		}
 
 		$builder = wp_ai_client_prompt( $prompt )
@@ -368,8 +378,33 @@ class Caption_Generator {
 	// ──────────────────────────────────────────────────────────────────────────
 
 	/**
+	 * Return a knowledge file's contents as valid UTF-8.
+	 *
+	 * Files saved from Windows as "ANSI" (Windows-1252) carry em/en dashes,
+	 * smart quotes and ® as single bytes (0x96, 0x97, 0xAE …) that are not valid
+	 * UTF-8, and the WP AI Client rejects the whole request because of them.
+	 * A file is saved in one encoding, so converting it as a whole is safe —
+	 * unlike the assembled prompt, which mixes these files with genuine UTF-8.
+	 *
+	 * @param  string $content  Raw file contents.
+	 * @param  string $filename For the log line only.
+	 * @return string
+	 */
+	private static function to_utf8( string $content, string $filename ): string {
+		if ( '' === $content || ! function_exists( 'mb_check_encoding' ) || mb_check_encoding( $content, 'UTF-8' ) ) {
+			return $content;
+		}
+
+		error_log( self::LOG_PREFIX . " ai-knowledge/{$filename} is not UTF-8 — converted from Windows-1252. Resave it as UTF-8 to silence this." );
+
+		$converted = mb_convert_encoding( $content, 'UTF-8', 'Windows-1252' );
+		return is_string( $converted ) ? $converted : $content;
+	}
+
+	/**
 	 * Read all knowledge files and return their contents keyed by type.
-	 * Missing files return an empty string — non-fatal.
+	 * Missing files return an empty string — non-fatal. Contents are normalised
+	 * to UTF-8 (see to_utf8()).
 	 */
 	private static function read_knowledge_files(): array {
 		$base   = WP_CONTENT_DIR . '/ai-knowledge/';
@@ -379,7 +414,7 @@ class Caption_Generator {
 			$path = $base . $filename;
 			if ( file_exists( $path ) ) {
 				$content        = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-				$result[ $key ] = ( false !== $content ) ? $content : '';
+				$result[ $key ] = ( false !== $content ) ? self::to_utf8( $content, $filename ) : '';
 			} else {
 				$result[ $key ] = '';
 			}

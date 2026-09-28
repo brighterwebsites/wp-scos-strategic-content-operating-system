@@ -1,0 +1,53 @@
+---
+description: Where docs live, when to create one, and when to retire it. Apply when creating, editing or finishing any markdown doc or plan.
+globs: ["**/*.md", ".cursor/plans/**"]
+alwaysApply: false
+---
+## Docs Lifecycle
+
+Docs exist to serve current work. A doc that describes finished or abandoned work is noise — retire it.
+
+---
+
+### 1. Where things live
+
+| Kind | Home | Notes |
+|---|---|---|
+| Standing dev instructions | `CLAUDE.md` | Canonical. `.cursor/rules/*.mdc` mirror parts of it |
+| Key / prefix naming | `Naming-conventions.md` | Canonical for DB and option keys |
+| Backlog — open tasks, bugs, requirements | `docs/SCOS_module-development-plan.md` | The **only** backlog. No second list anywhere |
+| Build plans | `.cursor/plans/` | Temporary. One plan per feature |
+| Module spec | `site-essentials/Modules/[Module]/SPEC.md` | Only when the module has non-obvious contracts |
+| User-facing how-to | Public docs site (brighterwebsites.com.au/software/) | Not in the repo |
+| Retired docs | `docs/history/` (plans → `docs/history/plans/`) | Read-only. Never cite as current |
+
+Do not create new markdown files in the repo root. `README.md`, `CLAUDE.md` and `Naming-conventions.md` are the only root docs.
+
+---
+
+### 2. Before creating a doc
+
+- Could this be a section in an existing doc? Add it there.
+- Is it a task, bug or requirement? Add it to the backlog, not a new file.
+- Is it a user how-to? It belongs on the public docs site.
+- Only a build plan or a module spec justifies a new file.
+
+---
+
+### 3. Retiring a plan or requirements doc
+
+When the work a doc describes ships (PR merged):
+
+1. Verify against the code — never trust the doc's own checkboxes or todo statuses.
+2. Move anything still outstanding into the backlog, under the right module section.
+3. Move the doc to `docs/history/`.
+
+A doc is never "partially retired". Either it's live, or its remaining items move to the backlog and the doc goes to history.
+
+---
+
+### 4. Keeping live docs honest
+
+- If a change makes a live doc wrong, fix the doc in the same PR.
+- Mark backlog items done when the PR merges, not before.
+- `docs/` is gitignored (local only). Anything that must survive a lost machine belongs in `CLAUDE.md`, a `.mdc` rule or a tracked `SPEC.md`.

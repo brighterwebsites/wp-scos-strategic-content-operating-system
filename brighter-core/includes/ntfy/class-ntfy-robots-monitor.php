@@ -1,9 +1,10 @@
 <?php
+// v1.1 | 2026-09-27
 /**
  * ntfy robots.txt Monitor
  *
  * File: class-ntfy-robots-monitor.php
- * Version: 1.0.0
+ * Version: 1.1.0
  *
  * Purpose: Verify robots.txt is accessible and not returning errors
  * Priority: MEDIUM - Important for SEO
@@ -40,27 +41,41 @@ class Brighter_Ntfy_Robots_Monitor {
     }
     
     /**
-     * Check robots.txt accessibility
+     * Check the origin robots.txt for a real User-agent record.
+     *
+     * Requests the public URL with DNS pinned to this server, so Cloudflare
+     * Bot Fight Mode cannot answer for the origin.
      */
     public function check_robots_txt() {
         $robots_url = home_url('/robots.txt');
-        
-        $response = wp_remote_get($robots_url, [
+
+        $response = Brighter_Ntfy_Origin_Request::get($robots_url, [
             'timeout' => 10,
-            'sslverify' => false, // Some sites have SSL issues
         ]);
-        
+
         if (is_wp_error($response)) {
-            $this->send_alert('Request failed: ' . $response->get_error_message(), $robots_url);
+            $this->send_alert($response->get_error_message(), $robots_url);
             return;
         }
-        
+
+        $body = wp_remote_retrieve_body($response);
+        if (Brighter_Ntfy_Origin_Request::is_cloudflare_challenge($body)) {
+            $this->send_alert('Response is a Cloudflare challenge, not robots.txt. Origin pin missed.', $robots_url);
+            return;
+        }
+
         $status_code = wp_remote_retrieve_response_code($response);
-        
-        // Alert on any non-200 status
         if ($status_code !== 200) {
             $this->send_alert('HTTP ' . $status_code . ' error', $robots_url);
+            return;
         }
+
+        if (stripos($body, 'user-agent:') === false) {
+            $this->send_alert('HTTP 200 but body is not a robots.txt (no User-agent record).', $robots_url);
+            return;
+        }
+
+        error_log('[ntfy Robots Monitor] Origin robots.txt OK: ' . $robots_url);
     }
     
     /**

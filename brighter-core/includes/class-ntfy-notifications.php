@@ -1,9 +1,10 @@
 <?php
+// v1.1 | 2026-09-27
 /**
  * ntfy Notifications Controller
  *
  * File: class-ntfy-notifications.php
- * Version: 1.0.0
+ * Version: 1.1.0
  *
  * Purpose: Main controller for ntfy notification system
  * Coordinates all monitors and manages configuration
@@ -37,8 +38,9 @@ class Brighter_Ntfy_Notifications {
             return;
         }
         
-        // Load client
+        // Load client and the origin-pinned HTTP helper used by the monitors.
         require_once BRIGHTER_CORE_PATH . 'includes/ntfy/class-ntfy-client.php';
+        require_once BRIGHTER_CORE_PATH . 'includes/ntfy/class-ntfy-origin-request.php';
         self::$client = new Brighter_Ntfy_Client();
         
         // Load and initialize monitors

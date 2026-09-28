@@ -1,9 +1,10 @@
 <?php
+// v1.1 | 2026-09-27
 /**
  * ntfy Downtime Monitor
  *
  * File: class-ntfy-downtime-monitor.php
- * Version: 1.0.0
+ * Version: 1.1.0
  *
  * Purpose: Monitor site health with periodic checks
  * Priority: HIGH - Critical for uptime monitoring
@@ -50,7 +51,7 @@ class Brighter_Ntfy_Downtime_Monitor {
         
         $issues = [];
         
-        // 1. Check external HTTP request to home URL
+        // 1. Check the homepage on the origin, not via Cloudflare.
         $http_check = $this->check_http_response();
         if (is_wp_error($http_check)) {
             $issues[] = $http_check->get_error_message();
@@ -77,15 +78,17 @@ class Brighter_Ntfy_Downtime_Monitor {
     }
     
     /**
-     * Check HTTP response of site
+     * Check HTTP response of the homepage on the origin.
+     *
+     * DNS is pinned to this server so Cloudflare Bot Fight Mode cannot 403
+     * the datacenter IP and look like downtime.
      */
     private function check_http_response() {
         $home_url = home_url('/');
-        
+
         $start_time = microtime(true);
-        $response = wp_remote_get($home_url, [
+        $response = Brighter_Ntfy_Origin_Request::get($home_url, [
             'timeout' => 15,
-            'sslverify' => false, // Some sites have SSL issues
             'headers' => [
                 'User-Agent' => 'Brighter-Health-Monitor/1.0',
             ],

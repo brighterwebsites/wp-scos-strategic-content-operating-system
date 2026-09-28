@@ -1,0 +1,121 @@
+---
+description: Before adding anything new to brighter-core, assess whether it belongs in site-essentials. Apply this rule on every task that touches brighter-core files.
+globs: ["**/brighter-core/**/*.php", "**/mu-plugins/brighter-core/**"]
+alwaysApply: true
+---
+
+## Refactor-First Assessment — brighter-core → site-essentials
+
+**Before writing a single line of new code in `brighter-core`, run this assessment.**
+
+The goal: nothing new should be added to `brighter-core` if it can live in `site-essentials` at equal or only marginally higher effort (≤ 15–20% more work). `brighter-core` is legacy. `site-essentials` is the future.
+
+---
+
+### Step 1 — Classify the task
+
+Answer these questions before touching any file:
+
+**1a. Is this task purely a bug fix within existing brighter-core logic?**
+→ Yes: fix it in place. No migration needed. Proceed.
+
+**1b. Is this a new feature, new setting, new UI, or new integration?**
+→ Yes: go to Step 2 before writing any code.
+
+**1c. Is this a modification or extension of existing brighter-core functionality?**
+→ Yes: go to Step 2. Even partial migrations count.
+
+---
+
+### Step 2 — Migration cost assessment
+
+Estimate the work in two scenarios:
+
+| Scenario | What to estimate |
+|---|---|
+| **A. Add to brighter-core** | Time to add the feature where it currently lives |
+| **B. Add to site-essentials** | Time to add the feature in the correct site-essentials location, following current file/folder/naming conventions |
+
+**If B ≤ A + 20%: implement in site-essentials. Do not add to brighter-core.**
+
+If B > A + 20%: implement in brighter-core for now, but add a `// TODO: migrate to site-essentials — [brief reason cost was high]` comment at the top of the relevant function or file.
+
+---
+
+### Step 3 — site-essentials placement
+
+If migrating or building new in site-essentials, identify the correct home before writing code:
+
+**Module fit — which module does this belong to?**
+
+| Capability | Module |
+|---|---|
+| SEO meta, canonical, robots, OG, sitemaps | `SEO` module |
+| Content metadata, ALTC, cluster assignment | `ContentArchitecture` module |
+| Reviews, Projects, Services CPTs and fields | `CustomPosts` module |
+| Social posting, talking points, short links | `SocialAmplification` module |
+| GA4 tracking, custom events, dimensions | `Analytics` module |
+| JSON-LD schema output | `Schema` module |
+| Business name, address, contact fields | `BusinessInfo` module |
+| Performance tweaks, security, WP cleanup | `WordPressTweaks` module |
+| Agency identity, support hub, redirects | `Agency` settings (site-essentials core) |
+
+**File and folder naming conventions:**
+- Module folder: `site-essentials/Modules/[ModuleName]/`
+- Main module class: `[ModuleName].php`
+- Admin page render: `[ModuleName]AdminPage.php` or `views/[module-name].php`
+- Assets: `site-essentials/assets/` (shared) or `Modules/[ModuleName]/assets/`
+- Follow the naming conventions in `mu-brighter-support-main/Naming-conventions.md`
+
+**Option and meta key prefixes:**
+- Always follow `meta-key-prefixes.mdc` — do not create `bw_` prefixed keys
+- Module settings: `scos_[module]_*` or `se_*` for genuinely global settings
+- Flag any existing `bw_` keys encountered: `// TODO: migrate to scos_ or se_`
+
+---
+
+### Step 4 — Admin UI
+
+If the task includes any admin UI (settings page, meta box, settings field):
+
+**Mandatory:** follow `scos-admin-ui.mdc` in full. No exceptions.
+
+This means:
+- `<div class="wrap scos">` wrapper
+- Tokens, not raw values
+- Classes from `snippets.html`, not invented markup
+- One of the five canonical page templates
+
+---
+
+### Step 5 — Multi-site safety check
+
+SCOS is deployed across multiple client sites from a shared MU plugin. Before implementing:
+
+- [ ] Will this change affect all sites it's deployed on?
+- [ ] Is it safe to deploy broadly, or does it need a per-site config gate?
+- [ ] If it touches database schema, CPT registration, or hook priorities — is the change backward compatible?
+- [ ] Does it require a `site_essentials_version` bump?
+
+If the answer to any of these introduces risk: add a module enable/disable toggle or a site-level config option before deploying.
+
+---
+
+### The short version (quick reference)
+
+```
+New code needed?
+  → Is it a bug fix in existing brighter-core logic?  → Fix in place.
+  → Is it anything else?
+      → Can it go to site-essentials within ~20% of the brighter-core effort?
+          YES → Build it in site-essentials. Follow module/naming conventions.
+          NO  → Build in brighter-core. Add TODO: migrate comment.
+```
+
+---
+
+### Why this rule exists
+
+`brighter-core` predates the current architecture. It works, but it carries naming inconsistencies (`bw_` prefixes), mixed concerns, and no design system for its admin UI. Every new feature added there increases the migration debt. `site-essentials` is the structured, testable, deployable future — the economics of Brighter Websites' delivery model depend on it staying clean and growing intentionally.
+
+The 15–20% threshold is not a loophole. It means: if the only reason to skip migration is pure convenience, migrate. If there's a genuine technical reason the cost is higher, document it and move on.

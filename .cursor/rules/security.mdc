@@ -1,0 +1,95 @@
+---
+description: Security requirements for all WordPress PHP code in mu-brighter-support-main
+globs: ["**/*.php"]
+alwaysApply: true
+---
+
+## Security Requirements
+
+All PHP code in this codebase must follow these security practices without exception.
+
+---
+
+### 1. Nonce Verification — All Forms
+
+Every form submission must verify a nonce before processing.
+
+```php
+if ( ! wp_verify_nonce( $_POST['nonce_field'], 'action_name' ) ) {
+    wp_die( 'Security check failed' );
+}
+```
+
+---
+
+### 2. Capability Checks — All Admin Actions
+
+Every admin action must check user capability before executing.
+
+```php
+if ( ! current_user_can( 'manage_options' ) ) {
+    wp_die( 'Unauthorized' );
+}
+```
+
+---
+
+### 3. Input Sanitization — All Inputs
+
+Sanitize all data coming in before storing or processing.
+
+```php
+$value = sanitize_text_field( $_POST['field'] );
+$email = sanitize_email( $_POST['email'] );
+$url   = esc_url_raw( $_POST['url'] );
+$int   = absint( $_POST['number'] );
+```
+
+---
+
+### 4. Output Escaping — All Outputs
+
+Escape all data at the point of output, not at the point of storage.
+
+```php
+echo esc_html( $user_input );
+echo esc_attr( $attribute_value );
+echo esc_url( $url );
+echo wp_kses_post( $html_content ); // When HTML is allowed
+```
+
+---
+
+### 5. Prepared Statements — All Direct SQL
+
+Never use raw variables in SQL queries. Always use `$wpdb->prepare()`.
+
+```php
+// ✅ Correct
+$result = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->posts} WHERE ID = %d AND post_status = %s",
+        $post_id,
+        'publish'
+    )
+);
+
+// ❌ Never do this
+$result = $wpdb->get_results(
+    "SELECT * FROM {$wpdb->posts} WHERE ID = $post_id"
+);
+```
+
+---
+
+### Order of Operations
+
+For any admin form handler, always follow this sequence:
+
+1. Verify nonce
+2. Check capability
+3. Sanitize input
+4. Process / save
+5. Escape output
+
+Skipping or reordering any step is a security defect.

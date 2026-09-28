@@ -1,0 +1,215 @@
+---
+description: Enforce SCOS admin UI design system for all WordPress admin pages in Site Essentials and SCOS modules
+globs: ["**/*.php", "**/admin/**", "**/includes/admin/**", "**/views/**", "**/templates/admin/**"]
+alwaysApply: true
+---
+
+## SCOS Admin UI — Design System Contract
+
+Canonical references (read before generating any admin UI):
+- `cursor-handoff/SPEC.md` — page templates, menu structure, do's/don'ts
+- `cursor-handoff/tokens.css` — all design tokens
+- `cursor-handoff/scos-ui.css` — all component styles
+- `cursor-handoff/snippets.html` — copy-paste markup for every component
+
+When this rule and SPEC.md conflict, SPEC.md wins. Update both together.
+
+---
+
+### 1. Page wrapper — mandatory
+
+Every admin page body MUST open with:
+```html
+<div class="wrap scos">
+```
+`.wrap` = WordPress admin margin reset. `.scos` = our style scope. Without both, nothing works correctly. No exceptions.
+
+---
+
+### 2. Asset enqueue — mandatory
+
+CSS files MUST be enqueued only on SCOS admin pages, in dependency order:
+
+```php
+add_action( 'admin_enqueue_scripts', function ( $hook ) {
+    if ( strpos( $hook, 'site-essentials' ) === false ) return;
+    $base = plugin_dir_url( __FILE__ ) . 'assets/';
+    wp_enqueue_style( 'scos-tokens', $base . 'tokens.css', [],             '1.0.0' );
+    wp_enqueue_style( 'scos-ui',     $base . 'scos-ui.css', ['scos-tokens'], '1.0.0' );
+} );
+```
+
+`scos-tokens` must be a dependency of `scos-ui` — never enqueue `scos-ui` alone.
+
+---
+
+### 3. Use canonical page templates
+
+There are FIVE templates. Pick one. Do not invent new layouts.
+
+| Template | Used by |
+|---|---|
+| **A. Tabbed settings page** | Agency, Import/Export, API Keys |
+| **B. Modules grid** | Site Essentials › Modules (default page) |
+| **C. Single-section settings** | Small/single-purpose settings pages |
+| **D. Support landing (hero)** | Support page only |
+| **E. Meta box** | Post editor sidebars (SEO, social, etc.) |
+
+See `SPEC.md §2` for the exact markup structure of each template.
+
+---
+
+### 4. Tokens — never raw values
+
+| ❌ Don't | ✅ Do |
+|---|---|
+| `color: #4f46e5` | `color: var(--scos-accent)` |
+| `padding: 16px` | `padding: var(--scos-s-4)` |
+| `font-size: 14px` | `font-size: var(--scos-fs-lg)` |
+| `border-radius: 8px` | `border-radius: var(--scos-r-lg)` |
+| `background: #eef2ff` | `background: var(--scos-accent-soft)` |
+
+Never add raw color, spacing, or font-size values in PHP templates or inline styles. All tokens live in `tokens.css`. If a token doesn't exist for what you need, add it to `tokens.css` first — don't bypass the system.
+
+---
+
+### 5. Class usage — match snippets, don't invent
+
+Always match a pattern from `snippets.html`. If no snippet exists for what you need, add the snippet first, then use it.
+
+**Core class groups:**
+
+| Pattern | Classes |
+|---|---|
+| Page chrome | `.scos__header` `.scos__title` `.scos__subtitle` `.scos__header-actions` |
+| Tabs | `.scos__tabs` `.scos__tab` `.scos__tab--active` `.scos__tab-count` |
+| Card | `.scos-card` `.scos-card__header` `.scos-card__header--plain` `.scos-card__body` `.scos-card__footer` `.scos-card__title` `.scos-card__desc` |
+| Section label | `.scos__section-label` |
+| Module grid | `.scos-modules` `.scos-module` `.scos-module--on` `.scos-module__head` `.scos-module__title` `.scos-module__desc` `.scos-module__meta` `.scos-module__divider` `.scos-module__foot` `.scos-module__status` `.scos-module__status--on/off/error` |
+| Buttons | `.scos-btn` `.scos-btn--primary` `.scos-btn--danger` `.scos-btn--ghost` `.scos-btn--lg` |
+| Form | `.scos-form` `.scos-input` `.scos-input--mono` `.scos-select` `.scos-textarea` `.scos-checkbox-row` |
+| Toggle | `.scos-toggle` `.scos-toggle__track` |
+| Badge | `.scos-badge` `.scos-badge--basic` `.scos-badge--pro` `.scos-badge--enterprise` `.scos-badge--soft` |
+| Notice | `.scos-notice` `.scos-notice--success/warning/danger/info` `.scos-notice__title` `.scos-notice__close` |
+| Meta box | `.scos-metabox` `.scos-metabox__row` `.scos-metabox__row--inline` `.scos-metabox__label` `.scos-metabox__hint` |
+| Support | `.scos-support__hero` `.scos-support__grid` `.scos-support__tile` `.scos-support__row` `.scos-support__list` `.scos-support__status` `.scos-support__status-dot` |
+| Empty state | `.scos-empty` `.scos-empty__icon` `.scos-empty__title` `.scos-empty__desc` |
+
+---
+
+### 6. Page header — always use this pattern
+
+```html
+<header class="scos__header">
+  <div>
+    <h1 class="scos__title"><?php esc_html_e( 'Page title', 'scos' ); ?></h1>
+    <p class="scos__subtitle">Site Essentials &rsaquo; Subsection</p>
+  </div>
+  <div class="scos__header-actions">
+    <!-- max one primary button per page -->
+    <button type="submit" class="scos-btn scos-btn--primary">Save changes</button>
+  </div>
+</header>
+```
+
+One primary button per card footer. One primary button per page header. Never two `.scos-btn--primary` in the same card.
+
+---
+
+### 7. Form rows — option key must be visible
+
+```html
+<table class="scos-form">
+  <tbody>
+    <tr>
+      <th>
+        <label for="se_agency_name">Agency name</label>
+        <div class="scos-form__slug">se_agency_name</div>  <!-- always show the key -->
+      </th>
+      <td>
+        <input id="se_agency_name" name="se_agency_name" type="text" class="scos-input"
+               value="<?php echo esc_attr( get_option('se_agency_name') ); ?>">
+        <p class="description">Shown in client dashboards and the Support hub.</p>
+      </td>
+    </tr>
+  </tbody>
+</table>
+```
+
+The `<label for>`, input `id`, and input `name` MUST all equal the option key. This makes grep safe and code review fast.
+
+`.scos-form__slug` styles: `font-family: var(--scos-font-mono); font-size: 11px; color: var(--scos-ink-subtle); font-weight: 400; margin-top: 2px;`
+
+---
+
+### 8. Option key prefixes
+
+| Prefix | Area |
+|---|---|
+| `se_agency_*` | Agency identity, meta tags, credit, redirects |
+| `se_support_*` | Support hub URLs, embed scripts |
+| `se_module_*` | Per-module on/off state and settings |
+| `se_cache_*` | Cache module |
+| `se_api_*` | API keys and rate limits |
+| `scos_[module]_*` | Module-specific meta (post meta) |
+| `se_*` | Genuinely global/shared settings |
+
+See `meta-key-prefixes.mdc` for the full naming convention including post meta and transients.
+
+---
+
+### 9. Security — non-negotiable on every page
+
+Every admin page or form handler MUST have:
+
+```php
+// Capability check at the top of every render function
+if ( ! current_user_can( 'manage_options' ) ) {
+    wp_die( esc_html__( 'Insufficient permissions.', 'scos' ) );
+}
+
+// Nonce in every form
+wp_nonce_field( 'scos_save_settings', 'scos_nonce' );
+
+// Verify nonce before processing
+if ( ! isset( $_POST['scos_nonce'] ) || ! wp_verify_nonce( $_POST['scos_nonce'], 'scos_save_settings' ) ) {
+    wp_die( 'Nonce check failed.' );
+}
+
+// Sanitize before saving, escape before output
+update_option( 'se_agency_name', sanitize_text_field( $_POST['se_agency_name'] ) );
+echo esc_html( get_option( 'se_agency_name' ) );
+```
+
+Nonces must be dynamic (generated server-side on each request). Never hardcode nonce values.
+
+---
+
+### 10. Hard don'ts
+
+- ❌ Never use WP core `.button-primary` — use `.scos-btn.scos-btn--primary`
+- ❌ Never nest `.scos-card` inside `.scos-card`
+- ❌ Never use third-party CSS frameworks (Bootstrap, Tailwind) in admin pages
+- ❌ Never add inline `style=""` for color, spacing, or typography — use a class
+- ❌ Never add emoji as functional icons in production (placeholder use in mockups only)
+- ❌ Never override the `.scos-support__grid` column count on screens < 1200px
+- ❌ Never enqueue `scos-ui.css` without `scos-tokens.css` as a dependency
+
+---
+
+### 11. New page checklist
+
+Before committing any new admin page, verify all of these:
+
+- [ ] Wrapped in `<div class="wrap scos">`
+- [ ] Uses one of the five canonical templates (SPEC.md §2)
+- [ ] Page header follows §6 above
+- [ ] All inputs: `id` = `name` = option key, key shown via `.scos-form__slug`
+- [ ] Option keys use correct prefix (§8 above)
+- [ ] No raw colors, spacing, or font sizes (all via tokens)
+- [ ] `current_user_can()` check at top of render function
+- [ ] `wp_nonce_field()` in form, `wp_verify_nonce()` before processing
+- [ ] `sanitize_*()` before saving, `esc_*()` before output
+- [ ] CSS enqueued only on SCOS pages, `scos-tokens` as dependency of `scos-ui`
+- [ ] One primary button per card footer max
+- [ ] Markup matched to a pattern in `snippets.html`

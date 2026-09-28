@@ -112,7 +112,7 @@ $deploy_info = Admin_UI::get_deployment_info();
 				</div>
 			</div>
 			<div class="scos-card__body">
-				<textarea id="se-import-json" rows="10" class="scos-input scos-input--mono" style="max-width:100%;margin-bottom:var(--scos-s-3)"></textarea>
+				<textarea id="se-import-json" rows="10" class="scos-input scos-input--mono" style="margin-bottom:var(--scos-s-3)"></textarea>
 				<label class="scos-checkbox-row" style="margin-bottom:var(--scos-s-3)">
 					<input type="checkbox" id="se-import-merge" checked>
 					<span><?php esc_html_e( 'Merge with existing settings (unchecked = replace all)', 'site-essentials' ); ?></span>

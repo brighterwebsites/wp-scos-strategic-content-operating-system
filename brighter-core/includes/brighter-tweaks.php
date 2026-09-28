@@ -6,12 +6,13 @@
  * Version: 4.4.1
  *
  * Changelog:
- * 4.4.1 - REMOVED dead theme-colour code: OPT_THEME ('theme_colour') was registered and
- *         saved by process_save() but had no form field anywhere to submit it, so it was
- *         unreachable. output_theme_color_meta() (also removed) read a different, unrelated
- *         option, bw_mobile_theme_color, that nothing in the codebase ever wrote — the
- *         theme-color meta tag has never actually output anything. sanitise_hex() removed
- *         as its only caller was this dead code path.
+ * 4.4.1 - FIXED theme-color meta: output_theme_color_meta() read the legacy option
+ *         bw_mobile_theme_color, but Business Info has saved scos_biz_mobile_theme_color since
+ *         the scos_biz_ migration, so the tag stopped outputting. Now reads through
+ *         brighter_get_option('mobile_theme_color') (scos_biz_ first, bw_ fallback) and
+ *         validates the hex before output.
+ *         REMOVED unused 'theme_colour' Tweaks option (OPT_THEME) and sanitise_hex(): it was
+ *         registered and saved but had no visible form field and nothing read it for output.
  * 4.4.0 - Replaced global "Post Types" + "Preload Image Size" controls with a per-post-type
  *         registered image size selector (brighter_preload_post_type_sizes). Auto-migrates
  *         existing brighter_preload_post_types + brighter_preload_use_og_image on first load.
@@ -55,6 +56,7 @@ class Brighter_Tweaks {
         // Frontend output - priority 1 for early loading
         add_action('wp_head', [__CLASS__, 'output_preloads'], 1);
         add_action('wp_head', [__CLASS__, 'output_featured_image_preload'], 1);
+        add_action('wp_head', [__CLASS__, 'output_theme_color_meta'], 1);
 
         // Google Fonts removal - CRITICAL
         add_action('wp_loaded', [__CLASS__, 'remove_google_fonts']);
@@ -635,6 +637,23 @@ class Brighter_Tweaks {
                 esc_attr($mime)
             );
         }
+    }
+
+    /**
+     * Output theme-color meta tag from Business Info › Media › Mobile Theme Colour.
+     */
+    public static function output_theme_color_meta() {
+        if (!function_exists('brighter_get_option')) {
+            return;
+        }
+
+        $theme_color = ltrim(trim((string) brighter_get_option('mobile_theme_color')), '#');
+        if (!preg_match('/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/', $theme_color)) {
+            return;
+        }
+
+        echo "\n<!-- Brighter Tweaks: Theme Color -->\n";
+        echo '<meta name="theme-color" content="#' . esc_attr(strtolower($theme_color)) . '">' . "\n";
     }
 
     /**

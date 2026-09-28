@@ -51,7 +51,6 @@ OWNED_FILES=(
     brighter-core-loader.php
     brighter-ga4-tracking.php
     site-essentials.php
-    sitemap-diagnostic-logger.php
 )
 
 # ---------------------------------------------------------------------------

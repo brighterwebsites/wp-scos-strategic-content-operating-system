@@ -2,6 +2,9 @@
  * Class prefix: .scos-*
  * Pair with tokens.css. Wrap your plugin's admin pages in
  * <div class="wrap scos"> to scope.
+ *
+ * v1.1 | 2026-09-28 — Textareas opt out of the 480px single-line input cap and fill
+ *                      the card (redirect rules, path lists and JSON need the width).
  */
 
 /* ── Base scope ─────────────────────────────────────────────── */
@@ -334,8 +337,10 @@
   border-radius: var(--scos-r-md);
   transition: border-color .12s, box-shadow .12s;
 }
-textarea.scos-input { height: auto; padding: var(--scos-s-2) var(--scos-s-3); line-height: 1.5; }
-.scos-textarea { height: auto; min-height: 120px; padding: var(--scos-s-2) var(--scos-s-3); font-family: var(--scos-font-mono); font-size: var(--scos-fs-md); line-height: 1.5; }
+/* The 480px cap above suits single-line fields; textareas hold redirect rules, path
+   lists and JSON, so they take the full width of whatever card contains them. */
+textarea.scos-input { height: auto; max-width: 100%; padding: var(--scos-s-2) var(--scos-s-3); line-height: 1.5; }
+.scos-textarea { height: auto; max-width: 100%; min-height: 120px; padding: var(--scos-s-2) var(--scos-s-3); font-family: var(--scos-font-mono); font-size: var(--scos-fs-md); line-height: 1.5; }
 .scos-input:focus,
 .scos-select:focus,
 .scos-textarea:focus {

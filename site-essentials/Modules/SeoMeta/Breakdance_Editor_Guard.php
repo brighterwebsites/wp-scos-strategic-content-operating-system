@@ -12,6 +12,9 @@
  *    enqueue_block_assets, so the CSS is added there as well.
  *
  * @package SiteEssentials
+ * v1.2 | 2026-09-28 — Owns the mode option (key unchanged) plus get_mode()/save_mode();
+ *                      the setting moved from SEO → Redirections to Essentials → Tweaks
+ *                      → Admin UX/UI, next to the other Breakdance admin toggle.
  * v1.1 | 2026-09-15 — Also style the launcher inside the block editor's iframe (the
  *                      admin-page CSS never reached it, so Guard/Protect did nothing
  *                      on WP 7.1 + Breakdance 3.0); selectors outrank Breakdance's own
@@ -29,6 +32,16 @@ class Breakdance_Editor_Guard {
 	const HANDLE = 'scos-breakdance-editor-guard';
 
 	/**
+	 * off | guard | protect — Breakdance "Use default editor" handling.
+	 * Settings UI: Essentials → Tweaks → Admin UX/UI.
+	 * Aligns with module-development.md scos_bd_protect / guard concept.
+	 */
+	public const OPTION_MODE = 'scos_breakdance_editor_guard';
+
+	/** Valid modes, in UI order. */
+	public const MODES = [ 'off', 'guard', 'protect' ];
+
+	/**
 	 * @return void
 	 */
 	public static function init(): void {
@@ -40,6 +53,36 @@ class Breakdance_Editor_Guard {
 		// Block editor — the launcher block renders inside the editor-canvas iframe.
 		add_action( 'enqueue_block_assets', [ __CLASS__, 'enqueue_in_editor_canvas' ] );
 	}
+
+	// ── Option access (one source of truth for views, save handlers, MCP) ─────
+
+	/**
+	 * @return string off|guard|protect.
+	 */
+	public static function get_mode(): string {
+		return self::sanitize_mode( (string) get_option( self::OPTION_MODE, 'off' ) );
+	}
+
+	/**
+	 * @param string $mode Raw value.
+	 * @return string off|guard|protect — anything unknown falls back to off.
+	 */
+	public static function sanitize_mode( string $mode ): string {
+		$mode = sanitize_key( $mode );
+		return in_array( $mode, self::MODES, true ) ? $mode : 'off';
+	}
+
+	/**
+	 * @param string $mode Raw value; sanitised before it is stored.
+	 * @return string The mode that was saved.
+	 */
+	public static function save_mode( string $mode ): string {
+		$mode = self::sanitize_mode( $mode );
+		update_option( self::OPTION_MODE, $mode, false );
+		return $mode;
+	}
+
+	// ── Asset loading ─────────────────────────────────────────────────────────
 
 	/**
 	 * @param string $hook_suffix Current admin screen.
@@ -71,7 +114,7 @@ class Breakdance_Editor_Guard {
 	 * @return void
 	 */
 	private static function add_css(): void {
-		$mode = (string) get_option( Redirections::OPTION_BREAKDANCE_GUARD, 'off' );
+		$mode = self::get_mode();
 		if ( ! in_array( $mode, [ 'guard', 'protect' ], true ) ) {
 			return;
 		}

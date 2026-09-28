@@ -7,9 +7,12 @@
  *
  * @package    SiteEssentials
  * @subpackage Core
- * @version    1.3
+ * @version    1.4
  * @since      1.0.0
  *
+ * v1.4 | 2026-09-28 — save_tweaks_settings() also stores the Breakdance "Use default
+ *                      editor" mode (moved onto the Admin UX/UI group from SEO →
+ *                      Redirections; option key unchanged).
  * v1.2 | 2026-08-02 — Third-party head scripts delegated to Core\Support_Scripts.
  *                      Removed the never-hooked output_support_scripts() and the
  *                      orphaned se_support_*_script save block, which wrote keys no
@@ -1703,6 +1706,15 @@ class Admin_UI {
 
         // Save settings
         $this->settings->update_module_settings('tweaks', ['enabled_tweaks' => $all_tweaks]);
+
+        // Admin UX/UI — Breakdance "Use default editor" guard. Its own option key, not a
+        // tweak flag, so it is saved separately. Only touched when the field was posted,
+        // so an older cached form can't silently reset it.
+        if ( isset( $_POST['scos_breakdance_editor_guard'] ) ) {
+            \SiteEssentials\Modules\SeoMeta\Breakdance_Editor_Guard::save_mode(
+                (string) wp_unslash( $_POST['scos_breakdance_editor_guard'] )
+            );
+        }
 
         // Redirect back with success message
         $redirect_url = add_query_arg([

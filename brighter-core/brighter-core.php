@@ -1,12 +1,17 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.3.1
+ * Version: 4.4.0
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.4.0 - REMOVE: class-content-analysis-seeder. Its backfill queue keyed off
+ *         _bw_last_analyzed, which SCOS_CA_ACTIVE stopped writing, so the
+ *         "posts pending analysis" admin notice could never clear and its
+ *         "Analyze N Now" button was a no-op. Clear the orphaned
+ *         bw_analyze_content_batch cron event per site after deploying.
  * 4.3.1 - REMOVE: bw-schema-admin (Support → Schema / brighter-schema); use Site Essentials → Schema.
  * 4.3.0 - FEATURE: Added ALTC (Authority-Led Topic Clusters) content optimization tracking system
  *         - New taxonomies: altc_strategic_lens, altc_topic
@@ -30,7 +35,7 @@ if (!defined('ABSPATH')) exit;
 //error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.3.1');
+define('BRIGHTER_CORE_VERSION', '4.4.0');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
@@ -84,11 +89,14 @@ function brighter_get_whitelisted_modules() {
 
             // ── Content Analysis ─────────────────────────────────────────────
             // class-content-analysis: keep — BW_Content_Analysis::get_aggregated_content()
-            //   still used by Social Amplification for raw content extraction.
+            //   is the shared Breakdance/rendered content extractor used by the
+            //   ContentArchitecture module and Content_Inventory_Gatherer.
             //   analyze_content() is gated by SCOS_CA_ACTIVE and is a no-op on all
             //   sites running ContentArchitecture module; bw_* stat writes are retired.
+            // Deleted: class-content-analysis-seeder — backfilled the retired
+            //   _bw_last_analyzed queue, so it could never reach zero once
+            //   SCOS_CA_ACTIVE gated the writes it depended on.
             'class-content-analysis',
-            'class-content-analysis-seeder',
             'class-content-stats-page',
             'class-column-toggles',
             'class-field-tooltips',
@@ -209,10 +217,10 @@ function brighter_load_modules() {
         'class-altc-taxonomies',
 
         // ── Content Analysis ──────────────────────────────────────────────────
-        // Keep: BW_Content_Analysis::get_aggregated_content() used by Social Amplification.
+        // Keep: BW_Content_Analysis::get_aggregated_content() — shared content
+        //   extractor used by the ContentArchitecture module and content inventory.
         //   analyze_content() is gated (SCOS_CA_ACTIVE) — bw_* stat writes are retired.
         'class-content-analysis',
-        'class-content-analysis-seeder',
         'class-content-stats-page',
         'reading-time-shortcode', // Reading time shortcode (frontend + backend)
         'tldr-shortcode',         // TLDR summary shortcode (frontend + backend)
@@ -228,7 +236,6 @@ function brighter_load_modules() {
        	'bw-ga4-seed-admin',
         // Legacy bw-schema-admin (Support > Schema) removed; use Site Essentials > Schema.
         // Content Analysis (admin-only)
-        'class-content-analysis-seeder',
         'class-content-stats-page',
         // Deleted: class-altc-meta-boxes, class-altc-admin-columns, class-altc-admin-pages,
         //          class-altc-migration, migrate-tldr-field, class-tldr-meta-box

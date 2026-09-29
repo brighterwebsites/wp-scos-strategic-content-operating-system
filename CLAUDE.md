@@ -87,6 +87,15 @@ class Analysis_MCP_Tool {
 
 ---
 
+### Commit & PR
+
+- Commit and open a PR once a logical chunk of work with a real, testable outcome is complete
+- Don't commit mid-change or half-finished work just to checkpoint it
+- Don't let multiple unrelated outcomes pile up in one PR — one outcome, one PR
+- The PR description states what changed and how to test it
+
+---
+
 ## 2. Code Standards
 
 **PHP Namespace:** `SiteEssentials\`

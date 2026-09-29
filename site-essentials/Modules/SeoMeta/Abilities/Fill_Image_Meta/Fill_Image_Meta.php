@@ -20,6 +20,7 @@
  * @subpackage Modules\SeoMeta\Abilities\Fill_Image_Meta
  *
  * v1.0 | 2026-07-01
+ * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  */
 
 declare( strict_types=1 );
@@ -27,31 +28,27 @@ declare( strict_types=1 );
 namespace SiteEssentials\Modules\SeoMeta\Abilities\Fill_Image_Meta;
 
 use WP_Error;
-use WordPress\AI\Abstracts\Abstract_Ability;
-
-use function WordPress\AI\get_preferred_models_for_text_generation;
+use SiteEssentials\Core\Abilities\Abstract_Scos_Ability;
+use SiteEssentials\Core\Abilities\Ability_Support;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Fill_Image_Meta extends Abstract_Ability {
+class Fill_Image_Meta extends Abstract_Scos_Ability {
 
 	// -------------------------------------------------------------------------
 	// Ability API registration
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Register this ability with the WP Abilities API.
+	 * Register this ability with the WordPress core Abilities API.
 	 *
 	 * @since 1.0.0
 	 * @return void
 	 */
 	public static function register(): void {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! Ability_Support::is_abilities_api_available() ) {
 			return;
 		}
 		wp_register_ability( 'scos/fill-image-meta', [
@@ -70,7 +67,7 @@ class Fill_Image_Meta extends Abstract_Ability {
 	}
 
 	// -------------------------------------------------------------------------
-	// Abstract_Ability implementation
+	// Abstract_Scos_Ability implementation
 	// -------------------------------------------------------------------------
 
 	/**
@@ -232,10 +229,11 @@ class Fill_Image_Meta extends Abstract_Ability {
 
 		// ── Call AI ───────────────────────────────────────────────────────────
 
-		$prompt_builder = wp_ai_client_prompt( $prompt )
-			->using_system_instruction( $this->get_system_instruction() )
-			->using_temperature( 0.4 )
-			->using_model_preference( ...get_preferred_models_for_text_generation() );
+		$prompt_builder = Ability_Support::text_prompt(
+			$prompt,
+			$this->get_system_instruction(),
+			0.4
+		);
 
 		$prompt_builder = $this->ensure_text_generation_supported(
 			$prompt_builder,

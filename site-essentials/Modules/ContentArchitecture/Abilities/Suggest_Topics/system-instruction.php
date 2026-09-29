@@ -3,7 +3,7 @@
  * System instruction for the Suggest_Topics ability.
  *
  * Must return a string — do not echo.
- * Abstract_Ability uses reflection to locate this file relative to Suggest_Topics.php.
+ * Abstract_Scos_Ability uses reflection to locate this file relative to Suggest_Topics.php.
  *
  * @package SiteEssentials
  */

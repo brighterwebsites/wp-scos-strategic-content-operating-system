@@ -15,6 +15,7 @@
  * v1.1 | 2026-09-11 — `retry_failed` resends only the slots that failed; the result
  *                      reports the run outcome, and `success` is true only when
  *                      every slot was scheduled.
+ * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  */
 
 declare( strict_types=1 );
@@ -22,7 +23,8 @@ declare( strict_types=1 );
 namespace SiteEssentials\Modules\SocialAmplification\Abilities\Send_Social_Post;
 
 use WP_Error;
-use WordPress\AI\Abstracts\Abstract_Ability;
+use SiteEssentials\Core\Abilities\Abstract_Scos_Ability;
+use SiteEssentials\Core\Abilities\Ability_Support;
 use SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine;
 use SiteEssentials\Modules\SocialAmplification\Publish_Hook;
 
@@ -30,21 +32,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Send_Social_Post extends Abstract_Ability {
+class Send_Social_Post extends Abstract_Scos_Ability {
 
 	// ──────────────────────────────────────────────────────────────────────────
 	// Registration
 	// ──────────────────────────────────────────────────────────────────────────
 
 	/**
-	 * Register this ability with the WP Abilities API.
-	 * Called via wp_abilities_api_init after class_exists guards confirm availability.
+	 * Register this ability with the WordPress core Abilities API.
+	 * Called via wp_abilities_api_init. Needs only core — this is a tool
+	 * ability, and caption generation is an optional fallback inside the engine.
 	 */
 	public static function register(): void {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! Ability_Support::is_abilities_api_available() ) {
 			return;
 		}
 		wp_register_ability( 'scos/send-social-post', [

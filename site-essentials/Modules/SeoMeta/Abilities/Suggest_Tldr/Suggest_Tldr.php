@@ -17,6 +17,7 @@
  * @subpackage Modules\SeoMeta\Abilities\Suggest_Tldr
  *
  * v1.0 | 2026-06-24
+ * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  */
 
 declare( strict_types=1 );
@@ -24,33 +25,27 @@ declare( strict_types=1 );
 namespace SiteEssentials\Modules\SeoMeta\Abilities\Suggest_Tldr;
 
 use WP_Error;
-use WordPress\AI\Abstracts\Abstract_Ability;
-
-use function WordPress\AI\get_post_context;
-use function WordPress\AI\normalize_content;
-use function WordPress\AI\get_preferred_models_for_text_generation;
+use SiteEssentials\Core\Abilities\Abstract_Scos_Ability;
+use SiteEssentials\Core\Abilities\Ability_Support;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Suggest_Tldr extends Abstract_Ability {
+class Suggest_Tldr extends Abstract_Scos_Ability {
 
 	// -------------------------------------------------------------------------
 	// Ability API registration
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Register this ability with the WP Abilities API.
+	 * Register this ability with the WordPress core Abilities API.
 	 *
 	 * @since 1.0.0
 	 * @return void
 	 */
 	public static function register(): void {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! Ability_Support::is_abilities_api_available() ) {
 			return;
 		}
 		wp_register_ability( 'scos/suggest-tldr', [
@@ -69,7 +64,7 @@ class Suggest_Tldr extends Abstract_Ability {
 	}
 
 	// -------------------------------------------------------------------------
-	// Abstract_Ability implementation
+	// Abstract_Scos_Ability implementation
 	// -------------------------------------------------------------------------
 
 	/**
@@ -162,16 +157,10 @@ class Suggest_Tldr extends Abstract_Ability {
 				);
 			}
 
-			// Prefer scos_ca_content_md — fully rendered markdown including Breakdance
-			// blocks, ACF fields, Query Loops, and Post Repeaters. Falls back to
-			// get_post_context() for posts not yet analysed.
-			$md_content = (string) get_post_meta( $post->ID, 'scos_ca_content_md', true );
-			if ( ! empty( $md_content ) ) {
-				$content = $md_content;
-			} else {
-				$post_context = get_post_context( $post->ID );
-				$content      = $post_context['content'] ?? '';
-			}
+			// Prefers scos_ca_content_md — fully rendered markdown including
+			// Breakdance blocks, ACF fields, Query Loops, and Post Repeaters —
+			// and falls back to post content for posts not yet analysed.
+			$content = Ability_Support::get_post_content_for_prompt( $post->ID );
 
 			if ( empty( $title ) && ! empty( $post->post_title ) ) {
 				$title = $post->post_title;
@@ -190,7 +179,7 @@ class Suggest_Tldr extends Abstract_Ability {
 		}
 
 		if ( $args['content'] ) {
-			$content = normalize_content( $args['content'] );
+			$content = Ability_Support::normalize_content( $args['content'] );
 		}
 
 		if ( empty( $content ) ) {
@@ -218,10 +207,11 @@ class Suggest_Tldr extends Abstract_Ability {
 		$prompt .= '<title>' . $title . '</title>' . "\n";
 		$prompt .= '<content>' . $content . '</content>';
 
-		$prompt_builder = wp_ai_client_prompt( $prompt )
-			->using_system_instruction( $this->get_system_instruction() )
-			->using_temperature( 0.4 )
-			->using_model_preference( ...get_preferred_models_for_text_generation() );
+		$prompt_builder = Ability_Support::text_prompt(
+			$prompt,
+			$this->get_system_instruction(),
+			0.4
+		);
 
 		$prompt_builder = $this->ensure_text_generation_supported(
 			$prompt_builder,

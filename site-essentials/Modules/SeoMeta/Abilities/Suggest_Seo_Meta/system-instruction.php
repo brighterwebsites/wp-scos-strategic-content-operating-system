@@ -3,7 +3,7 @@
  * System instruction for the Suggest_Seo_Meta ability (scos/suggest-seo-meta).
  *
  * Must return a string — do not echo.
- * Abstract_Ability uses reflection to locate this file relative to Suggest_Seo_Meta.php.
+ * Abstract_Scos_Ability uses reflection to locate this file relative to Suggest_Seo_Meta.php.
  *
  * @package SiteEssentials
  */

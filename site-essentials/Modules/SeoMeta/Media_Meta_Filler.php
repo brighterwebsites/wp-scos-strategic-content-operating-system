@@ -172,7 +172,7 @@ class Media_Meta_Filler {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'site-essentials' ) ] );
 		}
 
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
 			wp_send_json_error( [ 'message' => __( 'WordPress AI plugin is required for this feature.', 'site-essentials' ) ] );
 		}
 
@@ -231,7 +231,7 @@ class Media_Meta_Filler {
 			return $redirect_to;
 		}
 
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
 			return add_query_arg( 'scos_fim_error', 'no_ai_plugin', $redirect_to );
 		}
 
@@ -292,7 +292,7 @@ class Media_Meta_Filler {
 			];
 		}
 
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
 			return [
 				'message'         => __( 'WordPress AI plugin is required.', 'site-essentials' ),
 				'body'            => '',
@@ -339,7 +339,7 @@ class Media_Meta_Filler {
 			return;
 		}
 
-		$has_ai = class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' );
+		$has_ai = \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available();
 
 		wp_enqueue_script(
 			'scos-fill-image-meta',

@@ -221,7 +221,6 @@ elseif ( $active_tab === 'asset-preloading' ) :
 				?>
 				<input type="hidden" name="brighter_preload_webp_append"  value="<?php echo get_option( 'brighter_preload_webp_append', 0 ) ? '1' : '0'; ?>">
 				<input type="hidden" name="brighter_preload_webp_replace" value="<?php echo get_option( 'brighter_preload_webp_replace', 0 ) ? '1' : '0'; ?>">
-				<input type="hidden" name="theme_colour"                   value="<?php echo esc_attr( get_option( 'theme_colour', '' ) ); ?>">
 				<?php
 				// Preserve Card 3 (Per-Page Preloads) map so options.php does not clear it on Card 1 submit.
 				$_preload_map = get_option( 'bw_preloads_map', [] );
@@ -261,7 +260,6 @@ elseif ( $active_tab === 'asset-preloading' ) :
 				<?php settings_fields( 'brighter_tweaks' ); ?>
 				<?php // Preserve Google Fonts value so options.php does not clear it. ?>
 				<input type="hidden" name="bw_google_fonts_preload" value="<?php echo esc_attr( get_option( 'bw_google_fonts_preload', '' ) ); ?>">
-				<input type="hidden" name="theme_colour" value="<?php echo esc_attr( get_option( 'theme_colour', '' ) ); ?>">
 				<?php
 				// Preserve Card 3 (Per-Page Preloads) map so options.php does not clear it on Card 2 submit.
 				$_preload_map = get_option( 'bw_preloads_map', [] );

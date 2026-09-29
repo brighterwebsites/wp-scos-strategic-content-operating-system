@@ -2,6 +2,8 @@
 /**
  * SEO — Redirections tab view
  *
+ * v1.2 | 2026-09-28 — Breakdance "Use default editor" card removed; it now lives on
+ *                      Essentials → Tweaks → Admin UX/UI (same option key).
  * v1.1 | 2026-05-19
  *
  * SCOS design system: scos-card per section, scos-badge for counts,
@@ -22,10 +24,6 @@ $count_301 = count( Redirections::parse_301_rules( $raw_301 ) );
 $count_410 = count( Redirections::get_410_paths() );
 
 $disable_404_guess = (bool) get_option( Redirections::OPTION_DISABLE_404_GUESS, false );
-$bd_guard          = (string) get_option( Redirections::OPTION_BREAKDANCE_GUARD, 'off' );
-if ( ! in_array( $bd_guard, [ 'off', 'guard', 'protect' ], true ) ) {
-	$bd_guard = 'off';
-}
 
 if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 	echo '<div class="scos-notice scos-notice--success" style="margin-bottom:var(--scos-s-4)"><p>'
@@ -117,30 +115,6 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 					</tr>
 				</tbody>
 			</table>
-		</div>
-	</div>
-
-	<!-- ── Admin UX/UI ───────────────────────────────────────────────── -->
-	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
-		<div class="scos-card__header scos-card__header--plain">
-			<h2 class="scos-card__title"><?php esc_html_e( 'Breakdance: "Use default editor"', 'site-essentials' ); ?></h2>
-		</div>
-		<div class="scos-card__body">
-			<p class="description" style="margin-bottom:var(--scos-s-3)"><?php esc_html_e( 'When Breakdance data exists on a post, the launcher shows "Use default editor". Saving from the block editor can clear Breakdance layout. Choose how strongly to discourage that (CSS only — not role-based).', 'site-essentials' ); ?></p>
-			<fieldset>
-				<label class="scos-checkbox-row" style="margin-bottom:var(--scos-s-2)">
-					<input type="radio" name="scos_breakdance_editor_guard" value="off" <?php checked( $bd_guard, 'off' ); ?> />
-					<span><?php esc_html_e( 'Off (default)', 'site-essentials' ); ?></span>
-				</label>
-				<label class="scos-checkbox-row" style="margin-bottom:var(--scos-s-2)">
-					<input type="radio" name="scos_breakdance_editor_guard" value="guard" <?php checked( $bd_guard, 'guard' ); ?> />
-					<span><?php esc_html_e( 'Guard — show a red warning above the buttons; style "Use default editor" as secondary', 'site-essentials' ); ?></span>
-				</label>
-				<label class="scos-checkbox-row">
-					<input type="radio" name="scos_breakdance_editor_guard" value="protect" <?php checked( $bd_guard, 'protect' ); ?> />
-					<span><?php esc_html_e( 'Protect — hide "Use default editor" (strongest)', 'site-essentials' ); ?></span>
-				</label>
-			</fieldset>
 		</div>
 	</div>
 

@@ -1,0 +1,142 @@
+---
+description: Code standards for WordPress PHP development in mu-brighter-support-main
+globs: ["**/*.php"]
+alwaysApply: true
+---
+
+## Code Standards
+
+---
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Classes | `PascalCase` | `Content_Analyzer` |
+| Methods | `snake_case()` | `get_post_meta()` |
+| Properties | `$snake_case` | `$post_id` |
+| Constants | `SCREAMING_SNAKE_CASE` | `SE_VERSION` |
+| Files | Match class name | `Content_Analyzer.php` |
+
+PHP Namespace: `SiteEssentials\`
+One class per file. File name must match class name.
+
+For meta key and option naming conventions, see: `.cursor/rules/meta-key-prefixes.mdc`
+
+---
+
+### Hook Registration — Always Use Named Callbacks
+
+```php
+// ✅ Named class method — can be removed later
+add_action( 'save_post', [ $this, 'on_save_post' ], 10, 3 );
+add_action( 'init', [ self::class, 'register_post_type' ] );
+
+// ❌ Anonymous function — cannot be removed, do not use
+add_action( 'init', function() {
+    // This hook can never be unregistered
+} );
+```
+
+**Hook priorities:**
+- Default (10) unless there is a specific reason to change it
+- If using a non-default priority, add a comment explaining why
+
+---
+
+### Database Queries — Use WP Methods, Not Direct SQL
+
+```php
+// ✅ Use get_posts() or WP_Query
+$posts = get_posts( [
+    'post_type'      => 'post',
+    'posts_per_page' => 10,
+    'no_found_rows'  => true, // Skip COUNT query when pagination not needed
+] );
+
+// ❌ Avoid direct SQL unless absolutely necessary
+$posts = $wpdb->get_results( "SELECT * FROM {$wpdb->posts} WHERE post_type = 'post'" );
+```
+
+---
+
+### Post Meta — Always Batch-Load
+
+When looping over multiple posts, pre-load meta in a single query. Never load meta individually inside a loop.
+
+```php
+// ✅ Batch-load: 1 query for all meta
+$post_ids = wp_list_pluck( $posts, 'ID' );
+update_meta_cache( 'post', $post_ids );
+
+foreach ( $posts as $post ) {
+    $value = get_post_meta( $post->ID, 'scos_seo_metatitle', true ); // From cache
+}
+
+// ❌ N+1 queries — one per post
+foreach ( $posts as $post ) {
+    $value = get_post_meta( $post->ID, 'scos_seo_metatitle', true ); // Hits DB every time
+}
+```
+
+---
+
+### Performance Benchmarks
+
+These are the targets — flag any code that risks exceeding them:
+
+| Metric | Limit |
+|--------|-------|
+| Admin page load | < 500ms |
+| Frontend overhead | < 50ms |
+| Additional queries per page | < 5 |
+| Memory increase | < 10MB |
+
+Use `Cache_Helper::remember()` for any expensive or repeated operations:
+
+```php
+$data = Cache_Helper::remember( 'unique_cache_key', function() {
+    return expensive_database_query();
+}, 3600, 'module_name' ); // TTL in seconds, grouped by module
+```
+
+Invalidate cache on data change:
+
+```php
+add_action( 'save_post', function( $post_id ) {
+    Cache_Helper::flush( 'module_name' );
+} );
+```
+
+---
+
+### Module Interface
+
+Every module must implement `Module_Interface`. Required methods:
+
+```php
+// Static — module metadata
+public static function get_id();
+public static function get_name();
+public static function get_description();
+public static function get_tier();           // basic | pro | agency
+public static function get_dependencies();   // array of module IDs
+public static function get_version();
+
+// Instance — lifecycle
+public function init();
+public function render_settings();
+```
+
+Module directory structure:
+```
+modules/
+└── {module-name}/
+    ├── {Module_Name}_Module.php
+    ├── class-{feature}.php
+    ├── views/
+    │   └── settings.php
+    └── assets/
+        ├── css/
+        └── js/
+```

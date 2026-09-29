@@ -1,11 +1,13 @@
 <?php
+// v1.5 | 2026-09-28 — Breakdance "Use default editor" moved here from SEO → Redirections
+//                     (Admin UX/UI group). Option key unchanged: scos_breakdance_editor_guard.
 // v1.4 | 2026-06-18
 /**
  * Tweaks Module Settings View
  *
  * @package    SiteEssentials
  * @subpackage Modules\Tweaks
- * @version    1.3.0
+ * @version    1.4.0
  *
  * Variables available:
  * @var array $tweaks Current tweak settings
@@ -124,6 +126,8 @@ $groups = [
     ],
     'admin_ui' => [
         'label'     => __( 'Admin UX/UI', 'site-essentials' ),
+        // The Breakdance editor-guard radio group is rendered after these toggles;
+        // it has its own option key, so it is not part of $tweaks.
         'guide_url' => '',
         'tweaks'    => [
             'allow_editors_form_submissions' => [
@@ -145,6 +149,9 @@ $groups = [
 ];
 
 $allowed_desc_tags = [ 'code' => [], 'strong' => [], 'em' => [], 'br' => [], 'a' => [ 'href' => [], 'target' => [], 'rel' => [] ] ];
+
+// Breakdance "Use default editor" guard — separate option, saved by the same form.
+$bd_guard = \SiteEssentials\Modules\SeoMeta\Breakdance_Editor_Guard::get_mode();
 ?>
 
 <div class="se-module-settings-tweaks">
@@ -198,6 +205,33 @@ $allowed_desc_tags = [ 'code' => [], 'strong' => [], 'em' => [], 'br' => [], 'a'
                             </td>
                         </tr>
                         <?php endforeach; ?>
+
+                        <?php if ( 'admin_ui' === $group_id ) : ?>
+                        <tr>
+                            <td>
+                                <p class="scos-checkbox-row__label" style="margin:0 0 4px">
+                                    <strong><?php esc_html_e( 'Breakdance: "Use default editor"', 'site-essentials' ); ?></strong>
+                                </p>
+                                <p class="description" style="margin:0 0 10px">
+                                    <?php esc_html_e( 'When Breakdance data exists on a post, the launcher shows "Use default editor". Saving from the block editor can clear Breakdance layout. Choose how strongly to discourage that (CSS only — not role-based).', 'site-essentials' ); ?>
+                                </p>
+                                <fieldset>
+                                    <label class="scos-checkbox-row" style="margin-bottom:4px">
+                                        <input type="radio" name="scos_breakdance_editor_guard" value="off" <?php checked( $bd_guard, 'off' ); ?> />
+                                        <span class="scos-checkbox-row__label"><?php esc_html_e( 'Off (default)', 'site-essentials' ); ?></span>
+                                    </label>
+                                    <label class="scos-checkbox-row" style="margin-bottom:4px">
+                                        <input type="radio" name="scos_breakdance_editor_guard" value="guard" <?php checked( $bd_guard, 'guard' ); ?> />
+                                        <span class="scos-checkbox-row__label"><?php esc_html_e( 'Guard — show a red warning above the buttons; style "Use default editor" as secondary', 'site-essentials' ); ?></span>
+                                    </label>
+                                    <label class="scos-checkbox-row">
+                                        <input type="radio" name="scos_breakdance_editor_guard" value="protect" <?php checked( $bd_guard, 'protect' ); ?> />
+                                        <span class="scos-checkbox-row__label"><?php esc_html_e( 'Protect — hide "Use default editor" (strongest)', 'site-essentials' ); ?></span>
+                                    </label>
+                                </fieldset>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>

@@ -20,6 +20,10 @@
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
+ *
+ * v1.1 | 2026-09-28 — Breakdance "Use default editor" moved off this tab to
+ *                      Essentials → Tweaks → Admin UX/UI. Option key unchanged;
+ *                      Breakdance_Editor_Guard now owns it.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -37,10 +41,10 @@ class Redirections {
 	const OPTION_DISABLE_404_GUESS = 'scos_disable_404_redirect_guess';
 
 	/**
-	 * off | guard | protect — Breakdance "Use default editor" handling (see Redirections tab).
-	 * Aligns with module-development.md scos_bd_protect / guard concept.
+	 * @deprecated 1.1 Use Breakdance_Editor_Guard::OPTION_MODE. Kept as an alias only;
+	 *             the setting now lives on Essentials → Tweaks → Admin UX/UI.
 	 */
-	public const OPTION_BREAKDANCE_GUARD = 'scos_breakdance_editor_guard';
+	public const OPTION_BREAKDANCE_GUARD = Breakdance_Editor_Guard::OPTION_MODE;
 
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
@@ -210,14 +214,6 @@ class Redirections {
 
 		$disable_guess = ! empty( $_POST['scos_disable_404_redirect_guess'] );
 		update_option( self::OPTION_DISABLE_404_GUESS, $disable_guess, false );
-
-		$bd_guard = isset( $_POST['scos_breakdance_editor_guard'] )
-			? sanitize_key( wp_unslash( $_POST['scos_breakdance_editor_guard'] ) )
-			: 'off';
-		if ( ! in_array( $bd_guard, [ 'off', 'guard', 'protect' ], true ) ) {
-			$bd_guard = 'off';
-		}
-		update_option( self::OPTION_BREAKDANCE_GUARD, $bd_guard, false );
 
 		wp_safe_redirect(
 			add_query_arg(

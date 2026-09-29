@@ -15,6 +15,7 @@
  * v1.2 | 2026-06-24 — Add topic_term_id + existing_intent_goal to input schema; inject <topic> and reassessment context into prompt.
  * v1.3 | 2026-06-24 — Prefer scos_ca_content_md (Breakdance + ACF rendered content) over raw post_content.
  * v1.4 | 2026-06-30 — Query existing FAQs and inject into prompt for deduplication; parse matched_faq from AI response.
+ * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  */
 
 declare( strict_types=1 );
@@ -22,37 +23,31 @@ declare( strict_types=1 );
 namespace SiteEssentials\Modules\ContentArchitecture\Abilities\CA_Suggest;
 
 use WP_Error;
-use WordPress\AI\Abstracts\Abstract_Ability;
+use SiteEssentials\Core\Abilities\Abstract_Scos_Ability;
+use SiteEssentials\Core\Abilities\Ability_Support;
 use SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver;
-
-use function WordPress\AI\get_post_context;
-use function WordPress\AI\normalize_content;
-use function WordPress\AI\get_preferred_models_for_text_generation;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class CA_Suggest extends Abstract_Ability {
+class CA_Suggest extends Abstract_Scos_Ability {
 
 	// -------------------------------------------------------------------------
 	// Ability API registration
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Register this ability with the WP Abilities API.
+	 * Register this ability with the WordPress core Abilities API.
 	 *
-	 * Called via wp_abilities_api_init hook from Meta_Box::init() after the
-	 * class_exists guard confirms both APIs are available.
+	 * Called via the wp_abilities_api_init hook. Requires only core — the AI
+	 * plugin is not needed to register, only to generate.
 	 *
 	 * @since 1.0.0
 	 * @return void
 	 */
 	public static function register(): void {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! Ability_Support::is_abilities_api_available() ) {
 			return;
 		}
 		wp_register_ability( 'scos/suggest-intent-goal', [
@@ -71,7 +66,7 @@ class CA_Suggest extends Abstract_Ability {
 	}
 
 	// -------------------------------------------------------------------------
-	// Abstract_Ability implementation
+	// Abstract_Scos_Ability implementation
 	// -------------------------------------------------------------------------
 
 	/**
@@ -195,16 +190,10 @@ class CA_Suggest extends Abstract_Ability {
 				);
 			}
 
-			// Prefer scos_ca_content_md — fully rendered markdown including Breakdance
-			// blocks, ACF fields, Query Loops, and Post Repeaters. Falls back to
-			// get_post_context() for posts not yet analysed.
-			$md_content = (string) get_post_meta( $post->ID, 'scos_ca_content_md', true );
-			if ( ! empty( $md_content ) ) {
-				$content = $md_content;
-			} else {
-				$post_context = get_post_context( $post->ID );
-				$content      = $post_context['content'] ?? '';
-			}
+			// Prefers scos_ca_content_md — fully rendered markdown including
+			// Breakdance blocks, ACF fields, Query Loops, and Post Repeaters —
+			// and falls back to post content for posts not yet analysed.
+			$content = Ability_Support::get_post_content_for_prompt( $post->ID );
 
 			if ( empty( $title ) && ! empty( $post->post_title ) ) {
 				$title = $post->post_title;
@@ -212,7 +201,7 @@ class CA_Suggest extends Abstract_Ability {
 		}
 
 		if ( $args['content'] ) {
-			$content = normalize_content( $args['content'] );
+			$content = Ability_Support::normalize_content( $args['content'] );
 		}
 
 		if ( empty( $content ) ) {
@@ -269,10 +258,11 @@ class CA_Suggest extends Abstract_Ability {
 		$prompt .= '<title>' . $title . '</title>' . "\n";
 		$prompt .= '<content>' . $content . '</content>';
 
-		$prompt_builder = wp_ai_client_prompt( $prompt )
-			->using_system_instruction( $this->get_system_instruction() )
-			->using_temperature( 0.4 )
-			->using_model_preference( ...get_preferred_models_for_text_generation() );
+		$prompt_builder = Ability_Support::text_prompt(
+			$prompt,
+			$this->get_system_instruction(),
+			0.4
+		);
 
 		$prompt_builder = $this->ensure_text_generation_supported(
 			$prompt_builder,
@@ -479,5 +469,5 @@ class CA_Suggest extends Abstract_Ability {
 
 }
 
-// Register on wp_abilities_api_init — fires after both APIs are ready.
+// Register on wp_abilities_api_init — core requires registration on this hook.
 add_action( 'wp_abilities_api_init', [ CA_Suggest::class, 'register' ] );

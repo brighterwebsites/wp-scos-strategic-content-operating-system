@@ -25,6 +25,8 @@
 
 namespace SiteEssentials\Modules\ContentArchitecture;
 
+use SiteEssentials\Core\Abilities\Ability_Support;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -40,7 +42,10 @@ class Meta_Box {
 		add_action( 'wp_ajax_scos_ca_add_term',         [ __CLASS__, 'ajax_add_term' ] );
 		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
 
-		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		// Abilities need only the core Abilities API to register. They are
+		// discoverable by MCP agents whether or not an AI plugin is installed;
+		// generation inside them degrades to a WP_Error when it is not.
+		if ( Ability_Support::is_abilities_api_available() ) {
 			require_once __DIR__ . '/Abilities/CA_Suggest/CA_Suggest.php';
 			require_once __DIR__ . '/Abilities/Suggest_Topics/Suggest_Topics.php';
 		}
@@ -419,7 +424,9 @@ class Meta_Box {
 			],
 		] );
 
-		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		// Suggest buttons drive server-side generation, so they need the AI
+		// client — not just the Abilities API.
+		if ( Ability_Support::is_ai_client_available() ) {
 			$suggest_js = SITE_ESSENTIALS_PATH . 'Modules/ContentArchitecture/assets/scos-ca-suggest.js';
 			wp_enqueue_script(
 				'scos-ca-suggest',

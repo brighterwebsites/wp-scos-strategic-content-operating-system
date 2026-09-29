@@ -3,7 +3,7 @@
  * System instruction for the CA_Suggest ability (scos/suggest-intent-goal).
  *
  * Must return a string — do not echo.
- * Abstract_Ability uses reflection to locate this file relative to CA_Suggest.php.
+ * Abstract_Scos_Ability uses reflection to locate this file relative to CA_Suggest.php.
  *
  * @package SiteEssentials
  *

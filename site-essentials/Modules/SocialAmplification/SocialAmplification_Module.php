@@ -92,9 +92,11 @@ class SocialAmplification_Module implements Module_Interface {
 			\WP_CLI::add_command( 'scos-social cleanup-make', CLI\Cleanup_Make_Command::class );
 		}
 
-		// WP Abilities API — category + send-social-post ability
+		// WP Abilities API — category + send-social-post ability. Registration
+		// needs only core, so MCP agents can reach the ability on sites with no
+		// AI plugin; caption generation inside it stays optional.
 		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
-		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( \SiteEssentials\Core\Abilities\Ability_Support::is_abilities_api_available() ) {
 			require_once __DIR__ . '/Abilities/Send_Social_Post/Send_Social_Post.php';
 		}
 

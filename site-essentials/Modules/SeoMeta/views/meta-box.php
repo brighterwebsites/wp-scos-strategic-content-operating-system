@@ -48,7 +48,7 @@ defined( 'ABSPATH' ) || exit;
 	<div class="scos-seo-tab-panel is-active" id="scos-seo-tab-core" role="tabpanel">
 
 		<!-- AI suggest trigger — breadcrumb + title + description in one call -->
-		<?php if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) : ?>
+		<?php if ( \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) : ?>
 		<div class="scos-seo-ai-row">
 			<button type="button" id="scos-seo-suggest-btn" class="button">
 				<?php esc_html_e( 'Suggest with AI', 'site-essentials' ); ?>
@@ -74,7 +74,7 @@ defined( 'ABSPATH' ) || exit;
 		<div class="scos-seo-field">
 			<label for="scos_seo_tldr" class="scos-seo-label-row">
 				<?php esc_html_e( 'TLDR / Article Summary', 'site-essentials' ); ?>
-				<?php if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) : ?>
+				<?php if ( \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) : ?>
 				<button type="button" id="scos-tldr-suggest-btn" class="button button-small scos-seo-label-btn">
 					<?php esc_html_e( 'Suggest TLDR', 'site-essentials' ); ?>
 				</button>

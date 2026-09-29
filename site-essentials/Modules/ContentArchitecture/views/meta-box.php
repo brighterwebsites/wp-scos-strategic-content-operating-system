@@ -329,7 +329,7 @@ $purpose_type_labels = [
 				<p class="scos-ca-help"><?php esc_html_e( 'The primary question this content answers. Link an FAQ to make it machine-readable and trackable.', 'site-essentials' ); ?></p>
 			</div>
 
-			<?php if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) : ?>
+			<?php if ( \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) : ?>
 			<div class="scos-ca-suggest-wrap">
 				<button type="button" id="scos-ca-suggest-btn" class="button">
 					<?php esc_html_e( 'Suggest with AI', 'site-essentials' ); ?>

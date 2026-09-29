@@ -3,7 +3,7 @@
  * System instruction for the Fill_Image_Meta ability (scos/fill-image-meta).
  *
  * Must return a string — do not echo.
- * Abstract_Ability uses reflection to locate this file relative to Fill_Image_Meta.php.
+ * Abstract_Scos_Ability uses reflection to locate this file relative to Fill_Image_Meta.php.
  *
  * @package SiteEssentials
  */

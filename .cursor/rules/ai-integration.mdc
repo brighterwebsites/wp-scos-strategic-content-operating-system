@@ -59,13 +59,22 @@ $captions = ! empty( $input['captions'] )
 
 Reference implementation: `site-essentials/Modules/SeoMeta/Abilities/Suggest_Tldr/Suggest_Tldr.php`.
 
-```php
-use function WordPress\AI\get_preferred_models_for_text_generation;
+Every ability extends `SiteEssentials\Core\Abilities\Abstract_Scos_Ability`, which extends the
+**core** `WP_Ability`. Never extend `WordPress\AI\Abstracts\Abstract_Ability` — that class lives in
+the `ai` plugin, so extending it means the ability does not register at all on a site without the
+plugin, and MCP agents cannot discover it.
 
-$prompt_builder = wp_ai_client_prompt( $prompt )
-    ->using_system_instruction( $this->get_system_instruction() )
-    ->using_temperature( 0.4 )
-    ->using_model_preference( ...get_preferred_models_for_text_generation() );
+Generation goes through `Ability_Support::text_prompt()`, which returns a `WP_Error` when the AI
+client is absent instead of fatalling:
+
+```php
+use SiteEssentials\Core\Abilities\Ability_Support;
+
+$prompt_builder = Ability_Support::text_prompt(
+    $prompt,
+    $this->get_system_instruction(),
+    0.4
+);
 
 $prompt_builder = $this->ensure_text_generation_supported(
     $prompt_builder,
@@ -81,7 +90,12 @@ if ( is_wp_error( $result ) ) {
 }
 ```
 
-Always spread `...get_preferred_models_for_text_generation()`. Never hand-write a model list.
+`Ability_Support` applies the AI Client's own preferred-model list when the client is present, and
+applies **no** model preference when it is not. Never hand-write a model list to fill the gap.
+
+Use `Ability_Support::get_post_content_for_prompt()` for post content — it prefers the rendered
+`scos_ca_content_md` and falls back to post content. Never call `WordPress\AI\*` helper functions
+directly; `Ability_Support` wraps the ones we need behind `function_exists()`.
 
 ### Prohibited
 
@@ -116,7 +130,7 @@ Do not copy it, extend it, or add a second provider client beside it.
 ### System instructions
 
 - Must live in `system-instruction.php` **in the same directory as the ability class** —
-  `Abstract_Ability` locates it by reflection.
+  `Abstract_Scos_Ability` locates it by reflection.
 - Must `return` a string. Never echo.
 - All prompt rules, tone and formatting belong there, or in `wp-content/ai-knowledge/*.md` —
   never inline in an engine or client class.

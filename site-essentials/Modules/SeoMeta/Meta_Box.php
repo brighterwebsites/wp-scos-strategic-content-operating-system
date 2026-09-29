@@ -20,6 +20,8 @@
 
 namespace SiteEssentials\Modules\SeoMeta;
 
+use SiteEssentials\Core\Abilities\Ability_Support;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -34,7 +36,10 @@ class Meta_Box {
 		add_filter( 'wp_insert_post_data',              [ __CLASS__, 'maybe_freeze_modified_date' ], 10, 2 );
 		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
 
-		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		// Abilities need only the core Abilities API to register. They are
+		// discoverable by MCP agents whether or not an AI plugin is installed;
+		// generation inside them degrades to a WP_Error when it is not.
+		if ( Ability_Support::is_abilities_api_available() ) {
 			require_once __DIR__ . '/Abilities/Suggest_Seo_Meta/Suggest_Seo_Meta.php';
 			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
 			require_once __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
@@ -299,8 +304,9 @@ class Meta_Box {
 			'noindexSitemapMsg' => esc_html__( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ),
 		] );
 
-		// AI suggest script — only when the Abilities API is available.
-		if ( class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		// AI suggest script — needs the AI client, since the buttons drive
+		// server-side generation rather than just calling an ability.
+		if ( Ability_Support::is_ai_client_available() ) {
 			$suggest_js_path = SITE_ESSENTIALS_PATH . 'Modules/SeoMeta/assets/scos-seo-suggest.js';
 			wp_enqueue_script(
 				'scos-seo-suggest',

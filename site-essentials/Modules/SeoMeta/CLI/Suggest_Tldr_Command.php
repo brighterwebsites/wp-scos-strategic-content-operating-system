@@ -64,7 +64,7 @@ class Suggest_Tldr_Command extends WP_CLI_Command {
 	 * @param array $assoc_args Associated arguments (flags).
 	 */
 	public function __invoke( $args, $assoc_args ) {
-		if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) {
+		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
 			WP_CLI::error( 'The WordPress AI plugin is not active. scos/suggest-tldr requires it.' );
 		}
 

@@ -67,9 +67,9 @@ Rules:
 - **Ability names are permanent API contracts** — never rename after first deployment on any site (breaks REST, WP-CLI, and MCP consumers)
 - Register abilities on `wp_abilities_api_init` hook
 - Register categories on `wp_abilities_api_categories_init` hook
-- Always double-guard before registering:
+- Guard on the **core** Abilities API only — never on an AI plugin class, or the ability will not
+  register on sites without that plugin and MCP agents will not find it:
   ```php
-  if ( ! class_exists( 'WP_Ability' ) ) return;
-  if ( ! class_exists( 'WordPress\AI\Abstracts\Abstract_Ability' ) ) return;
+  if ( ! Ability_Support::is_abilities_api_available() ) return;
   ```
 - Always explicitly set `'category'` in `wp_register_ability()` args — do not rely on base class defaults

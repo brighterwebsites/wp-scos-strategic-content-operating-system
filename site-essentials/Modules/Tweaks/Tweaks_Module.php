@@ -1,4 +1,5 @@
 <?php
+// v1.4 | 2026-10-01 — disable_comments tweak (Comments_Disabler).
 // v1.3 | 2026-06-18
 /**
  * WordPress Tweaks Module
@@ -326,6 +327,10 @@ class Tweaks_Module implements Module_Interface {
 
             case 'hide_honeypot_from_agents':
                 $this->hide_honeypot_from_agents();
+                break;
+
+            case 'disable_comments':
+                Comments_Disabler::init();
                 break;
         }
     }
@@ -670,6 +675,7 @@ class Tweaks_Module implements Module_Interface {
             'disable_xmlrpc'           => false,
             'disable_rest_api'         => false,
             'restrict_rest_users'      => false,
+            'disable_comments'         => false,
             // SEO & Metadata Code Cleanup
             'remove_rsd_link'                 => false,
             'remove_wlw_link'                 => false,

@@ -147,7 +147,7 @@ class Image_Meta_Instructions {
 					'Written to be found when searching the media library.',
 					'Blend the topic of the page the image belongs to with the key thing shown: [topic or subject] [descriptor or context] — for example "concrete driveway before restoration".',
 					'When the image is not attached to a page, use the key subject and its context only.',
-					'No punctuation, no quotes.',
+					'No punctuation, no quotes, all lowercase.',
 				],
 			],
 		];

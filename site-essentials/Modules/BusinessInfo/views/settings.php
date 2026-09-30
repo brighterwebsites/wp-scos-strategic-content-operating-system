@@ -4,6 +4,8 @@
  * SCOS-BIZ-PASS1 — full SCOS design system rebuild.
  * Single-page accordion layout; no tabs. Shortcodes Reference removed.
  * All option keys, settings group, and save logic are untouched.
+ *
+ * v1.1 | 2026-09-30 — Add Main Product or Service (scos_biz_business_offering).
  */
 defined( 'ABSPATH' ) || exit;
 
@@ -82,6 +84,17 @@ if ( isset( $_GET['settings-updated'] ) ) {
 							<td>
 								<input id="scos_biz_business_category" name="scos_biz_business_category" type="text" class="scos-input"
 									value="<?php echo esc_attr( get_option( 'scos_biz_business_category', '' ) ); ?>">
+							</td>
+						</tr>
+						<tr>
+							<th>
+								<label for="scos_biz_business_offering"><?php esc_html_e( 'Main Product or Service', 'site-essentials' ); ?></label>
+								<div class="scos-form__slug">scos_biz_business_offering</div>
+							</th>
+							<td>
+								<input id="scos_biz_business_offering" name="scos_biz_business_offering" type="text" class="scos-input"
+									value="<?php echo esc_attr( get_option( 'scos_biz_business_offering', '' ) ); ?>">
+								<p class="description"><?php esc_html_e( 'A short phrase that finishes the sentence "[Business name] is a [category] in [city] that offers …". Used in schema, policies and AI writing instructions.', 'site-essentials' ); ?></p>
 							</td>
 						</tr>
 						<tr>

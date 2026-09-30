@@ -17,6 +17,7 @@
  * @subpackage Modules\SeoMeta\Abilities\Get_Seo_Meta_Instructions
  *
  * v1.0 | 2026-09-30
+ * v1.1 | 2026-09-30 — Output gains business and purpose.
  */
 
 declare( strict_types=1 );
@@ -76,7 +77,7 @@ class Get_Seo_Meta_Instructions extends Abstract_Scos_Ability {
 				],
 				'content_type' => [
 					'type'        => 'string',
-					'description' => 'Force a content type (article, page, product, service, case-study) instead of deriving it from the post type.',
+					'description' => 'Force a content type (article, page, product, service, case-study) instead of deriving it from the page purpose or post type.',
 				],
 				'fields'       => [
 					'type'        => 'array',
@@ -109,6 +110,14 @@ class Get_Seo_Meta_Instructions extends Abstract_Scos_Ability {
 				'post'                 => [
 					'type'        => 'object',
 					'description' => 'The post id and title, when post_id was given.',
+				],
+				'business'             => [
+					'type'        => 'object',
+					'description' => 'Who the business is: name, category, location, offering, description. Any may be empty.',
+				],
+				'purpose'              => [
+					'type'        => 'object',
+					'description' => 'The page\'s Content Architecture purpose: key and label. Empty strings when not set.',
 				],
 				'fields'               => [
 					'type'        => 'object',

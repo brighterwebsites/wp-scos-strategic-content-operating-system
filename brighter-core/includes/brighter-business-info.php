@@ -3,7 +3,7 @@
  * Brighter Tools: Business Info
  *
  * File: brighter-business-info.php
- * Version: 4.2.0
+ * Version: 4.3.0
  *
  * IN USE (do not remove):
  * - Caching: Brighter_Business_Cache (get_all, clear). brighter_update_option() clears cache on save.
@@ -13,6 +13,7 @@
  * - SEOPress schema mapping: sp_schemas_mapping_select (bw_* keys).
  *
  * Changelog:
+ * 4.3.0 | 2026-09-30 - New field business_offering (scos_biz_business_offering): the main product or service, as a short phrase.
  * 4.2.0 - SECURITY: Input sanitization, XSS protection, capability checks. Option prefix bw_.
  */
 
@@ -160,7 +161,8 @@ function brighter_get_business_info_fields() {
     if ($fields === null) {
         $fields = [
             // Entity Identity
-            'organisation_type', 'business_name', 'business_category', 'service_description', 'abn', 'founding_date', 'founder_contact_name',
+            // TODO: migrate to site-essentials — the whole Business Info registry still lives here; a new key has to join it to be saved.
+            'organisation_type', 'business_name', 'business_category', 'business_offering', 'service_description', 'abn', 'founding_date', 'founder_contact_name',
             
             // Key Media
             'site_icon', 'business_logo', 'publisher_logo', 'business_image', 'mobile_theme_color',

@@ -16,6 +16,7 @@
  * (BW_Content_Analysis::aggregate_content) when get_html() returns ''.
  *
  * // v1.0 | 2026-06-07
+ * // v1.1 | 2026-09-30 — Stop caching failed renders.
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
@@ -101,13 +102,21 @@ class Rendered_Content_Extractor {
 		$post = get_post( $post_id );
 		$key  = 'rendered_html_' . $post_id . '_' . md5( (string) $post->post_modified );
 
-		return (string) Cache_Helper::remember( $key, function () use ( $post_id ) {
-			$full = self::fetch_rendered_html( $post_id );
-			if ( '' === $full ) {
-				return '';
-			}
-			return self::extract_main( $full );
-		}, self::CACHE_TTL, self::CACHE_GROUP );
+		$cached = Cache_Helper::get( $key, self::CACHE_GROUP );
+		if ( is_string( $cached ) && '' !== $cached ) {
+			return $cached;
+		}
+
+		$full = self::fetch_rendered_html( $post_id );
+		$html = '' === $full ? '' : self::extract_main( $full );
+
+		// Only a successful render is cached. A failed loopback must not be
+		// remembered, or one bad request leaves the post empty for the full TTL.
+		if ( '' !== $html ) {
+			Cache_Helper::set( $key, $html, self::CACHE_TTL, self::CACHE_GROUP );
+		}
+
+		return $html;
 	}
 
 	/**

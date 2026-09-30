@@ -17,6 +17,7 @@
  * @since      1.3.0
  *
  * v1.0 | 2026-09-29
+ * v1.1 | 2026-09-30 — get_post_content_for_prompt() renders the page or parses builder data when no stored markdown exists.
  */
 
 declare( strict_types=1 );
@@ -231,10 +232,16 @@ class Ability_Support {
 	/**
 	 * Rendered content for a post, preferring the pre-built markdown.
 	 *
-	 * `scos_ca_content_md` is written by the Content Architecture analysis and
-	 * covers Breakdance, ACF, Query Loops and Post Repeaters, so it is the
-	 * better prompt input wherever it exists. Falls back to post content for
-	 * posts that have not been analysed.
+	 * Builder pages keep nothing in post_content, so reading that alone leaves
+	 * a Breakdance page with no content to write from. In order:
+	 *
+	 * 1. `scos_ca_content_md` — written by the Content Architecture analysis;
+	 *    covers Breakdance, ACF, Query Loops and Post Repeaters.
+	 * 2. A live render of the published page, for posts that analysis has not
+	 *    reached (module off, never analysed). Cached by the extractor.
+	 * 3. The builder data and ACF fields parsed directly — the only source for
+	 *    a draft, which has no public URL to render.
+	 * 4. post_content.
 	 *
 	 * @since 1.3.0
 	 *
@@ -246,6 +253,22 @@ class Ability_Support {
 
 		if ( '' !== $markdown ) {
 			return $markdown;
+		}
+
+		$extractor = '\SiteEssentials\Modules\ContentArchitecture\Rendered_Content_Extractor';
+		if ( class_exists( $extractor ) ) {
+			$markdown = trim( (string) $extractor::get_markdown( $post_id ) );
+			if ( '' !== $markdown ) {
+				return $markdown;
+			}
+		}
+
+		// TODO: migrate to site-essentials — the builder-data parser still lives in brighter-core.
+		if ( class_exists( '\BW_Content_Analysis' ) && function_exists( 'bw_cs_post_types' ) ) {
+			$aggregated = self::normalize_content( (string) \BW_Content_Analysis::get_aggregated_content( $post_id ) );
+			if ( '' !== $aggregated ) {
+				return $aggregated;
+			}
 		}
 
 		$context = self::get_post_context( $post_id );

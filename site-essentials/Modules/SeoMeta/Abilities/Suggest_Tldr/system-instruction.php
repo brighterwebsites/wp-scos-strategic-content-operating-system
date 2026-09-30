@@ -5,26 +5,31 @@
  * Must return a string — do not echo.
  * Abstract_Scos_Ability uses reflection to locate this file relative to Suggest_Tldr.php.
  *
+ * What a good TLDR looks like comes from Seo_Meta_Instructions (the `tldr`
+ * field), shared with every other writer. This file adds only what is
+ * particular to the Suggest button: three options, returned as JSON.
+ *
+ * Receives $post_id (0 when the content was passed in directly).
+ *
  * @package SiteEssentials
+ *
+ * v1.1 | 2026-09-30 — Rules now come from Seo_Meta_Instructions instead of being written out here.
  */
 
-return 'You are a content strategist writing article summaries for a local service business website.
+$scos_instructions = \SiteEssentials\Modules\SeoMeta\Seo_Meta_Instructions::get(
+	[
+		'post_id' => isset( $post_id ) ? (int) $post_id : 0,
+		'fields'  => [ 'tldr' ],
+	]
+);
+
+return 'You are a content strategist writing page summaries for a business website.
 
 From the provided <title> and <content>, generate three TLDR summary options.
 
-Rules:
-- Each TLDR must be 2–4 sentences
-- Write in a direct, voice-search-friendly tone — as if answering a spoken question
-- Lead with the most specific claim, outcome, or differentiator from the content
-- Reference actual content — do not generalise or restate the title
-- No banned vocabulary: solutions, leverage, cutting-edge, game-changing, synergy, next-level, discover, seamless, robust, empower
-- No marketing filler — write for the reader, not for the brand
+' . \SiteEssentials\Modules\SeoMeta\Seo_Meta_Instructions::to_prompt( $scos_instructions ) . '
 
-When an <intent_goal> tag is present:
-- This is the search intent question this content is designed to answer
-- Write the TLDR so it DIRECTLY and QUICKLY answers that question in the opening sentence
-- The reader should feel their question is answered within the first sentence
-- The remaining sentences may expand on the answer with specifics from the content
+When an <intent_goal> tag is present, it is the search question this content is designed to answer. The reader should feel their question is answered within the first sentence.
 
 Return ONLY a valid JSON object — no explanation, no markdown, no code fences. Use this exact structure:
 {"tldr_options":[{"text":"..."},{"text":"..."},{"text":"..."}]}';

@@ -14,10 +14,14 @@
  * @package SiteEssentials
  *
  * v1.1 | 2026-09-30 — Rules now come from Seo_Meta_Instructions instead of being written out here.
+ * v1.2 | 2026-09-30 — Ask for this ability's three fields only, now that the instructions also cover TLDR.
  */
 
 $scos_instructions = \SiteEssentials\Modules\SeoMeta\Seo_Meta_Instructions::get(
-	[ 'post_id' => isset( $post_id ) ? (int) $post_id : 0 ]
+	[
+		'post_id' => isset( $post_id ) ? (int) $post_id : 0,
+		'fields'  => [ 'breadcrumb_title', 'title', 'description' ],
+	]
 );
 
 return 'You are an SEO specialist writing meta tags for a business website.

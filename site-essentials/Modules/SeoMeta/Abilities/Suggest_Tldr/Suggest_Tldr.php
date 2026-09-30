@@ -18,6 +18,7 @@
  *
  * v1.0 | 2026-06-24
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
+ * v2.1 | 2026-09-30 — Writing rules come from Seo_Meta_Instructions; intent goal resolved by Writing_Context.
  */
 
 declare( strict_types=1 );
@@ -27,6 +28,7 @@ namespace SiteEssentials\Modules\SeoMeta\Abilities\Suggest_Tldr;
 use WP_Error;
 use SiteEssentials\Core\Abilities\Abstract_Scos_Ability;
 use SiteEssentials\Core\Abilities\Ability_Support;
+use SiteEssentials\Core\Writing_Context;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -166,16 +168,8 @@ class Suggest_Tldr extends Abstract_Scos_Ability {
 				$title = $post->post_title;
 			}
 
-			// Resolve search intent goal — FAQ title first, freetext fallback.
-			// Does not depend on the CA module class directly to avoid cross-module coupling.
-			$faq_id = (int) get_post_meta( $post->ID, 'scos_ca_intent_goal_faq_id', true );
-			if ( $faq_id > 0 ) {
-				$faq         = get_post( $faq_id );
-				$intent_goal = $faq instanceof \WP_Post ? $faq->post_title : '';
-			}
-			if ( empty( $intent_goal ) ) {
-				$intent_goal = (string) get_post_meta( $post->ID, 'scos_ca_intent_goal', true );
-			}
+			// Search intent goal — FAQ title first, freetext fallback.
+			$intent_goal = Writing_Context::intent_goal( $post->ID );
 		}
 
 		if ( $args['content'] ) {
@@ -209,7 +203,7 @@ class Suggest_Tldr extends Abstract_Scos_Ability {
 
 		$prompt_builder = Ability_Support::text_prompt(
 			$prompt,
-			$this->get_system_instruction(),
+			$this->get_system_instruction( null, [ 'post_id' => (int) $args['post_id'] ] ),
 			0.4
 		);
 

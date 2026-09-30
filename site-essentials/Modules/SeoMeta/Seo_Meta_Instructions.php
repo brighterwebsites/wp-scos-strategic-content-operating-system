@@ -27,6 +27,7 @@
  * v1.0 | 2026-09-30
  * v1.1 | 2026-09-30 — Business context and page purpose in the result; purpose picks the content type;
  *                      products never mention price or stock; shared parts moved to Writing_Context.
+ * v1.2 | 2026-09-30 — TLDR is a field here too; the post's search intent goal is returned.
  */
 
 declare( strict_types=1 );
@@ -43,7 +44,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Seo_Meta_Instructions {
 
 	/** Bump when the shipped rules change, so consumers can tell. */
-	const VERSION = '1.1';
+	const VERSION = '1.2';
 
 	/**
 	 * Build the instructions for a post, a post type, or the site in general.
@@ -54,7 +55,7 @@ class Seo_Meta_Instructions {
 	 *     @type int      $post_id      Post the meta is for. Sets the content type and adds current values.
 	 *     @type string   $post_type    Post type, when there is no post yet.
 	 *     @type string   $content_type Force a content type instead of deriving it from the page purpose or post type.
-	 *     @type string[] $fields       Limit to these fields: breadcrumb_title, title, description.
+	 *     @type string[] $fields       Limit to these fields: breadcrumb_title, title, description, tldr.
 	 * }
 	 * @return array<string,mixed>
 	 */
@@ -101,6 +102,7 @@ class Seo_Meta_Instructions {
 				: [],
 			'business'             => Writing_Context::business(),
 			'purpose'              => $purpose,
+			'intent_goal'          => Writing_Context::intent_goal( $post instanceof \WP_Post ? $post->ID : 0 ),
 			'fields'               => $fields,
 			'general_rules'        => self::general_rules(),
 			'avoid'                => Writing_Context::avoid(),
@@ -109,8 +111,8 @@ class Seo_Meta_Instructions {
 			'facts'                => [],
 			'saving'               => [
 				'Write each value to the meta_key given for its field, as post meta on the post.',
-				'Values are plain text. No HTML, no markdown, no surrounding quotes.',
-				'Count characters before saving. A value outside its min–max is wrong, not close enough.',
+				'Values are plain text unless the field\'s format says otherwise. No markdown, no surrounding quotes.',
+				'Count before saving. A value outside its min–max is wrong, not close enough.',
 				'Never write to _seopress_* keys.',
 			],
 			'notes'                => $voice['found'] ? [] : [ Writing_Context::missing_voice_note() ],
@@ -142,6 +144,7 @@ class Seo_Meta_Instructions {
 				'unit'     => 'words',
 				'min'      => 2,
 				'max'      => 5,
+				'format'   => 'plain text',
 				'rules'    => [
 					'A short navigation label, plain text.',
 					'Reflects the page topic, not a marketing phrase.',
@@ -155,6 +158,7 @@ class Seo_Meta_Instructions {
 				'min'      => 50,
 				'max'      => 60,
 				'target'   => 55,
+				'format'   => 'plain text',
 				'rules'    => [
 					'Hard limit — count every character including spaces.',
 					'Must differ meaningfully from the post title: add an angle, an audience or an outcome.',
@@ -171,12 +175,28 @@ class Seo_Meta_Instructions {
 				'min'      => 150,
 				'max'      => 160,
 				'target'   => 155,
+				'format'   => 'plain text',
 				'rules'    => [
 					'Hard limit — count every character.',
 					'The first 60 characters carry the most specific differentiator: a proof point, a number, a named entity or a unique claim.',
 					'The rest expands on the promise of the title and adds method or context.',
 					'End with a soft outcome or action signal.',
 					'Must not repeat the title verbatim.',
+				],
+			],
+			'tldr'             => [
+				'meta_key' => 'scos_seo_tldr',
+				'label'    => 'TLDR summary',
+				'unit'     => 'sentences',
+				'min'      => 2,
+				'max'      => 4,
+				'format'   => 'plain text; bold, lists and links are allowed as simple HTML',
+				'rules'    => [
+					'Direct and voice-search friendly — written as if answering a spoken question.',
+					'Lead with the most specific claim, outcome or differentiator from the content.',
+					'Reference the actual content. Do not generalise, and do not restate the title.',
+					'No marketing filler — write for the reader, not for the brand.',
+					'When the page has a search question to answer, answer it directly in the opening sentence; the remaining sentences add specifics from the content.',
 				],
 			],
 		];
@@ -246,6 +266,9 @@ class Seo_Meta_Instructions {
 					'End with a simple, clear call to action.',
 					$no_price_or_stock,
 				],
+				'tldr'             => [
+					$no_price_or_stock,
+				],
 			],
 			'case-study' => [
 				'title'       => [
@@ -270,25 +293,9 @@ class Seo_Meta_Instructions {
 	 * @return string
 	 */
 	public static function to_prompt( array $instructions ): string {
-		$content_type = (string) ( $instructions['content_type'] ?? '' );
-		$lines        = [];
-
-		foreach ( (array) ( $instructions['fields'] ?? [] ) as $field ) {
-			$limit = sprintf( '%d–%d %s', (int) $field['min'], (int) $field['max'], (string) $field['unit'] );
-			if ( ! empty( $field['target'] ) ) {
-				$limit .= sprintf( ', aim for %d', (int) $field['target'] );
-			}
-
-			$lines[] = sprintf( 'Rules for the %s (%s):', strtolower( (string) $field['label'] ), $limit );
-			foreach ( (array) $field['rules'] as $rule ) {
-				$lines[] = '- ' . $rule;
-			}
-			foreach ( (array) ( $field['type_rules'] ?? [] ) as $rule ) {
-				$lines[] = sprintf( '- For this content type (%s): %s', $content_type, $rule );
-			}
-			$lines[] = '';
-		}
-
-		return implode( "\n", $lines ) . "\n" . Writing_Context::to_prompt( $instructions );
+		return Writing_Context::fields_to_prompt(
+			(array) ( $instructions['fields'] ?? [] ),
+			(string) ( $instructions['content_type'] ?? '' )
+		) . Writing_Context::to_prompt( $instructions );
 	}
 }

@@ -10,6 +10,7 @@
  * @version    1.4
  * @since      1.0.0
  *
+ * v1.5 | 2026-10-01 — save_tweaks_settings() stores the disable_comments tweak.
  * v1.4 | 2026-09-28 — save_tweaks_settings() also stores the Breakdance "Use default
  *                      editor" mode (moved onto the Admin UX/UI group from SEO →
  *                      Redirections; option key unchanged).
@@ -1700,6 +1701,8 @@ class Admin_UI {
             'allow_editors_form_submissions'  => isset( $enabled_tweaks['allow_editors_form_submissions'] ),
             // Agentic
             'hide_honeypot_from_agents'       => isset( $enabled_tweaks['hide_honeypot_from_agents'] ),
+            // Security & Hardening (added later)
+            'disable_comments'                => isset( $enabled_tweaks['disable_comments'] ),
             // Legacy key — kept so previously saved data isn't lost
             'disable_embeds'                  => isset( $enabled_tweaks['disable_embeds'] ),
         ];

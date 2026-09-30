@@ -1,4 +1,5 @@
 <?php
+// v1.6 | 2026-10-01 — Disable Comments Site-wide toggle (Security & Hardening group).
 // v1.5 | 2026-09-28 — Breakdance "Use default editor" moved here from SEO → Redirections
 //                     (Admin UX/UI group). Option key unchanged: scos_breakdance_editor_guard.
 // v1.4 | 2026-06-18
@@ -71,6 +72,10 @@ $groups = [
             'restrict_rest_users' => [
                 'label'       => __( 'Restrict REST API Users Endpoint', 'site-essentials' ),
                 'description' => __( 'Removes <code>/wp/v2/users</code> from the REST API for unauthenticated requests. Logged-in users retain access. Prevents public username enumeration without affecting plugins that require authenticated REST user lookups. Use alongside "Restrict REST API to Logged-In Users" for full coverage, or use this alone for a lighter restriction.', 'site-essentials' ),
+            ],
+            'disable_comments' => [
+                'label'       => __( 'Disable Comments Site-wide', 'site-essentials' ),
+                'description' => __( 'Closes comments and pingbacks on every post type, hides comments already stored, and removes the Comments admin menu, admin bar bubble, dashboard widget, <code>/wp/v2/comments</code> REST endpoints, pingback XML-RPC methods, the <code>X-Pingback</code> header and comment feeds. Nothing is deleted — switch it off and everything returns. <strong>WooCommerce product reviews keep working</strong>: products are left alone while WooCommerce is active.', 'site-essentials' ),
             ],
         ],
     ],

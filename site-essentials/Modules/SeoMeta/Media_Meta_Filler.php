@@ -18,6 +18,8 @@
  * v1.0 | 2026-07-01
  * v1.1 | 2026-07-02 — Use wp_get_ability()->execute(); fix MLA bulk action hooks.
  * v1.2 | 2026-07-02 — Register MLA hooks on init; MLA bulk via custom_bulk_action; UI on Assistant page.
+ * v1.3 | 2026-10-01 — Overwrite bulk action; bulk notice reports skipped images; "Generate" box on
+ *                      the Edit Media screen.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -34,6 +36,9 @@ class Media_Meta_Filler {
 	const AJAX_RUN_BATCH = 'scos_fill_image_meta_run_batch';
 	const NONCE_ACTION   = 'scos_fill_image_meta';
 	const BULK_ACTION    = 'scos_fill_image_meta';
+
+	/** Bulk action that also replaces alt text and titles that are already set. */
+	const BULK_ACTION_OVERWRITE = 'scos_fill_image_meta_overwrite';
 
 	/** @var bool Whether the current MLA bulk run has already been handled. */
 	private static $mla_bulk_handled = false;
@@ -58,6 +63,10 @@ class Media_Meta_Filler {
 
 		// Bulk action result notice (core upload.php redirect flow).
 		add_action( 'admin_notices', [ __CLASS__, 'maybe_show_bulk_notice' ] );
+
+		// "Generate" box on the Edit Media screen, for one image at a time.
+		add_action( 'add_meta_boxes_attachment', [ __CLASS__, 'register_single_meta_box' ] );
+		add_action( 'admin_enqueue_scripts',     [ __CLASS__, 'enqueue_single_assets' ] );
 	}
 
 	/**
@@ -208,7 +217,8 @@ class Media_Meta_Filler {
 	 * @return array<string, string>
 	 */
 	public static function register_bulk_action( array $actions ): array {
-		$actions[ self::BULK_ACTION ] = __( 'Fill Image Meta', 'site-essentials' );
+		$actions[ self::BULK_ACTION ]           = __( 'Fill Image Meta (empty only)', 'site-essentials' );
+		$actions[ self::BULK_ACTION_OVERWRITE ] = __( 'Fill Image Meta (overwrite)', 'site-essentials' );
 		return $actions;
 	}
 
@@ -223,7 +233,7 @@ class Media_Meta_Filler {
 	 * @return string
 	 */
 	public static function handle_bulk_action( string $redirect_to, string $doaction, array $post_ids ): string {
-		if ( self::BULK_ACTION !== $doaction ) {
+		if ( ! in_array( $doaction, [ self::BULK_ACTION, self::BULK_ACTION_OVERWRITE ], true ) ) {
 			return $redirect_to;
 		}
 
@@ -236,11 +246,12 @@ class Media_Meta_Filler {
 		}
 
 		$groups = self::group_attachment_ids_by_parent( array_filter( array_map( 'absint', $post_ids ) ) );
-		$totals = self::run_groups( $groups, false );
+		$totals = self::run_groups( $groups, self::BULK_ACTION_OVERWRITE === $doaction );
 
 		return add_query_arg(
 			[
 				'scos_fim_processed' => $totals['processed'],
+				'scos_fim_skipped'   => $totals['skipped'],
 				'scos_fim_errors'    => $totals['errors'],
 			],
 			$redirect_to
@@ -257,7 +268,8 @@ class Media_Meta_Filler {
 	 * @return array<string, string>
 	 */
 	public static function register_mla_bulk_action( array $actions ): array {
-		$actions[ self::BULK_ACTION ] = __( 'Fill Image Meta', 'site-essentials' );
+		$actions[ self::BULK_ACTION ]           = __( 'Fill Image Meta (empty only)', 'site-essentials' );
+		$actions[ self::BULK_ACTION_OVERWRITE ] = __( 'Fill Image Meta (overwrite)', 'site-essentials' );
 		return $actions;
 	}
 
@@ -274,7 +286,7 @@ class Media_Meta_Filler {
 	 * @return mixed
 	 */
 	public static function mla_custom_bulk_action( $item_content, string $bulk_action, int $post_id ) {
-		if ( self::BULK_ACTION !== $bulk_action ) {
+		if ( ! in_array( $bulk_action, [ self::BULK_ACTION, self::BULK_ACTION_OVERWRITE ], true ) ) {
 			return $item_content;
 		}
 
@@ -312,12 +324,13 @@ class Media_Meta_Filler {
 		}
 
 		$groups = self::group_attachment_ids_by_parent( $attachment_ids );
-		$totals = self::run_groups( $groups, false );
+		$totals = self::run_groups( $groups, self::BULK_ACTION_OVERWRITE === $bulk_action );
 
-		/* translators: 1: number processed, 2: number of errors */
+		/* translators: 1: number processed, 2: number skipped, 3: number of errors */
 		$message = sprintf(
-			__( 'Fill Image Meta: %1$d updated, %2$d errors.', 'site-essentials' ),
+			__( 'Fill Image Meta: %1$d updated, %2$d skipped (already filled), %3$d errors.', 'site-essentials' ),
 			$totals['processed'],
+			$totals['skipped'],
 			$totals['errors']
 		);
 
@@ -407,12 +420,17 @@ class Media_Meta_Filler {
 
 		if ( isset( $_GET['scos_fim_processed'] ) ) {
 			$processed = absint( $_GET['scos_fim_processed'] );
+			$skipped   = absint( $_GET['scos_fim_skipped'] ?? 0 );
 			$errors    = absint( $_GET['scos_fim_errors'] ?? 0 );
 			/* translators: 1: images updated count, 2: error count */
 			$msg = sprintf(
 				__( 'Fill Image Meta: %1$d image(s) updated.', 'site-essentials' ),
 				$processed
 			);
+			if ( $skipped > 0 ) {
+				/* translators: %d: skipped count */
+				$msg .= ' ' . sprintf( __( '%d skipped because they already have alt text and a title — use "Fill Image Meta (overwrite)" to replace them.', 'site-essentials' ), $skipped );
+			}
 			if ( $errors > 0 ) {
 				/* translators: %d: error count */
 				$msg .= ' ' . sprintf( __( '%d error(s).', 'site-essentials' ), $errors );
@@ -478,10 +496,11 @@ class Media_Meta_Filler {
 	 *
 	 * @param array<int, int[]> $groups    Map of parent_post_id => attachment IDs.
 	 * @param bool              $overwrite
-	 * @return array{processed: int, errors: int}
+	 * @return array{processed: int, skipped: int, errors: int}
 	 */
 	private static function run_groups( array $groups, bool $overwrite ): array {
 		$processed = 0;
+		$skipped   = 0;
 		$errors    = 0;
 
 		foreach ( $groups as $parent_id => $ids ) {
@@ -493,12 +512,105 @@ class Media_Meta_Filler {
 			}
 
 			$processed += (int) ( $result['processed'] ?? 0 );
+			$skipped   += (int) ( $result['skipped'] ?? 0 );
 			$errors    += (int) ( $result['errors'] ?? 0 );
 		}
 
 		return [
 			'processed' => $processed,
+			'skipped'   => $skipped,
 			'errors'    => $errors,
 		];
+	}
+
+	// ── Edit Media screen: one image ───────────────────────────────────────────
+
+	/**
+	 * Add the "Image Meta" box to the Edit Media screen for images.
+	 *
+	 * @param \WP_Post $post The attachment.
+	 * @return void
+	 */
+	public static function register_single_meta_box( $post ): void {
+		if ( ! $post instanceof \WP_Post || ! wp_attachment_is_image( $post->ID ) || ! current_user_can( 'upload_files' ) ) {
+			return;
+		}
+
+		add_meta_box(
+			'scos_fill_image_meta',
+			__( 'Image Meta', 'site-essentials' ),
+			[ __CLASS__, 'render_single_meta_box' ],
+			'attachment',
+			'side',
+			'default'
+		);
+	}
+
+	/**
+	 * Render the box: one button that writes this image's alt text and title.
+	 *
+	 * @param \WP_Post $post The attachment.
+	 * @return void
+	 */
+	public static function render_single_meta_box( $post ): void {
+		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
+			echo '<p class="description">' . esc_html__( 'Connect an AI provider to generate alt text and a title for this image.', 'site-essentials' ) . '</p>';
+			return;
+		}
+		?>
+		<p>
+			<button type="button" id="scos-fim-single-run" class="button">
+				<?php esc_html_e( 'Generate alt text and title', 'site-essentials' ); ?>
+			</button>
+		</p>
+		<p class="description" id="scos-fim-single-status" role="status">
+			<?php esc_html_e( 'Looks at the image and replaces the current alt text and title. Saved straight away.', 'site-essentials' ); ?>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Load the script behind the Edit Media box.
+	 *
+	 * @param string $hook Current admin page hook.
+	 * @return void
+	 */
+	public static function enqueue_single_assets( $hook ): void {
+		if ( 'post.php' !== $hook ) {
+			return;
+		}
+
+		$post = get_post();
+		if ( ! $post instanceof \WP_Post || 'attachment' !== $post->post_type || ! wp_attachment_is_image( $post->ID ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'upload_files' ) || ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
+			return;
+		}
+
+		$js_path = SITE_ESSENTIALS_PATH . 'Modules/SeoMeta/assets/js/scos-fill-image-meta-single.js';
+
+		wp_enqueue_script(
+			'scos-fill-image-meta-single',
+			SITE_ESSENTIALS_URL . 'Modules/SeoMeta/assets/js/scos-fill-image-meta-single.js',
+			[],
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0',
+			true
+		);
+
+		wp_localize_script( 'scos-fill-image-meta-single', 'ScosFillImageMetaSingle', [
+			'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+			'action'       => self::AJAX_RUN_BATCH,
+			'nonce'        => wp_create_nonce( self::NONCE_ACTION ),
+			'attachmentId' => $post->ID,
+			'parentPostId' => (int) $post->post_parent,
+			'i18n'         => [
+				'running' => __( 'Looking at the image…', 'site-essentials' ),
+				'done'    => __( 'Alt text and title updated and saved.', 'site-essentials' ),
+				'nothing' => __( 'Nothing came back for this image. Try again.', 'site-essentials' ),
+				'failed'  => __( 'Could not generate:', 'site-essentials' ),
+			],
+		] );
 	}
 }

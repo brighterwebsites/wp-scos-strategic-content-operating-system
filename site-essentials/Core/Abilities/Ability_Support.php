@@ -18,6 +18,7 @@
  *
  * v1.0 | 2026-09-29
  * v1.1 | 2026-09-30 — get_post_content_for_prompt() renders the page or parses builder data when no stored markdown exists.
+ * v1.2 | 2026-09-30 — text_prompt() sends temperature only with a preferred-model list.
  */
 
 declare( strict_types=1 );
@@ -63,7 +64,7 @@ class Ability_Support {
 	 * Build a text prompt via the WordPress AI Client.
 	 *
 	 * Applies the client's own preferred-model list when it exposes one, and
-	 * applies no model preference otherwise. Returns a WP_Error when the client
+	 * applies no model preference (and no temperature) otherwise. Returns a WP_Error when the client
 	 * is not installed so callers have a single failure path.
 	 *
 	 * @since 1.3.0
@@ -94,11 +95,14 @@ class Ability_Support {
 			$prompt_builder = $prompt_builder->using_system_instruction( $system_instruction );
 		}
 
-		$prompt_builder = $prompt_builder->using_temperature( $temperature );
-
+		// Temperature is only sent alongside a preferred-model list. Without
+		// one the provider picks its own default model, and some reject the
+		// parameter outright — the whole request then fails with a 400.
 		$models = self::preferred_text_models();
 		if ( ! empty( $models ) ) {
-			$prompt_builder = $prompt_builder->using_model_preference( ...$models );
+			$prompt_builder = $prompt_builder
+				->using_temperature( $temperature )
+				->using_model_preference( ...$models );
 		}
 
 		return $prompt_builder;

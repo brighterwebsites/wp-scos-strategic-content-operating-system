@@ -161,6 +161,8 @@ class Image_Meta_Instructions {
 	public static function general_rules(): array {
 		return [
 			'Describe only what can be seen. Do not invent people, places, brands or outcomes.',
+			'Look at the image itself. A file name, URL or existing title is not evidence of what it shows.',
+			'Two different images never get the same alt text or title — say what sets each one apart.',
 		];
 	}
 

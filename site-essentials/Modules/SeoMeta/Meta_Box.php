@@ -18,11 +18,13 @@
  * v1.5 | 2026-07-18 — Remove SEOPress dual-writes and fallback reads; scos_seo_* is sole contract.
  * v1.6 | 2026-09-30 — Load the Get_Seo_Meta_Instructions ability.
  * v1.7 | 2026-09-30 — Load the Get_Image_Meta_Instructions ability.
+ * v1.8 | 2026-09-30 — Tell the suggest script whether Content Architecture is active.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
 
 use SiteEssentials\Core\Abilities\Ability_Support;
+use SiteEssentials\Core\Writing_Context;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -320,24 +322,14 @@ class Meta_Box {
 				true
 			);
 
-			// Resolve search intent goal server-side: FAQ title first, freetext fallback.
-			// Inline resolution avoids a direct class dependency on the CA module.
-			$intent_goal = '';
-			$faq_id      = (int) get_post_meta( $post->ID, 'scos_ca_intent_goal_faq_id', true );
-			if ( $faq_id > 0 ) {
-				$faq         = get_post( $faq_id );
-				$intent_goal = $faq instanceof \WP_Post ? $faq->post_title : '';
-			}
-			if ( empty( $intent_goal ) ) {
-				$intent_goal = (string) get_post_meta( $post->ID, 'scos_ca_intent_goal', true );
-			}
-
 			wp_localize_script( 'scos-seo-suggest', 'ScosSeoSuggest', [
 				'endpointSeoMeta' => rest_url( 'wp-abilities/v1/abilities/scos/suggest-seo-meta/run' ),
 				'endpointTldr'    => rest_url( 'wp-abilities/v1/abilities/scos/suggest-tldr/run' ),
 				'nonce'           => wp_create_nonce( 'wp_rest' ),
 				'postId'          => $post->ID,
-				'intentGoalText'  => sanitize_text_field( $intent_goal ),
+				'intentGoalText'  => sanitize_text_field( Writing_Context::intent_goal( (int) $post->ID ) ),
+				// The intent-goal nudge only makes sense where there is somewhere to set one.
+				'caActive'        => defined( 'SCOS_CA_ACTIVE' ),
 			] );
 		}
 	}

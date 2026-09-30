@@ -1,9 +1,10 @@
 <?php
+// v1.1 | 2026-09-27
 /**
  * ntfy Sitemap Monitor
  *
  * File: class-ntfy-sitemap-monitor.php
- * Version: 1.0.0
+ * Version: 1.1.0
  *
  * Purpose: Verify XML sitemap is accessible and valid
  * Priority: MEDIUM - Important for SEO
@@ -40,34 +41,41 @@ class Brighter_Ntfy_Sitemap_Monitor {
     }
     
     /**
-     * Check sitemap accessibility
+     * Check the origin sitemap for a real urlset or sitemap index.
+     *
+     * Requests the public URL with DNS pinned to this server, so Cloudflare
+     * Bot Fight Mode cannot answer for the origin.
      */
     public function check_sitemap() {
         $sitemap_url = home_url('/sitemap.xml');
-        
-        $response = wp_remote_get($sitemap_url, [
+
+        $response = Brighter_Ntfy_Origin_Request::get($sitemap_url, [
             'timeout' => 10,
-            'sslverify' => false,
         ]);
-        
+
         if (is_wp_error($response)) {
-            $this->send_alert('Request failed: ' . $response->get_error_message(), $sitemap_url);
+            $this->send_alert($response->get_error_message(), $sitemap_url);
             return;
         }
-        
+
+        $body = wp_remote_retrieve_body($response);
+        if (Brighter_Ntfy_Origin_Request::is_cloudflare_challenge($body)) {
+            $this->send_alert('Response is a Cloudflare challenge, not a sitemap. Origin pin missed.', $sitemap_url);
+            return;
+        }
+
         $status_code = wp_remote_retrieve_response_code($response);
-        
-        // Alert on any non-200 status
         if ($status_code !== 200) {
             $this->send_alert('HTTP ' . $status_code . ' error', $sitemap_url);
             return;
         }
-        
-        // Check content type
-        $content_type = wp_remote_retrieve_header($response, 'content-type');
-        if (strpos($content_type, 'xml') === false) {
-            $this->send_alert('Invalid content type: ' . $content_type, $sitemap_url);
+
+        if (!preg_match('/<(urlset|sitemapindex)\b/i', $body)) {
+            $this->send_alert('HTTP 200 but body is not a sitemap (no urlset or sitemapindex).', $sitemap_url);
+            return;
         }
+
+        error_log('[ntfy Sitemap Monitor] Origin sitemap OK: ' . $sitemap_url);
     }
     
     /**

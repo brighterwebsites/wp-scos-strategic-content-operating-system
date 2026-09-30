@@ -13,6 +13,10 @@
  * Exposed to agents as the scos/get-seo-meta-instructions ability and to
  * WP-CLI as `wp scos seo-meta-instructions`.
  *
+ * What is shared with every other kind of writing — the business, the brand
+ * voice, the vocabulary to avoid, the page's purpose — comes from
+ * Core\Writing_Context.
+ *
  * Site plugins extend or override the result through the
  * `scos_seo_meta_instructions` filter — that is where site-specific rules and
  * post-specific facts belong, not in this file.
@@ -21,13 +25,15 @@
  * @subpackage Modules\SeoMeta
  *
  * v1.0 | 2026-09-30
+ * v1.1 | 2026-09-30 — Business context and page purpose in the result; purpose picks the content type;
+ *                      products never mention price or stock; shared parts moved to Writing_Context.
  */
 
 declare( strict_types=1 );
 
 namespace SiteEssentials\Modules\SeoMeta;
 
-use SiteEssentials\Core\Ai_Knowledge;
+use SiteEssentials\Core\Writing_Context;
 use SiteEssentials\Core\Abilities\Ability_Support;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -37,13 +43,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Seo_Meta_Instructions {
 
 	/** Bump when the shipped rules change, so consumers can tell. */
-	const VERSION = '1.0';
-
-	/** Optional per-site brand voice, in wp-content/ai-knowledge/. */
-	const VOICE_FILE = '205-brand-voice.md';
-
-	/** Content type used when a post type has no mapping. */
-	const DEFAULT_CONTENT_TYPE = 'page';
+	const VERSION = '1.1';
 
 	/**
 	 * Build the instructions for a post, a post type, or the site in general.
@@ -51,9 +51,9 @@ class Seo_Meta_Instructions {
 	 * @param array<string,mixed> $args {
 	 *     All optional.
 	 *
-	 *     @type int      $post_id      Post the meta is for. Sets the post type and adds current values.
+	 *     @type int      $post_id      Post the meta is for. Sets the content type and adds current values.
 	 *     @type string   $post_type    Post type, when there is no post yet.
-	 *     @type string   $content_type Force a content type instead of deriving it from the post type.
+	 *     @type string   $content_type Force a content type instead of deriving it from the page purpose or post type.
 	 *     @type string[] $fields       Limit to these fields: breadcrumb_title, title, description.
 	 * }
 	 * @return array<string,mixed>
@@ -65,9 +65,10 @@ class Seo_Meta_Instructions {
 			? $post->post_type
 			: ( isset( $args['post_type'] ) ? sanitize_key( (string) $args['post_type'] ) : '' );
 
+		$purpose      = Writing_Context::purpose( $post instanceof \WP_Post ? $post->ID : 0 );
 		$content_type = ! empty( $args['content_type'] )
 			? sanitize_key( (string) $args['content_type'] )
-			: self::content_type_for_post_type( $post_type );
+			: Writing_Context::content_type( $post_type, $purpose['key'] );
 
 		$type_rules = self::type_rules( $content_type );
 		$wanted     = ! empty( $args['fields'] ) && is_array( $args['fields'] )
@@ -86,15 +87,7 @@ class Seo_Meta_Instructions {
 			$fields[ $key ] = $field;
 		}
 
-		$voice = self::voice();
-		$notes = [];
-		if ( ! $voice['found'] ) {
-			$notes[] = sprintf(
-				'No brand voice file on this site (wp-content/%1$s/%2$s). Write in plain, specific language and follow the rules as given.',
-				Ai_Knowledge::DIR,
-				self::VOICE_FILE
-			);
-		}
+		$voice = Writing_Context::voice();
 
 		$instructions = [
 			'version'              => self::VERSION,
@@ -106,9 +99,11 @@ class Seo_Meta_Instructions {
 					'title' => $post->post_title,
 				]
 				: [],
+			'business'             => Writing_Context::business(),
+			'purpose'              => $purpose,
 			'fields'               => $fields,
 			'general_rules'        => self::general_rules(),
-			'avoid'                => self::avoid(),
+			'avoid'                => Writing_Context::avoid(),
 			'voice'                => $voice,
 			'editorial_guidelines' => Ability_Support::get_guidelines_for_prompt( [ 'site', 'copy' ] ),
 			'facts'                => [],
@@ -118,7 +113,7 @@ class Seo_Meta_Instructions {
 				'Count characters before saving. A value outside its min–max is wrong, not close enough.',
 				'Never write to _seopress_* keys.',
 			],
-			'notes'                => $notes,
+			'notes'                => $voice['found'] ? [] : [ Writing_Context::missing_voice_note() ],
 		];
 
 		/**
@@ -201,62 +196,17 @@ class Seo_Meta_Instructions {
 	}
 
 	/**
-	 * Words and phrases that must not appear in any field.
-	 *
-	 * @return string[]
-	 */
-	public static function avoid(): array {
-		return [
-			'learn more',
-			'click here',
-			'discover',
-			'solutions',
-			'leverage',
-			'cutting-edge',
-			'game-changing',
-			'synergy',
-			'next-level',
-			'seamless',
-			'robust',
-			'empower',
-		];
-	}
-
-	/**
-	 * Map a post type to the content type its rules are written for.
-	 *
-	 * @param string $post_type Post type slug. Empty returns the default.
-	 * @return string One of: article, page, product, service, case-study (or a filtered value).
-	 */
-	public static function content_type_for_post_type( string $post_type ): string {
-		$map = [
-			'post'     => 'article',
-			'page'     => 'page',
-			'product'  => 'product',
-			'service'  => 'service',
-			'services' => 'service',
-			'project'  => 'case-study',
-			'projects' => 'case-study',
-		];
-
-		$content_type = $map[ $post_type ] ?? self::DEFAULT_CONTENT_TYPE;
-
-		/**
-		 * Filters the content type used to pick writing rules for a post type.
-		 *
-		 * @param string $content_type The resolved content type.
-		 * @param string $post_type    The post type slug.
-		 */
-		return (string) apply_filters( 'scos_writing_content_type', $content_type, $post_type );
-	}
-
-	/**
 	 * Extra rules per field for one content type.
 	 *
 	 * @param string $content_type e.g. `product`.
 	 * @return array<string,string[]> Keyed by field. Empty for an unknown type.
 	 */
 	public static function type_rules( string $content_type ): array {
+		// Prices and stock change after the meta is written, so they go stale
+		// in search results. A site that regenerates on every price change can
+		// lift this through the scos_seo_meta_instructions filter.
+		$no_price_or_stock = 'Never mention price or stock availability, unless the site\'s facts or instructions direct otherwise.';
+
 		$rules = [
 			'article'    => [
 				'title'       => [
@@ -289,10 +239,12 @@ class Seo_Meta_Instructions {
 				],
 				'title'            => [
 					'Lead with the product name and the variant that defines it (size, model, capacity) as given in the content or facts.',
+					$no_price_or_stock,
 				],
 				'description'      => [
 					'Say what the product is and what or who it suits, in plain language a shop assistant would use.',
 					'End with a simple, clear call to action.',
+					$no_price_or_stock,
 				],
 			],
 			'case-study' => [
@@ -306,24 +258,6 @@ class Seo_Meta_Instructions {
 		];
 
 		return $rules[ $content_type ] ?? [];
-	}
-
-	/**
-	 * The site's brand voice, when it has one.
-	 *
-	 * Reads wp-content/ai-knowledge/205-brand-voice.md. A site without the
-	 * file is normal: `found` is false and `text` is empty.
-	 *
-	 * @return array{found:bool,source:string,text:string}
-	 */
-	public static function voice(): array {
-		$text = Ai_Knowledge::read( self::VOICE_FILE );
-
-		return [
-			'found'  => '' !== $text,
-			'source' => Ai_Knowledge::DIR . '/' . self::VOICE_FILE,
-			'text'   => $text,
-		];
 	}
 
 	/**
@@ -355,32 +289,6 @@ class Seo_Meta_Instructions {
 			$lines[] = '';
 		}
 
-		$lines[] = 'General rules:';
-		foreach ( (array) ( $instructions['general_rules'] ?? [] ) as $rule ) {
-			$lines[] = '- ' . $rule;
-		}
-
-		$avoid = (array) ( $instructions['avoid'] ?? [] );
-		if ( $avoid ) {
-			$lines[] = '- Never use these words or phrases: "' . implode( '", "', $avoid ) . '"';
-		}
-
-		$facts = (array) ( $instructions['facts'] ?? [] );
-		if ( $facts ) {
-			$lines[] = '';
-			$lines[] = 'Facts about this post — use them, do not contradict them:';
-			foreach ( $facts as $fact ) {
-				$lines[] = '- ' . (string) $fact;
-			}
-		}
-
-		$voice = (string) ( $instructions['voice']['text'] ?? '' );
-		if ( '' !== $voice ) {
-			$lines[] = '';
-			$lines[] = 'Brand voice for this site — match it:';
-			$lines[] = $voice;
-		}
-
-		return implode( "\n", $lines );
+		return implode( "\n", $lines ) . "\n" . Writing_Context::to_prompt( $instructions );
 	}
 }

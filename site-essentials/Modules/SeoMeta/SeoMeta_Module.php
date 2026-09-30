@@ -21,6 +21,7 @@
  * v1.2 | 2026-07-01 — Register suggest-seo-meta and suggest-tldr WP-CLI commands.
  * v1.3 | 2026-07-01 — Bootstrap Media_Meta_Filler, Media_Columns; add scos fill-image-meta CLI command.
  * v1.4 | 2026-07-18 — Remove SEOPress dual-writes and fallback reads; scos_seo_* is sole contract.
+ * v1.5 | 2026-09-30 — Register the seo-meta-instructions WP-CLI command.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -114,6 +115,16 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/CLI/Suggest_Seo_Meta_Command.php';
 		require_once __DIR__ . '/CLI/Suggest_Tldr_Command.php';
 		require_once __DIR__ . '/CLI/Fill_Image_Meta_Command.php';
+		require_once __DIR__ . '/CLI/Seo_Meta_Instructions_Command.php';
+
+		\WP_CLI::add_command(
+			'scos seo-meta-instructions',
+			CLI\Seo_Meta_Instructions_Command::class,
+			[
+				'shortdesc' => 'Show how SCOS SEO meta is written for a post or post type.',
+				'longdesc'  => 'Prints the same instructions the scos/get-seo-meta-instructions ability returns. No AI involved.',
+			]
+		);
 
 		\WP_CLI::add_command(
 			'scos suggest-seo-meta',

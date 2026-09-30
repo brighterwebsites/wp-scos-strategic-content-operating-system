@@ -16,6 +16,7 @@
  * v1.3 | 2026-07-01 — Register scos-media ability category; load Fill_Image_Meta ability.
  * v1.4 | 2026-07-15 — Remove bw_tldr fallback read; migration confirmed complete on all sites.
  * v1.5 | 2026-07-18 — Remove SEOPress dual-writes and fallback reads; scos_seo_* is sole contract.
+ * v1.6 | 2026-09-30 — Load the Get_Seo_Meta_Instructions ability.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -40,6 +41,7 @@ class Meta_Box {
 		// discoverable by MCP agents whether or not an AI plugin is installed;
 		// generation inside them degrades to a WP_Error when it is not.
 		if ( Ability_Support::is_abilities_api_available() ) {
+			require_once __DIR__ . '/Abilities/Get_Seo_Meta_Instructions/Get_Seo_Meta_Instructions.php';
 			require_once __DIR__ . '/Abilities/Suggest_Seo_Meta/Suggest_Seo_Meta.php';
 			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
 			require_once __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
@@ -58,7 +60,7 @@ class Meta_Box {
 		}
 		wp_register_ability_category( 'scos-seo-meta', [
 			'label'       => __( 'SCOS: SEO Meta', 'site-essentials' ),
-			'description' => __( 'AI-assisted suggestions for SEO meta fields.', 'site-essentials' ),
+			'description' => __( 'Writing instructions and AI-assisted suggestions for SEO meta fields.', 'site-essentials' ),
 		] );
 		wp_register_ability_category( 'scos-media', [
 			'label'       => __( 'SCOS: Media', 'site-essentials' ),

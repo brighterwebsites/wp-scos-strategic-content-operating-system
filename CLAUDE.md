@@ -743,6 +743,22 @@ This codebase used to carry a hand-rolled provider client in Social Amplificatio
   never inline in an engine or client class.
 - Write them provider-neutral: describe the task and the output contract, never the model or vendor.
 
+### Writing instructions — the *what*, separate from the *how*
+
+How a kind of content is written (meta keys, limits, rules per content type, vocabulary to avoid,
+brand voice) lives in one instructions class and is exposed as a `scos/get-*-instructions` tool
+ability, so every writer follows the same rules — the Suggest button, an MCP agent, a site plugin.
+
+Reference implementation: `site-essentials/Modules/SeoMeta/Seo_Meta_Instructions.php`
+(`scos/get-seo-meta-instructions`, `wp scos seo-meta-instructions`).
+
+- A generation ability's `system-instruction.php` pulls its rules from the instructions class and
+  adds only its own *how* — how many options, the output format. Never restate the rules there.
+- Site-specific rules and post-specific facts come in through the class's filter
+  (`scos_seo_meta_instructions`), from the site's own plugin. Never put them in SCOS.
+- Brand voice is read with `Core\Ai_Knowledge::read()` from `wp-content/ai-knowledge/`. A missing
+  file is normal: write without it and say so in the result's `notes`.
+
 ### Unattended contexts (cron, publish hooks, WP-CLI)
 
 - No user is present. Never depend on `current_user_can()` inside the generation path.

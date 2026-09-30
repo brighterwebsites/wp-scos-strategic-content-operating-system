@@ -19,6 +19,7 @@
  *
  * v1.0 | 2026-06-24
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
+ * v2.1 | 2026-09-30 — Writing rules come from Seo_Meta_Instructions; the system instruction is built per post type.
  */
 
 declare( strict_types=1 );
@@ -209,7 +210,7 @@ class Suggest_Seo_Meta extends Abstract_Scos_Ability {
 
 		$prompt_builder = Ability_Support::text_prompt(
 			$prompt,
-			$this->get_system_instruction(),
+			$this->get_system_instruction( null, [ 'post_id' => (int) $args['post_id'] ] ),
 			0.5
 		);
 

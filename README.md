@@ -56,7 +56,7 @@ wp-scos-strategic-content-operating-system/
 └── archive/                     # Retired one-off scripts (do not deploy)
 ```
 
-**Rule of thumb:** New features go in `site-essentials/` unless a genuine migration-cost exception applies. See `CLAUDE.md` and `.cursor/rules/scos-refactor-first.mdc`.
+**Rule of thumb:** New features go in `site-essentials/` unless a genuine migration-cost exception applies. See `CLAUDE.md` § 4.
 
 
 ---

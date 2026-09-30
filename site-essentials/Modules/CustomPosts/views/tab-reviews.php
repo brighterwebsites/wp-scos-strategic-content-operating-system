@@ -4,7 +4,7 @@
  *
  * v1.0 | 2026-05-19
  *
- * TODO: migrate Reviews bw_* keys to scos_review_* / scos_cpt_* — see meta-key-prefixes.mdc.
+ * TODO: migrate Reviews bw_* keys to scos_review_* / scos_cpt_* — see CLAUDE.md § 3.
  * Legacy keys still in use:
  *   - Post type:  bw_reviews
  *   - Taxonomy:   bw_review_platform

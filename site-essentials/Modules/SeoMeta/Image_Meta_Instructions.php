@@ -147,7 +147,7 @@ class Image_Meta_Instructions {
 					'Written to be found when searching the media library.',
 					'Blend the topic of the page the image belongs to with the key thing shown: [topic or subject] [descriptor or context] — for example "concrete driveway before restoration".',
 					'When the image is not attached to a page, use the key subject and its context only.',
-					'No punctuation, no quotes.',
+					'No punctuation, no quotes, all lowercase.',
 				],
 			],
 		];
@@ -161,6 +161,8 @@ class Image_Meta_Instructions {
 	public static function general_rules(): array {
 		return [
 			'Describe only what can be seen. Do not invent people, places, brands or outcomes.',
+			'Look at the image itself. A file name, URL or existing title is not evidence of what it shows.',
+			'Two different images never get the same alt text or title — say what sets each one apart.',
 		];
 	}
 

@@ -21,6 +21,8 @@
  * v1.0 | 2026-06-24
  * v1.1 | 2026-07-17 — fillField() now syncs via the TinyMCE API when the target is
  *                      a wp_editor() instance (scos_seo_tldr switched from textarea).
+ * v1.2 | 2026-09-30 — The "set a Search Intent Goal" nudges only show when Content
+ *                      Architecture is active (ScosSeoSuggest.caActive).
  */
 
 ( function () {
@@ -245,12 +247,14 @@
 
 		// Immediately show a loading state with intent goal context.
 		var intentGoal = cfg.intentGoalText || '';
-		var noticeHtml;
+		var noticeHtml = '';
 		if ( intentGoal ) {
 			noticeHtml = '<div class="scos-ca-modal-note scos-ca-modal-note--info">'
 				+ '<strong>Writing TLDR to answer:</strong> ' + escHtml( intentGoal )
 				+ '</div>';
-		} else {
+		} else if ( cfg.caActive ) {
+			// Only nudge when Content Architecture is on — without it there is
+			// nowhere to set an intent goal.
 			noticeHtml = '<div class="scos-ca-modal-note scos-ca-modal-note--warn">'
 				+ 'Set a Search Intent Goal in Content Architecture for a more targeted TLDR. Continuing without it.'
 				+ '</div>';
@@ -288,7 +292,7 @@
 			html += '<div class="scos-ca-modal-note scos-ca-modal-note--info">'
 				+ '<strong>Writing to answer:</strong> ' + escHtml( intentGoal )
 				+ '</div>';
-		} else {
+		} else if ( cfg.caActive ) {
 			html += '<div class="scos-ca-modal-note scos-ca-modal-note--warn">'
 				+ 'No Search Intent Goal set — suggestions based on content alone.'
 				+ '</div>';

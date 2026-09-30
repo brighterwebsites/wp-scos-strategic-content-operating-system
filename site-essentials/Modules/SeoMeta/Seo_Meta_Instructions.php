@@ -212,6 +212,8 @@ class Seo_Meta_Instructions {
 			'Base all copy on the substance of the content, not on title keywords alone.',
 			'Reflect what the reader actually needs.',
 			'No invented claims — nothing that is not present in the content or the supplied facts.',
+			'State facts directly, as facts about the subject. Never refer to the page, listing, description or specifications as a source ("is listed as", "the description says", "the page shows").',
+			'When the content gives two different figures for the same thing, use the more specific one and say it once.',
 		];
 	}
 

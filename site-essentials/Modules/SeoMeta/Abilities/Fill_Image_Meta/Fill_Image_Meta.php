@@ -21,6 +21,7 @@
  *
  * v1.0 | 2026-07-01
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
+ * v2.1 | 2026-09-30 — Send the image files to the model, not just their URLs, and work in chunks of six.
  */
 
 declare( strict_types=1 );
@@ -36,6 +37,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Fill_Image_Meta extends Abstract_Scos_Ability {
+
+	/** Images sent to the model in one request. */
+	const MAX_IMAGES_PER_CALL = 6;
+
+	/** Largest image file sent to the model. Bigger files are described from context only. */
+	const MAX_PROMPT_IMAGE_BYTES = 4194304; // 4 MB
+
+	/** Image types sent to the model. */
+	const PROMPT_IMAGE_MIMES = [ 'image/jpeg', 'image/png', 'image/webp', 'image/gif' ];
 
 	// -------------------------------------------------------------------------
 	// Ability API registration
@@ -223,45 +233,27 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 
 		$category_terms_block = $this->get_category_terms_block();
 
-		// ── Build prompt ──────────────────────────────────────────────────────
+		// ── Call AI, a few images at a time ───────────────────────────────────
+		//
+		// The image files travel with the request, so a large group is split to
+		// keep each request a sensible size.
 
-		$prompt = $this->build_prompt( $attachments_to_process, $parent_context, $category_terms_block );
+		$ai_items   = [];
+		$last_error = null;
 
-		// ── Call AI ───────────────────────────────────────────────────────────
+		foreach ( array_chunk( $attachments_to_process, self::MAX_IMAGES_PER_CALL ) as $chunk ) {
+			$items = $this->generate_for( $chunk, $parent_context, $category_terms_block );
 
-		$prompt_builder = Ability_Support::text_prompt(
-			$prompt,
-			$this->get_system_instruction(),
-			0.4
-		);
+			if ( is_wp_error( $items ) ) {
+				$last_error = $items;
+				continue;
+			}
 
-		$prompt_builder = $this->ensure_text_generation_supported(
-			$prompt_builder,
-			esc_html__( 'Image meta generation failed. Please ensure you have a connected provider that supports text generation.', 'site-essentials' )
-		);
-
-		if ( is_wp_error( $prompt_builder ) ) {
-			return $prompt_builder;
+			$ai_items = array_merge( $ai_items, $items );
 		}
 
-		$result = $prompt_builder->generate_text();
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		// ── Parse AI response ─────────────────────────────────────────────────
-
-		$json_str = preg_replace( '/^```(?:json)?\s*/i', '', trim( (string) $result ) );
-		$json_str = preg_replace( '/\s*```$/', '', $json_str );
-		$parsed   = json_decode( $json_str, true );
-
-		if ( ! is_array( $parsed ) || empty( $parsed['images'] ) || ! is_array( $parsed['images'] ) ) {
-			return new WP_Error(
-				'scos_fill_image_meta_parse_error',
-				__( 'AI response could not be parsed. Please try again.', 'site-essentials' ),
-				[ 'status' => 500 ]
-			);
+		if ( empty( $ai_items ) && $last_error ) {
+			return $last_error;
 		}
 
 		// ── Save to WordPress ─────────────────────────────────────────────────
@@ -273,7 +265,7 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 
 		// Index AI output by ID for quick lookup.
 		$ai_by_id = [];
-		foreach ( $parsed['images'] as $item ) {
+		foreach ( $ai_items as $item ) {
 			if ( isset( $item['id'] ) ) {
 				$ai_by_id[ (int) $item['id'] ] = $item;
 			}
@@ -446,6 +438,124 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 	}
 
 	/**
+	 * Generate alt text and titles for one chunk of images.
+	 *
+	 * @param array<int, array{id: int, url: string}> $attachments
+	 * @param array{title: string, tldr: string, is_project: bool, project_title: string} $parent_context
+	 * @param string $category_terms_block
+	 * @return array<int, array<string, mixed>>|WP_Error The model's per-image items.
+	 */
+	private function generate_for( array $attachments, array $parent_context, string $category_terms_block ) {
+		$prompt_builder = Ability_Support::text_prompt(
+			$this->build_prompt( $attachments, $parent_context, $category_terms_block ),
+			$this->get_system_instruction(),
+			0.4
+		);
+
+		if ( ! is_wp_error( $prompt_builder ) ) {
+			$prompt_builder = $this->attach_images( $prompt_builder, $attachments );
+		}
+
+		$prompt_builder = $this->ensure_text_generation_supported(
+			$prompt_builder,
+			esc_html__( 'Image meta generation failed. Please ensure you have a connected provider that supports text generation from images.', 'site-essentials' )
+		);
+
+		if ( is_wp_error( $prompt_builder ) ) {
+			return $prompt_builder;
+		}
+
+		$result = $prompt_builder->generate_text();
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$json_str = preg_replace( '/^```(?:json)?\s*/i', '', trim( (string) $result ) );
+		$json_str = preg_replace( '/\s*```$/', '', $json_str );
+		$parsed   = json_decode( $json_str, true );
+
+		if ( ! is_array( $parsed ) || empty( $parsed['images'] ) || ! is_array( $parsed['images'] ) ) {
+			return new WP_Error(
+				'scos_fill_image_meta_parse_error',
+				__( 'AI response could not be parsed. Please try again.', 'site-essentials' ),
+				[ 'status' => 500 ]
+			);
+		}
+
+		return $parsed['images'];
+	}
+
+	/**
+	 * Attach each image to the prompt so the model describes what it sees.
+	 *
+	 * Without the file the model has only the URL to go on, and writes the
+	 * alt text from the file name. An image that cannot be attached (SVG,
+	 * missing file, too large) stays in the prompt by URL only.
+	 *
+	 * @param mixed                                   $prompt_builder The AI Client prompt builder.
+	 * @param array<int, array{id: int, url: string}> $attachments
+	 * @return mixed The prompt builder.
+	 */
+	private function attach_images( $prompt_builder, array $attachments ) {
+		foreach ( $attachments as $att ) {
+			$file = $this->image_file_for_prompt( (int) $att['id'] );
+			if ( ! $file ) {
+				continue;
+			}
+
+			$prompt_builder = $prompt_builder
+				->with_text( sprintf( 'Image id %d:', (int) $att['id'] ) )
+				->with_file( $file['path'], $file['mime'] );
+		}
+
+		return $prompt_builder;
+	}
+
+	/**
+	 * The file to show the model for one attachment.
+	 *
+	 * Prefers a mid-sized rendition: enough to see what is in the image,
+	 * without sending a full-resolution upload.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return array{path: string, mime: string}|null Null when there is nothing suitable to send.
+	 */
+	private function image_file_for_prompt( int $attachment_id ): ?array {
+		$original = (string) get_attached_file( $attachment_id );
+		if ( '' === $original ) {
+			return null;
+		}
+
+		$candidates = [];
+		foreach ( [ 'medium_large', 'large', 'medium' ] as $size ) {
+			$rendition = image_get_intermediate_size( $attachment_id, $size );
+			if ( is_array( $rendition ) && ! empty( $rendition['file'] ) ) {
+				$candidates[] = [
+					'path' => trailingslashit( dirname( $original ) ) . wp_basename( (string) $rendition['file'] ),
+					'mime' => (string) ( $rendition['mime-type'] ?? '' ),
+				];
+			}
+		}
+		$candidates[] = [
+			'path' => $original,
+			'mime' => (string) get_post_mime_type( $attachment_id ),
+		];
+
+		foreach ( $candidates as $candidate ) {
+			if ( ! in_array( $candidate['mime'], self::PROMPT_IMAGE_MIMES, true ) ) {
+				continue;
+			}
+			if ( ! is_readable( $candidate['path'] ) || filesize( $candidate['path'] ) > self::MAX_PROMPT_IMAGE_BYTES ) {
+				continue;
+			}
+			return $candidate;
+		}
+
+		return null;
+	}
+
+	/**
 	 * Build the text prompt passed to the AI.
 	 *
 	 * @param array<int, array{id: int, url: string}> $attachments
@@ -473,7 +583,8 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 			$prompt .= $category_terms_block . "\n";
 		}
 
-		// Images list — IDs + URLs for vision-capable models.
+		// Images list — IDs + URLs. The files themselves are attached after
+		// this text (see attach_images()); the URL is reference only.
 		$prompt .= "<images>\n";
 		foreach ( $attachments as $att ) {
 			$prompt .= '<image id="' . absint( $att['id'] ) . '">' . esc_url( $att['url'] ) . '</image>' . "\n";

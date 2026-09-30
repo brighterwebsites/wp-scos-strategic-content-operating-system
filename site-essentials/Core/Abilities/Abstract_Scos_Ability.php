@@ -25,6 +25,7 @@
  * @since      1.3.0
  *
  * v1.0 | 2026-09-29
+ * v1.1 | 2026-09-30 — ensure_text_generation_supported() no longer rejects core's prompt builder.
  */
 
 declare( strict_types=1 );
@@ -248,7 +249,9 @@ abstract class Abstract_Scos_Ability extends WP_Ability {
 			return $prompt_builder;
 		}
 
-		if ( ! is_object( $prompt_builder ) || ! method_exists( $prompt_builder, 'is_supported_for_text_generation' ) ) {
+		// is_callable, not method_exists: core's prompt builder answers this
+		// through __call, so method_exists is false even though the call works.
+		if ( ! is_object( $prompt_builder ) || ! is_callable( array( $prompt_builder, 'is_supported_for_text_generation' ) ) ) {
 			return new WP_Error( 'scos_ai_client_unavailable', $message, array( 'status' => 503 ) );
 		}
 

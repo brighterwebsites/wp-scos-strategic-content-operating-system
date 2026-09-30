@@ -17,6 +17,7 @@
  * v1.4 | 2026-07-15 — Remove bw_tldr fallback read; migration confirmed complete on all sites.
  * v1.5 | 2026-07-18 — Remove SEOPress dual-writes and fallback reads; scos_seo_* is sole contract.
  * v1.6 | 2026-09-30 — Load the Get_Seo_Meta_Instructions ability.
+ * v1.7 | 2026-09-30 — Load the Get_Image_Meta_Instructions ability.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -42,6 +43,7 @@ class Meta_Box {
 		// generation inside them degrades to a WP_Error when it is not.
 		if ( Ability_Support::is_abilities_api_available() ) {
 			require_once __DIR__ . '/Abilities/Get_Seo_Meta_Instructions/Get_Seo_Meta_Instructions.php';
+			require_once __DIR__ . '/Abilities/Get_Image_Meta_Instructions/Get_Image_Meta_Instructions.php';
 			require_once __DIR__ . '/Abilities/Suggest_Seo_Meta/Suggest_Seo_Meta.php';
 			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
 			require_once __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';

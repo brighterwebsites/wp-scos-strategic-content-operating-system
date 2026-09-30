@@ -18,6 +18,7 @@
  *
  * v1.0 | 2026-09-30
  * v1.1 | 2026-09-30 — Output gains business and purpose.
+ * v1.2 | 2026-09-30 — Covers the TLDR field; output gains intent_goal.
  */
 
 declare( strict_types=1 );
@@ -46,7 +47,7 @@ class Get_Seo_Meta_Instructions extends Abstract_Scos_Ability {
 		}
 		wp_register_ability( 'scos/get-seo-meta-instructions', [
 			'label'         => __( 'SCOS: Get SEO Meta Instructions', 'site-essentials' ),
-			'description'   => __( 'Returns the rules for writing SCOS SEO meta (breadcrumb label, meta title, meta description): the meta keys, length limits, how to write each field for the post\'s content type, vocabulary to avoid and the site\'s brand voice. Call this before writing or updating SEO meta by any route. Read-only, no AI inside.', 'site-essentials' ),
+			'description'   => __( 'Returns the rules for writing SCOS SEO meta (breadcrumb label, meta title, meta description, TLDR summary): the meta keys, length limits, how to write each field for the post\'s content type, vocabulary to avoid and the site\'s brand voice. Call this before writing or updating SEO meta by any route. Read-only, no AI inside.', 'site-essentials' ),
 			'category'      => 'scos-seo-meta',
 			'ability_class' => self::class,
 			'meta'          => [
@@ -119,9 +120,13 @@ class Get_Seo_Meta_Instructions extends Abstract_Scos_Ability {
 					'type'        => 'object',
 					'description' => 'The page\'s Content Architecture purpose: key and label. Empty strings when not set.',
 				],
+				'intent_goal'          => [
+					'type'        => 'string',
+					'description' => 'The search question the post is written to answer, when Content Architecture has one.',
+				],
 				'fields'               => [
 					'type'        => 'object',
-					'description' => 'Keyed by field. Each has meta_key, label, unit, min, max, optional target, rules, type_rules and (with post_id) current.',
+					'description' => 'Keyed by field. Each has meta_key, label, unit, min, max, optional target, format, rules, type_rules and (with post_id) current.',
 				],
 				'general_rules'        => [
 					'type'  => 'array',

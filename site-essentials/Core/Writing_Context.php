@@ -15,6 +15,7 @@
  * @subpackage Core
  *
  * v1.0 | 2026-09-30
+ * v1.1 | 2026-09-30 — intent_goal(); field rules rendering shared by the instructions classes.
  */
 
 declare( strict_types=1 );
@@ -129,6 +130,30 @@ class Writing_Context {
 	}
 
 	/**
+	 * The search question a post is written to answer, from Content Architecture.
+	 *
+	 * The linked FAQ's title when there is one, otherwise the freetext goal.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string Empty when the post has none.
+	 */
+	public static function intent_goal( int $post_id ): string {
+		if ( ! $post_id ) {
+			return '';
+		}
+
+		$faq_id = (int) get_post_meta( $post_id, 'scos_ca_intent_goal_faq_id', true );
+		if ( $faq_id > 0 ) {
+			$faq = get_post( $faq_id );
+			if ( $faq instanceof \WP_Post && '' !== $faq->post_title ) {
+				return (string) $faq->post_title;
+			}
+		}
+
+		return trim( (string) get_post_meta( $post_id, 'scos_ca_intent_goal', true ) );
+	}
+
+	/**
 	 * The content type that decides which type rules apply.
 	 *
 	 * The page's purpose wins when it is set — on a builder site almost
@@ -172,10 +197,45 @@ class Writing_Context {
 	}
 
 	/**
+	 * Render each field's rules as plain text for a system prompt.
+	 *
+	 * A field has label, unit, max, rules and optionally min, target and
+	 * type_rules. A field with no min reads "up to {max}".
+	 *
+	 * @param array<string,array<string,mixed>> $fields       Fields from an instructions class.
+	 * @param string                            $content_type Content type the type_rules were chosen for.
+	 * @return string Ends with a blank line when there is at least one field.
+	 */
+	public static function fields_to_prompt( array $fields, string $content_type = '' ): string {
+		$lines = [];
+
+		foreach ( $fields as $field ) {
+			$limit = empty( $field['min'] )
+				? sprintf( 'up to %d %s', (int) $field['max'], (string) $field['unit'] )
+				: sprintf( '%d–%d %s', (int) $field['min'], (int) $field['max'], (string) $field['unit'] );
+			if ( ! empty( $field['target'] ) ) {
+				$limit .= sprintf( ', aim for %d', (int) $field['target'] );
+			}
+
+			$lines[] = sprintf( '%s — %s:', (string) $field['label'], $limit );
+			foreach ( (array) ( $field['rules'] ?? [] ) as $rule ) {
+				$lines[] = '- ' . $rule;
+			}
+			foreach ( (array) ( $field['type_rules'] ?? [] ) as $rule ) {
+				$lines[] = sprintf( '- For this content type (%s): %s', $content_type, $rule );
+			}
+			$lines[] = '';
+		}
+
+		return $lines ? implode( "\n", $lines ) . "\n" : '';
+	}
+
+	/**
 	 * Render the shared context as plain text for a system prompt.
 	 *
 	 * Reads the keys the instructions classes all return: business, purpose,
-	 * general_rules, avoid, facts and voice. Anything absent is left out.
+	 * intent_goal, general_rules, avoid, facts and voice. Anything absent is
+	 * left out.
 	 *
 	 * @param array<string,mixed> $instructions Result of an instructions class's get().
 	 * @return string
@@ -202,6 +262,11 @@ class Writing_Context {
 		$purpose = (string) ( $instructions['purpose']['label'] ?? '' );
 		if ( '' !== $purpose ) {
 			$lines[] = '- Purpose of this page: ' . $purpose;
+		}
+
+		$intent_goal = (string) ( $instructions['intent_goal'] ?? '' );
+		if ( '' !== $intent_goal ) {
+			$lines[] = '- Search question this page answers: ' . $intent_goal;
 		}
 
 		if ( $lines ) {

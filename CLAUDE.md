@@ -1,7 +1,10 @@
-# CLAUDE.md — mu-brighter-support-main (SCOS / Site Essentials)
+# CLAUDE.md — SCOS / Site Essentials (wp-scos-strategic-content-operating-system)
 
 This file is the standing instruction set for all development work on this codebase.
 Read it fully before touching any file. All rules apply to every task unless explicitly overridden in the task prompt.
+
+It is the **single source** for these rules. There are no mirrored copies (the old `.cursor/rules/*.mdc`
+files and `Naming-conventions.md` were folded in here) — change a rule here and nowhere else.
 
 ---
 
@@ -79,7 +82,7 @@ class Analysis_MCP_Tool {
 
 **Minor increment (e.g. 1.0 → 1.1):** when >10 lines changed, or any structural/logic change.
 
-**Major increment (e.g. 1.x → 2.0):** only after a full Plan → Build → Test cycle completes. All success criteria confirmed passing before bumping.
+**Major increment (e.g. 1.x → 2.0):** only after a full Plan → Build → Test cycle completes. All success criteria confirmed passing before bumping. Bump the primary files the plan changed — dependents that only picked up a typo or a 1–2 line fix stay on a minor bump or none.
 
 **If no version header exists:** add `// v1.0 | YYYY-MM-DD` on first edit.
 
@@ -93,6 +96,56 @@ class Analysis_MCP_Tool {
 - Don't commit mid-change or half-finished work just to checkpoint it
 - Don't let multiple unrelated outcomes pile up in one PR — one outcome, one PR
 - The PR description states what changed and how to test it
+- Close issues from the PR (`Closes #123`), so they close when it merges, not before
+
+---
+
+### Docs & Backlog
+
+Docs exist to serve current work. A doc that describes finished or abandoned work is noise — retire it.
+
+**Where things live:**
+
+| Kind | Home | Notes |
+|---|---|---|
+| Standing dev instructions | `CLAUDE.md` | Canonical, including key / prefix naming (Section 3) |
+| Backlog — open tasks, bugs, requirements | GitHub Issues on this repo | The **only** backlog |
+| Roadmap / module strategy | `docs/SCOS_module-development-plan.md` | Direction and sequencing, not a task list |
+| Build plans | `docs/plans/` | Temporary. One plan per feature |
+| Module spec | `site-essentials/Modules/[Module]/SPEC.md` | Only when the module has non-obvious contracts |
+| User-facing how-to | Public docs site (brighterwebsites.com.au/software/) | Not in the repo |
+| Retired docs | `docs/history/` (plans → `docs/history/plans/`) | Read-only. Never cite as current |
+
+Do not create new markdown files in the repo root. `README.md` and `CLAUDE.md` are the only root docs.
+
+`docs/` is gitignored (local only). Anything that must survive a lost machine belongs in `CLAUDE.md`,
+a tracked `SPEC.md` or an issue.
+
+**Before creating a doc:**
+- Could this be a section in an existing doc? Add it there.
+- Is it a task, bug or requirement? Open a GitHub issue, not a new file.
+- Is it a user how-to? It belongs on the public docs site.
+- Only a build plan or a module spec justifies a new file.
+
+**Retiring a plan or requirements doc** — when the work it describes ships (PR merged):
+1. Verify against the code — never trust the doc's own checkboxes or todo statuses.
+2. Open a GitHub issue for anything still outstanding. Search open issues first to avoid duplicates.
+3. Move the doc to `docs/history/`.
+
+A doc is never "partially retired". Either it's live, or its remaining items become issues and the doc goes to history.
+If a change makes a live doc wrong, fix the doc in the same PR.
+
+**Issue conventions:**
+- One issue per fixable outcome. Group related work under a parent issue with sub-issues.
+- Body: the problem, evidence (`file:line`), and what "done" looks like.
+- **The repo is public.** No client names, domains, credentials or server details in issues, PRs or commits.
+- Labels — one type plus one area:
+
+| Type | Area |
+|---|---|
+| `bug` `enhancement` `chore` `docs` `ops` | `mod:seo` `mod:content-architecture` `mod:social-amplification` `mod:analytics` `mod:schema` `mod:custom-posts` `mod:tweaks` `mod:agency` `mod:agentic` `migration` |
+
+`migration` = moving code out of `brighter-core`. `ops` = a one-off task run on live sites, not a code change.
 
 ---
 
@@ -142,6 +195,38 @@ $posts = get_posts( [
 $posts = $wpdb->get_results( "SELECT * FROM {$wpdb->posts} ..." );
 ```
 
+When direct SQL is unavoidable, it goes through `$wpdb->prepare()` — see Security below.
+
+---
+
+### Security — All PHP
+
+These apply to every form handler, AJAX/REST callback and admin action, not only admin pages.
+
+Always in this order — skipping or reordering a step is a security defect:
+
+1. **Verify nonce** — `wp_verify_nonce()` on every form submission. Nonces are generated server-side per request, never hardcoded
+2. **Check capability** — `current_user_can()` before any admin action
+3. **Sanitize input** — `sanitize_text_field()`, `sanitize_email()`, `esc_url_raw()`, `absint()` before storing or processing
+4. **Process / save**
+5. **Escape output** — at the point of output, not storage: `esc_html()`, `esc_attr()`, `esc_url()`, `wp_kses_post()` when HTML is allowed
+
+Never put a raw variable in SQL:
+
+```php
+// ✅
+$result = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM {$wpdb->posts} WHERE ID = %d AND post_status = %s",
+        $post_id,
+        'publish'
+    )
+);
+
+// ❌
+$result = $wpdb->get_results( "SELECT * FROM {$wpdb->posts} WHERE ID = $post_id" );
+```
+
 ---
 
 ### Post Meta — Always Batch-Load
@@ -181,9 +266,11 @@ $data = Cache_Helper::remember( 'unique_cache_key', function() {
 }, 3600, 'module_name' );
 
 // Invalidate on data change
-add_action( 'save_post', function( $post_id ) {
+add_action( 'save_post', [ $this, 'flush_module_cache' ] );
+
+public function flush_module_cache( $post_id ) {
     Cache_Helper::flush( 'module_name' );
-} );
+}
 ```
 
 ---
@@ -223,7 +310,10 @@ modules/
 
 ## 3. Meta Key & Option Naming
 
-Canonical reference: `mu-brighter-support-main/Naming-conventions.md` — that doc wins if there is a conflict. Update both together.
+This section is the canonical naming reference for database keys, options, tables and abilities.
+
+Clean prefixes are infrastructure, not cosmetics: `wp post meta list --keys=scos_sa_%` scopes exactly
+to Social Amplification, which is what makes bulk operations, DB cleanup and WP-CLI/MCP queries safe.
 
 ### Post Meta Prefixes
 
@@ -233,27 +323,55 @@ Canonical reference: `mu-brighter-support-main/Naming-conventions.md` — that d
 | `scos_ca_` | Content Architecture module | `scos_ca_topic` |
 | `scos_sa_` | Social Amplification module | `scos_sa_generated_caption` |
 | `scos_cpt_` | CPT customisation | `scos_cpt_icon` |
-| `se_` | Site-wide / shared across modules | `se_ga4_id` |
+| `se_` | Site-wide / shared across modules | `se_site_launched_at` |
 
 ### Options Prefixes
 
 | Prefix | Scope | Example |
 |--------|-------|---------|
 | `site_essentials_` | Plugin-level config, version, flags | `site_essentials_version` |
-| `se_` | Site-wide user-configurable settings | `se_agency_name` |
+| `se_` | Site-wide user-configurable settings | `se_ga4_id` |
+| `se_agency_` | Agency white label — branding, meta defaults, credit, login redirects | `se_agency_name` |
+| `se_support_` | Support hub URLs, landing HTML, head snippets | `se_support_manual_full` |
 | `scos_` | SCOS module-level settings | `scos_sa_default_tone` |
+| `scos_biz_` | Business Info module options | `scos_biz_business_name` |
+
+### Tables, Transients, ACF
+
+- Tables: `wp_se_[tablename]` (e.g. `wp_se_proof_library`) — the `wp_` part comes from `$wpdb->prefix` at runtime, never hardcode it
+- Transients: `se_[name]`
+- ACF field keys: `field_scos_[module]_[fieldname]`
 
 ### Rules
 
-- ALL new meta and option keys MUST follow the prefix table above
+- ALL new meta and option keys MUST follow the prefix tables above
+- Format: always lowercase, words separated by underscores
+- `scos_[module]_` owns module-specific meta — even if another module reads it
+- `se_` is for settings genuinely global or shared by two or more modules. If a setting will clearly be shared (e.g. a third-party service ID), use `se_` from the start
 - NEVER create new keys with `bw_` prefix — deprecated
 - This applies to **PHP meta and option keys only**. Front-end CSS class and custom-property namespaces are a separate convention: a shared agency component keeps the `bw-` prefix (e.g. the Tables module's `bw-stack`, `--bw-t-accent`)
-- If you encounter `bw_` keys in existing code, flag with `// TODO: migrate to scos_ or se_` — do NOT auto-rename
-- Format: always lowercase, words separated by underscores
-- Transients: `se_[name]`
-- ACF field keys: `field_scos_[module]_[fieldname]`
-- If a setting will clearly be shared across modules (e.g. a third-party service ID), use `se_` from the start
+- If you encounter `bw_` keys in existing code, flag with `// TODO: migrate to scos_ or se_` — do NOT auto-rename. Migration is a deliberate DB operation
+- Legacy inconsistencies exist throughout the codebase — flag them, never silently "fix" them
+- `_seopress_*` is a read-only legacy migration fallback — never write to it in new code
 - **AI provider keys and model strings are not SCOS options** — never store them under any prefix. Credentials belong to the AI Provider plugins (`connectors_ai_*`); the model is resolved by the WP AI Client. See Section 6
+
+### WordPress Abilities API Naming
+
+| Type | Pattern | Example |
+|---|---|---|
+| Ability slug | `scos/[verb]-[noun]` | `scos/suggest-intent-goal` |
+| Category slug | `scos-[module-name]` | `scos-content-architecture` |
+
+- Ability slugs use a forward slash after `scos` — the namespace separator
+- Category slugs use dashes only — a forward slash in a category slug makes registration fail
+- **Ability names are permanent API contracts** — never rename after first deployment on any site (breaks REST, WP-CLI and MCP consumers)
+- Register abilities on `wp_abilities_api_init`, categories on `wp_abilities_api_categories_init`
+- Guard on the **core** Abilities API only — never on an AI plugin class, or the ability will not
+  register on sites without that plugin and MCP agents will not find it:
+  ```php
+  if ( ! Ability_Support::is_abilities_api_available() ) return;
+  ```
+- Always explicitly set `'category'` in `wp_register_ability()` args — do not rely on base class defaults
 
 ---
 
@@ -328,6 +446,9 @@ Canonical references (read before generating any admin UI):
 - `site-essentials/assets/css/scos-ui.css` — all component styles
 - `design-set/snippets.html` — copy-paste markup for every component
 
+The design-set docs still call their folder `cursor-handoff/` — read that as `design-set/`, and the
+live CSS is in `site-essentials/assets/css/`.
+
 ### Mandatory: Page Wrapper
 
 Every admin page body MUST open with:
@@ -339,12 +460,14 @@ Both classes required. No exceptions.
 ### Mandatory: Asset Enqueue
 
 ```php
-add_action( 'admin_enqueue_scripts', function ( $hook ) {
+add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+
+public function enqueue_admin_assets( $hook ) {
     if ( strpos( $hook, 'site-essentials' ) === false ) return;
     $base = plugin_dir_url( __FILE__ ) . 'assets/';
     wp_enqueue_style( 'scos-tokens', $base . 'tokens.css', [],             '1.0.0' );
     wp_enqueue_style( 'scos-ui',     $base . 'scos-ui.css', ['scos-tokens'], '1.0.0' );
-} );
+}
 ```
 
 `scos-tokens` must be a dependency of `scos-ui`. Never enqueue `scos-ui` alone.
@@ -370,6 +493,26 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 | `background: #eef2ff` | `background: var(--scos-accent-soft)` |
 
 If a token doesn't exist for what you need, add it to `tokens.css` first.
+
+### Classes — Match Snippets, Don't Invent
+
+Always match a pattern from `snippets.html`. If no snippet exists for what you need, add the snippet first, then use it.
+
+| Pattern | Classes |
+|---|---|
+| Page chrome | `.scos__header` `.scos__title` `.scos__subtitle` `.scos__header-actions` |
+| Tabs | `.scos__tabs` `.scos__tab` `.scos__tab--active` `.scos__tab-count` |
+| Card | `.scos-card` `.scos-card__header` `.scos-card__header--plain` `.scos-card__body` `.scos-card__footer` `.scos-card__title` `.scos-card__desc` |
+| Section label | `.scos__section-label` |
+| Module grid | `.scos-modules` `.scos-module` `.scos-module--on` `.scos-module__head` `.scos-module__title` `.scos-module__desc` `.scos-module__meta` `.scos-module__divider` `.scos-module__foot` `.scos-module__status` `.scos-module__status--on/off/error` |
+| Buttons | `.scos-btn` `.scos-btn--primary` `.scos-btn--danger` `.scos-btn--ghost` `.scos-btn--lg` |
+| Form | `.scos-form` `.scos-input` `.scos-input--mono` `.scos-select` `.scos-textarea` `.scos-checkbox-row` |
+| Toggle | `.scos-toggle` `.scos-toggle__track` |
+| Badge | `.scos-badge` `.scos-badge--basic` `.scos-badge--pro` `.scos-badge--enterprise` `.scos-badge--soft` |
+| Notice | `.scos-notice` `.scos-notice--success/warning/danger/info` `.scos-notice__title` `.scos-notice__close` |
+| Meta box | `.scos-metabox` `.scos-metabox__row` `.scos-metabox__row--inline` `.scos-metabox__label` `.scos-metabox__hint` |
+| Support | `.scos-support__hero` `.scos-support__grid` `.scos-support__tile` `.scos-support__row` `.scos-support__list` `.scos-support__status` `.scos-support__status-dot` |
+| Empty state | `.scos-empty` `.scos-empty__icon` `.scos-empty__title` `.scos-empty__desc` |
 
 ### Page Header Pattern
 
@@ -411,6 +554,8 @@ One primary button per card footer. One primary button per page header. Never tw
 
 ### Security — Non-Negotiable on Every Admin Page
 
+The general rules and order of operations are in Section 2 (Security — All PHP). On an admin page that means:
+
 ```php
 // Capability check at the top of every render function
 if ( ! current_user_can( 'manage_options' ) ) {
@@ -437,6 +582,7 @@ echo esc_html( get_option( 'se_agency_name' ) );
 - ❌ Never use Bootstrap, Tailwind, or any third-party CSS framework in admin pages
 - ❌ Never add inline `style=""` for color, spacing, or typography — use a class
 - ❌ Never add emoji as functional icons in production
+- ❌ Never override the `.scos-support__grid` column count on screens < 1200px
 - ❌ Never enqueue `scos-ui.css` without `scos-tokens.css` as a dependency
 
 ### New Admin Page Checklist
@@ -460,8 +606,8 @@ Before considering any admin page complete:
 
 ## 6. AI Integration — Provider & Model Agnostic
 
-Canonical reference for all AI work. `.cursor/rules/ai-integration.mdc` mirrors this file —
-this one wins on conflict. Update both together.
+Canonical reference for all AI work. Ability slugs, category slugs, registration hooks and guards
+are in Section 3 (WordPress Abilities API Naming).
 
 ### The one rule
 
@@ -574,9 +720,8 @@ $model = get_option( 'scos_ai_model', 'gpt-5.6-luna' );
 '…that is handled by the Anthropic API within the amplification engine.'
 ```
 
-Named anti-pattern in this codebase:
-`site-essentials/Modules/SocialAmplification/Amplification/Anthropic_Client.php` (pending removal).
-Do not copy it, extend it, or add a second provider client beside it.
+This codebase used to carry a hand-rolled provider client in Social Amplification
+(`Anthropic_Client.php`, since removed). Do not reintroduce one, for any provider.
 
 ### Credentials & approval
 
@@ -608,7 +753,7 @@ Do not copy it, extend it, or add a second provider client beside it.
 ### Checklist — before any AI-touching change
 
 - [ ] No provider name, model string, endpoint or API key anywhere in the diff
-- [ ] Generation routes through `wp_ai_client_prompt()` with `get_preferred_models_for_text_generation()`
+- [ ] Generation routes through `Ability_Support::text_prompt()` — no direct `WordPress\AI\*` calls, no hand-written model list
 - [ ] Ability type chosen deliberately — tool / generation / hybrid
 - [ ] Agent-supplyable content accepted as input before being generated server-side
 - [ ] Instructions in `system-instruction.php`, provider-neutral, returns a string

@@ -329,7 +329,7 @@ class Cpt_Module implements Module_Interface {
     // REVIEWS CPT REGISTRATION
     // -------------------------------------------------------------------------
     // TODO: migrate Reviews bw_* keys to scos_review_* / scos_cpt_* — see
-    //       .cursor/rules/meta-key-prefixes.mdc. Legacy keys still in use:
+    //       CLAUDE.md § 3. Legacy keys still in use:
     //         - Post type:  bw_reviews
     //         - Taxonomy:   bw_review_platform
     //         - Meta:       bw_rating, bw_date, bw_date_precision, bw_verify_url,

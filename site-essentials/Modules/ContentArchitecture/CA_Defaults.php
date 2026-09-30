@@ -7,7 +7,7 @@
  * `scos_ca_purpose` to sensible defaults so the post appears correctly in
  * the CA admin columns and reporting without the editor needing to fill them in.
  *
- * Defaults (matching plan — see meta-key-prefixes.mdc for slug reference):
+ * Defaults (matching plan — see CLAUDE.md § 3 for slug reference):
  *   faq        → intent: informational_s (Info Solution)
  *                purpose: supporting     (Supporting Topic)
  *   projects   → intent: trust           (Authority Trust)

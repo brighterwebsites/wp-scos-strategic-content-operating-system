@@ -16,6 +16,9 @@
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
+ *
+ * v1.0 | 2026-10-01 — Default robots.txt: Content-Signal line, Cloudflare email-protection
+ *                      disallow, note on the feed block when feeds are disabled.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -61,8 +64,12 @@ class Virtual_Files {
 		return implode( "\n", [
 			'# WordPress',
 			'User-agent: *',
+			'Content-Signal: ai-train=yes, search=yes, ai-input=yes',
 			'Disallow: /wp-admin/',
 			'Allow: /wp-admin/admin-ajax.php',
+			'',
+			'# Cloudflare email obfuscation links',
+			'Disallow: /cdn-cgi/l/email-protection',
 			'',
 			'# Block Search Results',
 			'Disallow: /?s=',
@@ -70,6 +77,7 @@ class Virtual_Files {
 			'Disallow: /search/',
 			'',
 			'# Block RSS Feeds',
+			'# Remove this block if "Disable RSS Feeds" is on in Tweaks — feed URLs then redirect instead.',
 			'Disallow: /feed/',
 			'Disallow: /*/feed/',
 			'Disallow: /*/feed$',

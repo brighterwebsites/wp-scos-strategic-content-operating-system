@@ -22,8 +22,11 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.3 | 2026-06-04
+ * @version    1.4 | 2026-10-01
  * @since      1.0.0
+ *
+ * v1.4 | 2026-10-01 — Paged canonical and rel prev/next drop the request's query string;
+ *                      canonical_printed() lets fallback canonicals stand down.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -33,6 +36,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Head_Output {
+
+	/** @var bool Whether this request's <head> already has our canonical tag. */
+	private static $canonical_printed = false;
+
+	/**
+	 * Whether SEO Meta has printed a canonical tag on this request.
+	 *
+	 * Other code that prints a fallback canonical (brighter-core's paged
+	 * archive canonical) checks this so a page never carries two.
+	 *
+	 * @return bool
+	 */
+	public static function canonical_printed(): bool {
+		return self::$canonical_printed;
+	}
 
 	public static function init() {
 		// Title — priority 100 overrides SEOPress (priority 10) and theme filters.
@@ -264,6 +282,7 @@ class Head_Output {
 
 		if ( ! empty( $canonical ) ) {
 			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+			self::$canonical_printed = true;
 		}
 
 		// ── Open Graph ───────────────────────────────────────────────────────
@@ -347,9 +366,10 @@ class Head_Output {
 
 		if ( ! empty( $base_url ) ) {
 			$canonical = ( $settings['canonical_paged'] && $paged > 1 )
-				? get_pagenum_link( $paged )
+				? self::paged_url( $paged )
 				: $base_url;
 			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+			self::$canonical_printed = true;
 		}
 
 		// ── Open Graph ───────────────────────────────────────────────────────
@@ -563,11 +583,35 @@ class Head_Output {
 		$paged     = max( 1, (int) get_query_var( 'paged' ) );
 
 		if ( $paged > 1 ) {
-			echo '<link rel="prev" href="' . esc_url( get_pagenum_link( $paged - 1 ) ) . '" />' . "\n";
+			echo '<link rel="prev" href="' . esc_url( self::paged_url( $paged - 1 ) ) . '" />' . "\n";
 		}
 		if ( $paged < $max_pages ) {
-			echo '<link rel="next" href="' . esc_url( get_pagenum_link( $paged + 1 ) ) . '" />' . "\n";
+			echo '<link rel="next" href="' . esc_url( self::paged_url( $paged + 1 ) ) . '" />' . "\n";
 		}
+	}
+
+	/**
+	 * URL of page N of the current archive, without the visitor's query string.
+	 *
+	 * get_pagenum_link() builds on the current request URI, so it carries
+	 * whatever query string the visitor arrived with — utm_* tags, orderby,
+	 * filters — into the canonical and prev/next links. With pretty permalinks
+	 * the page number is part of the path, so the query string is never part
+	 * of the page's identity and is dropped. With plain permalinks the archive
+	 * and page are themselves query args, so the URL is left as WordPress
+	 * builds it.
+	 *
+	 * @param int $page Page number. 1 returns the archive's first page.
+	 * @return string
+	 */
+	private static function paged_url( int $page ): string {
+		$url = (string) get_pagenum_link( $page, false );
+
+		if ( '' === (string) get_option( 'permalink_structure' ) ) {
+			return $url;
+		}
+
+		return (string) preg_replace( '/[?#].*$/', '', $url );
 	}
 
 	// ── SEOPress suppression ──────────────────────────────────────────────────

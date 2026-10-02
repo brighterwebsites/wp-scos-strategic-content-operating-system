@@ -1,5 +1,5 @@
 <?php
-// v1.0 | 2026-08-03
+// v1.1 | 2026-10-03
 
 /**
  * WooCommerce schema token resolver.
@@ -25,6 +25,8 @@
  *
  * %%_woo_offers_json%%
  *   Full schema.org Offer object (price, currency, availability, url, optional sku).
+ *   Adds validFrom / priceValidUntil from scheduled sale dates, and shippingDetails
+ *   and hasMerchantReturnPolicy from the Merchant tab (Merchant_Schema) when set.
  *   Whole-value replacement returns a PHP array — same pattern as %%post_thumbnail%%.
  *
  * Logic is public/static so WP-CLI / MCP / REST can call the same methods.
@@ -193,18 +195,43 @@ class Woo_Schema_Tokens {
 			return null;
 		}
 
+		$currency = self::get_currency();
+
 		$offer = [
-			'@type'         => 'Offer',
-			'url'           => get_permalink( $post_id ),
-			'priceCurrency' => self::get_currency(),
-			'price'         => (string) $price,
-			'availability'  => self::get_availability( $post_id ),
+			'@type'           => 'Offer',
+			'url'             => get_permalink( $post_id ),
+			'priceCurrency'   => $currency,
+			'price'           => (string) $price,
+			'availability'    => self::get_availability( $post_id ),
 			'priceValidUntil' => gmdate( 'Y-m-d', strtotime( '+1 year' ) ),
 		];
+
+		// A scheduled sale bounds the price: it is valid from the sale start
+		// and until the sale end, not for a year.
+		if ( $product->is_on_sale() ) {
+			$sale_from = $product->get_date_on_sale_from();
+			$sale_to   = $product->get_date_on_sale_to();
+			if ( $sale_from ) {
+				$offer['validFrom'] = $sale_from->date( 'c' );
+			}
+			if ( $sale_to ) {
+				$offer['priceValidUntil'] = $sale_to->date( 'Y-m-d' );
+			}
+		}
 
 		$sku = $product->get_sku();
 		if ( is_string( $sku ) && $sku !== '' ) {
 			$offer['sku'] = $sku;
+		}
+
+		$shipping = Merchant_Schema::get_shipping_details( (float) $price, $currency );
+		if ( null !== $shipping ) {
+			$offer['shippingDetails'] = $shipping;
+		}
+
+		$return_policy = Merchant_Schema::get_return_policy();
+		if ( null !== $return_policy ) {
+			$offer['hasMerchantReturnPolicy'] = $return_policy;
 		}
 
 		// Drop empty optional string fields (keep price always).

@@ -15,6 +15,7 @@
  * @subpackage Modules\SiteSchema
  * @since      1.0.0
  * v1.2 | 2026-08-03 — WooCommerce schema tokens (price, sku, category, availability, currency, offers)
+ * v1.3 | 2026-10-03 — Merchant tab: return policy + shipping details on WooCommerce offers
  */
 
 namespace SiteEssentials\Modules\SiteSchema;
@@ -48,7 +49,7 @@ class SiteSchema_Module implements Module_Interface {
 	}
 
 	public static function get_version() {
-		return '1.2.0';
+		return '1.3.0';
 	}
 
 	public function init() {
@@ -67,6 +68,7 @@ class SiteSchema_Module implements Module_Interface {
 			\SiteEssentials\Modules\SeoSchema\Meta_Box::init();
 		}
 
+		require_once __DIR__ . '/Merchant_Schema.php';
 		require_once __DIR__ . '/Woo_Schema_Tokens.php';
 		Woo_Schema_Tokens::register();
 
@@ -200,6 +202,17 @@ class SiteSchema_Module implements Module_Interface {
 		}
 		if ( $current_tab === 'service' ) {
 			update_option( 'scos_site_schema_service_purpose_auto', isset( $_POST['scos_site_schema_service_purpose_auto'] ) ? '1' : '' );
+		}
+		if ( $current_tab === 'merchant' ) {
+			$merchant_input = [];
+			foreach ( array_keys( Merchant_Schema::FIELDS ) as $field ) {
+				$key = Merchant_Schema::option_key( $field );
+				if ( isset( $_POST[ $key ] ) ) {
+					// Sanitized per field type in Merchant_Schema::save_settings().
+					$merchant_input[ $field ] = wp_unslash( $_POST[ $key ] );
+				}
+			}
+			Merchant_Schema::save_settings( $merchant_input );
 		}
 
 		wp_safe_redirect( add_query_arg( [ 'page' => 'site-essentials-schema', 'scos_schema_saved' => '1', 'tab' => $current_tab ?: 'local-business' ], admin_url( 'admin.php' ) ) );

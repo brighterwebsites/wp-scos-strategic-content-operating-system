@@ -2,9 +2,9 @@
 /**
  * Site Schema Module — settings view.
  *
- * v1.4 | 2026-08-03 — Document WooCommerce schema tokens
+ * v1.5 | 2026-10-03 — Merchant tab (return policy, shipping)
  *
- * Tabbed panel: Local Business | Success Stories | Product | Service
+ * Tabbed panel: Local Business | Success Stories | Product | Service | Merchant
  * SCOS design system: scos__header, scos__tabs, scos-card, scos-form.
  */
 defined( 'ABSPATH' ) || exit;
@@ -14,6 +14,7 @@ $tabs = [
 	'success-stories' => __( 'Success Stories', 'site-essentials' ),
 	'product'         => __( 'Product', 'site-essentials' ),
 	'service'         => __( 'Service', 'site-essentials' ),
+	'merchant'        => __( 'Merchant', 'site-essentials' ),
 ];
 
 $current_tab = isset( $_GET['tab'] ) && array_key_exists( $_GET['tab'], $tabs )
@@ -31,6 +32,7 @@ $product_purpose_auto     = get_option( 'scos_site_schema_product_purpose_auto',
 $service                  = get_option( 'scos_site_schema_service', '' );
 $service_ids              = get_option( 'scos_site_schema_service_ids', '' );
 $service_purpose_auto     = get_option( 'scos_site_schema_service_purpose_auto', '' );
+$merchant_store_country   = \SiteEssentials\Modules\SiteSchema\Merchant_Schema::get_store_country();
 
 $guide_base = 'https://brighterwebsites.com.au/software/schema/';
 $guide_urls = [
@@ -38,6 +40,7 @@ $guide_urls = [
 	'success-stories' => $guide_base . '#success',
 	'product'         => $guide_base . '#product',
 	'service'         => $guide_base . '#service',
+	'merchant'        => $guide_base . '#merchant',
 ];
 $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_tab ] : $guide_base;
 ?>
@@ -289,6 +292,103 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 			</div>
 		</div>
 
+	<?php elseif ( $current_tab === 'merchant' ) : ?>
+
+		<?php
+		$merchant_cards = [
+			[
+				'title' => __( 'Return Policy', 'site-essentials' ),
+				'desc'  => __( 'Output as hasMerchantReturnPolicy on every WooCommerce Offer (%%_woo_offers_json%%). Leave the category empty to output no return policy.', 'site-essentials' ),
+				'rows'  => [
+					'country'         => [ 'label' => __( 'Primary country', 'site-essentials' ), 'type' => 'text', 'placeholder' => $merchant_store_country, 'desc' => __( 'Two-letter ISO code. Used for the return policy and the shipping destination. Empty = WooCommerce store country.', 'site-essentials' ) ],
+					'return_category' => [ 'label' => __( 'Return window', 'site-essentials' ), 'type' => 'select', 'options' => [
+						''                                 => __( '— No return policy —', 'site-essentials' ),
+						'MerchantReturnFiniteReturnWindow' => __( 'Returns within a set number of days', 'site-essentials' ),
+						'MerchantReturnUnlimitedWindow'    => __( 'Returns any time', 'site-essentials' ),
+						'MerchantReturnNotPermitted'       => __( 'No returns', 'site-essentials' ),
+					] ],
+					'return_days'     => [ 'label' => __( 'Return days', 'site-essentials' ), 'type' => 'number', 'placeholder' => '30', 'desc' => __( 'Required for a set number of days, otherwise the policy is not output.', 'site-essentials' ) ],
+					'return_method'   => [ 'label' => __( 'Return method', 'site-essentials' ), 'type' => 'select', 'options' => [
+						''              => __( '— Not specified —', 'site-essentials' ),
+						'ReturnByMail'  => __( 'By mail', 'site-essentials' ),
+						'ReturnInStore' => __( 'In store', 'site-essentials' ),
+						'ReturnAtKiosk' => __( 'At a kiosk / drop-off point', 'site-essentials' ),
+					] ],
+					'return_fees'     => [ 'label' => __( 'Return fees', 'site-essentials' ), 'type' => 'select', 'options' => [
+						''                                 => __( '— Not specified —', 'site-essentials' ),
+						'FreeReturn'                       => __( 'Free returns', 'site-essentials' ),
+						'ReturnFeesCustomerResponsibility' => __( 'Customer pays return shipping', 'site-essentials' ),
+					] ],
+					'return_url'      => [ 'label' => __( 'Return policy page', 'site-essentials' ), 'type' => 'url', 'placeholder' => home_url( '/refund-returns/' ) ],
+				],
+			],
+			[
+				'title' => __( 'Shipping', 'site-essentials' ),
+				'desc'  => __( 'Output as shippingDetails on every WooCommerce Offer: one flat rate to the primary country. Leave the rate empty to output no shipping details. Merchant Center account shipping settings override this.', 'site-essentials' ),
+				'rows'  => [
+					'shipping_rate'      => [ 'label' => __( 'Flat rate', 'site-essentials' ), 'type' => 'money', 'placeholder' => '15.00', 'desc' => __( 'In the store currency. 0 = free shipping.', 'site-essentials' ) ],
+					'shipping_free_over' => [ 'label' => __( 'Free shipping over', 'site-essentials' ), 'type' => 'money', 'placeholder' => '150.00', 'desc' => __( 'Optional. Products priced at or above this ship free.', 'site-essentials' ) ],
+					'handling_min'       => [ 'label' => __( 'Handling days (min)', 'site-essentials' ), 'type' => 'number', 'placeholder' => '0' ],
+					'handling_max'       => [ 'label' => __( 'Handling days (max)', 'site-essentials' ), 'type' => 'number', 'placeholder' => '2', 'desc' => __( 'Business days to dispatch.', 'site-essentials' ) ],
+					'transit_min'        => [ 'label' => __( 'Transit days (min)', 'site-essentials' ), 'type' => 'number', 'placeholder' => '2' ],
+					'transit_max'        => [ 'label' => __( 'Transit days (max)', 'site-essentials' ), 'type' => 'number', 'placeholder' => '7', 'desc' => __( 'Delivery time is only output when both maximums are set.', 'site-essentials' ) ],
+				],
+			],
+		];
+		?>
+
+		<?php foreach ( $merchant_cards as $merchant_card ) : ?>
+			<div class="scos-card">
+				<div class="scos-card__header">
+					<div>
+						<h2 class="scos-card__title"><?php echo esc_html( $merchant_card['title'] ); ?></h2>
+						<p class="scos-card__desc"><?php echo esc_html( $merchant_card['desc'] ); ?></p>
+					</div>
+				</div>
+				<div class="scos-card__body">
+					<table class="scos-form">
+						<tbody>
+							<?php foreach ( $merchant_card['rows'] as $field => $row ) : ?>
+								<?php
+								$key   = \SiteEssentials\Modules\SiteSchema\Merchant_Schema::option_key( $field );
+								$value = (string) get_option( $key, '' );
+								?>
+								<tr>
+									<th>
+										<label for="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $row['label'] ); ?></label>
+										<div class="scos-form__slug"><?php echo esc_html( $key ); ?></div>
+									</th>
+									<td>
+										<?php if ( 'select' === $row['type'] ) : ?>
+											<select id="<?php echo esc_attr( $key ); ?>" name="<?php echo esc_attr( $key ); ?>" class="scos-select">
+												<?php foreach ( $row['options'] as $option_value => $option_label ) : ?>
+													<option value="<?php echo esc_attr( $option_value ); ?>"<?php selected( $value, $option_value ); ?>><?php echo esc_html( $option_label ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										<?php else : ?>
+											<input id="<?php echo esc_attr( $key ); ?>" name="<?php echo esc_attr( $key ); ?>"
+												type="<?php echo esc_attr( 'money' === $row['type'] || 'number' === $row['type'] ? 'number' : $row['type'] ); ?>"
+												<?php if ( 'money' === $row['type'] ) : ?>step="0.01" min="0"<?php elseif ( 'number' === $row['type'] ) : ?>step="1" min="0"<?php endif; ?>
+												class="scos-input" value="<?php echo esc_attr( $value ); ?>"
+												placeholder="<?php echo esc_attr( $row['placeholder'] ?? '' ); ?>">
+										<?php endif; ?>
+										<?php if ( ! empty( $row['desc'] ) ) : ?>
+											<p class="description"><?php echo esc_html( $row['desc'] ); ?></p>
+										<?php endif; ?>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+				<div class="scos-card__footer">
+					<button type="submit" form="scos-schema-form" class="scos-btn scos-btn--primary">
+						<?php esc_html_e( 'Save Schema', 'site-essentials' ); ?>
+					</button>
+				</div>
+			</div>
+		<?php endforeach; ?>
+
 	<?php endif; ?>
 
 </form>
@@ -315,7 +415,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 			<li><code>%%_woo_category%%</code> &mdash; <?php esc_html_e( 'First product_cat term name', 'site-essentials' ); ?></li>
 			<li><code>%%_woo_availability%%</code> &mdash; <?php esc_html_e( 'Schema.org availability URL from stock status (InStock / OutOfStock / BackOrder)', 'site-essentials' ); ?></li>
 			<li><code>%%_woo_currency%%</code> &mdash; <?php esc_html_e( 'Store currency code (e.g. AUD)', 'site-essentials' ); ?></li>
-			<li><code>%%_woo_offers_json%%</code> &mdash; <?php esc_html_e( 'Full Offer object (price, currency, availability, url, sku)', 'site-essentials' ); ?></li>
+			<li><code>%%_woo_offers_json%%</code> &mdash; <?php esc_html_e( 'Full Offer object (price, currency, availability, url, sku, sale dates, plus shipping and return policy from the Merchant tab)', 'site-essentials' ); ?></li>
 			<li><code>%%_scos_review_cards_json%%</code> &mdash; <?php esc_html_e( 'Array of Review objects from ScosReviewCard elements on the page (specific mode only)', 'site-essentials' ); ?></li>
 			<li><code>%%_scos_aggregate_rating_json%%</code> &mdash; <?php esc_html_e( 'AggregateRating object — count and average across all published reviews', 'site-essentials' ); ?></li>
 		</ul>

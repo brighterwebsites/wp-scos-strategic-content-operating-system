@@ -416,7 +416,7 @@ $current_guide = isset( $guide_urls[ $current_tab ] ) ? $guide_urls[ $current_ta
 			<li><code>%%_woo_availability%%</code> &mdash; <?php esc_html_e( 'Schema.org availability URL from stock status (InStock / OutOfStock / BackOrder)', 'site-essentials' ); ?></li>
 			<li><code>%%_woo_currency%%</code> &mdash; <?php esc_html_e( 'Store currency code (e.g. AUD)', 'site-essentials' ); ?></li>
 			<li><code>%%_woo_offers_json%%</code> &mdash; <?php esc_html_e( 'Full Offer object (price, currency, availability, url, sku, sale dates, plus shipping and return policy from the Merchant tab)', 'site-essentials' ); ?></li>
-			<li><code>%%_scos_review_cards_json%%</code> &mdash; <?php esc_html_e( 'Array of Review objects from ScosReviewCard elements on the page (specific mode only)', 'site-essentials' ); ?></li>
+			<li><code>%%_scos_review_cards_json%%</code> &mdash; <?php esc_html_e( 'Array of Review objects from ScosReviewCard elements on the page or its Breakdance template (specific, loop and connected modes)', 'site-essentials' ); ?></li>
 			<li><code>%%_scos_aggregate_rating_json%%</code> &mdash; <?php esc_html_e( 'AggregateRating object — count and average across all published reviews', 'site-essentials' ); ?></li>
 		</ul>
 		<p class="description" style="margin-top:var(--scos-s-2)"><?php esc_html_e( 'Multiple blocks: use a single array [ { … }, { … } ].', 'site-essentials' ); ?></p>

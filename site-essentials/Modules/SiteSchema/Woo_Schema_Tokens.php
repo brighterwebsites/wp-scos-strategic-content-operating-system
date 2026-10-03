@@ -1,5 +1,5 @@
 <?php
-// v1.1 | 2026-10-03
+// v1.2 | 2026-10-03
 
 /**
  * WooCommerce schema token resolver.
@@ -25,7 +25,8 @@
  *
  * %%_woo_offers_json%%
  *   Full schema.org Offer object (price, currency, availability, url, optional sku).
- *   Adds validFrom / priceValidUntil from scheduled sale dates, and shippingDetails
+ *   validFrom is the scheduled sale start, else the product's last-modified date;
+ *   priceValidUntil is the sale end when set. Adds shippingDetails
  *   and hasMerchantReturnPolicy from the Merchant tab (Merchant_Schema) when set.
  *   Whole-value replacement returns a PHP array — same pattern as %%post_thumbnail%%.
  *
@@ -206,14 +207,14 @@ class Woo_Schema_Tokens {
 			'priceValidUntil' => gmdate( 'Y-m-d', strtotime( '+1 year' ) ),
 		];
 
-		// A scheduled sale bounds the price: it is valid from the sale start
-		// and until the sale end, not for a year.
+		$valid_from = self::get_valid_from( $product );
+		if ( '' !== $valid_from ) {
+			$offer['validFrom'] = $valid_from;
+		}
+
+		// A scheduled sale ends the price at the sale end, not in a year.
 		if ( $product->is_on_sale() ) {
-			$sale_from = $product->get_date_on_sale_from();
-			$sale_to   = $product->get_date_on_sale_to();
-			if ( $sale_from ) {
-				$offer['validFrom'] = $sale_from->date( 'c' );
-			}
+			$sale_to = $product->get_date_on_sale_to();
 			if ( $sale_to ) {
 				$offer['priceValidUntil'] = $sale_to->date( 'Y-m-d' );
 			}
@@ -242,6 +243,32 @@ class Woo_Schema_Tokens {
 		}
 
 		return $offer;
+	}
+
+	/**
+	 * Date the current price took effect, as an ISO 8601 string.
+	 *
+	 * The sale start when a sale is running with a scheduled start; otherwise
+	 * the product's last-modified date. WooCommerce does not record when a
+	 * price was set, so last-modified is the closest stand-in.
+	 *
+	 * Public for WP-CLI / MCP reuse.
+	 *
+	 * @param \WC_Product $product
+	 * @return string Empty when no date is available.
+	 */
+	public static function get_valid_from( $product ): string {
+		if ( ! $product || ! is_a( $product, 'WC_Product' ) ) {
+			return '';
+		}
+		if ( $product->is_on_sale() ) {
+			$sale_from = $product->get_date_on_sale_from();
+			if ( $sale_from ) {
+				return $sale_from->date( 'c' );
+			}
+		}
+		$modified = $product->get_date_modified();
+		return $modified ? $modified->date( 'c' ) : '';
 	}
 
 	/**

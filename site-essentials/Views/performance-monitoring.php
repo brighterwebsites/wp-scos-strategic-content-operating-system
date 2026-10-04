@@ -7,6 +7,8 @@
  * in wp-config.php. Manual push notifications are fully functional;
  * some automated monitors are partially implemented.
  *
+ * v1.0 | 2026-10-04
+ *
  * @package    SiteEssentials
  * @subpackage Views
  */
@@ -77,7 +79,7 @@ if ( isset( $_POST['scos_ntfy_test'] ) && check_admin_referer( 'scos_ntfy_test' 
 					<code>wp-config.php</code>:
 				</p>
 				<pre>define('NTFY_ENABLED', true);
-define('NTFY_SERVER_URL', 'https://ntfy.bweb1.com.au');
+define('NTFY_SERVER_URL', 'https://ntfy.example.com');
 define('NTFY_USERNAME', 'your-username');
 define('NTFY_PASSWORD', 'your-password');</pre>
 			</div>

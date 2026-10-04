@@ -32,8 +32,8 @@
 ```php
 // ntfy Notification System
 define('NTFY_ENABLED', true);
-define('NTFY_SERVER_URL', 'https://ntfy.bweb1.com.au');
-define('NTFY_USERNAME', 'vanessa');
+define('NTFY_SERVER_URL', 'https://ntfy.example.com');
+define('NTFY_USERNAME', 'your-username');
 define('NTFY_PASSWORD', 'your-password-here');
 
 // Optional: Custom topic prefix (default: 'bw-agency')

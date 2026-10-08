@@ -319,6 +319,7 @@ add_action(
 		\SiteEssentials\Modules\SeoMeta\Breakdance_Editor_Guard::init();
 		\SiteEssentials\Core\Migration_Deprecated::init();
 		\SiteEssentials\Core\Support_Scripts::init();
+		\SiteEssentials\Core\Scos_Rest_Field::init();
 	},
 	6
 );

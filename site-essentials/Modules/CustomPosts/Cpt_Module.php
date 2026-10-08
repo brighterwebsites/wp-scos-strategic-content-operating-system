@@ -235,6 +235,12 @@ class Cpt_Module implements Module_Interface {
             \SiteEssentials\Modules\CustomPosts\FAQ\FAQ_Module::init();
         }
 
+        // ─── Relationship loops: let 'any' + post__in queries return reviews/FAQs ─
+        if (!empty($opts['enable_reviews']) || !empty($opts['enable_faq'])) {
+            require_once __DIR__ . '/Pinned_Query_Types.php';
+            Pinned_Query_Types::init();
+        }
+
         // ─── General: default post permalinks & category base (optional) ───────
         require_once __DIR__ . '/General_Post_Permalink_Settings.php';
         General_Post_Permalink_Settings::bootstrap( $opts );

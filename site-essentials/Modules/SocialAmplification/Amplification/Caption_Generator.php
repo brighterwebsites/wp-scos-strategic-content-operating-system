@@ -27,6 +27,7 @@
  * v1.0 | 2026-09-11
  * v1.1 | 2026-09-11 — Normalise ai-knowledge files to UTF-8 (Windows-1252 files
  *                      broke the strict AI Client JSON encoding); scrub prompts.
+ * v1.2 | 2026-10-07 — Stop sending temperature; it made the AI Client skip the preferred model.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -137,9 +138,13 @@ class Caption_Generator {
 			$system = mb_scrub( $system, 'UTF-8' );
 		}
 
+		// Temperature is not sent: the AI Client treats it as a model
+		// requirement and skips the site's preferred model when that model
+		// doesn't declare support. See Ability_Support::text_prompt().
+		unset( $temperature );
+
 		$builder = wp_ai_client_prompt( $prompt )
 			->using_system_instruction( $system )
-			->using_temperature( $temperature )
 			->using_max_tokens( self::MAX_TOKENS );
 
 		if ( function_exists( 'WordPress\AI\get_preferred_models_for_text_generation' ) ) {

@@ -20,6 +20,9 @@
  * @since      1.0.0
  *
  * v1.0 | 2026-06-30
+ * v1.1 | 2026-10-13 — Save only when JS confirms it loaded this post's values
+ *                     (scos_seo_qe_loaded = post ID). Stops one post's meta being
+ *                     copied onto another, or wiped when pre-population fails.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -139,6 +142,7 @@ class Admin_Columns {
 		if ( ! in_array( $post_type, Meta_Fields::get_post_types(), true ) ) { return; }
 		?>
 		<fieldset class="scos-qe-fieldset inline-edit-col">
+			<input type="hidden" name="scos_seo_qe_loaded" value="">
 			<div class="inline-edit-col">
 				<h4 class="scos-qe-title"><?php esc_html_e( 'SEO Meta', 'site-essentials' ); ?></h4>
 				<div class="scos-seo-qe-fields">
@@ -176,6 +180,10 @@ class Admin_Columns {
 
 		// Only process Quick Edit saves — not normal post editor saves (Meta_Box handles those).
 		if ( ! isset( $_REQUEST['_inline_edit'] ) ) { return; }
+
+		// JS sets this to the post ID only after filling the fields from this post's
+		// own data. Anything else means the fields may be blank or another post's.
+		if ( ! isset( $_POST['scos_seo_qe_loaded'] ) || absint( $_POST['scos_seo_qe_loaded'] ) !== (int) $post_id ) { return; }
 
 		if ( isset( $_POST['scos_seo_qe_title'] ) ) {
 			$val = sanitize_text_field( wp_unslash( $_POST['scos_seo_qe_title'] ) );

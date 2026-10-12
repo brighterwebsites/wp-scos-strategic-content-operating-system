@@ -14,6 +14,9 @@
  *
  * v1.1 | 2026-05-22 — scos_ca_intent_goal column now shows linked FAQ title + incomplete badge.
  * v1.2 | 2026-07-21 — Remove Social column (Make.com trigger button, deprecated/unused on all sites).
+ * v1.3 | 2026-10-13 — Quick Edit saves only when JS confirms it loaded this post's values
+ *                     (scos_ca_qe_loaded = post ID). Stops one post's CA fields being
+ *                     copied onto another, or reset when pre-population fails.
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -345,6 +348,7 @@ class Admin_Columns {
 		// The sentinel field lets PHP know progress was intentionally submitted.
 		?>
 		<input type="hidden" name="scos_ca_qe_progress_submitted" value="1" />
+		<input type="hidden" name="scos_ca_qe_loaded" value="" />
 		<fieldset class="scos-qe-fieldset inline-edit-col">
 			<div class="inline-edit-col">
 				<h4 class="scos-qe-title"><?php esc_html_e( 'Content Architecture', 'site-essentials' ); ?></h4>
@@ -679,6 +683,15 @@ class Admin_Columns {
 	}
 
 	private static function save_quick_edit_fields( $post_id ) {
+		// JS sets this to the post ID only after filling the fields from this post's
+		// own data. Anything else means the fields may be defaults or another post's.
+		if ( ! isset( $_POST['scos_ca_qe_loaded'] ) || absint( $_POST['scos_ca_qe_loaded'] ) !== (int) $post_id ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( '[SCOS QE:skip] post_id=%d — fields not loaded for this post, CA fields left unchanged', $post_id ) );
+			}
+			return;
+		}
+
 		// Taxonomies
 		if ( isset( $_POST['scos_ca_qe_cluster'] ) ) {
 			$id = absint( $_POST['scos_ca_qe_cluster'] );

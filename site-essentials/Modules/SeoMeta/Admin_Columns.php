@@ -2,12 +2,13 @@
 /**
  * SEO Meta — Admin List Table Columns
  *
- * Adds two opt-in columns to all supported post type list tables:
- *   scos_seo_title — SEO Title (truncated preview)
- *   scos_seo_desc  — SEO Description (truncated preview)
+ * Adds columns to all supported post type list tables:
+ *   scos_seo_target_query — Target Query (shown by default)
+ *   scos_seo_title        — SEO Title (truncated preview, opt-in)
+ *   scos_seo_desc         — SEO Description (truncated preview, opt-in)
  *
  * Quick Edit adds inline editing for:
- *   scos_seo_title, scos_seo_description, scos_seo_breadcrumb_title
+ *   scos_seo_title, scos_seo_description, scos_seo_breadcrumb_title, scos_seo_target_query
  *
  * Save writes to scos_seo_* keys only.
  *
@@ -23,6 +24,7 @@
  * v1.1 | 2026-10-13 — Save only when JS confirms it loaded this post's values
  *                     (scos_seo_qe_loaded = post ID). Stops one post's meta being
  *                     copied onto another, or wiped when pre-population fails.
+ * v1.2 | 2026-10-18 — Target Query column (visible by default) and Quick Edit field.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -67,6 +69,7 @@ class Admin_Columns {
 		foreach ( $columns as $key => $label ) {
 			$new[ $key ] = $label;
 			if ( 'title' === $key ) {
+				$new['scos_seo_target_query'] = __( 'Target Query', 'site-essentials' );
 				$new['scos_seo_title'] = __( 'SEO Title', 'site-essentials' );
 				$new['scos_seo_desc']  = __( 'SEO Desc', 'site-essentials' );
 			}
@@ -74,7 +77,7 @@ class Admin_Columns {
 		return $new;
 	}
 
-	/** Hide both SEO columns by default — users opt in via Screen Options. */
+	/** Hide the title and description columns by default — users opt in via Screen Options. */
 	public static function default_hidden( $hidden, $screen ) {
 		if ( ! isset( $screen->base ) || 'edit' !== $screen->base ) {
 			return $hidden;
@@ -93,14 +96,16 @@ class Admin_Columns {
 				$title      = get_post_meta( $post_id, 'scos_seo_title', true );
 				$desc       = get_post_meta( $post_id, 'scos_seo_description', true );
 				$breadcrumb = get_post_meta( $post_id, 'scos_seo_breadcrumb_title', true );
+				$query      = get_post_meta( $post_id, 'scos_seo_target_query', true );
 
 				// Hidden container — read by Quick Edit JS for pre-population.
 				printf(
-					'<span class="scos-seo-qe-data" id="scos-seo-data-%d" data-title="%s" data-desc="%s" data-breadcrumb="%s" style="display:none"></span>',
+					'<span class="scos-seo-qe-data" id="scos-seo-data-%d" data-title="%s" data-desc="%s" data-breadcrumb="%s" data-query="%s" style="display:none"></span>',
 					$post_id,
 					esc_attr( (string) $title ),
 					esc_attr( (string) $desc ),
-					esc_attr( (string) $breadcrumb )
+					esc_attr( (string) $breadcrumb ),
+					esc_attr( (string) $query )
 				);
 
 				if ( $title ) {
@@ -109,6 +114,15 @@ class Admin_Columns {
 						esc_attr( $title ),
 						esc_html( wp_trim_words( $title, 8, '…' ) )
 					);
+				} else {
+					echo '<span class="scos-col-empty">—</span>';
+				}
+				break;
+
+			case 'scos_seo_target_query':
+				$query = get_post_meta( $post_id, 'scos_seo_target_query', true );
+				if ( $query ) {
+					printf( '<span class="scos-col-text">%s</span>', esc_html( $query ) );
 				} else {
 					echo '<span class="scos-col-empty">—</span>';
 				}
@@ -146,6 +160,11 @@ class Admin_Columns {
 			<div class="inline-edit-col">
 				<h4 class="scos-qe-title"><?php esc_html_e( 'SEO Meta', 'site-essentials' ); ?></h4>
 				<div class="scos-seo-qe-fields">
+
+					<label class="scos-qe-label scos-seo-qe-label--wide">
+						<span class="title"><?php esc_html_e( 'Target KW Query', 'site-essentials' ); ?></span>
+						<input type="text" name="scos_seo_qe_target_query" class="scos-seo-qe-input" style="width:100%">
+					</label>
 
 					<label class="scos-qe-label scos-seo-qe-label--wide">
 						<span class="title"><?php esc_html_e( 'SEO Title', 'site-essentials' ); ?></span>
@@ -198,6 +217,11 @@ class Admin_Columns {
 		if ( isset( $_POST['scos_seo_qe_breadcrumb'] ) ) {
 			$val = sanitize_text_field( wp_unslash( $_POST['scos_seo_qe_breadcrumb'] ) );
 			self::update_or_delete( $post_id, 'scos_seo_breadcrumb_title', $val );
+		}
+
+		if ( isset( $_POST['scos_seo_qe_target_query'] ) ) {
+			$val = sanitize_text_field( wp_unslash( $_POST['scos_seo_qe_target_query'] ) );
+			self::update_or_delete( $post_id, 'scos_seo_target_query', $val );
 		}
 	}
 

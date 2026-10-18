@@ -19,6 +19,7 @@
  * v1.6 | 2026-09-30 — Load the Get_Seo_Meta_Instructions ability.
  * v1.7 | 2026-09-30 — Load the Get_Image_Meta_Instructions ability.
  * v1.8 | 2026-09-30 — Tell the suggest script whether Content Architecture is active.
+ * v1.9 | 2026-10-18 — Target query field (scos_seo_target_query).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -111,6 +112,8 @@ class Meta_Box {
 
 		$breadcrumb_title = get_post_meta( $post->ID, 'scos_seo_breadcrumb_title', true );
 
+		$target_query = get_post_meta( $post->ID, 'scos_seo_target_query', true );
+
 		$tldr = get_post_meta( $post->ID, 'scos_seo_tldr', true );
 
 		$title = get_post_meta( $post->ID, 'scos_seo_title', true );
@@ -147,6 +150,12 @@ class Meta_Box {
 		if ( isset( $_POST['scos_seo_breadcrumb_title'] ) ) {
 			$val = sanitize_text_field( $_POST['scos_seo_breadcrumb_title'] );
 			self::update_or_delete( $post_id, 'scos_seo_breadcrumb_title', $val );
+		}
+
+		// ---- Target query (the GSC search term to win impressions for) ----
+		if ( isset( $_POST['scos_seo_target_query'] ) ) {
+			$val = sanitize_text_field( wp_unslash( $_POST['scos_seo_target_query'] ) );
+			self::update_or_delete( $post_id, 'scos_seo_target_query', $val );
 		}
 
 		// ---- TLDR ----

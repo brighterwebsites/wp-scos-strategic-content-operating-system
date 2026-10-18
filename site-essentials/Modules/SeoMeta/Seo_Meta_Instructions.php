@@ -28,6 +28,7 @@
  * v1.1 | 2026-09-30 — Business context and page purpose in the result; purpose picks the content type;
  *                      products never mention price or stock; shared parts moved to Writing_Context.
  * v1.2 | 2026-09-30 — TLDR is a field here too; the post's search intent goal is returned.
+ * v1.3 | 2026-10-18 — The post's target query (scos_seo_target_query) is returned.
  */
 
 declare( strict_types=1 );
@@ -44,7 +45,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Seo_Meta_Instructions {
 
 	/** Bump when the shipped rules change, so consumers can tell. */
-	const VERSION = '1.2';
+	const VERSION = '1.3';
 
 	/**
 	 * Build the instructions for a post, a post type, or the site in general.
@@ -103,6 +104,9 @@ class Seo_Meta_Instructions {
 			'business'             => Writing_Context::business(),
 			'purpose'              => $purpose,
 			'intent_goal'          => Writing_Context::intent_goal( $post instanceof \WP_Post ? $post->ID : 0 ),
+			'target_query'         => $post instanceof \WP_Post
+				? trim( (string) get_post_meta( $post->ID, 'scos_seo_target_query', true ) )
+				: '',
 			'fields'               => $fields,
 			'general_rules'        => self::general_rules(),
 			'avoid'                => Writing_Context::avoid(),

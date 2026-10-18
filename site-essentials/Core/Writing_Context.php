@@ -16,6 +16,7 @@
  *
  * v1.0 | 2026-09-30
  * v1.1 | 2026-09-30 — intent_goal(); field rules rendering shared by the instructions classes.
+ * v1.2 | 2026-10-18 — to_prompt() renders target_query when an instructions class returns one.
  */
 
 declare( strict_types=1 );
@@ -234,8 +235,8 @@ class Writing_Context {
 	 * Render the shared context as plain text for a system prompt.
 	 *
 	 * Reads the keys the instructions classes all return: business, purpose,
-	 * intent_goal, general_rules, avoid, facts and voice. Anything absent is
-	 * left out.
+	 * intent_goal, general_rules, avoid, facts and voice, plus target_query
+	 * where a class returns one. Anything absent is left out.
 	 *
 	 * @param array<string,mixed> $instructions Result of an instructions class's get().
 	 * @return string
@@ -267,6 +268,12 @@ class Writing_Context {
 		$intent_goal = (string) ( $instructions['intent_goal'] ?? '' );
 		if ( '' !== $intent_goal ) {
 			$lines[] = '- Search question this page answers: ' . $intent_goal;
+		}
+
+		$target_query = (string) ( $instructions['target_query'] ?? '' );
+		if ( '' !== $target_query ) {
+			$lines[] = '- Search term this page should win impressions for: ' . $target_query
+				. ' (work it into the meta title, near the start, and the description, in natural wording)';
 		}
 
 		if ( $lines ) {

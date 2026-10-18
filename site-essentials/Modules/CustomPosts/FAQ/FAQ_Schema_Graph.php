@@ -17,7 +17,13 @@
  * emitted by the block's render callback, so the page has exactly one
  * JSON-LD graph.
  *
- * v1.4 | 2026-05-19
+ * Scos_Faqs elements in Breakdance templates (and on archives) are not in
+ * the post's own data, so the head graph cannot see them. Those elements
+ * fire `scos_faq_ids_rendered` as they render; the FAQs collected from it
+ * are printed as a second FAQPage block in the footer, minus any FAQ the
+ * head graph already listed.
+ *
+ * v1.5 | 2026-10-17
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -58,6 +64,29 @@ class FAQ_Schema_Graph {
 	private static $inspect = [];
 
 	/**
+	 * True once the head graph filter has run on this request. The footer
+	 * block is only printed when it has, so the schema kill switch and
+	 * allow-list in scos-schema-output.php also cover the footer.
+	 *
+	 * @var bool
+	 */
+	private static $graph_ran = false;
+
+	/**
+	 * FAQ IDs the head graph put in its FAQPage.
+	 *
+	 * @var int[]
+	 */
+	private static $head_ids = [];
+
+	/**
+	 * FAQ IDs collected from `scos_faq_ids_rendered`, in render order.
+	 *
+	 * @var int[]
+	 */
+	private static $rendered_ids = [];
+
+	/**
 	 * Register the filter.
 	 *
 	 * @since 1.0.0
@@ -65,6 +94,9 @@ class FAQ_Schema_Graph {
 	 */
 	public static function register(): void {
 		add_filter( 'scos_schema_graph_items', [ self::class, 'filter_graph' ], 10, 2 );
+		add_action( 'scos_faq_ids_rendered', [ self::class, 'collect_rendered_ids' ], 10, 2 );
+		// Late, after anything else printed in wp_footer has rendered its FAQ elements.
+		add_action( 'wp_footer', [ self::class, 'emit_footer_graph' ], 100 );
 		add_action( 'wp_print_footer_scripts', [ self::class, 'emit_inspection_footer' ], 100 );
 	}
 
@@ -80,6 +112,7 @@ class FAQ_Schema_Graph {
 	public static function filter_graph( $graph, $post_id ): array {
 		$graph = is_array( $graph ) ? $graph : [];
 		$post_id = (int) $post_id;
+		self::$graph_ran = true;
 		if ( self::inspect_enabled() ) {
 			self::$inspect['filter_called'] = true;
 			self::$inspect['arg_post_id']   = $post_id;
@@ -130,23 +163,8 @@ class FAQ_Schema_Graph {
 			return $graph;
 		}
 
-		$main_entity = [];
 		$skipped     = [];
-		foreach ( $faqs as $faq ) {
-			$answer = FAQ_Module::get_schema_answer( (int) $faq->ID );
-			if ( false === $answer || '' === $answer ) {
-				$skipped[] = (int) $faq->ID;
-				continue;
-			}
-			$main_entity[] = [
-				'@type'          => 'Question',
-				'name'           => get_the_title( $faq->ID ),
-				'acceptedAnswer' => [
-					'@type' => 'Answer',
-					'text'  => $answer,
-				],
-			];
-		}
+		$main_entity = self::build_questions( $faqs, $skipped );
 		if ( self::inspect_enabled() ) {
 			self::$inspect['questions_added']      = count( $main_entity );
 			self::$inspect['skipped_empty_answer'] = $skipped;
@@ -156,6 +174,8 @@ class FAQ_Schema_Graph {
 			return $graph;
 		}
 
+		self::$head_ids = array_values( array_diff( wp_list_pluck( $faqs, 'ID' ), $skipped ) );
+
 		$graph[] = [
 			'@type'      => 'FAQPage',
 			'@id'        => get_permalink( $post_id ) . '#faq',
@@ -163,6 +183,150 @@ class FAQ_Schema_Graph {
 		];
 
 		return $graph;
+	}
+
+	/**
+	 * Build Question entries for FAQs that have a schema answer.
+	 *
+	 * @since 1.5.0
+	 * @param \WP_Post[] $faqs    FAQ posts.
+	 * @param int[]      $skipped Reference; IDs with an empty answer are appended.
+	 * @return array[]
+	 */
+	private static function build_questions( array $faqs, array &$skipped ): array {
+		$questions = [];
+		foreach ( $faqs as $faq ) {
+			$answer = FAQ_Module::get_schema_answer( (int) $faq->ID );
+			if ( false === $answer || '' === $answer ) {
+				$skipped[] = (int) $faq->ID;
+				continue;
+			}
+			$questions[] = [
+				'@type'          => 'Question',
+				'name'           => get_the_title( $faq->ID ),
+				'acceptedAnswer' => [
+					'@type' => 'Answer',
+					'text'  => $answer,
+				],
+			];
+		}
+		return $questions;
+	}
+
+	// =========================================================================
+	// Rendered elements (templates, archives) → footer FAQPage
+	// =========================================================================
+
+	/**
+	 * Collect FAQ IDs from a Scos_Faqs element that just rendered.
+	 *
+	 * Fired by Brighter BD Elements as `scos_faq_ids_rendered`. Only FAQs
+	 * rendered for the page itself count: an element inside a post loop
+	 * reports the loop post as its context, and those are ignored so an
+	 * archive doesn't collect every listed item's FAQs.
+	 *
+	 * @since 1.5.0
+	 * @param mixed $ids     FAQ post IDs.
+	 * @param mixed $context [ 'type' => 'post'|'term'|'none', 'object' => WP_Post|WP_Term|null ].
+	 * @return void
+	 */
+	public static function collect_rendered_ids( $ids, $context = [] ): void {
+		if ( ! is_array( $ids ) || ! self::is_page_context( is_array( $context ) ? $context : [] ) ) {
+			return;
+		}
+		foreach ( $ids as $id ) {
+			self::$rendered_ids[] = (int) $id;
+		}
+		if ( self::inspect_enabled() ) {
+			self::$inspect['footer_rendered_ids'] = array_values( array_unique( self::$rendered_ids ) );
+		}
+	}
+
+	/**
+	 * Is this render context the queried object (or no object at all)?
+	 *
+	 * @since 1.5.0
+	 * @param array $context Render context from the element.
+	 * @return bool
+	 */
+	private static function is_page_context( array $context ): bool {
+		$type    = $context['type'] ?? 'none';
+		$object  = $context['object'] ?? null;
+		$queried = get_queried_object();
+
+		if ( 'none' === $type ) {
+			return true;
+		}
+		if ( 'post' === $type ) {
+			return $object instanceof \WP_Post && $queried instanceof \WP_Post && $object->ID === $queried->ID;
+		}
+		if ( 'term' === $type ) {
+			return $object instanceof \WP_Term && $queried instanceof \WP_Term && $object->term_id === $queried->term_id;
+		}
+		return false;
+	}
+
+	/**
+	 * Print the footer FAQPage for FAQs rendered by elements the head graph
+	 * could not see.
+	 *
+	 * Uses the same `@id` as the head FAQPage on singular pages, so a page
+	 * with FAQs in both places describes one FAQPage node.
+	 *
+	 * @since 1.5.0
+	 * @return void
+	 */
+	public static function emit_footer_graph(): void {
+		if ( ! self::$graph_ran || empty( self::$rendered_ids ) ) {
+			return;
+		}
+
+		$ids = array_values( array_diff( array_unique( array_filter( self::$rendered_ids ) ), self::$head_ids ) );
+		if ( empty( $ids ) ) {
+			return;
+		}
+
+		$skipped   = [];
+		$questions = self::build_questions( FAQ_Module::get_by_ids( $ids ), $skipped );
+		$url       = self::current_url();
+		if ( empty( $questions ) || '' === $url ) {
+			return;
+		}
+
+		$schema = [
+			'@context' => 'https://schema.org',
+			'@graph'   => [
+				[
+					'@type'      => 'FAQPage',
+					'@id'        => $url . '#faq',
+					'mainEntity' => $questions,
+				],
+			],
+		];
+
+		// JSON_HEX_TAG keeps a `</script>` inside an answer from closing the tag.
+		echo "\n" . '<script id="scos-faq-graph" type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG ) . '</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * URL of the current page, without query string.
+	 *
+	 * @since 1.5.0
+	 * @return string Empty string when it can't be resolved.
+	 */
+	private static function current_url(): string {
+		$queried = get_queried_object();
+		if ( is_singular() && $queried instanceof \WP_Post ) {
+			return (string) get_permalink( $queried );
+		}
+		if ( $queried instanceof \WP_Term ) {
+			$link = get_term_link( $queried );
+			return is_wp_error( $link ) ? '' : $link;
+		}
+
+		global $wp;
+		$path = isset( $wp->request ) ? (string) $wp->request : '';
+		return home_url( user_trailingslashit( $path ) );
 	}
 
 	// =========================================================================

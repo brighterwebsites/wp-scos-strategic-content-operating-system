@@ -3,6 +3,7 @@
  * SEO Meta — Archive Settings view
  *
  * v1.1 | 2026-05-19
+ * v1.2 | 2026-10-18 — Token table lists %%_acf_*%% / %%_cmeta_*%% field tokens.
  *
  * SCOS design system: scos-accordion replaces <details>, scos-form inside bodies,
  * scos-badge for status, scos-save-bar, scos__section-label. Inline <style> removed.
@@ -58,6 +59,8 @@ $chevron_svg = '<svg class="scos-accordion__chevron" xmlns="http://www.w3.org/20
 					<tr><th><code>%description%</code></th><td><?php esc_html_e( 'Term description — the description set on the taxonomy term edit screen', 'site-essentials' ); ?></td></tr>
 					<tr><th><code>%author%</code></th><td><?php esc_html_e( 'Author display name (author archives)', 'site-essentials' ); ?></td></tr>
 					<tr><th><code>%search%</code></th><td><?php esc_html_e( 'Search query string (search results archives)', 'site-essentials' ); ?></td></tr>
+					<tr><th><code>%%_acf_field_name%%</code></th><td><?php esc_html_e( 'ACF field on the term, author, posts page (blog archive) or shop page (product archive)', 'site-essentials' ); ?></td></tr>
+					<tr><th><code>%%_cmeta_meta_key%%</code></th><td><?php esc_html_e( 'Custom meta value from the same object. Blank when the field is empty or not text.', 'site-essentials' ); ?></td></tr>
 				</tbody>
 			</table>
 			<p class="description" style="margin-top:var(--scos-s-3)">
@@ -564,7 +567,7 @@ $chevron_svg = '<svg class="scos-accordion__chevron" xmlns="http://www.w3.org/20
 				<p class="description" style="margin-bottom:var(--scos-s-2)">
 					<?php
 					printf(
-						esc_html__( 'Tokens: %%title%% (%s term name), %%term%% (same), %%taxonomy%% (taxonomy label), %%sitename%%, %%sep%%, %%page%%', 'site-essentials' ),
+						esc_html__( 'Tokens: %%title%% (%s term name), %%term%% (same), %%taxonomy%% (taxonomy label), %%sitename%%, %%sep%%, %%page%%, %%%%_acf_field_name%%%% (ACF field on the term), %%%%_cmeta_meta_key%%%% (term meta)', 'site-essentials' ),
 						esc_html( strtolower( $tax_label ) )
 					);
 					?>

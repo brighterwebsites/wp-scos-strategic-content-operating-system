@@ -20,6 +20,7 @@
  *
  * CPT / Posts archive only:
  *  tldr              – plain string
+ *  target_query      – plain string, the GSC search term to win impressions for
  *  sitemap_exclude   – array subset of: xml, html, news
  *  og_image_id       – attachment ID (int)
  *  pagination_noindex – bool — noindex on /page/2+
@@ -48,7 +49,8 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.2 | 2026-10-18 — %%_acf_*%% / %%_cmeta_*%% field tokens.
+ * @version    1.3 | 2026-10-18 — target_query field (CPT / posts archives).
+ * v1.2 | 2026-10-18 — %%_acf_*%% / %%_cmeta_*%% field tokens.
  * @since      1.1.0
  */
 
@@ -72,6 +74,7 @@ class Archive_Settings {
 			'description'        => '',
 			'breadcrumb_title'   => '',
 			'tldr'               => '',
+			'target_query'       => '',
 			'robots'             => [],
 			'sitemap_exclude'    => [],
 			'og_image_id'        => 0,
@@ -464,6 +467,7 @@ class Archive_Settings {
 			if ( ! in_array( $slug, self::SPECIAL_SLUGS, true ) ) {
 				// CPT / Posts archive–only fields
 				$data['tldr']               = sanitize_textarea_field( $raw['tldr'] ?? '' );
+				$data['target_query']        = sanitize_text_field( $raw['target_query'] ?? '' );
 				$data['sitemap_exclude']     = self::sanitize_checkboxes(
 					$raw['sitemap_exclude'] ?? [],
 					[ 'xml', 'html', 'news' ]

@@ -11,6 +11,7 @@
  *                      that the field supports bold/lists via wp_editor().
  * v1.4 | 2026-07-24 — Stop excluding 'product' from fallback post type list (only
  *                      used when ContentArchitecture module is inactive).
+ * v1.5 | 2026-10-18 — Register scos_seo_target_query.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -46,6 +47,10 @@ class Meta_Fields {
 		register_post_meta( '', 'scos_seo_tldr',             $tldr_field );
 		register_post_meta( '', 'scos_seo_title',            $string );
 		register_post_meta( '', 'scos_seo_description',      $textarea );
+
+		// The Search Console query the page should get the most impressions for.
+		// Distinct from scos_ca_intent_goal, the question the content answers.
+		register_post_meta( '', 'scos_seo_target_query',     $string );
 
 		// Advanced SEO
 		register_post_meta( '', 'scos_seo_canonical',        $url );

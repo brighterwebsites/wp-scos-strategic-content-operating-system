@@ -2,6 +2,7 @@
 // v1.1 | 2026-10-13 — Resolve the post from edit()'s own argument, not a click
 //                      listener that fired after edit() and left the previous
 //                      post's ID in place (copied one post's SEO meta onto the next).
+// v1.2 | 2026-10-18 — Target query field.
 ( function ( $ ) {
 	'use strict';
 
@@ -40,6 +41,7 @@
 			$panel.find( 'input[name="scos_seo_qe_title"]' ).val( $dataEl.attr( 'data-title' ) || '' );
 			$panel.find( 'textarea[name="scos_seo_qe_description"]' ).val( $dataEl.attr( 'data-desc' ) || '' );
 			$panel.find( 'input[name="scos_seo_qe_breadcrumb"]' ).val( $dataEl.attr( 'data-breadcrumb' ) || '' );
+			$panel.find( 'input[name="scos_seo_qe_target_query"]' ).val( $dataEl.attr( 'data-query' ) || '' );
 			$panel.find( 'input[name="scos_seo_qe_loaded"]' ).val( String( postId ) );
 
 			return result;

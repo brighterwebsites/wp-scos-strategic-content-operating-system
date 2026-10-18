@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-05-19
  * v1.2 | 2026-10-18 — Token table lists %%_acf_*%% / %%_cmeta_*%% field tokens.
+ * v1.3 | 2026-10-18 — Target KW Query field on CPT / posts archives.
  *
  * SCOS design system: scos-accordion replaces <details>, scos-form inside bodies,
  * scos-badge for status, scos-save-bar, scos__section-label. Inline <style> removed.
@@ -156,6 +157,18 @@ $chevron_svg = '<svg class="scos-accordion__chevron" xmlns="http://www.w3.org/20
 				<h3 class="scos__section-label" style="font-size:var(--scos-fs-sm);margin-bottom:var(--scos-s-2)"><?php esc_html_e( 'Meta & SEO', 'site-essentials' ); ?></h3>
 				<table class="scos-form" style="margin-bottom:var(--scos-s-4)">
 					<tbody>
+						<tr>
+							<th>
+								<label for="scos-<?php echo esc_attr( $slug ); ?>-target-query"><?php esc_html_e( 'Target KW Query', 'site-essentials' ); ?></label>
+							</th>
+							<td>
+								<input type="text" id="scos-<?php echo esc_attr( $slug ); ?>-target-query"
+									name="<?php echo esc_attr( $f ); ?>[target_query]"
+									value="<?php echo esc_attr( $s['target_query'] ); ?>"
+									class="scos-input">
+								<p class="description"><?php esc_html_e( 'The Search Console search term this archive should get the most impressions for. For a per-term value, use an ACF term field and the %%_acf_field_name%% token.', 'site-essentials' ); ?></p>
+							</td>
+						</tr>
 						<tr>
 							<th>
 								<label for="scos-<?php echo esc_attr( $slug ); ?>-title"><?php esc_html_e( 'Meta Title', 'site-essentials' ); ?></label>

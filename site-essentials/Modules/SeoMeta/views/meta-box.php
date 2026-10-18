@@ -5,6 +5,7 @@
  * Variables available from Meta_Box::render():
  *   $post                      WP_Post
  *   $breadcrumb_title          string
+ *   $target_query              string
  *   $tldr                      string
  *   $title                     string
  *   $description               string
@@ -21,6 +22,7 @@
  * v1.0 | 2026-06-24
  * v1.1 | 2026-07-17 — TLDR field switched from plain textarea to a teeny
  *                      wp_editor() instance (bold/lists/link, no images).
+ * v1.2 | 2026-10-18 — Target KW Query field.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -56,6 +58,19 @@ defined( 'ABSPATH' ) || exit;
 			<span class="scos-seo-ai-hint"><?php esc_html_e( 'Suggest breadcrumb label, meta title and description from page content.', 'site-essentials' ); ?></span>
 		</div>
 		<?php endif; ?>
+
+		<!-- Target KW Query -->
+		<div class="scos-seo-field">
+			<label for="scos_seo_target_query">
+				<?php esc_html_e( 'Target KW Query', 'site-essentials' ); ?>
+			</label>
+			<input type="text"
+				name="scos_seo_target_query"
+				id="scos_seo_target_query"
+				value="<?php echo esc_attr( $target_query ); ?>"
+				placeholder="<?php esc_attr_e( 'e.g. horse stable kits', 'site-essentials' ); ?>">
+			<p class="scos-seo-help"><?php esc_html_e( 'The Search Console search term this page should get the most impressions for. Not the question it answers (that is the Intent Goal). Used by Suggest with AI.', 'site-essentials' ); ?></p>
+		</div>
 
 		<!-- Breadcrumb Title -->
 		<div class="scos-seo-field">

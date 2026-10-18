@@ -39,9 +39,16 @@
  *  %search%   Current search query (search context only)
  *  %author%   Author display name (author context only)
  *
+ * Field tokens (same syntax as the schema templates):
+ *  %%_acf_field_name%%  ACF field on the archive's source object
+ *  %%_cmeta_meta_key%%  Meta value on the archive's source object
+ *  Source object: the queried term (term archives), the author (author
+ *  archives), the posts page (blog archive), the shop page (product archive).
+ *  Anything else, or a missing / non-text value, resolves to an empty string.
+ *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.1 | 2026-05-22
+ * @version    1.2 | 2026-10-18 — %%_acf_*%% / %%_cmeta_*%% field tokens.
  * @since      1.1.0
  */
 
@@ -222,6 +229,10 @@ class Archive_Settings {
 			return '';
 		}
 
+		// Field tokens first, so their %% delimiters are gone before the
+		// %token% pass runs over the string.
+		$raw = self::parse_field_tokens( $raw );
+
 		// %title% — context-dependent
 		switch ( $slug ) {
 			case 'post':
@@ -320,6 +331,93 @@ class Archive_Settings {
 		];
 
 		return str_replace( array_keys( $tokens ), array_values( $tokens ), $raw );
+	}
+
+	/**
+	 * Replace %%_acf_name%% and %%_cmeta_key%% with values from the archive's
+	 * source object (see field_source()).
+	 *
+	 * @param  string $raw Template string.
+	 * @return string
+	 */
+	private static function parse_field_tokens( string $raw ): string {
+		if ( false === strpos( $raw, '%%_' ) ) {
+			return $raw;
+		}
+
+		$source = self::field_source();
+
+		return (string) preg_replace_callback(
+			'/%%_(acf|cmeta)_([A-Za-z0-9_-]+)%%/',
+			static function ( array $m ) use ( $source ): string {
+				return self::field_value( $source, $m[1], $m[2] );
+			},
+			$raw
+		);
+	}
+
+	/**
+	 * The object an archive's field tokens read from.
+	 *
+	 * @return array{type: string, id: int}|null Meta type ('term', 'user', 'post') and object ID.
+	 */
+	private static function field_source(): ?array {
+		$queried = get_queried_object();
+
+		if ( $queried instanceof \WP_Term ) {
+			return [ 'type' => 'term', 'id' => (int) $queried->term_id ];
+		}
+		if ( $queried instanceof \WP_User ) {
+			return [ 'type' => 'user', 'id' => (int) $queried->ID ];
+		}
+		// Archives with a page behind them: the posts page and the WooCommerce shop.
+		if ( is_home() ) {
+			$page_id = (int) get_option( 'page_for_posts' );
+			return $page_id ? [ 'type' => 'post', 'id' => $page_id ] : null;
+		}
+		if ( is_post_type_archive( 'product' ) && function_exists( 'wc_get_page_id' ) ) {
+			$page_id = (int) wc_get_page_id( 'shop' );
+			return $page_id > 0 ? [ 'type' => 'post', 'id' => $page_id ] : null;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Plain-text value of one field token.
+	 *
+	 * ACF tokens go through get_field() so formatted values (select labels,
+	 * true/false) come out the way ACF renders them; without ACF they read the
+	 * meta key of the same name, which is where ACF stores the raw value.
+	 *
+	 * @param  array|null $source From field_source().
+	 * @param  string     $kind   'acf' or 'cmeta'.
+	 * @param  string     $name   Field name or meta key.
+	 * @return string
+	 */
+	private static function field_value( ?array $source, string $kind, string $name ): string {
+		if ( null === $source ) {
+			return '';
+		}
+
+		if ( 'acf' === $kind && function_exists( 'get_field' ) ) {
+			$acf_id = 'post' === $source['type'] ? $source['id'] : $source['type'] . '_' . $source['id'];
+			$value  = get_field( $name, $acf_id );
+		} else {
+			$value = get_metadata( $source['type'], $source['id'], $name, true );
+		}
+
+		// Multi-value fields (checkbox, multi-select) join their text values.
+		if ( is_array( $value ) ) {
+			$value = implode( ', ', array_filter( array_map(
+				static function ( $v ) {
+					return is_scalar( $v ) ? trim( (string) $v ) : '';
+				},
+				$value
+			), 'strlen' ) );
+		}
+
+		return is_scalar( $value ) ? trim( wp_strip_all_tags( (string) $value ) ) : '';
 	}
 
 	// ── Form save handler ─────────────────────────────────────────────────────

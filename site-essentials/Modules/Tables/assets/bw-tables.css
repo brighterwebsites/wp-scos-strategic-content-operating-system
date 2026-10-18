@@ -1,4 +1,4 @@
-/* BW Universal Table System — v3.1
+/* BW Universal Table System — v3.2 | 2026-10-18
    Shared agency component (tier 2, bw- namespace). Ported from the v2
    stylesheet running on brighterwebsites.com.au, retaining its visual
    decisions and mapping them onto the v3 class taxonomy.
@@ -187,8 +187,10 @@
     background: none;
   }
   .bw-stack thead { display: none; }
+  /* border-box: a full-width cell plus its padding must not outgrow the
+     card, which clips it (overflow: hidden) — not every theme resets this. */
   .bw-stack tr,
-  .bw-stack td { display: block; width: 100%; }
+  .bw-stack td { display: block; width: 100%; box-sizing: border-box; }
 
   .bw-stack tbody tr {
     margin-bottom: 12px;
@@ -208,6 +210,8 @@
   }
   .bw-stack td:not(:last-child) { border-right: none; }
   .bw-stack tbody tr td:last-child { border-bottom: none; }
+  /* The desktop last-row rule would strip the last card's dividers. */
+  .bw-stack tbody tr:last-child td:not(:last-child) { border-bottom: 1px solid var(--bw-t-border); }
 
   /* Without labels, the first cell acts as the card title. */
   .bw-stack:not(.bw-labels) td:first-child {
@@ -216,23 +220,29 @@
   }
 
   /* ---- .bw-labels — heading printed beside each value.
-     Needs the data-bw-label stamp (bw-tables.js). ---- */
-  .bw-stack.bw-labels td {
-    position: relative;
-    padding: 10px 12px 10px 45%;
+     Needs the data-bw-label stamp and .bw-cell wrapper (bw-tables.js).
+     A grid, not an absolute label: a long heading wraps inside its own
+     column and the row grows to fit, instead of running over the value. ---- */
+  .bw-stack.bw-labels td[data-bw-label] {
+    display: grid;
+    grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
   }
-  .bw-stack.bw-labels td::before {
+  .bw-stack.bw-labels td[data-bw-label]::before {
     content: attr(data-bw-label);
-    position: absolute;
-    left: 12px;
-    top: 10px;
     font-size: 13px;
     font-weight: 600;
     line-height: 1.3;
     color: var(--bw-t-muted);
+    overflow-wrap: anywhere;
   }
-  .bw-stack.bw-labels td[data-bw-label=""] { padding-left: 12px; }
+  .bw-stack.bw-labels td[data-bw-label=""] { display: block; }
   .bw-stack.bw-labels td[data-bw-label=""]::before { display: none; }
+  .bw-labels .bw-cell { min-width: 0; overflow-wrap: anywhere; }
+  /* Keep the value's first line level with the label's. */
+  .bw-labels .bw-cell > :first-child { margin-top: 0; }
+  .bw-labels .bw-cell > :last-child  { margin-bottom: 0; }
 
   /* ---- .bw-cards — each COLUMN becomes a card. Built by bw-tables.js.
      The original table is hidden once the build succeeds, so a table left
@@ -276,20 +286,21 @@
 
   /* Labelled rows — .bw-cards.bw-labels uses column one as the row label */
   .bw-cards__row--labelled {
-    position: relative;
-    min-height: 40px;
-    padding-left: 45%;
+    display: grid;
+    grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
   }
   .bw-cards__row--labelled::before {
     content: attr(data-bw-label);
-    position: absolute;
-    left: 14px;
-    top: 10px;
     font-size: 0.875em;
     font-weight: 600;
     line-height: 1.3;
     color: var(--bw-t-muted);
+    overflow-wrap: anywhere;
   }
+  .bw-cards__row--labelled[data-bw-label=""] { display: block; }
+  .bw-cards__row--labelled[data-bw-label=""]::before { display: none; }
 
   /* .bw-compare — the last card is the featured one */
   .bw-compare .bw-cards__card:last-child {

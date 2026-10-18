@@ -1,5 +1,5 @@
-# BW Universal Table System — v3.1 Spec
-<!-- v3.1 | 2026-08-28 -->
+# BW Universal Table System — v3.2 Spec
+<!-- v3.2 | 2026-10-18 -->
 
 **Status:** for review, pre-implementation
 **Supersedes:** v3 draft (paths and activation gate corrected against the actual repo)
@@ -241,7 +241,7 @@ The no-class default is new. v2 had none, so an unclassed wide table just overfl
 
 | Class | Effect |
 |---|---|
-| `.bw-labels` | In `stack`: header text as `::before` label per cell (via a `data-bw-label` stamp — see §5.2). In `cards`: first column's values become row labels, and column 1 is omitted as its own card. |
+| `.bw-labels` | In `stack`: header text as `::before` label per cell (via a `data-bw-label` stamp — see §5.2). In `cards`: first column's values become row labels, and column 1 is omitted as its own card. Either way the label and value sit in a two-column grid (40% / rest), so a long label wraps and grows the row — see §6.4. |
 | `.bw-hide-first` | Omit first column entirely (cards only, no label use) |
 | `.bw-compare` | Last column highlighted as featured; in cards, last card gets accent border |
 | `.bw-pricing` | SKU / config / price column width treatment |
@@ -310,10 +310,11 @@ mq.addEventListener('change', e => { if (e.matches) build(); });
 
 **Accepted trade-off:** on mobile the content exists twice in the DOM. A 12×6 table adds roughly 150 nodes. Lighthouse flags DOM size past ~1,400 nodes total, so this is comfortable but not free. Screen readers ignore `display:none`, so no accessibility cost.
 
-The alternative — *moving* cells rather than cloning — has zero duplication and preserves IDs and event listeners, but requires full teardown logic to survive a landscape rotation back over the breakpoint. Deferred to v3.2 if node counts ever become a real Lighthouse problem.
+The alternative — *moving* cells rather than cloning — has zero duplication and preserves IDs and event listeners, but requires full teardown logic to survive a landscape rotation back over the breakpoint. Deferred to a later version if node counts ever become a real Lighthouse problem.
 
 ### 6.4 Build rules
 
+- **Wrap labelled content in `.bw-cell`.** Every labelled cell (stack) and labelled card row gets its content moved into one `div.bw-cell`, and the label is the grid's first column. v3.1 positioned the label absolutely beside a fixed 45% indent: a long heading ran over the value, and since an absolute label adds no height, a wrapped label beside a short value bled into the next cell. The wrapper is required because a grid makes every inline child its own item — `a <strong>b</strong> c` would stack on three lines.
 - **Strip IDs on clone.** `card.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'))`. Fixes v2's duplicate-ID bug, which breaks in-page anchors and any `label[for]` inside a cell.
 - **No `thead`?** Fall back to treating the first `tbody` row as the header. Gutenberg tables with the header-row toggle off are common and v2 silently dropped all labels for them.
 - **`colspan` / `rowspan`: unsupported.** Explicit non-goal. Detect, skip the transform, leave the table in scroll mode, `console.warn` in debug. Silently producing a scrambled card grid is worse than not transforming.

@@ -1,8 +1,9 @@
-/* BW Universal Table System — v3.1
+/* BW Universal Table System — v3.2 | 2026-10-18
    Two jobs, both mobile-only:
 
      .bw-labels  stamp each cell with its column heading, because CSS cannot
-                 read a thead into a ::before.
+                 read a thead into a ::before, and wrap its content in .bw-cell
+                 so the label and value can sit in a grid.
      .bw-cards   rebuild the table as one card per column.
 
    Build once, never tear down: the media query only fires on an actual
@@ -49,11 +50,22 @@
 		return head.fromBody ? rows.filter(function (r) { return r !== head.row; }) : rows;
 	}
 
+	// Move a cell's content into one .bw-cell wrapper. The labelled layout is a
+	// two-column grid, and without a wrapper every inline child (a <strong>, a
+	// link) would become its own grid item and stack on a separate line.
+	function wrapContent(el) {
+		var inner = document.createElement('div');
+		inner.className = 'bw-cell';
+		while (el.firstChild) inner.appendChild(el.firstChild);
+		el.appendChild(inner);
+	}
+
 	/* ---- .bw-labels : stamp data-bw-label on every cell ---- */
 	function stampLabels(fig, table, head) {
 		bodyRows(table, head).forEach(function (row) {
 			Array.prototype.forEach.call(row.children, function (cell, i) {
 				cell.setAttribute('data-bw-label', head.cells[i] || '');
+				wrapContent(cell);
 			});
 		});
 	}
@@ -106,6 +118,7 @@
 				if (useLabels) {
 					line.classList.add('bw-cards__row--labelled');
 					line.setAttribute('data-bw-label', rowLabels[r] || '');
+					wrapContent(line);
 				}
 
 				body.appendChild(line);

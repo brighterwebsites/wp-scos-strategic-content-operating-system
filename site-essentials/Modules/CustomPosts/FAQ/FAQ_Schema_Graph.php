@@ -23,7 +23,10 @@
  * are printed as a second FAQPage block in the footer, minus any FAQ the
  * head graph already listed.
  *
- * v1.5 | 2026-10-17
+ * Both FAQPage blocks carry `url` and `isPartOf` the WebPage node, so the
+ * footer block joins the head graph by `@id` instead of standing alone.
+ *
+ * v1.6 | 2026-10-18
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -176,11 +179,7 @@ class FAQ_Schema_Graph {
 
 		self::$head_ids = array_values( array_diff( wp_list_pluck( $faqs, 'ID' ), $skipped ) );
 
-		$graph[] = [
-			'@type'      => 'FAQPage',
-			'@id'        => get_permalink( $post_id ) . '#faq',
-			'mainEntity' => $main_entity,
-		];
+		$graph[] = self::faq_page_node( self::current_url(), $main_entity );
 
 		return $graph;
 	}
@@ -295,13 +294,7 @@ class FAQ_Schema_Graph {
 
 		$schema = [
 			'@context' => 'https://schema.org',
-			'@graph'   => [
-				[
-					'@type'      => 'FAQPage',
-					'@id'        => $url . '#faq',
-					'mainEntity' => $questions,
-				],
-			],
+			'@graph'   => [ self::faq_page_node( $url, $questions ) ],
 		];
 
 		// JSON_HEX_TAG keeps a `</script>` inside an answer from closing the tag.
@@ -309,12 +302,40 @@ class FAQ_Schema_Graph {
 	}
 
 	/**
+	 * FAQPage node, linked to the page's WebPage node by `@id`.
+	 *
+	 * The WebPage `@id` in scos-schema-output.php is the bare page URL, from the
+	 * same bw_schema_current_url() this class uses.
+	 *
+	 * @since 1.6.0
+	 * @param string  $url       Page URL, no query string.
+	 * @param array[] $questions Question entries.
+	 * @return array
+	 */
+	private static function faq_page_node( string $url, array $questions ): array {
+		return [
+			'@type'      => 'FAQPage',
+			'@id'        => $url . '#faq',
+			'url'        => $url,
+			'isPartOf'   => [ '@id' => $url ],
+			'mainEntity' => $questions,
+		];
+	}
+
+	/**
 	 * URL of the current page, without query string.
+	 *
+	 * Defers to brighter-core's bw_schema_current_url() so the FAQPage and the
+	 * WebPage `@id` can't drift apart.
 	 *
 	 * @since 1.5.0
 	 * @return string Empty string when it can't be resolved.
 	 */
 	private static function current_url(): string {
+		if ( function_exists( 'bw_schema_current_url' ) ) {
+			return (string) bw_schema_current_url();
+		}
+
 		$queried = get_queried_object();
 		if ( is_singular() && $queried instanceof \WP_Post ) {
 			return (string) get_permalink( $queried );

@@ -1,5 +1,5 @@
-# BW Universal Table System — v3.2 Spec
-<!-- v3.2 | 2026-10-18 -->
+# BW Universal Table System — v3.3 Spec
+<!-- v3.3 | 2026-10-18 -->
 
 **Status:** for review, pre-implementation
 **Supersedes:** v3 draft (paths and activation gate corrected against the actual repo)
@@ -307,6 +307,7 @@ mq.addEventListener('change', e => { if (e.matches) build(); });
 - Mobile load: one build pass. Original table hidden via CSS `.bw-built`.
 - Rotation / resize: `change` fires only on an actual breakpoint crossing, not per resize tick.
 - No resize listener, no debounce timer, no teardown churn.
+- Mobile → desktop after a build: the original table comes back because `.bw-built table { display: none }` is mobile-only, and `.bw-cards__container` is hidden outside the media query. Without that desktop rule the cards stayed visible under the table (fixed in v3.3).
 
 **Accepted trade-off:** on mobile the content exists twice in the DOM. A 12×6 table adds roughly 150 nodes. Lighthouse flags DOM size past ~1,400 nodes total, so this is comfortable but not free. Screen readers ignore `display:none`, so no accessibility cost.
 

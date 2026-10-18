@@ -1,4 +1,4 @@
-/* BW Universal Table System — v3.2 | 2026-10-18
+/* BW Universal Table System — v3.3 | 2026-10-18
    Shared agency component (tier 2, bw- namespace). Ported from the v2
    stylesheet running on brighterwebsites.com.au, retaining its visual
    decisions and mapping them onto the v3 class taxonomy.
@@ -166,6 +166,11 @@
 .bw-compact { font-size: 0.85rem; line-height: 1.4; }
 .bw-compact th,
 .bw-compact td { padding: 7px 12px; }
+
+/* Cards are built on mobile and never torn down (bw-tables.js), so a phone
+   rotated or a window widened past the breakpoint would show them under the
+   restored desktop table. The mobile block below turns them back on. */
+.bw-cards__container { display: none; }
 
 /* =========================================================
    3. BEHAVIOUR — below --bw-t-bp only

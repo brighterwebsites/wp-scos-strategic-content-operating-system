@@ -5,6 +5,10 @@
  * v1.3 | 2026-06-29 — Guard inline Service block against admin template; no duplicate schema.
  * v1.4 | 2026-06-29 — Read scos_seo_tldr + scos_schema_custom first; bw_ keys as fallback only.
  * v1.5 | 2026-07-15 — Remove all bw_ fallback reads; migration confirmed complete on all sites.
+ * v1.6 | 2026-10-18 — WebPage @id/url from bw_schema_current_url() (no query string). Archives type
+ *                      the WebPage node as CollectionPage listing the main query's items, instead of a
+ *                      second node pointing at the post type archive. Term archives get term crumbs.
+ *                      WooCommerce's own BreadcrumbList is suppressed while this graph is output.
  *
  * Outputs consolidated @graph schema for all page types.
  * Uses template_redirect to ensure WordPress conditionals work.
@@ -23,7 +27,7 @@
  *
  * @package    BrighterCore
  * @subpackage Schema
- * @version    1.3 | 2026-06-29
+ * @version    1.6 | 2026-10-18
  * @since      1.0.0
  */
 
@@ -158,6 +162,64 @@ function bw_output_schema_graph() {
     
     // Buffer the output to inject into wp_head
     add_action('wp_head', 'bw_render_schema_graph', 5);
+
+    // The graph carries the BreadcrumbList. A WooCommerce breadcrumb element would
+    // print a second one in the body; an empty array makes WC skip its markup.
+    add_filter('woocommerce_structured_data_breadcrumblist', '__return_empty_array');
+}
+
+/**
+ * Canonical URL of the current request, without query string.
+ *
+ * Used for the WebPage @id so that ?utm_ / ?nocache= never reach an @id, and
+ * so other modules (FAQ_Schema_Graph) can point at the WebPage node by @id.
+ *
+ * @return string
+ */
+function bw_schema_current_url() {
+    if (is_front_page()) {
+        return home_url('/');
+    }
+    if (is_singular()) {
+        $link = get_permalink(get_queried_object_id());
+        if ($link) {
+            return $link;
+        }
+    }
+
+    // Archives, search, 404: the request path covers term archives and /page/N/.
+    global $wp;
+    $path = isset($wp->request) ? (string) $wp->request : '';
+    return home_url(user_trailingslashit($path));
+}
+
+/**
+ * ListItems for the posts the main query is listing on an archive.
+ *
+ * Reads the main query rather than running another one, so the list matches
+ * the page (the queried term, the current page number) for any post type.
+ *
+ * @return array[]
+ */
+function bw_schema_archive_list_items() {
+    global $wp_query;
+    $items = [];
+    if (!($wp_query instanceof WP_Query) || empty($wp_query->posts)) {
+        return $items;
+    }
+    $position = 1;
+    foreach ($wp_query->posts as $post) {
+        if (!($post instanceof WP_Post)) {
+            continue;
+        }
+        $items[] = [
+            "@type" => "ListItem",
+            "position" => $position++,
+            "url" => get_permalink($post),
+            "name" => wp_strip_all_tags(get_the_title($post))
+        ];
+    }
+    return $items;
 }
 
 /**
@@ -608,7 +670,7 @@ function bw_render_schema_graph() {
     // DYNAMIC BLOCKS
     // ============================================
     
-    $current_url = home_url($_SERVER['REQUEST_URI']);
+    $current_url = bw_schema_current_url();
     // Use get_queried_object_id() for reliable singular ID in wp_head context
     $post_id = is_singular() ? get_queried_object_id() : 0;
     if ($post_id && !get_post_status($post_id)) {
@@ -645,58 +707,36 @@ function bw_render_schema_graph() {
         ];
     }
     
-    $graph[] = $webpage;
-    
     // ============================================
-    // ARCHIVE PAGES - CollectionPage (includes blog home)
+    // ARCHIVE PAGES - the WebPage node is a CollectionPage (includes blog home)
     // ============================================
-    
+
     // is_home() = blog posts page (when using static front page)
-    // is_archive() = category, tag, CPT archive, date archive, etc.
+    // is_archive() = category, tag, custom taxonomy, CPT archive, date archive, etc.
+    // One node per URL: typing the WebPage as CollectionPage, rather than adding a
+    // second node, keeps every isPartOf / @id reference pointing at the same thing.
     if (is_home() || is_archive()) {
-        $post_type = get_post_type() ?: 'post';
-        $archive_url = get_post_type_archive_link($post_type) ?: $current_url;
-        
-        // Get archive title
         if (is_home()) {
             $archive_title = 'Blog';
         } else {
             $archive_title = post_type_archive_title('', false) ?: single_term_title('', false) ?: 'Archive';
         }
-        
         $archive_description = term_description() ?: get_the_archive_description() ?: '';
-        
-        $posts = get_posts([
-            'numberposts' => 5,
-            'post_type' => $post_type,
-            'post_status' => 'publish'
-        ]);
-        
-        $entities = [];
-        foreach ($posts as $post) {
-            $entities[] = [
-                "@type" => "BlogPosting",
-                "headline" => get_the_title($post),
-                "url" => get_permalink($post),
-                "datePublished" => get_the_date('c', $post),
-                "author" => [
-                    "@type" => "Person",
-                    "name" => get_the_author_meta('display_name', $post->post_author)
-                ]
-            ];
-        }
-        
-        if (!empty($entities)) {
-            $graph[] = [
-                "@type" => "CollectionPage",
-                "@id" => esc_url($archive_url) . '#collection',
-                "name" => $archive_title,
-                "url" => esc_url($archive_url),
-                "description" => wp_strip_all_tags($archive_description),
-                "mainEntity" => $entities
+
+        $webpage["@type"] = "CollectionPage";
+        $webpage["name"] = wp_strip_all_tags($archive_title);
+        $webpage["description"] = wp_strip_all_tags($archive_description);
+
+        $items = bw_schema_archive_list_items();
+        if (!empty($items)) {
+            $webpage["mainEntity"] = [
+                "@type" => "ItemList",
+                "itemListElement" => $items
             ];
         }
     }
+
+    $graph[] = $webpage;
     
     // ============================================
     // SINGLE POSTS - Article (enhanced)
@@ -1091,13 +1131,42 @@ function bw_render_schema_graph() {
     elseif (is_archive()) {
         $post_type = get_post_type() ?: 'post';
         $post_type_obj = get_post_type_object($post_type);
-        
-        if ($post_type_obj) {
+        $queried = get_queried_object();
+        $post_type_link = $post_type_obj ? get_post_type_archive_link($post_type) : false;
+
+        if ($post_type_obj && $post_type_link) {
+            $breadcrumbs[] = [
+                "@type" => "ListItem",
+                "position" => $position++,
+                "name" => $post_type === 'post' ? 'Blog' : $post_type_obj->labels->name,
+                "item" => $post_type_link
+            ];
+        }
+
+        // Term archives: parent terms, then the term itself.
+        if ($queried instanceof WP_Term) {
+            $ancestors = array_reverse(get_ancestors($queried->term_id, $queried->taxonomy, 'taxonomy'));
+            foreach ($ancestors as $ancestor_id) {
+                $ancestor = get_term($ancestor_id, $queried->taxonomy);
+                if (!($ancestor instanceof WP_Term)) {
+                    continue;
+                }
+                $ancestor_link = get_term_link($ancestor);
+                if (is_wp_error($ancestor_link)) {
+                    continue;
+                }
+                $breadcrumbs[] = [
+                    "@type" => "ListItem",
+                    "position" => $position++,
+                    "name" => $ancestor->name,
+                    "item" => $ancestor_link
+                ];
+            }
             $breadcrumbs[] = [
                 "@type" => "ListItem",
                 "position" => $position,
-                "name" => $post_type_obj->labels->name,
-                "item" => get_post_type_archive_link($post_type)
+                "name" => $queried->name,
+                "item" => $current_url
             ];
         }
     }

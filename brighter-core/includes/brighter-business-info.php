@@ -3,7 +3,7 @@
  * Brighter Tools: Business Info
  *
  * File: brighter-business-info.php
- * Version: 4.3.0
+ * Version: 4.3.1 | 2026-10-19 — organisation_type stores the schema.org type (LocalBusiness), not the label.
  *
  * IN USE (do not remove):
  * - Caching: Brighter_Business_Cache (get_all, clear). brighter_update_option() clears cache on save.
@@ -271,6 +271,21 @@ function scos_biz_run_migration() {
 add_action( 'admin_init', 'scos_biz_run_migration', 5 );
 
 /**
+ * organisation_type holds a schema.org @type, because it is read raw by the
+ * %%_cmeta_options_scos_biz_organisation_type%% schema token. The dropdown used
+ * to save its label, "Local Business"; map it on read for sites saved that way,
+ * and on write so the next save corrects the stored value.
+ *
+ * @param mixed $value Option value.
+ * @return mixed
+ */
+function brighter_normalize_organisation_type( $value ) {
+    return ( 'Local Business' === $value ) ? 'LocalBusiness' : $value;
+}
+add_filter( 'option_' . BRIGHTER_OPTION_PREFIX . 'organisation_type', 'brighter_normalize_organisation_type' );
+add_filter( 'pre_update_option_' . BRIGHTER_OPTION_PREFIX . 'organisation_type', 'brighter_normalize_organisation_type' );
+
+/**
  * Sanitize business field based on type
  * 
  * SECURITY: Field-specific sanitization
@@ -362,7 +377,7 @@ function brighterweb_register_business_info_settings() {
         'brighterweb_entity_section', 
         [
             'id' => BRIGHTER_OPTION_PREFIX . 'organisation_type',
-            'options' => ['Local Business', 'Organization', 'Person'],
+            'options' => ['LocalBusiness' => 'Local Business', 'Organization' => 'Organization', 'Person' => 'Person'],
             'note' => 'Person vs. Organization / Local Business'
         ]
     );

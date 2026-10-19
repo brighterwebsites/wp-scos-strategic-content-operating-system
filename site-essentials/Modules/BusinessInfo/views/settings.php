@@ -6,6 +6,7 @@
  * All option keys, settings group, and save logic are untouched.
  *
  * v1.1 | 2026-09-30 — Add Main Product or Service (scos_biz_business_offering).
+ * v1.2 | 2026-10-19 — Organisation Type submits the schema.org type (LocalBusiness); label unchanged.
  */
 defined( 'ABSPATH' ) || exit;
 
@@ -57,10 +58,15 @@ if ( isset( $_GET['settings-updated'] ) ) {
 							<td>
 								<select id="scos_biz_organisation_type" name="scos_biz_organisation_type" class="scos-select">
 									<?php
-									$org_types = [ 'Local Business', 'Organization', 'Person' ];
+									// Value is the schema.org @type; the schema token reads it raw.
+									$org_types = [
+										'LocalBusiness' => __( 'Local Business', 'site-essentials' ),
+										'Organization'  => __( 'Organization', 'site-essentials' ),
+										'Person'        => __( 'Person', 'site-essentials' ),
+									];
 									$saved_org  = get_option( 'scos_biz_organisation_type', '' );
-									foreach ( $org_types as $opt ) {
-										printf( '<option value="%s"%s>%s</option>', esc_attr( $opt ), selected( $saved_org, $opt, false ), esc_html( $opt ) );
+									foreach ( $org_types as $opt => $label ) {
+										printf( '<option value="%s"%s>%s</option>', esc_attr( $opt ), selected( $saved_org, $opt, false ), esc_html( $label ) );
 									}
 									?>
 								</select>

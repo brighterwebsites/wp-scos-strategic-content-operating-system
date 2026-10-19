@@ -43,13 +43,15 @@
  * Field tokens (same syntax as the schema templates):
  *  %%_acf_field_name%%  ACF field on the archive's source object
  *  %%_cmeta_meta_key%%  Meta value on the archive's source object
+ *  Single % works too (%_acf_field_name%), matching the built-in tokens.
  *  Source object: the queried term (term archives), the author (author
  *  archives), the posts page (blog archive), the shop page (product archive).
  *  Anything else, or a missing / non-text value, resolves to an empty string.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.3 | 2026-10-18 — target_query field (CPT / posts archives).
+ * @version    1.4 | 2026-10-19 — Field tokens also accept single % (%_acf_name%), like the other tokens.
+ * v1.3 | 2026-10-18 — target_query field (CPT / posts archives).
  * v1.2 | 2026-10-18 — %%_acf_*%% / %%_cmeta_*%% field tokens.
  * @since      1.1.0
  */
@@ -344,14 +346,15 @@ class Archive_Settings {
 	 * @return string
 	 */
 	private static function parse_field_tokens( string $raw ): string {
-		if ( false === strpos( $raw, '%%_' ) ) {
+		if ( false === strpos( $raw, '%_' ) ) {
 			return $raw;
 		}
 
 		$source = self::field_source();
 
 		return (string) preg_replace_callback(
-			'/%%_(acf|cmeta)_([A-Za-z0-9_-]+)%%/',
+			// %% like the schema templates, or % like the built-in tokens.
+			'/%%?_(acf|cmeta)_([A-Za-z0-9_-]+)%%?/',
 			static function ( array $m ) use ( $source ): string {
 				return self::field_value( $source, $m[1], $m[2] );
 			},

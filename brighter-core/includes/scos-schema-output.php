@@ -9,6 +9,8 @@
  *                      the WebPage node as CollectionPage listing the main query's items, instead of a
  *                      second node pointing at the post type archive. Term archives get term crumbs.
  *                      WooCommerce's own BreadcrumbList is suppressed while this graph is output.
+ * v1.7 | 2026-10-19 — WooCommerce pages take the BreadcrumbList trail from WC_Breadcrumb, so the
+ *                      schema matches the visible WooCommerce breadcrumb (Home > category > product).
  *
  * Outputs consolidated @graph schema for all page types.
  * Uses template_redirect to ensure WordPress conditionals work.
@@ -166,6 +168,52 @@ function bw_output_schema_graph() {
     // The graph carries the BreadcrumbList. A WooCommerce breadcrumb element would
     // print a second one in the body; an empty array makes WC skip its markup.
     add_filter('woocommerce_structured_data_breadcrumblist', '__return_empty_array');
+}
+
+/**
+ * Breadcrumb trail on WooCommerce pages, as WooCommerce's own breadcrumb builds it.
+ *
+ * Sites show WooCommerce's breadcrumb on shop pages (Home > category > product),
+ * and WooCommerce's BreadcrumbList is suppressed while the graph is output, so the
+ * graph has to carry the same trail. WC_Breadcrumb::generate() runs the
+ * woocommerce_get_breadcrumb filter and leaves Home out.
+ *
+ * @param string $current_url From bw_schema_current_url(); used for the last crumb.
+ * @param int    $post_id     Current post ID (0 off singulars).
+ * @return array|null List of ['name' => string, 'url' => string], or null off WooCommerce pages.
+ */
+function bw_schema_wc_breadcrumb_trail($current_url, $post_id) {
+    if (!function_exists('is_woocommerce') || !class_exists('WC_Breadcrumb') || !is_woocommerce()) {
+        return null;
+    }
+
+    $crumbs = (new WC_Breadcrumb())->generate();
+    if (empty($crumbs)) {
+        return null;
+    }
+
+    $trail = [];
+    $last  = count($crumbs) - 1;
+    foreach (array_values($crumbs) as $i => $crumb) {
+        $name = isset($crumb[0]) ? trim(wp_strip_all_tags((string) $crumb[0])) : '';
+        $url  = isset($crumb[1]) ? (string) $crumb[1] : '';
+
+        if ($i === $last) {
+            // The current page: WooCommerce leaves its URL empty.
+            $url = $current_url;
+            $override = (is_singular() && $post_id) ? get_post_meta($post_id, 'scos_seo_breadcrumb_title', true) : '';
+            if (!empty($override)) {
+                $name = $override;
+            }
+        }
+
+        if ('' === $name || '' === $url) {
+            continue;
+        }
+        $trail[] = ['name' => $name, 'url' => $url];
+    }
+
+    return $trail ?: null;
 }
 
 /**
@@ -1111,9 +1159,23 @@ function bw_render_schema_graph() {
         "name" => "Home",
         "item" => home_url('/')
     ];
-    
+
+    $wc_trail = bw_schema_wc_breadcrumb_trail($current_url, $post_id);
+
+    // WOOCOMMERCE PAGES - the trail WooCommerce's own breadcrumb shows
+    if ($wc_trail) {
+        foreach ($wc_trail as $crumb) {
+            $breadcrumbs[] = [
+                "@type" => "ListItem",
+                "position" => $position++,
+                "name" => $crumb['name'],
+                "item" => $crumb['url']
+            ];
+        }
+    }
+
     // FRONT PAGE - just Home, nothing else
-    if (is_front_page()) {
+    elseif (is_front_page()) {
         // Only Home breadcrumb for front page
     }
     

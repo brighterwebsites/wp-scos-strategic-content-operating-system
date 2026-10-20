@@ -6,7 +6,12 @@
  *
  * @package BrighterCore
  * @subpackage API
- * @version 1.0.0
+ * @version 1.1.0
+ *
+ * v1.1 | 2026-10-20 — CAR / ALTC data reads scos_ca_* meta and the scos_content_cluster / scos_topic
+ *                      taxonomies (legacy altc_* taxonomies as fallback). bw_* meta reads removed;
+ *                      the bw_ → scos_ migration is complete. Adds service_pathway + intent_goal
+ *                      to altc_content_data; drops notes (no SCOS equivalent).
  */
 
 if (!defined('ABSPATH')) exit;
@@ -537,109 +542,72 @@ class Brighter_API_Endpoints {
      */
     private function build_scos_data($post_id) {
         // ============================================
-        // GATHER ALTC FRAMEWORK DATA
+        // GATHER CLUSTER / TOPIC (scos_* taxonomies, legacy altc_* taxonomy fallback)
         // ============================================
-        
-        $altc_id = get_post_meta($post_id, 'bw_primary_altc_id', true);
-        $altc_name = 'not_set';
-        
-        if ($altc_id) {
-            $altc_term = get_term($altc_id, 'altc_strategic_lens');
-            if ($altc_term && !is_wp_error($altc_term)) {
-                $altc_name = $altc_term->name;
-            }
-        }
-        
-        // Fallback: Try to get first assigned ALTC term if no primary set
-        if ($altc_name === 'not_set') {
-            $altc_terms = wp_get_post_terms($post_id, 'altc_strategic_lens', array('fields' => 'names'));
-            if (!empty($altc_terms) && !is_wp_error($altc_terms)) {
-                $altc_name = $altc_terms[0];
-            }
-        }
-        
-        $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
-        $topic_name = 'not_set';
-        
-        if ($topic_id) {
-            $topic_term = get_term($topic_id, 'altc_topic');
-            if ($topic_term && !is_wp_error($topic_term)) {
-                $topic_name = $topic_term->name;
-            }
-        }
-        
-        // Fallback: Try to get first assigned topic term if no primary set
-        if ($topic_name === 'not_set') {
-            $topic_terms = wp_get_post_terms($post_id, 'altc_topic', array('fields' => 'names'));
-            if (!empty($topic_terms) && !is_wp_error($topic_terms)) {
-                $topic_name = $topic_terms[0];
-            }
-        }
-        
-        // Fallback: Try old bw_page_topic meta field
-        if ($topic_name === 'not_set') {
-            $old_topic = get_post_meta($post_id, 'bw_page_topic', true);
-            if (!empty($old_topic)) {
-                $topic_name = $old_topic;
-            }
-        }
-        
+
+        $cluster_term = $this->get_primary_term($post_id, 'scos_content_cluster', 'altc_strategic_lens');
+        $altc_name    = $cluster_term ? $cluster_term->name : 'not_set';
+
+        $topic_term = $this->get_primary_term($post_id, 'scos_topic', 'altc_topic');
+        $topic_name = $topic_term ? $topic_term->name : 'not_set';
+
         // ============================================
         // GATHER CONTENT STRATEGY DATA
         // ============================================
-        
-        $intent = get_post_meta($post_id, 'bw_intent', true) ?: 'not_set';
-        $purpose = get_post_meta($post_id, 'bw_purpose', true) ?: 'not_set';
-        $maturity = get_post_meta($post_id, 'bw_cont_maturity', true) ?: 'not_set';
-        
-        // Content Plan (replaces deprecated optimization_status)
-        $content_plan = get_post_meta($post_id, 'content_plan', true) ?: 'none';
-        
+
+        $intent   = get_post_meta($post_id, 'scos_ca_intent', true) ?: 'not_set';
+        $purpose  = get_post_meta($post_id, 'scos_ca_purpose', true) ?: 'not_set';
+        $maturity = get_post_meta($post_id, 'scos_ca_maturity', true) ?: 'not_set';
+
+        // Content Plan — the CA "Planned Action" field (legacy content_plan meta)
+        $content_plan = get_post_meta($post_id, 'scos_ca_next_step', true) ?: 'none';
+
         // ============================================
         // GATHER PILLAR RELATIONSHIP
         // ============================================
-        
-        $pillar_id = get_post_meta($post_id, 'bw_pillar_page_id', true);
+
+        // scos_ca_pillar_page_id is deprecated (#171) — still read until its consumers are gone.
+        $pillar_id = (int) get_post_meta($post_id, 'scos_ca_pillar_page_id', true);
         $pillar = null;
-        
+
         if ($pillar_id) {
-            $pillar_purpose = get_post_meta($pillar_id, 'bw_purpose', true);
+            $pillar_purpose = get_post_meta($pillar_id, 'scos_ca_purpose', true);
             $pillar_name = get_the_title($pillar_id);
             $pillar_type = ($pillar_purpose === 'service-page') ? 'service' : 'pillar';
-            
+
             $pillar = array(
-                'id' => (int) $pillar_id,
+                'id' => $pillar_id,
                 'title' => $pillar_name,
                 'type' => $pillar_type,
                 'url' => get_permalink($pillar_id) ?: ''
             );
         }
-        
+
         // Service Pathway (similar to Pillar but for service/product pathways)
-        $service_pathway_id = get_post_meta($post_id, 'bw_service_pathway_id', true);
+        $service_pathway_id = (int) get_post_meta($post_id, 'scos_ca_service_pathway_id', true);
         $service_pathway = null;
-        
+
         if ($service_pathway_id) {
             $service_pathway_name = get_the_title($service_pathway_id);
             $service_pathway = array(
-                'id' => (int) $service_pathway_id,
+                'id' => $service_pathway_id,
                 'title' => $service_pathway_name,
                 'url' => get_permalink($service_pathway_id) ?: ''
             );
         }
-        
+
         // Breadcrumb schema (for short page title)
-        $breadcrumb_schema = get_post_meta($post_id, 'bw_breadcrumb_schema', true) ?: '';
-        
+        $breadcrumb_schema = get_post_meta($post_id, 'scos_seo_breadcrumb_title', true) ?: '';
+
         // ============================================
         // GATHER CONTENT METRICS (Internal use only)
         // ============================================
-        
+
         $metrics = array(
-            'word_count' => (int) get_post_meta($post_id, 'bw_word_count', true),
-            'reading_time' => (int) get_post_meta($post_id, 'bw_reading_time', true),
-            'internal_links' => (int) get_post_meta($post_id, 'bw_internal_link_count', true),
-            'external_links' => (int) get_post_meta($post_id, 'bw_external_link_count', true),
+            'word_count' => (int) get_post_meta($post_id, 'scos_ca_word_count', true),
+            'reading_time' => (int) get_post_meta($post_id, 'scos_ca_reading_time', true),
+            'internal_links' => (int) get_post_meta($post_id, 'scos_ca_links_to_internal', true),
+            'external_links' => (int) get_post_meta($post_id, 'scos_ca_links_to_external', true),
             'last_updated' => get_the_modified_date('Y-m-d', $post_id)
         );
         
@@ -673,8 +641,8 @@ class Brighter_API_Endpoints {
             'breadcrumb_schema' => $breadcrumb_schema,
             
             // Field mappings (API-specific)
-            'google_index_status' => get_post_meta($post_id, 'bw_index_status', true) ?: 'not_set',
-            'search_intent_goal' => get_post_meta($post_id, 'bw_altc_notes', true) ?: '',
+            'google_index_status' => get_post_meta($post_id, 'scos_ca_index_status', true) ?: 'not_set',
+            'search_intent_goal' => $this->get_intent_goal($post_id),
             
             // GA4 tracking config
             'tracking' => array(
@@ -900,73 +868,109 @@ class Brighter_API_Endpoints {
     private function get_altc_data($post_id) {
         $data = array();
 
-        // Get ALTC Strategic Lens (resolve to name)
-        $altc_id = get_post_meta($post_id, 'bw_primary_altc_id', true);
-        if ($altc_id) {
-            $altc_term = get_term($altc_id, 'altc_strategic_lens');
-            if ($altc_term && !is_wp_error($altc_term)) {
-                $data['primary_altc'] = array(
-                    'id' => $altc_term->term_id,
-                    'name' => $altc_term->name,
-                    'slug' => $altc_term->slug
-                );
-            }
+        // Cluster (scos_content_cluster, legacy altc_strategic_lens fallback)
+        $cluster_term = $this->get_primary_term($post_id, 'scos_content_cluster', 'altc_strategic_lens');
+        if ($cluster_term) {
+            $data['primary_altc'] = array(
+                'id' => $cluster_term->term_id,
+                'name' => $cluster_term->name,
+                'slug' => $cluster_term->slug
+            );
         }
 
-        // Get ALTC Topic (resolve to name)
-        $topic_id = get_post_meta($post_id, 'bw_primary_topic_id', true);
-        if ($topic_id) {
-            $topic_term = get_term($topic_id, 'altc_topic');
-            if ($topic_term && !is_wp_error($topic_term)) {
-                $data['primary_topic'] = array(
-                    'id' => $topic_term->term_id,
-                    'name' => $topic_term->name,
-                    'slug' => $topic_term->slug
-                );
-            }
+        // Primary topic (scos_topic, legacy altc_topic fallback)
+        $topic_term = $this->get_primary_term($post_id, 'scos_topic', 'altc_topic');
+        if ($topic_term) {
+            $data['primary_topic'] = array(
+                'id' => $topic_term->term_id,
+                'name' => $topic_term->name,
+                'slug' => $topic_term->slug
+            );
         }
 
         // Content maturity
-        $maturity = get_post_meta($post_id, 'bw_cont_maturity', true);
+        $maturity = get_post_meta($post_id, 'scos_ca_maturity', true);
         if ($maturity) {
             $data['content_maturity'] = $maturity;
         }
 
         // Content strategy fields
-        $intent = get_post_meta($post_id, 'bw_intent', true);
+        $intent = get_post_meta($post_id, 'scos_ca_intent', true);
         if ($intent) {
             $data['intent'] = $intent;
         }
 
-        $purpose = get_post_meta($post_id, 'bw_purpose', true);
+        $purpose = get_post_meta($post_id, 'scos_ca_purpose', true);
         if ($purpose) {
             $data['purpose'] = $purpose;
         }
 
-        // Pillar page (resolve to title)
-        $pillar_id = get_post_meta($post_id, 'bw_pillar_page_id', true);
-        if ($pillar_id) {
-            $pillar_post = get_post($pillar_id);
-            if ($pillar_post) {
-                $data['pillar_page'] = array(
-                    'id' => $pillar_id,
-                    'title' => get_the_title($pillar_id),
-                    'url' => get_permalink($pillar_id)
-                );
-            }
+        $intent_goal = $this->get_intent_goal($post_id);
+        if ($intent_goal !== '') {
+            $data['intent_goal'] = $intent_goal;
         }
 
-        $notes = get_post_meta($post_id, 'bw_notes', true);
-        if ($notes) {
-            $data['notes'] = $notes;
+        // Pillar page (resolve to title). Deprecated (#171) — read until consumers are gone.
+        $pillar_id = (int) get_post_meta($post_id, 'scos_ca_pillar_page_id', true);
+        if ($pillar_id && get_post($pillar_id)) {
+            $data['pillar_page'] = array(
+                'id' => $pillar_id,
+                'title' => get_the_title($pillar_id),
+                'url' => get_permalink($pillar_id)
+            );
         }
 
-        $index_status = get_post_meta($post_id, 'bw_index_status', true);
+        // Service pathway (resolve to title)
+        $service_pathway_id = (int) get_post_meta($post_id, 'scos_ca_service_pathway_id', true);
+        if ($service_pathway_id && get_post($service_pathway_id)) {
+            $data['service_pathway'] = array(
+                'id' => $service_pathway_id,
+                'title' => get_the_title($service_pathway_id),
+                'url' => get_permalink($service_pathway_id)
+            );
+        }
+
+        $index_status = get_post_meta($post_id, 'scos_ca_index_status', true);
         if ($index_status) {
             $data['index_status'] = $index_status;
         }
 
         return $data;
+    }
+
+    /**
+     * First assigned term in a SCOS taxonomy, falling back to the legacy ALTC taxonomy.
+     *
+     * @param int    $post_id         Post ID
+     * @param string $taxonomy        SCOS taxonomy (scos_content_cluster / scos_topic)
+     * @param string $legacy_taxonomy Legacy taxonomy (altc_strategic_lens / altc_topic)
+     * @return WP_Term|null
+     */
+    private function get_primary_term($post_id, $taxonomy, $legacy_taxonomy) {
+        foreach (array($taxonomy, $legacy_taxonomy) as $tax) {
+            if (!taxonomy_exists($tax)) {
+                continue;
+            }
+            $terms = wp_get_post_terms($post_id, $tax);
+            if (!is_wp_error($terms) && !empty($terms)) {
+                return $terms[0];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The question the content answers — Intent_Goal_Resolver when CA is active,
+     * else the raw scos_ca_intent_goal meta.
+     *
+     * @param int $post_id Post ID
+     * @return string
+     */
+    private function get_intent_goal($post_id) {
+        if (class_exists('SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver')) {
+            return (string) \SiteEssentials\Modules\ContentArchitecture\Intent_Goal_Resolver::resolve_question($post_id);
+        }
+        return (string) get_post_meta($post_id, 'scos_ca_intent_goal', true);
     }
 
     /**

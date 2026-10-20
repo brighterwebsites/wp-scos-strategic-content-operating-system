@@ -1,7 +1,12 @@
 <?php
 /**
  * Brighter GA4 Tracking Loader
- * Version: 3.0.0 - Standalone GA4 implementation
+ * Version: 3.1.0 - Standalone GA4 implementation
+ *
+ * v3.1.0 | 2026-10-21: the inline loader only bootstraps gtag now (#158). Its
+ * click listener double-fired click_phone/click_email and sent a generic
+ * `click` for every link; its 50% `scroll` and `download` collided with GA4
+ * enhanced measurement (scroll at 90%, file_download). Leave those to EM.
  *
  * Loads GA4 tracking with our configured measurement ID
  * Falls back to SEOPress if present
@@ -103,27 +108,6 @@ add_action('wp_head', function() {
                 console.log('[Brighter GA4] Script loaded and configured:',window.brighterGA4.measurementId);
             }
         }
-        
-        (function track(){
-            if(typeof window.gtag!=='function'){setTimeout(track,100);return;}
-            document.addEventListener('click',function(e){
-                var el=e.target.closest('a,button');
-                if(!el||el.dataset.gaSkip==='1')return;
-                var href=el.getAttribute('href');
-                if(!href)return;
-                var ev='click';
-                if(href.startsWith('tel:'))ev='click_phone';
-                else if(href.startsWith('mailto:'))ev='click_email';
-                else if(/\.(pdf|docx?|xlsx?|zip)$/i.test(href))ev='download';
-                gtag('event',ev,{event_category:'Engagement',event_label:el.textContent?.trim()||href,page_title:document.title,page_path:location.pathname});
-            },true);
-            var scrolled=false;
-            window.addEventListener('scroll',function(){
-                if(scrolled)return;
-                var depth=(window.scrollY+window.innerHeight)/Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
-                if(depth>=0.5){scrolled=true;gtag('event','scroll',{event_category:'Engagement',event_label:'Scrolled 50%',depth_percent:50,page_title:document.title,page_path:location.pathname});}
-            },{passive:true});
-        })();
     }
     checkAndInit();
     })();
@@ -139,7 +123,7 @@ add_action('wp_enqueue_scripts', function() {
     $src = content_url('mu-plugins/brighter-core/js/brighter-ga4-enhanced.js');
 
     // Load in footer with defer
-    wp_enqueue_script($handle, $src, [], '5.2.0', true); // keep in step with the JS header — busts LiteSpeed/browser cache
+    wp_enqueue_script($handle, $src, [], '5.3.0', true); // keep in step with the JS header — busts LiteSpeed/browser cache
     
     // Add defer attribute
     add_filter('script_loader_tag', function($tag, $h) use ($handle) {

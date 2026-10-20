@@ -1,6 +1,14 @@
 /**
- * Brighter GA4 Enhanced v5.2.0
+ * Brighter GA4 Enhanced v5.3.0
  * Lead Hierarchy + Selector Attribution + CTA Tracking
+ *
+ * v5.3.0 | 2026-10-21: stop event inflation (#158). Only view_* rules are
+ * observed for impressions — click events no longer fire when an element
+ * scrolls into view. Clicks inside view sections and form wrappers no longer
+ * fire. Form wrapper events (form_quote etc.) fire once, on submit.
+ * form_start renamed lead_form_start; our duplicate form_submit dropped
+ * (generate_lead carries the same payload) — both collided with GA4
+ * enhanced-measurement form interactions.
  *
  * v5.2.0 | 2026-10-20: read CAR v1.2 keys (known-for-goal, topic-maturity,
  * commercial-end-target). altc_primary, content_maturity and service_pathway
@@ -165,17 +173,32 @@
       { s: '.ga-hrcy-end',    e: 'view_section', c: 'Hierarchy', l: 'EndCTA Reached',                v: 3 },
     ];
 
-    // Stamps data-ga-* attributes; used by impression tracking and DevTools inspection
+    // Three kinds of rule, each with exactly one trigger:
+    //   view_*  → impression only (IntersectionObserver)
+    //   Forms   → form wrapper, fires on submit only
+    //   others  → click only
+    const isViewRule  = r => r.e.indexOf('view_') === 0;
+    const isFormRule  = r => r.c === 'Forms';
+    const CLICK_RULES = RULES.filter(r => !isViewRule(r) && !isFormRule(r));
+    const FORM_RULES  = RULES.filter(isFormRule);
+
+    // Stamps data-ga-* attributes for DevTools inspection. Click rules stamp the
+    // click attributes; view rules only stamp data-ga-impression (the rule index),
+    // so an element can never fire its click event on impression.
     function tag(root) {
       root = root || document;
-      RULES.forEach(r => {
+      RULES.forEach((r, i) => {
         root.querySelectorAll(r.s).forEach(el => {
-          if (!el.dataset.gaEvent && r.e) el.dataset.gaEvent = r.e;
+          if (isViewRule(r)) {
+            if (!el.dataset.gaImpression) el.dataset.gaImpression = String(i);
+            return;
+          }
+          if (isFormRule(r)) return;
+          if (!el.dataset.gaEvent) el.dataset.gaEvent = r.e;
           if (!el.dataset.gaCategory) el.dataset.gaCategory = r.c;
           if (!el.dataset.gaLabel) el.dataset.gaLabel = r.l;
           if (!el.dataset.value && r.v) el.dataset.value = r.v;
           if (r.v && !el.dataset.currency) el.dataset.currency = 'AUD';
-          if (r.e && !r.e.includes('download') && !el.dataset.gaImpression) el.dataset.gaImpression = '';
         });
       });
     }
@@ -221,14 +244,15 @@
       catch(e) { return null; }
     }
 
-    // Click tracking — live RULES lookup ensures events fire even before tag() has run.
+    // Click tracking — live CLICK_RULES lookup ensures events fire even before tag() has run.
+    // View and form rules are excluded: a click inside a section or form wrapper is not an event.
     // Uses el.contains() to prefer the deepest (most specific) match when multiple rules
     // match ancestors of the click target.
     document.addEventListener('click', function(e) {
       if (window.brighterGA4 && window.brighterGA4.skipTracking === true) return;
 
       let el = null, rule = null;
-      for (const r of RULES) {
+      for (const r of CLICK_RULES) {
         try {
           const match = e.target.closest(r.s);
           if (match && (!el || el.contains(match))) { el = match; rule = r; }
@@ -276,7 +300,7 @@
           payload.event_label    = label;
           payload.lead_tier      = leadData.tier || 'unknown';
           payload.lead_type      = leadData.type || 'unknown';
-          gtag('event', 'form_start', payload);
+          gtag('event', 'lead_form_start', payload); // not form_start — that's enhanced measurement's name
           started.add(form);
         }
       }, { once: true });
@@ -309,8 +333,15 @@
         else payload.value = { hot: 50, warm: 25, cold: 10 }[leadData.tier] || 20;
         payload.currency = form.dataset.currency || 'AUD';
 
-        gtag('event', 'form_submit', payload);
         gtag('event', 'generate_lead', payload);
+
+        // Wrapper-specific lead event (form_quote etc.), once per submit — never on click
+        const formRule = FORM_RULES.find(r => form.closest(r.s));
+        if (formRule) {
+          const rulePayload = Object.assign({}, payload, { event_category: formRule.c, event_label: formRule.l });
+          if (formRule.v) rulePayload.value = formRule.v;
+          gtag('event', formRule.e, rulePayload);
+        }
       });
     });
 
@@ -326,12 +357,13 @@
         const obs = new IntersectionObserver(entries => {
           entries.forEach(entry => {
             if (entry.isIntersecting) {
-              const el = entry.target, ds = el.dataset;
-              const payload = getBaseParams();
-              payload.event_category = (ds.gaCategory || 'Engagement') + ' Impressions';
-              payload.event_label    = ds.gaLabel || el.textContent?.trim() || 'Unknown';
-              gtag('event', ds.gaEvent || 'view_component', payload);
+              const el = entry.target, rule = RULES[+el.dataset.gaImpression];
               obs.unobserve(el);
+              if (!rule) return;
+              const payload = getBaseParams();
+              payload.event_category = rule.c + ' Impressions';
+              payload.event_label    = rule.l;
+              gtag('event', rule.e, payload);
             }
           });
         }, { threshold: 0.5 });

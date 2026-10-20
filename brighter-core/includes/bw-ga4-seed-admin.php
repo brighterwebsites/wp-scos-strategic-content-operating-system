@@ -6,6 +6,8 @@
  * - Configuration
  * - Content Strategy Tracking
  * - Seeding
+ *
+ * v1.1 | 2026-10-21 — form_submit row removed; our form events no longer use enhanced-measurement names (#158)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -250,7 +252,7 @@ function brighter_analytics_render_page() {
                     <p><strong>📝 Form Context Dimensions (Yellow Rows):</strong> Lead tier, lead type, and CTA context 
                     (cta_label, cta_location, cta_type) are automatically captured on form submissions. These help you 
                     understand which CTAs and content sections drive conversions. <strong>Note:</strong> CTA dimensions are 
-                    only sent with <code>form_submit</code> and <code>generate_lead</code> events.</p>
+                    only sent with <code>generate_lead</code> and the form wrapper events (<code>form_quote</code> etc.).</p>
                 </div>
 
                 <hr style="margin: 30px 0;">
@@ -341,11 +343,6 @@ function brighter_analytics_render_page() {
                                 <td><code>generate_lead</code></td>
                                 <td>Forms</td>
                                 <td><strong>🔥 Primary conversion</strong> - GA4 standard event. Mark as conversion in GA4 Admin → Events.</td>
-                            </tr>
-                            <tr style="background-color: #fff4e5;">
-                                <td><code>form_submit</code></td>
-                                <td>Forms</td>
-                                <td><strong>🔥 Primary conversion</strong></td>
                             </tr>
                             <tr style="background-color: #fff9e5;">
                                 <td><code>click_main_cta</code></td>

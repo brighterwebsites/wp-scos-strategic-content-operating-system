@@ -14,6 +14,7 @@
  *
  * Safe for production - marks all events clearly as seed data
  *
+ * v1.2 | 2026-10-21 — form_start → lead_form_start; form_submit dropped (#158)
  * v1.1 | 2026-10-20 — read CAR v1.2 keys (known-for-goal, topic-maturity, commercial-end-target)
  */
 
@@ -148,8 +149,7 @@ add_action('wp_footer', function() {
         { name: 'click_email', category: 'Contact' },
         
         // Forms
-        { name: 'form_start', category: 'Forms' },
-        { name: 'form_submit', category: 'Forms' },
+        { name: 'lead_form_start', category: 'Forms' },
 
 
         { name: 'form_enquiry', category: 'Forms' },
@@ -197,7 +197,7 @@ add_action('wp_footer', function() {
             params.event_category = event.category;
 
             // Add lead hierarchy parameters for form-related events
-            if (event.name === 'generate_lead' || event.name === 'form_submit') {
+            if (event.name === 'generate_lead') {
                 params.lead_tier = 'warm';
                 params.lead_type = 'contact_form';
                 params.form_type = 'contact_form';

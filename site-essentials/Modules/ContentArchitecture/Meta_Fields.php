@@ -17,6 +17,7 @@
  * v1.1 | 2026-05-22 — Added scos_ca_intent_goal_faq_id integer meta key.
  * v1.2 | 2026-06-10 — Added "review" to next_step_options(); triggers Revision Viewer.
  * v1.3 | 2026-06-30 — Added "ai-updated" to next_step_options().
+ * v1.4 | 2026-10-20 — Mark scos_ca_pillar_page_id @deprecated (#171).
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -61,6 +62,7 @@ class Meta_Fields {
 		];
 
 		// ---- Strategy fields ----
+		// @deprecated #171 — hidden from all UI; kept registered so stored values still read.
 		register_post_meta( '', 'scos_ca_pillar_page_id',        $int );
 		register_post_meta( '', 'scos_ca_service_pathway_id',    $int );
 		register_post_meta( '', 'scos_ca_intent_goal_faq_id',    $int );

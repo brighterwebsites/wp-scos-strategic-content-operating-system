@@ -106,12 +106,6 @@ fieldset.scos-qe-fieldset.inline-edit-col {
 	padding: 0 6px;
 }
 
-/* ---- Hide Pillar Page — kept in PHP/DB for data integrity, hidden from UI ---- */
-label:has( select[name="scos_ca_qe_pillar_page_id"] ),
-label:has( select[name="scos_ca_be_pillar_page_id"] ) {
-	display: none !important;
-}
-
 /* ---- Progress tags in quick/bulk edit ---- */
 .scos-qe-progress-wrap {
 	margin-top: 8px;

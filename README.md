@@ -89,10 +89,11 @@ On singular pages (when Content Architecture module is active), SCOS injects:
 ```javascript
 window.scosCAR = {
   car: {
-    cluster, topic,           // scos_content_cluster / scos_topic taxonomies
-    maturity, intent, purpose, // scos_ca_* post meta
-    "search-intent",          // Intent_Goal_Resolver (FAQ link or scos_ca_intent_goal)
-    pillar, service_pathway,  // scos_ca_pillar_page_id, scos_ca_service_pathway_id
+    "known-for-goal",         // scos_content_cluster term { title, description }
+    topic,                    // scos_topic term name
+    "topic-maturity", intent, purpose, // scos_ca_maturity / scos_ca_intent / scos_ca_purpose
+    answers,                  // Intent_Goal_Resolver (FAQ link or scos_ca_intent_goal)
+    "commercial-end-target",  // scos_ca_service_pathway_id { url, title }
     metrics                   // scos_ca_* analysis fields (auto on save)
   },
   meta: { post_id, post_type, scos_version, car_generated }

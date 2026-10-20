@@ -8,7 +8,6 @@
  *   $current_topic           int   term_id or 0
  *   $clusters                WP_Term[]
  *   $topics                  WP_Term[]
- *   $pillar_pages            WP_Post[]
  *   $service_pathway_pages   WP_Post[]
  *   $fields                  array  strategy + workflow post meta
  *                              (includes 'intent_goal_faq_id')
@@ -130,21 +129,6 @@ $purpose_type_labels = [
 			<h4 class="scos-ca-section-title"><?php esc_html_e( 'Structural Context', 'site-essentials' ); ?></h4>
 
 			<div class="scos-ca-field-row">
-
-				<!-- Pillar Page -->
-				<div class="scos-ca-field">
-					<label for="scos_ca_pillar_page_id"><?php esc_html_e( 'Pillar Page', 'site-essentials' ); ?></label>
-					<select name="scos_ca_pillar_page_id" id="scos_ca_pillar_page_id">
-						<option value="0"><?php esc_html_e( '— None —', 'site-essentials' ); ?></option>
-						<?php foreach ( $pillar_pages as $p ) : ?>
-							<option value="<?php echo esc_attr( $p->ID ); ?>"
-								<?php selected( $fields['pillar_page_id'], $p->ID ); ?>>
-								<?php echo esc_html( get_the_title( $p ) ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-					<p class="scos-ca-help"><?php esc_html_e( 'Link to the parent Pillar page this content supports.', 'site-essentials' ); ?></p>
-				</div>
 
 				<!-- Service Pathway -->
 				<div class="scos-ca-field">

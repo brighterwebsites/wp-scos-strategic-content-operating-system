@@ -11,6 +11,8 @@
  *                      WooCommerce's own BreadcrumbList is suppressed while this graph is output.
  * v1.7 | 2026-10-19 — WooCommerce pages take the BreadcrumbList trail from WC_Breadcrumb, so the
  *                      schema matches the visible WooCommerce breadcrumb (Home > category > product).
+ * v1.8 | 2026-10-20 — Topic sameAs reads scos_topic_same_as (the key the Topic screen saves), with
+ *                      topic_sameas_url as the legacy altc_topic fallback. Drop supporting-topics TODO.
  *
  * Outputs consolidated @graph schema for all page types.
  * Uses template_redirect to ensure WordPress conditionals work.
@@ -809,7 +811,8 @@ function bw_render_schema_graph() {
         }
         if ( ! is_wp_error( $topic_terms ) && ! empty( $topic_terms ) ) {
             $topic_term   = $topic_terms[0];
-            $topic_sameas = get_term_meta( $topic_term->term_id, 'topic_sameas_url', true );
+            $topic_sameas = get_term_meta( $topic_term->term_id, 'scos_topic_same_as', true )
+                ?: get_term_meta( $topic_term->term_id, 'topic_sameas_url', true ); // legacy altc_topic key
             $about = [ "@type" => "Thing", "name" => $topic_term->name ];
             if ( ! empty( $topic_term->description ) ) {
                 $about["description"] = wp_strip_all_tags( $topic_term->description );
@@ -899,7 +902,6 @@ function bw_render_schema_graph() {
         }
         
         // TODO: Future enhancements
-        // - "about" array from bw_supporting_topics (multiple topics)
         // - "mentions" for Place (Ballarat) - could be site-wide or per-post
         
         $graph[] = $article;
@@ -932,7 +934,8 @@ function bw_render_schema_graph() {
         }
         if ( ! is_wp_error( $topic_terms ) && ! empty( $topic_terms ) ) {
             $topic_term   = $topic_terms[0];
-            $topic_sameas = get_term_meta( $topic_term->term_id, 'topic_sameas_url', true );
+            $topic_sameas = get_term_meta( $topic_term->term_id, 'scos_topic_same_as', true )
+                ?: get_term_meta( $topic_term->term_id, 'topic_sameas_url', true ); // legacy altc_topic key
             $about = [ "@type" => "Thing", "name" => $topic_term->name ];
             if ( ! empty( $topic_term->description ) ) {
                 $about["description"] = wp_strip_all_tags( $topic_term->description );

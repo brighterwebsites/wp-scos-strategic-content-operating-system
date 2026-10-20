@@ -289,6 +289,9 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			}
 		}
 
+		// Legacy meta registry + cleanup (Core, not a module — always available).
+		\WP_CLI::add_command( 'scos legacy-meta', \SiteEssentials\Core\CLI\Legacy_Meta_Command::class );
+
 		if ( file_exists( $backfill_file ) ) {
 			require_once $backfill_file;
 			\WP_CLI::add_command(

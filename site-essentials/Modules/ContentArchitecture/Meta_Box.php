@@ -21,6 +21,7 @@
  * v1.4 | 2026-06-23 — Guard save() against recursive save_post loops triggered by internal wp_insert_post calls.
  * v1.5 | 2026-06-24 — Load Suggest_Topics ability; pass endpointTopics + currentTopicId/Name to JS localization.
  * v1.6 | 2026-06-29 — Allow self-assignment in pillar and service pathway dropdowns (remove post exclude).
+ * v1.7 | 2026-10-20 — Pillar Page field removed from the meta box; scos_ca_pillar_page_id deprecated (#171).
  */
 
 namespace SiteEssentials\Modules\ContentArchitecture;
@@ -130,7 +131,6 @@ class Meta_Box {
 
 		// ---- Strategy + Workflow post meta ----
 		$fields = [
-			'pillar_page_id'         => (int) get_post_meta( $post->ID, 'scos_ca_pillar_page_id', true ),
 			'service_pathway_id'     => (int) get_post_meta( $post->ID, 'scos_ca_service_pathway_id', true ),
 			'intent_goal_faq_id'     => Intent_Goal_Resolver::get_faq_id( $post->ID ),
 			'intent'                 => (string) get_post_meta( $post->ID, 'scos_ca_intent', true ),
@@ -169,17 +169,6 @@ class Meta_Box {
 		$topics   = get_terms( [ 'taxonomy' => 'scos_topic',           'hide_empty' => false, 'orderby' => 'name' ] );
 		if ( is_wp_error( $clusters ) ) { $clusters = []; }
 		if ( is_wp_error( $topics ) )   { $topics   = []; }
-
-		// ---- Pillar pages: posts with purpose = pillar ----
-		// No self-exclude: a pillar page can assign itself as its own pillar.
-		$pillar_pages = get_posts( [
-			'post_type'      => Taxonomies::get_post_types(),
-			'posts_per_page' => -1,
-			'post_status'    => 'publish',
-			'orderby'        => 'title',
-			'order'          => 'ASC',
-			'meta_query'     => [ [ 'key' => 'scos_ca_purpose', 'value' => 'pillar' ] ],
-		] );
 
 		// ---- Service pathway pages: service, product, conversion-hub ----
 		// No self-exclude: a service/product/conversion-hub page can assign itself as
@@ -334,8 +323,9 @@ class Meta_Box {
 			}
 		}
 
-		// ---- Integer: pillar page + service pathway ----
-		foreach ( [ 'scos_ca_pillar_page_id', 'scos_ca_service_pathway_id' ] as $key ) {
+		// ---- Integer: service pathway ----
+		// scos_ca_pillar_page_id is deprecated (#171): no longer in the form, so never written here.
+		foreach ( [ 'scos_ca_service_pathway_id' ] as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
 				$val = absint( $_POST[ $key ] );
 				if ( $val > 0 ) {

@@ -82,7 +82,6 @@
 				'maturity':     'scos_ca_qe_maturity',
 				'index-status': 'scos_ca_qe_index_status',
 				'next-step':    'scos_ca_qe_next_step',
-				'pillar':       'scos_ca_qe_pillar_page_id',
 				'pathway':      'scos_ca_qe_service_pathway_id',
 			};
 

@@ -13,6 +13,8 @@
  * - Track rare high-value events
  *
  * Safe for production - marks all events clearly as seed data
+ *
+ * v1.1 | 2026-10-20 — read CAR v1.2 keys (known-for-goal, topic-maturity, commercial-end-target)
  */
 
 // Wrap everything in template_redirect hook to ensure WordPress is fully loaded
@@ -88,8 +90,9 @@ add_action('wp_footer', function() {
     const scos = window.scosCAR || {};
     const car = scos.car || {};
     const meta = scos.meta || {};
-    const pillar = car.pillar || null;
-    const servicePathway = car.service_pathway || null;
+    // CAR v1.2 keys (scos-car-injection.php)
+    const knownFor = car['known-for-goal'] || {};
+    const endTarget = car['commercial-end-target'] || null;
     
     function getBaseParams() {
         // Use breadcrumb schema as short title if available, fallback to document.title
@@ -108,18 +111,18 @@ add_action('wp_footer', function() {
             content_purpose: car.purpose || 'not_set',
             
             // ALTC Framework fields (from SCOS CAR)
-            altc_primary: car.cluster || 'not_set',
+            altc_primary: knownFor.title || 'not_set',
             altc_topic: car.topic || 'not_set', // Preferred field name
             content_topic: car.topic || 'not_set', // Legacy - kept for backwards compatibility
-            content_maturity: car.maturity || 'not_set',
+            content_maturity: car['topic-maturity'] || 'not_set',
             
             // Content workflow fields (from SCOS CAR)
             content_plan: car.content_plan || 'none',
             
             // Relationship fields (from SCOS CAR)
-            pillar_page: (pillar && pillar.title) ? pillar.title : 'none',
-            pillar_type: (pillar && pillar.type) ? pillar.type : 'none',
-            service_pathway: (servicePathway && servicePathway.title) ? servicePathway.title : 'none',
+            pillar_page: 'none', // pillar removed from CAR v1.2
+            pillar_type: 'none',
+            service_pathway: (endTarget && endTarget.title) ? endTarget.title : 'none',
             
             // Post metadata (from SCOS CAR)
             post_type: meta.post_type || 'page',

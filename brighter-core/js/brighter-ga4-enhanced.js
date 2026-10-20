@@ -1,6 +1,10 @@
 /**
- * Brighter GA4 Enhanced v5.1.0
+ * Brighter GA4 Enhanced v5.2.0
  * Lead Hierarchy + Selector Attribution + CTA Tracking
+ *
+ * v5.2.0 | 2026-10-20: read CAR v1.2 keys (known-for-goal, topic-maturity,
+ * commercial-end-target). altc_primary, content_maturity and service_pathway
+ * were always not_set/none since the CAR restructure.
  *
  * v5.1.0: Live RULES lookup for click tracking — fires correctly before tag() runs,
  * eliminating early-click gaps. Deferred tag() + IntersectionObserver to
@@ -21,8 +25,10 @@
     const scos = window.scosCAR || {};
     const car = scos.car || {};
     const meta = scos.meta || {};
-    const pillar = car.pillar || null;
-    const servicePathway = car.service_pathway || null;
+    // CAR v1.2 keys (scos-car-injection.php). GA4 param names are unchanged so
+    // existing custom dimensions keep collecting.
+    const knownFor = car['known-for-goal'] || {};
+    const endTarget = car['commercial-end-target'] || null;
 
     function getBaseParams() {
       const breadcrumb = scos.breadcrumb_schema || '';
@@ -31,14 +37,14 @@
         page_title:       pageTitle,
         content_intent:   car.intent    || 'not_set',
         content_purpose:  car.purpose   || 'not_set',
-        altc_primary:     car.cluster   || 'not_set',
+        altc_primary:     knownFor.title || 'not_set',
         altc_topic:       car.topic     || 'not_set',
         content_topic:    car.topic     || 'not_set', // legacy — kept for backwards compatibility
-        content_maturity: car.maturity  || 'not_set',
+        content_maturity: car['topic-maturity'] || 'not_set',
         content_plan:     car.content_plan || 'none',
-        pillar_page:      (pillar && pillar.title)         ? pillar.title         : 'none',
-        pillar_type:      (pillar && pillar.type)          ? pillar.type          : 'none',
-        service_pathway:  (servicePathway && servicePathway.title) ? servicePathway.title : 'none',
+        pillar_page:      'none', // pillar removed from CAR v1.2 — param kept for dimension continuity
+        pillar_type:      'none',
+        service_pathway:  (endTarget && endTarget.title) ? endTarget.title : 'none',
         post_type:        meta.post_type || 'page'
       };
     }

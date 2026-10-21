@@ -2,12 +2,13 @@
 /**
  * Agentic Module
  *
- * v1.2 | 2026-08-04
+ * v1.3 | 2026-10-21
  *
  * Handles AI agent discovery and content accessibility for client sites.
  *
  * Content access:
- *   - Markdown content negotiation (Accept: text/markdown)
+ *   - Markdown content negotiation (Accept: text/markdown), plus the
+ *     .htaccess rule that keeps LiteSpeed from answering it with cached HTML
  *   - scos/v1 REST content API (search, list, content/{slug}, site-info, health)
  *   - WebMCP widget (conditionally loaded on the /mcp/ page)
  *   - Native WebMCP: the same tools via document.modelContext on every page
@@ -61,7 +62,7 @@ class Agentic_Module implements Module_Interface {
 	}
 
 	public static function get_version(): string {
-		return '1.2';
+		return '1.3';
 	}
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ class Agentic_Module implements Module_Interface {
 		}
 
 		Markdown_Renderer::init();
+		Markdown_Cache_Rule::init();
 		Content_API::init();
 		OpenAPI_Spec::init();
 		WebMCP_Widget::init();
@@ -84,6 +86,22 @@ class Agentic_Module implements Module_Interface {
 		Mcp_Server_Card::init();
 
 		add_action( 'send_headers', [ __CLASS__, 'send_link_headers' ] );
+
+		self::register_cli_commands();
+	}
+
+	private static function register_cli_commands(): void {
+		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+			return;
+		}
+
+		\WP_CLI::add_command(
+			'scos markdown-cache-rule',
+			CLI\Markdown_Cache_Rule_Command::class,
+			[
+				'shortdesc' => 'Check or sync the .htaccess rule that lets Markdown requests skip the page cache.',
+			]
+		);
 	}
 
 	/**

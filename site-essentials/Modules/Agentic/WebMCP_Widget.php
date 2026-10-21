@@ -2,12 +2,17 @@
 /**
  * Agentic — WebMCP Widget
  *
- * v1.0 | 2026-08-04
+ * v1.1 | 2026-10-21
  *
- * Conditionally loads the jasonjmcghee/WebMCP widget and registers the four
- * SCOS content tools on the designated /mcp/ page only — never site-wide.
+ * v1.1 | 2026-10-21 — Tools now come from WebMCP_Tools (shared with the native
+ *                     document.modelContext registration) and describe the
+ *                     site by its own name, not the agency's.
  *
- * Tools registered (executors call the scos/v1 REST endpoints from Phase 1):
+ * Conditionally loads the jasonjmcghee/WebMCP widget and registers the
+ * SCOS content tools on the designated /mcp/ page only. Site-wide, browser-
+ * native registration is WebMCP_Native's job.
+ *
+ * Tools registered (definitions in WebMCP_Tools; executors call scos/v1):
  *   search_content  — keyword + optional purpose/intent filters
  *   list_content    — optional purpose/intent filters, full list
  *   get_content     — full body for one item by slug
@@ -71,12 +76,6 @@ class WebMCP_Widget {
 			'0.1.13',
 			true
 		);
-
-		// Inject site URL so the inline tool registration JS can build endpoint URLs.
-		wp_localize_script( 'scos-webmcp', 'scosWebMCP', [
-			'restUrl' => esc_url_raw( rest_url( 'scos/v1' ) ),
-			'nonce'   => '', // Public GET endpoints — no nonce needed.
-		] );
 	}
 
 	// ── Tool registration ─────────────────────────────────────────────────────
@@ -95,8 +94,6 @@ class WebMCP_Widget {
 		?>
 <script>
 (function () {
-    var base = scosWebMCP.restUrl;
-
     var mcp = new WebMCP({
         color:    <?php echo wp_json_encode( $color ); ?>,
         position: 'bottom-right',
@@ -104,95 +101,26 @@ class WebMCP_Widget {
         padding:  '16px'
     });
 
-    // ── search_content ────────────────────────────────────────────────────────
-    mcp.registerTool(
-        'search_content',
-        "Search Brighter Websites' service pages, case studies, and articles by keyword, optionally filtered by content type (purpose) or search intent. Returns lightweight results: title, slug, excerpt, url, purpose, and intent for each match.",
-        {
-            type: 'object',
-            properties: {
-                query: {
-                    type: 'string',
-                    description: 'Keyword to search for.'
-                },
-                purpose: {
-                    type: 'string',
-                    description: 'Optional. Filter by content type. Common values: service-page, pillar, case-study, supporting, authority-page, resource-guide.'
-                },
-                intent: {
-                    type: 'string',
-                    description: 'Optional. Filter by search intent. Common values: informational, commercial, transact_lead, trust.'
-                }
-            },
-            required: ['query']
-        },
-        function (args) {
-            var url = base + '/search?query=' + encodeURIComponent(args.query || '');
-            if (args.purpose) url += '&purpose=' + encodeURIComponent(args.purpose);
-            if (args.intent)  url += '&intent='  + encodeURIComponent(args.intent);
-            return fetch(url).then(function (r) { return r.json(); });
-        }
-    );
+    var tools = <?php echo wp_json_encode( WebMCP_Tools::definitions() ); ?>;
 
-    // ── list_content ──────────────────────────────────────────────────────────
-    mcp.registerTool(
-        'list_content',
-        "List all published content from Brighter Websites, optionally filtered by content type (purpose) or search intent. Use this to get a full picture of available topics before drilling into a specific piece.",
-        {
-            type: 'object',
-            properties: {
-                purpose: {
-                    type: 'string',
-                    description: 'Optional. Filter by content type: service-page, pillar, case-study, supporting, authority-page, resource-guide, conversion-hub, etc.'
-                },
-                intent: {
-                    type: 'string',
-                    description: 'Optional. Filter by search intent: informational, commercial, transact_lead, trust, navigational.'
-                }
-            }
-        },
-        function (args) {
-            var url = base + '/list';
-            var params = [];
-            if (args.purpose) params.push('purpose=' + encodeURIComponent(args.purpose));
-            if (args.intent)  params.push('intent='  + encodeURIComponent(args.intent));
-            if (params.length) url += '?' + params.join('&');
-            return fetch(url).then(function (r) { return r.json(); });
-        }
-    );
+    function buildUrl(def, args) {
+        var path = def.path.replace(/\{(\w+)\}/g, function (m, key) {
+            return encodeURIComponent(args[key] == null ? '' : args[key]);
+        });
+        var qs = (def.query || []).filter(function (key) {
+            return args[key] != null && args[key] !== '';
+        }).map(function (key) {
+            return key + '=' + encodeURIComponent(args[key]);
+        }).join('&');
+        return def.base.replace(/\/$/, '') + path + (qs ? '?' + qs : '');
+    }
 
-    // ── get_content ───────────────────────────────────────────────────────────
-    mcp.registerTool(
-        'get_content',
-        'Retrieve the full text content of a specific Brighter Websites page or article by its slug. Use search_content or list_content first to find the slug you need.',
-        {
-            type: 'object',
-            properties: {
-                slug: {
-                    type: 'string',
-                    description: 'The URL slug of the page or post (e.g. "website-design-ballarat" or "what-is-altc").'
-                }
-            },
-            required: ['slug']
-        },
-        function (args) {
-            return fetch(base + '/content/' + encodeURIComponent(args.slug))
-                .then(function (r) { return r.json(); });
-        }
-    );
-
-    // ── get_site_info ─────────────────────────────────────────────────────────
-    mcp.registerTool(
-        'get_site_info',
-        'Get context about Brighter Websites — who we are, what we do, who we serve, our services and topic areas. Call this first to understand the site before using other tools.',
-        {
-            type: 'object',
-            properties: {}
-        },
-        function () {
-            return fetch(base + '/site-info').then(function (r) { return r.json(); });
-        }
-    );
+    // Same definitions as the native registration (WebMCP_Tools.php).
+    tools.forEach(function (def) {
+        mcp.registerTool(def.name, def.description, def.inputSchema, function (args) {
+            return fetch(buildUrl(def, args || {})).then(function (r) { return r.json(); });
+        });
+    });
 
 }());
 </script>

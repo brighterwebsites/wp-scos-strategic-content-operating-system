@@ -2,7 +2,12 @@
 /**
  * Agentic — Content REST API
  *
- * v1.0 | 2026-08-04
+ * v1.1 | 2026-10-21
+ *
+ * v1.1 | 2026-10-21 — site-info describes the site's own business from the
+ *                     Business Info fields (Business_Profile). The default was
+ *                     a hardcoded agency description, so every site without a
+ *                     stored override told agents it was that agency.
  *
  * Public, read-only content endpoints under the scos/v1 namespace. Designed
  * for consumption by WebMCP tools, AI agents, and the WP-CLI/MCP layer.
@@ -11,13 +16,15 @@
  *   GET /wp-json/scos/v1/search          keyword + optional purpose/intent filters
  *   GET /wp-json/scos/v1/list            full list, optional purpose/intent filters
  *   GET /wp-json/scos/v1/content/{slug}  full body for one item by slug
- *   GET /wp-json/scos/v1/site-info       static site framing (stored in scos_webmcp_site_info option)
+ *   GET /wp-json/scos/v1/site-info       the business, from Business Info (Business_Profile)
  *
  * All routes are unauthenticated GET — no write endpoints, no nonce required.
  * Filter params map to the real SCOS CA meta fields (scos_ca_purpose, scos_ca_intent).
  *
- * site-info is stored in the scos_webmcp_site_info WP option (JSON-encoded array).
- * Populate via WP-CLI: wp option update scos_webmcp_site_info '{"name":"..."}' --format=json
+ * site-info comes from the Business Info fields (Business_Profile::get()).
+ * A stored scos_webmcp_site_info option still overrides it completely, for a
+ * site that needs hand-written framing:
+ *   wp option update scos_webmcp_site_info '{"name":"..."}' --format=json
  *
  * @package    SiteEssentials
  * @subpackage Modules\Agentic
@@ -198,7 +205,7 @@ class Content_API {
 	}
 
 	/**
-	 * Return static site framing from the scos_webmcp_site_info option.
+	 * Return the business profile, or the scos_webmcp_site_info override.
 	 */
 	public static function handle_site_info( \WP_REST_Request $request ): \WP_REST_Response {
 		$stored = get_option( 'scos_webmcp_site_info', [] );
@@ -287,33 +294,11 @@ class Content_API {
 	}
 
 	/**
-	 * Default site-info structure used when the option is not yet populated.
-	 * Update by setting the scos_webmcp_site_info option via WP-CLI or admin.
+	 * Site-info used when no scos_webmcp_site_info override is stored.
 	 *
 	 * @return array
 	 */
 	public static function get_site_info_default(): array {
-		return [
-			'name'        => get_bloginfo( 'name' ),
-			'tagline'     => get_bloginfo( 'description' ),
-			'description' => 'Brighter Websites is an AI-native SEO and web design agency for regional Australian small businesses. We specialise in Authority-Led Topic Cluster (ALTC) content strategy, Breakdance website design, and the SCOS Strategic Content Operating System — a structured approach to turning websites into revenue-generating assets.',
-			'author'      => 'Vanessa',
-			'location'    => 'Ballarat, VIC, Australia',
-			'services'    => [
-				'Website design (Breakdance)',
-				'ALTC content strategy',
-				'SEO and technical SEO',
-				'Website-First Blueprint (WFB)',
-				'SCOS Strategic Content Operating System',
-			],
-			'topics'      => [
-				'Local SEO for regional Australian businesses',
-				'Authority-Led Topic Clusters (ALTC)',
-				'Website-first business strategy',
-				'AI-ready content architecture',
-				'Breakdance website design',
-			],
-			'url'         => home_url(),
-		];
+		return \SiteEssentials\Modules\BusinessInfo\Business_Profile::get();
 	}
 }

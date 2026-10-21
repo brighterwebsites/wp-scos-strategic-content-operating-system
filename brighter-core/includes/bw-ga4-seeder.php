@@ -14,6 +14,7 @@
  *
  * Safe for production - marks all events clearly as seed data
  *
+ * v1.4 | 2026-10-21 — altc_primary → cluster, altc_topic → topic; content_topic and pillar_* dropped (#98)
  * v1.3 | 2026-10-21 — seed only the events still tracked (#159); content_plan dropped (#97)
  * v1.2 | 2026-10-21 — form_start → lead_form_start; form_submit dropped (#158)
  * v1.1 | 2026-10-20 — read CAR v1.2 keys (known-for-goal, topic-maturity, commercial-end-target)
@@ -113,14 +114,11 @@ add_action('wp_footer', function() {
             content_purpose: car.purpose || 'not_set',
             
             // ALTC Framework fields (from SCOS CAR)
-            altc_primary: knownFor.title || 'not_set',
-            altc_topic: car.topic || 'not_set', // Preferred field name
-            content_topic: car.topic || 'not_set', // Legacy - kept for backwards compatibility
+            cluster: knownFor.title || 'not_set',
+            topic: car.topic || 'not_set',
             content_maturity: car['topic-maturity'] || 'not_set',
 
             // Relationship fields (from SCOS CAR)
-            pillar_page: 'none', // pillar removed from CAR v1.2
-            pillar_type: 'none',
             service_pathway: (endTarget && endTarget.title) ? endTarget.title : 'none',
             
             // Post metadata (from SCOS CAR)

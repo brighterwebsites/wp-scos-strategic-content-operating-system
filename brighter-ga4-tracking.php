@@ -131,7 +131,7 @@ add_action('wp_enqueue_scripts', function() {
     $src = content_url('mu-plugins/brighter-core/js/brighter-ga4-enhanced.js');
 
     // Load in footer with defer
-    wp_enqueue_script($handle, $src, [], '5.4.0', true); // keep in step with the JS header — busts LiteSpeed/browser cache
+    wp_enqueue_script($handle, $src, [], '5.5.0', true); // keep in step with the JS header — busts LiteSpeed/browser cache
     
     // Add defer attribute
     add_filter('script_loader_tag', function($tag, $h) use ($handle) {

@@ -1,6 +1,12 @@
 /**
- * Brighter GA4 Enhanced v5.4.0
+ * Brighter GA4 Enhanced v5.5.0
  * Lead Hierarchy + Selector Attribution + CTA Tracking
+ *
+ * v5.5.0 | 2026-10-21: parameter clean-up (#98). altc_primary → cluster,
+ * altc_topic → topic (no dual-fire). content_topic, pillar_page and
+ * pillar_type are no longer sent. Click event_label is the link/button text
+ * (then aria-label/title, then image alt), falling back to the rule's role
+ * label only for empty icon links; an explicit data-ga-label still wins.
  *
  * v5.4.0 | 2026-10-21: trimmed to the events in use (#159). Cut nav_*, trust
  * views (incl. click_video), form-view events and the content-section
@@ -52,12 +58,9 @@
         page_title:       pageTitle,
         content_intent:   car.intent    || 'not_set',
         content_purpose:  car.purpose   || 'not_set',
-        altc_primary:     knownFor.title || 'not_set',
-        altc_topic:       car.topic     || 'not_set',
-        content_topic:    car.topic     || 'not_set', // legacy — kept for backwards compatibility
+        cluster:          knownFor.title || 'not_set',
+        topic:            car.topic     || 'not_set',
         content_maturity: car['topic-maturity'] || 'not_set',
-        pillar_page:      'none', // pillar removed from CAR v1.2 — param kept for dimension continuity
-        pillar_type:      'none',
         service_pathway:  (endTarget && endTarget.title) ? endTarget.title : 'none',
         post_type:        meta.post_type || 'page'
       };
@@ -174,18 +177,25 @@
           if (isFormRule(r)) return;
           if (!el.dataset.gaEvent) el.dataset.gaEvent = r.e;
           if (!el.dataset.gaCategory) el.dataset.gaCategory = r.c;
-          if (!el.dataset.gaLabel) el.dataset.gaLabel = r.l;
           if (!el.dataset.value && r.v) el.dataset.value = r.v;
           if (r.v && !el.dataset.currency) el.dataset.currency = 'AUD';
         });
       });
     }
 
+    // Visible copy of a link/button: text, then aria-label/title, then image alt. GA4 caps values at 100 chars.
+    function ctaText(element) {
+      const text = (element.textContent || '').replace(/\s+/g, ' ').trim()
+        || (element.getAttribute('aria-label') || element.getAttribute('title') || '').trim()
+        || ((element.querySelector('img[alt]') || {}).alt || '').trim();
+      return text.slice(0, 100);
+    }
+
     // CTA context tracking
     function storeCTAContext(element) {
       try {
         const ctaData = {
-          label:     element.textContent?.trim() || element.value || 'Unknown',
+          label:     ctaText(element) || element.value || 'Unknown',
           location:  detectLocation(element),
           type:      detectCTAType(element),
           timestamp: Date.now()
@@ -250,7 +260,7 @@
       const ds        = el.dataset;
       const eventName = ds.gaEvent    || (rule && rule.e);
       const category  = ds.gaCategory || (rule && rule.c);
-      const label     = ds.gaLabel    || (rule && rule.l);
+      const label     = ds.gaLabel    || ctaText(el) || (rule && rule.l);
       const value     = ds.value      || (rule && rule.v);
 
       if (!eventName) return;

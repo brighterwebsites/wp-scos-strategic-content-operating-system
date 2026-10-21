@@ -85,7 +85,7 @@ defined( 'ABSPATH' ) || exit;
 				<span>
 					<strong><?php esc_html_e( 'Enable WebMCP Widget', 'site-essentials' ); ?></strong>
 					<span class="description" style="display:block;margin-top:2px">
-						<?php esc_html_e( 'Loads the WebMCP widget and registers the four SCOS content tools (search, list, content, site-info) on the designated MCP page only. Requires the page ID to be set below.', 'site-essentials' ); ?>
+						<?php esc_html_e( 'Registers the SCOS content tools (search, list, content, site-info) with the browser\'s built-in AI agent on every page (native WebMCP, does nothing in browsers without it), and loads the WebMCP widget for desktop MCP clients on the MCP page set below.', 'site-essentials' ); ?>
 					</span>
 				</span>
 			</label>

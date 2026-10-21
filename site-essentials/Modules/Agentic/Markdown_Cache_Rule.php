@@ -10,16 +10,24 @@
  * only stops a markdown response from being stored; it cannot stop a stored
  * HTML copy from being served.
  *
- * This class keeps a marker block in .htaccess that tells LiteSpeed to skip
- * the cache when the Accept header asks for markdown:
+ * This class keeps a marker block in .htaccess that gives markdown requests
+ * their own cache variant (the pattern LiteSpeed Cache uses for WebP/mobile):
  *
  *   # BEGIN SCOS Markdown
  *   <IfModule LiteSpeed>
  *   RewriteEngine On
  *   RewriteCond %{HTTP_ACCEPT} text/markdown [NC]
- *   RewriteRule .* - [E=Cache-Control:no-cache]
+ *   RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+markdown]
  *   </IfModule>
  *   # END SCOS Markdown
+ *
+ * A vary, not E=Cache-Control:no-cache: no-cache only stops a response being
+ * stored, so the cached HTML was still served. With the vary, the markdown
+ * variant is never stored (the renderer sends no-cache) and always reaches PHP.
+ *
+ * OpenLiteSpeed only re-reads .htaccess on a (graceful) restart. A block this
+ * class writes takes effect after the next restart; the server-level check
+ * (servers repo) restarts when it finds the block newer than the server.
  *
  * The block is written above "# BEGIN WordPress", whose final RewriteRule
  * ends rewrite processing with [L]. Anything appended below it never runs,
@@ -35,7 +43,7 @@
  * and the block is missing. The server-level fleet check uses it.
  *
  * Disabling the Agentic module leaves the block in place. That is harmless:
- * markdown-only requests then reach WordPress uncached and get HTML.
+ * markdown requests then get HTML, cached under their own variant.
  *
  * @package    SiteEssentials
  * @subpackage Modules\Agentic
@@ -94,12 +102,12 @@ class Markdown_Cache_Rule {
 	private static function block_lines(): array {
 		return [
 			'# BEGIN ' . self::MARKER,
-			'# Agents asking for Markdown skip the page cache, so a cached HTML copy',
+			'# Agents asking for Markdown get their own cache variant, so a cached HTML copy',
 			'# is never served in place of the Markdown response. Managed by SCOS.',
 			'<IfModule LiteSpeed>',
 			'RewriteEngine On',
 			'RewriteCond %{HTTP_ACCEPT} text/markdown [NC]',
-			'RewriteRule .* - [E=Cache-Control:no-cache]',
+			'RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+markdown]',
 			'</IfModule>',
 			'# END ' . self::MARKER,
 		];

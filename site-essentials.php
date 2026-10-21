@@ -17,8 +17,8 @@
  * @package SiteEssentials
  * @version 1.1.1
  *
- * v1.1.2 | 2026-10-22 — Registers the WooCommerce GA bridge's ID inheritance on
- *                       plugins_loaded, ahead of WooCommerce's integrations (init 0).
+ * v1.1.2 | 2026-10-22 — Registers the WooCommerce GA bridge on plugins_loaded,
+ *                       ahead of WooCommerce's integrations (init 0).
  * v1.1.1 | 2026-08-17 — Removed the SERVER_ADDR licence gate, which silently
  *                       disabled the whole plugin when the server IP changed
  *                       and published agency hosting IPs to a public repo.
@@ -269,7 +269,7 @@ add_action('init', function() {
 }, 5); // Priority 5 to load early
 
 // WooCommerce builds its integrations at init 0, before modules load (init 5).
-add_action( 'plugins_loaded', [ \SiteEssentials\Modules\Analytics\Woo_GA_Bridge::class, 'register_inheritance' ] );
+add_action( 'plugins_loaded', [ \SiteEssentials\Modules\Analytics\Woo_GA_Bridge::class, 'init' ] );
 
 /**
  * WP-CLI commands — registered early and independently of module enable/disable state.

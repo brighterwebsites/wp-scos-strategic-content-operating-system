@@ -12,9 +12,10 @@
  * Only bridges when the plugin's ID then matches the SCOS one. A different ID means
  * the site deliberately reports ecommerce elsewhere, so the plugin is left alone.
  *
- * v1.2 | 2026-10-22: ID inheritance registered on plugins_loaded. WooCommerce builds its
- *                     integrations at init 0, before modules load (init 5), so the filter
- *                     added in init() came too late and the plugin stayed disabled.
+ * v1.2 | 2026-10-22: registered on plugins_loaded from site-essentials.php, not from
+ *                     Analytics_Module::init(). WooCommerce builds its integrations at init 0,
+ *                     before modules load (init 5): the plugin read its ID and built its gtag
+ *                     config before the bridge's filters existed, so it stayed disabled.
  * v1.1 | 2026-10-21: blank plugin ID inherits the SCOS ID (#206)
  * v1.0 | 2026-10-21 (#206)
  *
@@ -39,21 +40,19 @@ class Woo_GA_Bridge {
 	const SETTINGS_OPTION = 'woocommerce_google_analytics_settings';
 
 	/**
-	 * Hooked on plugins_loaded from site-essentials.php. WooCommerce reads the plugin's
-	 * settings when it builds its integrations (init 0), before Module_Loader runs (init 5),
-	 * so the filter can't wait for init().
+	 * Hooked on plugins_loaded from site-essentials.php. WooCommerce builds the plugin's
+	 * integration at init 0, reading its settings and gtag config there, before Module_Loader
+	 * runs (init 5), so this can't wait for Analytics_Module::init().
 	 */
-	public static function register_inheritance() {
+	public static function init() {
 		if ( '' === self::scos_id() || ! Settings_Manager::instance()->is_module_enabled( 'analytics' ) ) {
 			return;
 		}
 
 		add_filter( 'option_' . self::SETTINGS_OPTION, [ __CLASS__, 'inherit_scos_id' ] );
 		add_filter( 'default_option_' . self::SETTINGS_OPTION, [ __CLASS__, 'inherit_scos_id' ] );
-	}
 
-	public static function init() {
-		if ( '' === self::scos_id() || ! self::should_bridge() ) {
+		if ( ! self::should_bridge() ) {
 			return;
 		}
 

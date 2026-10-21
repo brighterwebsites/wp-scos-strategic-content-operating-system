@@ -2,7 +2,13 @@
 /**
  * Markdown Renderer
  *
- * v1.1 | 2026-08-04
+ * v1.2 | 2026-10-21
+ *
+ * v1.2 | 2026-10-21 — Clean output on page-builder markup (#211): heading and
+ *                     link text trimmed and collapsed, empty ones dropped,
+ *                     entities decoded, indentation and blank-line noise
+ *                     removed. Tag patterns anchored so <b>/<i>/<p>/<li> no
+ *                     longer match <button>/<img>/<path>/<link>.
  *
  * Serves a Markdown representation of singular posts/pages and the front page
  * when an agent requests it. Two trigger paths coexist:
@@ -214,20 +220,8 @@ class Markdown_Renderer {
 		// Run standard content filters (shortcodes, blocks, etc.) first.
 		$content = apply_filters( 'the_content', $content );
 
-		// ── Inline formatting ─────────────────────────────────────────────────
-		$content = preg_replace( '/<strong[^>]*>(.*?)<\/strong>/is', '**$1**', $content );
-		$content = preg_replace( '/<b[^>]*>(.*?)<\/b>/is',           '**$1**', $content );
-		$content = preg_replace( '/<em[^>]*>(.*?)<\/em>/is',         '_$1_',   $content );
-		$content = preg_replace( '/<i[^>]*>(.*?)<\/i>/is',           '_$1_',   $content );
-
-		// ── Links → [text](url) ───────────────────────────────────────────────
-		$content = preg_replace(
-			'/<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is',
-			'[$2]($1)',
-			$content
-		);
-
 		// ── Images → ![alt](src), matching both attribute orderings ───────────
+		// Before links, so a linked image survives inside the link text.
 		$content = preg_replace(
 			'/<img\s[^>]*alt=["\']([^"\']*)["\'][^>]*src=["\']([^"\']+)["\'][^>]*\/?>/is',
 			'![$1]($2)',
@@ -239,36 +233,149 @@ class Markdown_Renderer {
 			$content
 		);
 
+		// ── Links → [text](url) ───────────────────────────────────────────────
+		$content = preg_replace_callback(
+			'/<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is',
+			[ __CLASS__, 'convert_link' ],
+			$content
+		);
+
+		// ── Inline formatting ─────────────────────────────────────────────────
+		// \b stops <b>/<i> matching <button>, <img>, <iframe>, <input> etc.
+		$content = preg_replace_callback( '/<(strong|b)\b[^>]*>(.*?)<\/\1>/is', [ __CLASS__, 'convert_bold' ],   $content );
+		$content = preg_replace_callback( '/<(em|i)\b[^>]*>(.*?)<\/\1>/is',     [ __CLASS__, 'convert_italic' ], $content );
+
 		// ── Code (before block conversion to avoid mangling <pre> content) ────
-		$content = preg_replace( '/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/is', "\n```\n$1\n```\n", $content );
-		$content = preg_replace( '/<code[^>]*>(.*?)<\/code>/is',                  '`$1`',             $content );
+		$content = preg_replace( '/<pre\b[^>]*><code[^>]*>(.*?)<\/code><\/pre>/is', "\n```\n$1\n```\n", $content );
+		$content = preg_replace( '/<code\b[^>]*>(.*?)<\/code>/is',                   '`$1`',             $content );
 
 		// ── Headings ─────────────────────────────────────────────────────────
-		$content = preg_replace( '/<h1[^>]*>(.*?)<\/h1>/is',         '# $1',    $content );
-		$content = preg_replace( '/<h2[^>]*>(.*?)<\/h2>/is',         '## $1',   $content );
-		$content = preg_replace( '/<h3[^>]*>(.*?)<\/h3>/is',         '### $1',  $content );
-		$content = preg_replace( '/<h[456][^>]*>(.*?)<\/h[456]>/is', '#### $1', $content );
+		$content = preg_replace_callback( '/<h([1-6])\b[^>]*>(.*?)<\/h\1>/is', [ __CLASS__, 'convert_heading' ], $content );
 
 		// ── Block elements → double newline ───────────────────────────────────
 		$content = preg_replace(
-			'/<\/?(?:p|div|blockquote|section|article|header|footer|main|aside)[^>]*>/i',
+			'/<\/?(?:p|div|blockquote|section|article|header|footer|main|aside)\b[^>]*>/i',
 			"\n\n",
 			$content
 		);
 
 		// ── List items ────────────────────────────────────────────────────────
-		$content = preg_replace( '/<li[^>]*>(.*?)<\/li>/is', "- $1\n", $content );
+		$content = preg_replace_callback( '/<li\b[^>]*>(.*?)<\/li>/is', [ __CLASS__, 'convert_list_item' ], $content );
 
 		// ── Line breaks ───────────────────────────────────────────────────────
 		$content = preg_replace( '/<br\s*\/?>/i', "\n", $content );
 
-		// ── Strip remaining HTML ──────────────────────────────────────────────
+		// ── Strip remaining HTML, then decode entities once ───────────────────
 		$content = wp_strip_all_tags( $content );
+		$content = self::decode_entities( $content );
 
-		// ── Normalise whitespace: collapse 3+ newlines to 2 ──────────────────
-		$content = preg_replace( '/\n{3,}/', "\n\n", $content );
+		return self::normalise_whitespace( $content );
+	}
 
-		return trim( $content );
+	// ── Conversion callbacks ──────────────────────────────────────────────────
+
+	/**
+	 * Reduce an HTML fragment to one line of text: tags stripped, whitespace
+	 * collapsed. Builder markup indents element text across several lines.
+	 *
+	 * @param string $html Fragment.
+	 * @return string
+	 */
+	private static function inline_text( string $html ): string {
+		return trim( preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $html ) ) );
+	}
+
+	/**
+	 * @param array $m [1] level, [2] inner HTML.
+	 * @return string Heading on its own paragraph, or a break if it has no text.
+	 */
+	private static function convert_heading( array $m ): string {
+		$text = self::inline_text( $m[2] );
+		if ( '' === $text ) {
+			return "\n\n";
+		}
+		return "\n\n" . str_repeat( '#', min( (int) $m[1], 4 ) ) . ' ' . $text . "\n\n";
+	}
+
+	/**
+	 * Same-page anchors (#, #id) and javascript: links mean nothing outside
+	 * the page, so only their text is kept. Links with no text are dropped.
+	 *
+	 * @param array $m [1] href, [2] inner HTML.
+	 * @return string
+	 */
+	private static function convert_link( array $m ): string {
+		$text = self::inline_text( $m[2] );
+		$href = trim( $m[1] );
+		if ( '' === $text ) {
+			return '';
+		}
+		if ( '' === $href || '#' === $href[0] || 0 === stripos( $href, 'javascript:' ) ) {
+			return $text;
+		}
+		return '[' . $text . '](' . $href . ')';
+	}
+
+	/**
+	 * @param array $m [2] inner HTML.
+	 * @return string
+	 */
+	private static function convert_bold( array $m ): string {
+		$text = self::inline_text( $m[2] );
+		return '' === $text ? '' : '**' . $text . '**';
+	}
+
+	/**
+	 * @param array $m [2] inner HTML.
+	 * @return string
+	 */
+	private static function convert_italic( array $m ): string {
+		$text = self::inline_text( $m[2] );
+		return '' === $text ? '' : '_' . $text . '_';
+	}
+
+	/**
+	 * @param array $m [1] inner HTML.
+	 * @return string
+	 */
+	private static function convert_list_item( array $m ): string {
+		$text = trim( $m[1] );
+		return '' === $text ? '' : '- ' . $text . "\n";
+	}
+
+	/**
+	 * Decode HTML entities (&amp; → &). Non-breaking spaces become plain
+	 * spaces so they count as whitespace in the clean-up that follows.
+	 *
+	 * @param string $text Tag-free text.
+	 * @return string
+	 */
+	private static function decode_entities( string $text ): string {
+		$text = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return str_replace( "\u{00A0}", ' ', $text );
+	}
+
+	/**
+	 * Remove builder indentation and blank-line runs. Leading whitespace is
+	 * stripped (four spaces would otherwise turn prose into a Markdown code
+	 * block), except inside fenced code, which is left exactly as written.
+	 *
+	 * @param string $text Markdown with layout whitespace.
+	 * @return string
+	 */
+	private static function normalise_whitespace( string $text ): string {
+		$text  = str_replace( [ "\r\n", "\r" ], "\n", $text );
+		$parts = preg_split( '/(\n```\n.*?\n```\n)/s', $text, -1, PREG_SPLIT_DELIM_CAPTURE );
+
+		foreach ( $parts as $i => $part ) {
+			if ( 1 === $i % 2 ) {
+				continue; // Fenced code block.
+			}
+			$part        = preg_replace( '/^\h+|\h+$/mu', '', $part );
+			$parts[ $i ] = preg_replace( '/\n{3,}/', "\n\n", $part );
+		}
+
+		return trim( preg_replace( '/\n{3,}/', "\n\n", implode( '', $parts ) ) );
 	}
 
 	// ── Token estimate ────────────────────────────────────────────────────────

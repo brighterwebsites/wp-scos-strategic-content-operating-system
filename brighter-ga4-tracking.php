@@ -1,7 +1,12 @@
 <?php
 /**
  * Brighter GA4 Tracking Loader
- * Version: 3.1.0 - Standalone GA4 implementation
+ * Version: 3.2.0 - Standalone GA4 implementation
+ *
+ * v3.2.0 | 2026-10-21: gtag.js is fetched on idle after `load` (#205), not
+ * during parsing. The gtag() stub and config still run at once, so queued
+ * events are sent when it arrives. Never wait for user interaction: visitors
+ * who don't scroll or tap would vanish from GA4.
  *
  * v3.1.0 | 2026-10-21: the inline loader only bootstraps gtag now (#158). Its
  * click listener double-fired click_phone/click_email and sent a generic
@@ -101,7 +106,10 @@ add_action('wp_head', function() {
             var s=document.createElement('script');
             s.async=true;
             s.src='https://www.googletagmanager.com/gtag/js?id='+window.brighterGA4.measurementId;
-            document.head.appendChild(s);
+            // Fetch gtag.js once the page is idle after load: keeps its layout reads out of the load window.
+            var inject=function(){document.head.appendChild(s);};
+            var idle=function(){('requestIdleCallback' in window)?requestIdleCallback(inject,{timeout:1500}):setTimeout(inject,1500);};
+            if(document.readyState==='complete'){idle();}else{window.addEventListener('load',idle,{once:true});}
             gtag('config',window.brighterGA4.measurementId,{'send_page_view':false});
             window.brighterGA4.loaded=true;
             if(window.console&&window.console.log){

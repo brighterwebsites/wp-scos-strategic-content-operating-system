@@ -2,7 +2,10 @@
 /**
  * Llms_Txt — generated /llms.txt
  *
- * v1.0 | 2026-10-21
+ * v1.1 | 2026-10-22
+ *
+ * v1.1 | 2026-10-22 — the enquiry line points at the enquiry handoff (form
+ *                     fields + link route) when an enquiry page is set.
  *
  * Builds an llms.txt (llmstxt.org format) from the site's own data:
  *   - H1 + summary from Business_Profile (scos_biz_* fields, WP fallbacks)
@@ -125,7 +128,9 @@ class Llms_Txt {
 			. ( get_option( 'scos_agentic_ard_enabled' ) ? ', [ARD catalog](' . Agentic\Ard_Catalog::get_url() . ')' : '' ) . '.';
 
 		$contact = get_page_by_path( 'contact' );
-		if ( $contact && 'publish' === $contact->post_status ) {
+		if ( Agentic\Enquiry_Form::is_enabled() ) {
+			$lines[] = '- Enquiries: agents can\'t send them, but can prepare one. [Form fields](' . Agentic\Enquiry_API::get_url() . '), then `POST ' . Agentic\Enquiry_API::get_link_url() . '` returns a link that opens the [form](' . Agentic\Enquiry_Form::page_url() . ') filled in, for the person to check and send.';
+		} elseif ( $contact && 'publish' === $contact->post_status ) {
 			$lines[] = '- Enquiries and bookings are not available through the API. Use the [contact page](' . get_permalink( $contact ) . ').';
 		}
 

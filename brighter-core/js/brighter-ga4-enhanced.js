@@ -1,6 +1,13 @@
 /**
- * Brighter GA4 Enhanced v5.3.0
+ * Brighter GA4 Enhanced v5.4.0
  * Lead Hierarchy + Selector Attribution + CTA Tracking
+ *
+ * v5.4.0 | 2026-10-21: trimmed to the events in use (#159). Cut nav_*, trust
+ * views (incl. click_video), form-view events and the content-section
+ * view_section labels; the CTA milestone view_sections (mid, final, assist,
+ * end) stay. ga-hrcy-* classes still set cta_location / element_location.
+ * cta_type now knows menu, end, meeting, phone and email CTAs, not only
+ * main/micro/assist. content_plan is no longer sent (#97).
  *
  * v5.3.0 | 2026-10-21: stop event inflation (#158). Only view_* rules are
  * observed for impressions — click events no longer fire when an element
@@ -49,7 +56,6 @@
         altc_topic:       car.topic     || 'not_set',
         content_topic:    car.topic     || 'not_set', // legacy — kept for backwards compatibility
         content_maturity: car['topic-maturity'] || 'not_set',
-        content_plan:     car.content_plan || 'none',
         pillar_page:      'none', // pillar removed from CAR v1.2 — param kept for dimension continuity
         pillar_type:      'none',
         service_pathway:  (endTarget && endTarget.title) ? endTarget.title : 'none',
@@ -138,35 +144,7 @@
       { s: '.ga-subscribe',   e: 'form_subscribe',  c: 'Forms',       l: 'Subscribed',       v: 1  },
       { s: '.ga-lead_magnet', e: 'form_lead_magnet',c: 'Forms',       l: 'Lead Magnet',      v: 5  },
 
-      // Form containers (not the form itself)
-      { s: '.ga-vsubscribe',  e: 'view_sub_form',     c: 'Engagement',  l: 'Subscribe Form Viewed', v: 0 },
-      { s: '.ga-vquote',      e: 'view_enquiry_form', c: 'Engagement',  l: 'Enquiry Form Viewed',   v: 0 },
-      { s: '.ga-vcontact',    e: 'view_contact_form', c: 'Engagement',  l: 'Contact Form Viewed',   v: 0 },
 
-      { s: '.ga-lead_magsection', e: 'view_lead_magnet', c: 'Lead Magnet', l: 'View LM Section', v: 0 },
-
-      { s: '.ga-nav-blog, a[href*="/blog"]', e: 'nav_blog',           c: 'Navigation', l: 'Blog Path',      v: 1 },
-      { s: '.ga-nav-project',               e: 'nav_project',         c: 'Navigation', l: 'Portfolio Path', v: 1 },
-      { s: '.ga-nav-product',               e: 'nav_product',         c: 'Navigation', l: 'Product Path',   v: 2 },
-      { s: '.ga-nav-service',               e: 'nav_service',         c: 'Navigation', l: 'Service Path',   v: 2 },
-      { s: '.ga-nav-pricing',               e: 'nav_pricing_detail',  c: 'Navigation', l: 'Pricing Path',   v: 8 },
-
-      { s: '.ga-trust-reviews', e: 'view_reviews', c: 'Trust', l: 'Reviews Viewed',             v: 0 },
-      { s: '.ga-trust-pricing', e: 'view_pricing', c: 'Trust', l: 'Pricing Viewed',              v: 0 },
-      { s: '.ga-trust-specs',   e: 'view_specs',   c: 'Trust', l: 'Specifications Viewed',       v: 0 },
-      { s: '.ga-trust-case',    e: 'view_case',    c: 'Trust', l: 'Case Study Excerpt Viewed',   v: 0 },
-      { s: '.ga-exp-video',     e: 'click_video',  c: 'Trust', l: 'Expert Video Viewed',         v: 0 },
-      { s: '.ga-trust-badge',   e: 'view_badge',   c: 'Trust', l: 'Trust Badge Viewed',          v: 0 },
-
-      { s: '.ga-hrcy-atf',    e: 'view_section', c: 'Hierarchy', l: 'ATF Viewed',                   v: 1 },
-      { s: '.ga-hrcy-phs',    e: 'view_section', c: 'Hierarchy', l: 'Problem Hook Viewed',           v: 1 },
-      { s: '.ga-hrcy-ppd',    e: 'view_section', c: 'Hierarchy', l: 'Position Promise Dif Viewed',   v: 0 },
-      { s: '.ga-hrcy-method', e: 'view_section', c: 'Hierarchy', l: 'Method Viewed',                 v: 0 },
-      { s: '.ga-hrcy-specs',  e: 'view_section', c: 'Hierarchy', l: 'Specifications Viewed',         v: 0 },
-      { s: '.ga-hrcy-pricing',e: 'view_section', c: 'Hierarchy', l: 'Pricing Viewed',                v: 0 },
-      { s: '.ga-hrcy-aut',    e: 'view_section', c: 'Hierarchy', l: 'Authority Viewed',              v: 0 },
-      { s: '.ga-hrcy-tac',    e: 'view_section', c: 'Hierarchy', l: 'Trust Anchors Viewed',          v: 0 },
-      { s: '.ga-hrcy-faq',    e: 'view_section', c: 'Hierarchy', l: 'FAQ Viewed',                    v: 0 },
       { s: '.ga-hrcy-mid',    e: 'view_section', c: 'Hierarchy', l: 'MidCTA Reached',                v: 1 },
       { s: '.ga-hrcy-final',  e: 'view_section', c: 'Hierarchy', l: 'Final Push Reached',            v: 2 },
       { s: '.ga-hrcy-assist', e: 'view_section', c: 'Hierarchy', l: 'Assist CTA Reached',            v: 2 },
@@ -231,11 +209,15 @@
       return 'unknown';
     }
 
+    // Mirrors the CTA click rules: ga-cta-<type> class, then the meeting/tel/mailto fallbacks.
+    const CTA_TYPES = ['menu', 'main', 'micro', 'assist', 'end', 'meeting', 'phone', 'email'];
     function detectCTAType(element) {
       const classList = Array.from(element.classList);
-      if (classList.some(c => c.includes('ga-cta-main')))   return 'main';
-      if (classList.some(c => c.includes('ga-cta-micro')))  return 'micro';
-      if (classList.some(c => c.includes('ga-cta-assist'))) return 'assist';
+      const type = CTA_TYPES.find(t => classList.some(c => c.indexOf('ga-cta-' + t) === 0));
+      if (type) return type;
+      if (element.matches('[data-track="meeting"]')) return 'meeting';
+      if (element.matches('[href^="tel:"]'))         return 'phone';
+      if (element.matches('[href^="mailto:"]'))      return 'email';
       return 'unknown';
     }
 
@@ -261,8 +243,7 @@
 
       if (!el || el.dataset.gaSkip === '1') return;
 
-      if (el.classList.contains('ga-cta-main')  || el.classList.contains('ga-cta-micro') ||
-          el.classList.contains('ga-cta-assist') || el.tagName === 'BUTTON' || el.tagName === 'A') {
+      if (detectCTAType(el) !== 'unknown' || el.tagName === 'BUTTON' || el.tagName === 'A') {
         storeCTAContext(el);
       }
 

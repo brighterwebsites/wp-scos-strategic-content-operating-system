@@ -7,6 +7,7 @@
  * - Content Strategy Tracking
  * - Seeding
  *
+ * v1.2 | 2026-10-21 — event lists match the trimmed set (#159); content_plan row removed (#97)
  * v1.1 | 2026-10-21 — form_submit row removed; our form events no longer use enhanced-measurement names (#158)
  */
 
@@ -112,14 +113,12 @@ function brighter_analytics_render_page() {
                 <h4>What's Being Tracked:</h4>
                 <ul style="line-height: 1.8;">
                     <li>📄 <strong>Page views</strong> with content strategy metadata</li>
-                    <li>🎯 <strong>CTA clicks</strong> (main, micro, menu cta, assists)</li>
+                    <li>🎯 <strong>CTA clicks</strong> (menu, main, micro, assist, end, meeting)</li>
                     <li>🎯 <strong>Contact Clicks</strong> (phone, email)</li>
                     <li>📝 <strong>Form interactions</strong> (start, submit, lead generation)</li>
                     <li>📝 <strong>Form Lead Generation</strong> (cold, warm, hot)</li>
                     <li>🎓 <strong>Lead magnets</strong> (downloads, guides)</li>
-                    <li>👁️ <strong>Trust signals</strong> (reviews, pricing, case studies, videos)</li>
-                    <li>📊 <strong>Navigation</strong> (blog, portfolio, products, services)</li>
-                    <li>📍 <strong>Page hierarchy</strong> (Above the fold, mid & final CTA sections)</li>
+                    <li>📍 <strong>CTA milestones reached</strong> (mid, final, assist, end CTA sections)</li>
                    
                 </ul>
 
@@ -202,11 +201,6 @@ function brighter_analytics_render_page() {
                             <td><code>service_pathway</code></td>
                             <td>Service/Product pathway page</td>
                             <td>Page title of linked service pathway</td>
-                        </tr>
-                        <tr>
-                            <td><code>content_plan</code></td>
-                            <td>Content workflow status</td>
-                            <td>approve, testing, revise, merge, archive</td>
                         </tr>
 
                         <tr style="background-color: #e8f5e9;">
@@ -350,9 +344,14 @@ function brighter_analytics_render_page() {
                                 <td><strong>⭐ Conversion intent</strong></td>
                             </tr>
                             <tr>
-                                <td><code>get_lead_magnet</code></td>
-                                <td>Lead Magnet</td>
-                                <td>Lead generation</td>
+                                <td><code>form_quote</code> / <code>form_enquiry</code></td>
+                                <td>Forms</td>
+                                <td>Lead by form wrapper (<code>ga-quote</code>, <code>ga-form</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>form_lead_magnet</code></td>
+                                <td>Forms</td>
+                                <td>Lead generation (<code>ga-lead_magnet</code>)</td>
                             </tr>
                             <tr>
                                 <td><code>click_phone</code></td>
@@ -365,18 +364,13 @@ function brighter_analytics_render_page() {
                                 <td>Direct contact</td>
                             </tr>
                             <tr>
-                                <td><code>view_pricing</code></td>
-                                <td>Trust</td>
-                                <td>Purchase consideration</td>
-                            </tr>
-                            <tr>
-                                <td><code>subscribe</code></td>
-                                <td>Subscribe</td>
-                                <td>Lead nurture</td>
+                                <td><code>form_subscribe</code></td>
+                                <td>Forms</td>
+                                <td>Lead nurture (<code>ga-subscribe</code>)</td>
                             </tr>
                             <tr>
                                 <td colspan="3" style="text-align: center; font-style: italic; color: #666;">
-                                    + 15 more engagement events
+                                    Also: click_menu_cta, click_micro_cta, click_assist_cta, click_end_cta, lead_form_start, view_section (CTA milestones)
                                 </td>
                             </tr>
                         </tbody>

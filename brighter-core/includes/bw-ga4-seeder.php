@@ -14,6 +14,7 @@
  *
  * Safe for production - marks all events clearly as seed data
  *
+ * v1.3 | 2026-10-21 — seed only the events still tracked (#159); content_plan dropped (#97)
  * v1.2 | 2026-10-21 — form_start → lead_form_start; form_submit dropped (#158)
  * v1.1 | 2026-10-20 — read CAR v1.2 keys (known-for-goal, topic-maturity, commercial-end-target)
  */
@@ -116,10 +117,7 @@ add_action('wp_footer', function() {
             altc_topic: car.topic || 'not_set', // Preferred field name
             content_topic: car.topic || 'not_set', // Legacy - kept for backwards compatibility
             content_maturity: car['topic-maturity'] || 'not_set',
-            
-            // Content workflow fields (from SCOS CAR)
-            content_plan: car.content_plan || 'none',
-            
+
             // Relationship fields (from SCOS CAR)
             pillar_page: 'none', // pillar removed from CAR v1.2
             pillar_type: 'none',
@@ -160,27 +158,8 @@ add_action('wp_footer', function() {
         { name: 'form_subscribe', category: 'Forms' },
 
         { name: 'generate_lead', category: 'Forms' },
-          
 
-        // Navigation
-        { name: 'nav_blog', category: 'Navigation' },
-        { name: 'nav_project', category: 'Navigation' },
-        { name: 'nav_product', category: 'Navigation' },
-        { name: 'nav_service', category: 'Navigation' },
-        { name: 'nav_pricing', category: 'Navigation' },
-      
-        
-        // Trust signals
-        { name: 'view_reviews', category: 'Trust' },
-        { name: 'view_pricing', category: 'Trust' },
-        { name: 'view_specs', category: 'Trust' },
-        { name: 'view_case', category: 'Trust' },
-        { name: 'view_badge', category: 'Trust' },
-        { name: 'click_video', category: 'Trust' },
-        
-
-        
-        // Hierarchy
+        // Hierarchy: CTA milestones (mid, final, assist, end)
         { name: 'view_section', category: 'Hierarchy' }
 
         

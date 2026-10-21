@@ -9,6 +9,9 @@
  * - Defines SCOS_ANALYTICS_ACTIVE (hides legacy brighter-core Analytics menu)
  * - Manages GA4 Measurement ID (option: brighter_ga4_measurement_id)
  * - Renders settings panel with seeding status + how-to
+ * - Bridges the WooCommerce GA plugin onto the SCOS gtag (Woo_GA_Bridge)
+ *
+ * v1.1 | 2026-10-21: Woo_GA_Bridge (#206)
  *
  * @package    SiteEssentials
  * @subpackage Modules\Analytics
@@ -47,7 +50,7 @@ class Analytics_Module implements Module_Interface {
 	}
 
 	public static function get_version() {
-		return '1.0.0';
+		return '1.1.0';
 	}
 
 	public function init() {
@@ -58,6 +61,8 @@ class Analytics_Module implements Module_Interface {
 		add_action( 'admin_init', [ __CLASS__, 'save_settings' ] );
 		add_action( 'admin_init', [ __CLASS__, 'handle_seed_reset' ] );
 		add_action( 'wp_ajax_brighter_ga4_seed_complete', [ __CLASS__, 'ajax_seed_complete' ] );
+
+		Woo_GA_Bridge::init();
 	}
 
 	/**

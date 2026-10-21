@@ -1,7 +1,11 @@
 <?php
 /**
  * Brighter GA4 Tracking Loader
- * Version: 3.2.0 - Standalone GA4 implementation
+ * Version: 3.2.1 - Standalone GA4 implementation
+ *
+ * v3.2.1 | 2026-10-21: `scos_ga4_load_immediately` filter skips the idle wait
+ * (#206). Used on the WooCommerce order-received page so `purchase` isn't
+ * lost when the buyer closes the tab before gtag.js arrives.
  *
  * v3.2.0 | 2026-10-21: gtag.js is fetched on idle after `load` (#205), not
  * during parsing. The gtag() stub and config still run at once, so queued
@@ -42,6 +46,7 @@ add_action('wp_head', function() {
             window.brighterGA4 = {
                 measurementId: '<?php echo esc_js($ga4_id); ?>',
                 loaded: false,
+                loadNow: <?php echo apply_filters('scos_ga4_load_immediately', false) ? 'true' : 'false'; ?>,
                 skipTracking: <?php echo $is_admin_or_editor ? 'true' : 'false'; ?> // Skip events if admin/editor logged in
             };
             // Debug logging (only in development - remove in production)
@@ -109,7 +114,9 @@ add_action('wp_head', function() {
             // Fetch gtag.js once the page is idle after load: keeps its layout reads out of the load window.
             var inject=function(){document.head.appendChild(s);};
             var idle=function(){('requestIdleCallback' in window)?requestIdleCallback(inject,{timeout:1500}):setTimeout(inject,1500);};
-            if(document.readyState==='complete'){idle();}else{window.addEventListener('load',idle,{once:true});}
+            // loadNow (filter scos_ga4_load_immediately): pages whose hits can't wait, e.g. the order-received purchase.
+            if(window.brighterGA4.loadNow===true){inject();}
+            else if(document.readyState==='complete'){idle();}else{window.addEventListener('load',idle,{once:true});}
             gtag('config',window.brighterGA4.measurementId,{'send_page_view':false});
             window.brighterGA4.loaded=true;
             if(window.console&&window.console.log){

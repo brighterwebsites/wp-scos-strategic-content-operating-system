@@ -2,7 +2,7 @@
 /**
  * Agentic Module — settings view
  *
- * v1.2 | 2026-10-21
+ * v1.3 | 2026-10-22
  *
  * Template C (single-section settings). Rendered inside <div class="wrap scos">
  * by Admin_UI::render_agentic_page().
@@ -141,6 +141,83 @@ defined( 'ABSPATH' ) || exit;
 				);
 				?>
 			</p>
+		</div>
+	</div>
+
+	<!-- ── Enquiry handoff ───────────────────────────────────────────────── -->
+	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+		<div class="scos-card__header scos-card__header--plain">
+			<h2 class="scos-card__title"><?php esc_html_e( 'Enquiry handoff', 'site-essentials' ); ?></h2>
+			<p class="scos-card__desc">
+				<?php esc_html_e( 'Lets an agent in a chat or terminal draft an enquiry and give the person a link that opens your form filled in. The person checks it and presses send, so it arrives like any other form submission. Nothing is stored or sent by SCOS.', 'site-essentials' ); ?>
+			</p>
+		</div>
+		<div class="scos-card__body">
+			<table class="scos-form">
+				<tbody>
+					<tr>
+						<th>
+							<label for="scos_agentic_enquiry_page_id"><?php esc_html_e( 'Enquiry page ID', 'site-essentials' ); ?></label>
+							<div class="scos-form__slug">scos_agentic_enquiry_page_id</div>
+						</th>
+						<td>
+							<input
+								id="scos_agentic_enquiry_page_id"
+								name="scos_agentic_enquiry_page_id"
+								type="number"
+								class="scos-input"
+								value="<?php echo esc_attr( absint( get_option( 'scos_agentic_enquiry_page_id', 0 ) ) ?: '' ); ?>"
+								min="0"
+								style="width:120px">
+							<p class="description">
+								<?php esc_html_e( 'A published page the form appears on (a form in a site-wide popup works on any page). Blank turns enquiry handoff off.', 'site-essentials' ); ?>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th>
+							<label for="scos_agentic_enquiry_form"><?php esc_html_e( 'Form toolname', 'site-essentials' ); ?></label>
+							<div class="scos-form__slug">scos_agentic_enquiry_form</div>
+						</th>
+						<td>
+							<input
+								id="scos_agentic_enquiry_form"
+								name="scos_agentic_enquiry_form"
+								type="text"
+								class="scos-input scos-input--mono"
+								value="<?php echo esc_attr( (string) get_option( 'scos_agentic_enquiry_form', '' ) ); ?>"
+								style="width:240px">
+							<p class="description">
+								<?php esc_html_e( 'The form\'s WebMCP toolname attribute. Blank uses the first form on the page that has one. Field descriptions come from each field\'s toolparamdescription.', 'site-essentials' ); ?>
+							</p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<?php
+			if ( \SiteEssentials\Modules\Agentic\Enquiry_Form::is_enabled() ) :
+				$scos_enquiry = \SiteEssentials\Modules\Agentic\Enquiry_Form::get_schema();
+				if ( $scos_enquiry ) :
+					?>
+					<p class="description" style="margin-top:var(--scos-s-4)">
+						<?php
+						printf(
+							/* translators: 1: form toolname, 2: comma-separated field names */
+							esc_html__( 'Found form %1$s with fields: %2$s.', 'site-essentials' ),
+							'<code>' . esc_html( $scos_enquiry['form'] ) . '</code>',
+							esc_html( implode( ', ', wp_list_pluck( $scos_enquiry['fields'], 'name' ) ) )
+						);
+						?>
+						<a href="<?php echo esc_url( \SiteEssentials\Modules\Agentic\Enquiry_API::get_url() ); ?>" target="_blank" rel="noopener"><code><?php echo esc_html( \SiteEssentials\Modules\Agentic\Enquiry_API::get_url() ); ?></code></a>
+					</p>
+				<?php else : ?>
+					<div class="scos-notice scos-notice--warning" style="margin-top:var(--scos-s-4)">
+						<p><?php esc_html_e( 'No form with a toolname attribute was found on that page, so agents are told no enquiry form is available. Add toolname and tooldescription to the form, then save this page again to re-check.', 'site-essentials' ); ?></p>
+					</div>
+					<?php
+				endif;
+			endif;
+			?>
 		</div>
 	</div>
 

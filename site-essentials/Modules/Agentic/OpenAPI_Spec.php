@@ -2,7 +2,10 @@
 /**
  * Agentic — OpenAPI 3.1 Description + Health Endpoint
  *
- * v1.0 | 2026-08-04
+ * v1.1 | 2026-10-22
+ *
+ * v1.1 | 2026-10-22 — enquiry handoff paths (/enquiry, /enquiry/link), listed
+ *                     only when an enquiry page is set. (#200 D17)
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -114,7 +117,7 @@ class OpenAPI_Spec {
 			'info'    => [
 				'title'       => $site_name . ' — SCOS Content API',
 				'version'     => Agentic_Module::get_version(),
-				'description' => 'Read-only access to published content, filterable by the SCOS content architecture fields (purpose and search intent). Intended for AI agents and automated consumers. No authentication required; no write operations exist.',
+				'description' => 'Read-only access to published content, filterable by the SCOS content architecture fields (purpose and search intent). Intended for AI agents and automated consumers. No authentication required. Nothing here writes or sends anything: the enquiry link route only builds a URL for a person to open.',
 				'contact'     => [
 					'url' => home_url(),
 				],
@@ -131,7 +134,7 @@ class OpenAPI_Spec {
 				'/content/{slug}' => self::path_content(),
 				'/site-info'      => self::path_site_info(),
 				'/health'         => self::path_health(),
-			],
+			] + self::enquiry_paths(),
 			'components' => [
 				'schemas'    => [
 					'ContentSummary' => self::schema_content_summary(),
@@ -255,6 +258,80 @@ class OpenAPI_Spec {
 								'schema' => [ '$ref' => '#/components/schemas/SiteInfo' ],
 							],
 						],
+					],
+				],
+			],
+		];
+	}
+
+	/**
+	 * Only listed when the site has an enquiry page, so the spec never
+	 * describes a route that 404s.
+	 */
+	private static function enquiry_paths(): array {
+		if ( ! Enquiry_Form::is_enabled() ) {
+			return [];
+		}
+
+		return [
+			'/enquiry'      => [
+				'get' => [
+					'operationId' => 'getEnquiryForm',
+					'summary'     => 'Get the enquiry form\'s fields',
+					'description' => 'The fields of the site\'s enquiry or quote form: name, type, whether required, and the allowed options for multiple-choice fields. Read this before building a link.',
+					'responses'   => [
+						'200' => [ 'description' => 'The form: form, description, url, fields[], how.' ],
+						'503' => [ 'description' => 'The enquiry page has no annotated form.' ],
+					],
+				],
+			],
+			'/enquiry/link' => [
+				'post' => [
+					'operationId' => 'buildEnquiryLink',
+					'summary'     => 'Build a pre-filled enquiry link',
+					'description' => 'Returns a link that opens the site\'s form filled in with these values. Nothing is sent: give the link to the person, who checks the form and presses send. Unknown fields and values that are not one of a field\'s options come back in ignored.',
+					'requestBody' => [
+						'required' => true,
+						'content'  => [
+							'application/json' => [
+								'schema' => [
+									'type'       => 'object',
+									'required'   => [ 'fields' ],
+									'properties' => [
+										'fields' => [
+											'type'                 => 'object',
+											'description'          => 'Field name => value, or a list of values for multiple-choice fields.',
+											'additionalProperties' => [
+												'oneOf' => [
+													[ 'type' => 'string' ],
+													[ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+												],
+											],
+										],
+									],
+								],
+							],
+						],
+					],
+					'responses'   => [
+						'200' => [
+							'description' => 'The link.',
+							'content'     => [
+								'application/json' => [
+									'schema' => [
+										'type'       => 'object',
+										'properties' => [
+											'url'              => [ 'type' => 'string', 'format' => 'uri' ],
+											'filled'           => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+											'missing_required' => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+											'ignored'          => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+											'next'             => [ 'type' => 'string' ],
+										],
+									],
+								],
+							],
+						],
+						'503' => [ 'description' => 'The enquiry page has no annotated form.' ],
 					],
 				],
 			],

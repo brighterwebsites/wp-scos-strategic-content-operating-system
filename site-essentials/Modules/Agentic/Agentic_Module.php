@@ -2,7 +2,7 @@
 /**
  * Agentic Module
  *
- * v1.3 | 2026-10-21
+ * v1.4 | 2026-10-22
  *
  * Handles AI agent discovery and content accessibility for client sites.
  *
@@ -12,6 +12,8 @@
  *   - scos/v1 REST content API (search, list, content/{slug}, site-info, health)
  *   - WebMCP widget (conditionally loaded on the /mcp/ page)
  *   - Native WebMCP: the same tools via document.modelContext on every page
+ *   - Enquiry handoff: an agent builds a link that opens the site's own
+ *     form pre-filled, for the person to check and send (opt-in, #200 D17)
  *
  * Discovery layer — how an agent finds the above without being told:
  *   - RFC 8288 Link headers (llms.txt, /mcp/, api-catalog)
@@ -64,7 +66,7 @@ class Agentic_Module implements Module_Interface {
 	}
 
 	public static function get_version(): string {
-		return '1.3';
+		return '1.4';
 	}
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -80,6 +82,9 @@ class Agentic_Module implements Module_Interface {
 		OpenAPI_Spec::init();
 		WebMCP_Widget::init();
 		WebMCP_Native::init();
+		Enquiry_Form::init();
+		Enquiry_API::init();
+		Enquiry_Prefill::init();
 
 		// Discovery layer — the router must init before its consumers register.
 		Well_Known_Router::init();

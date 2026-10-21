@@ -2,7 +2,10 @@
 /**
  * Agentic — Agent Skills Discovery (Cloudflare RFC v0.2.0)
  *
- * v1.0 | 2026-08-04
+ * v1.1 | 2026-10-22
+ *
+ * v1.1 | 2026-10-22 — enquiry-handoff skill, listed only when an enquiry page
+ *                     is set. (#200 D17)
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -154,7 +157,7 @@ class Agent_Skills {
 	 * @return array<string, array{description: string}>
 	 */
 	private static function get_skills(): array {
-		return [
+		$skills = [
 			'content-api'           => [
 				'description' => 'Query this site\'s published content programmatically via its REST API, including filtering by content purpose and search intent.',
 			],
@@ -165,6 +168,14 @@ class Agent_Skills {
 				'description' => 'Connect to this site\'s WebMCP tools from an MCP client to search and read content through tool calls rather than HTTP requests.',
 			],
 		];
+
+		if ( Enquiry_Form::is_enabled() ) {
+			$skills['enquiry-handoff'] = [
+				'description' => 'Prepare an enquiry or quote request with a person and hand them a link that opens this site\'s form filled in, for them to check and send.',
+			];
+		}
+
+		return $skills;
 	}
 
 	/**
@@ -183,6 +194,9 @@ class Agent_Skills {
 
 			case 'webmcp-connect':
 				return self::skill_webmcp_connect();
+
+			case 'enquiry-handoff':
+				return Enquiry_Form::is_enabled() ? self::skill_enquiry_handoff() : '';
 		}
 
 		return '';
@@ -382,6 +396,56 @@ so the failure is silent — the symptom is that nothing is listening on port
 
 Workarounds: run with `--foreground` in an interactive terminal, or guard the
 call with `process.stdin.isTTY &&` in the installed package.
+MD;
+	}
+
+	private static function skill_enquiry_handoff(): string {
+		$site_name = get_bloginfo( 'name' );
+		$schema    = Enquiry_API::get_url();
+		$link      = Enquiry_API::get_link_url();
+		$page      = Enquiry_Form::page_url();
+
+		return <<<MD
+---
+name: enquiry-handoff
+description: Prepare an enquiry or quote request with a person and hand them a link that opens this site's form filled in, for them to check and send.
+---
+
+# Preparing an enquiry for {$site_name}
+
+You can't send an enquiry to this business, and nothing here pretends you can.
+What you can do is draft it with the person and give them a link that opens
+the business's own form already filled in. They check it and press send.
+
+## Steps
+
+1. `GET {$schema}` returns the form's fields: `name`, `type`, `required`,
+   and `options` for multiple-choice fields.
+2. Ask the person for anything required you don't know. Don't invent contact
+   details.
+3. `POST {$link}` with a JSON body:
+
+   ```json
+   {"fields": {"name": "Jo", "email": "jo@example.com", "services": ["An option exactly as listed"], "message": "..."}}
+   ```
+
+4. Read the response:
+   - `url` is the link to give the person.
+   - `missing_required` lists required fields still empty. The person can
+     fill them in on the form, or you can ask and build the link again.
+   - `ignored` lists fields or values that weren't accepted. Values for
+     multiple-choice fields must match an option (case doesn't matter).
+5. Give the person the link and tell them plainly that nothing has been sent
+   until they press send on the form.
+
+## Notes
+
+- The values travel in the link's `#` fragment, which never reaches the
+  server, so the person's details stay out of logs and analytics.
+- Building a link stores nothing and sends nothing.
+- The form is on {$page}. In a browser with a built-in agent, the same form
+  is available as a WebMCP tool, so you can fill it in directly while the
+  person watches.
 MD;
 	}
 }

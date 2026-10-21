@@ -4,6 +4,8 @@
  *
  * v1.2 | 2026-06-21
  * v1.3 | 2026-07-01 — Add extra_media_columns toggle.
+ * v1.4 | 2026-10-21 — llms.txt: blank serves the generated version; "Start from
+ *                      generated version" button.
  *
  * SCOS design system: scos-card per section, scos-checkbox-row, scos-input--mono,
  * scos-save-bar, scos-notice. Inline <style> block removed.
@@ -15,6 +17,7 @@
 
 use SiteEssentials\Modules\SeoMeta\Image_SEO;
 use SiteEssentials\Modules\SeoMeta\Virtual_Files;
+use SiteEssentials\Modules\SeoMeta\Llms_Txt;
 use SiteEssentials\Modules\SeoMeta\Exif_Stripper;
 
 defined( 'ABSPATH' ) || exit;
@@ -160,13 +163,19 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 			<p class="description" style="margin-bottom:var(--scos-s-4)"><?php esc_html_e( 'Changing the enabled state will flush WordPress rewrite rules on save.', 'site-essentials' ); ?></p>
 
 			<div id="scos-llms-editor" <?php echo $llms_opts['enabled'] ? '' : 'style="opacity:.5;pointer-events:none;"'; ?>>
-				<label for="scos_llms_content" style="display:block;font-size:var(--scos-fs-lg);font-weight:600;color:var(--scos-ink);margin-bottom:var(--scos-s-2)">
-					<?php esc_html_e( 'llms.txt content', 'site-essentials' ); ?>
-				</label>
+				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--scos-s-2)">
+					<label for="scos_llms_content" style="font-size:var(--scos-fs-lg);font-weight:600;color:var(--scos-ink)">
+						<?php esc_html_e( 'llms.txt content', 'site-essentials' ); ?>
+					</label>
+					<button type="button" id="scos-llms-generated" class="scos-btn scos-btn--ghost"
+						data-default="<?php echo esc_attr( Llms_Txt::build() ); ?>">
+						<?php esc_html_e( '↺ Start from generated version', 'site-essentials' ); ?>
+					</button>
+				</div>
 				<textarea name="scos_llms[content]" id="scos_llms_content" rows="16"
 					class="scos-input scos-input--mono"
-					placeholder="<?php esc_attr_e( '# Add your llms.txt content here…', 'site-essentials' ); ?>"><?php echo esc_textarea( $llms_opts['content'] ); ?></textarea>
-				<p class="description" style="margin-top:var(--scos-s-1)"><?php esc_html_e( 'Plain text only. The file is served with Content-Type: text/plain and X-Robots-Tag: noindex.', 'site-essentials' ); ?></p>
+					placeholder="<?php esc_attr_e( 'Leave blank to serve the generated version.', 'site-essentials' ); ?>"><?php echo esc_textarea( $llms_opts['content'] ); ?></textarea>
+				<p class="description" style="margin-top:var(--scos-s-1)"><?php esc_html_e( 'Leave blank to serve a version generated from Business Info, your service pages, recent articles and the agent features that are switched on. It updates as those change. Anything typed here replaces it. Plain text, served with Content-Type: text/plain and X-Robots-Tag: noindex.', 'site-essentials' ); ?></p>
 			</div>
 		</div>
 	</div>
@@ -295,6 +304,16 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 			resetBtn.addEventListener( 'click', function () {
 				if ( window.confirm( '<?php echo esc_js( __( 'Replace the current content with the gold-standard template?', 'site-essentials' ) ); ?>' ) ) {
 					robotsTa.value = this.dataset.default;
+				}
+			} );
+		}
+
+		var llmsGen = document.getElementById( 'scos-llms-generated' );
+		var llmsTa  = document.getElementById( 'scos_llms_content' );
+		if ( llmsGen && llmsTa ) {
+			llmsGen.addEventListener( 'click', function () {
+				if ( '' === llmsTa.value.trim() || window.confirm( '<?php echo esc_js( __( 'Replace the current content with the generated version? Saving it freezes it: it will no longer update on its own.', 'site-essentials' ) ); ?>' ) ) {
+					llmsTa.value = this.dataset.default;
 				}
 			} );
 		}

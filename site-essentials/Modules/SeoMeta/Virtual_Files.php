@@ -11,12 +11,15 @@
  * llms.txt
  *   Registers a rewrite rule to serve /llms.txt as a virtual plain-text
  *   file from a WordPress query var. Rewrite rules are flushed automatically
- *   when the enabled state changes.
+ *   when the enabled state changes. Blank content serves the generated
+ *   version from Llms_Txt; anything typed in the editor replaces it.
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
  *
+ * v1.1 | 2026-10-21 — llms.txt with blank custom content serves the generated
+ *                      version (Llms_Txt::build()), so it stays current.
  * v1.0 | 2026-10-01 — Default robots.txt: Content-Signal line, Cloudflare email-protection
  *                      disallow, note on the feed block when feeds are disabled.
  */
@@ -153,7 +156,12 @@ class Virtual_Files {
 			return;
 		}
 		$llms    = self::get_llms();
-		$content = $llms['content'] ?? '';
+		$content = trim( (string) ( $llms['content'] ?? '' ) );
+		if ( '' === $content ) {
+			$content = Llms_Txt::build();
+			// Generated from live content: keep a page-cache copy for an hour at most.
+			do_action( 'litespeed_control_set_ttl', HOUR_IN_SECONDS );
+		}
 
 		header( 'Content-Type: text/plain; charset=utf-8' );
 		header( 'X-Robots-Tag: noindex' );

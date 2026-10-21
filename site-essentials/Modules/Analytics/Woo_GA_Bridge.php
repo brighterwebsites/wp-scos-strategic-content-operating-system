@@ -8,9 +8,11 @@
  * - no second page_view (its config gets send_page_view: false; SCOS sends page_view)
  * - gtag.js loads at once on the order-received page so `purchase` isn't lost
  *
- * Only bridges when the plugin's measurement ID matches the SCOS one. A different
- * ID means the site deliberately reports ecommerce elsewhere, so the plugin is left alone.
+ * A blank plugin measurement ID inherits the SCOS one, so the ID is set in one place.
+ * Only bridges when the plugin's ID then matches the SCOS one. A different ID means
+ * the site deliberately reports ecommerce elsewhere, so the plugin is left alone.
  *
+ * v1.1 | 2026-10-21: blank plugin ID inherits the SCOS ID (#206)
  * v1.0 | 2026-10-21 (#206)
  *
  * @package    SiteEssentials
@@ -28,7 +30,18 @@ class Woo_GA_Bridge {
 	/** Script handle the plugin registers for gtag.js. */
 	const GTAG_HANDLE = 'google-tag-manager';
 
+	/** Option the plugin stores its integration settings in (ga_id lives here). */
+	const SETTINGS_OPTION = 'woocommerce_google_analytics_settings';
+
 	public static function init() {
+		if ( '' === self::scos_id() ) {
+			return;
+		}
+
+		// Before WooCommerce loads its integrations, so the plugin sees the inherited ID.
+		add_filter( 'option_' . self::SETTINGS_OPTION, [ __CLASS__, 'inherit_scos_id' ] );
+		add_filter( 'default_option_' . self::SETTINGS_OPTION, [ __CLASS__, 'inherit_scos_id' ] );
+
 		if ( ! self::should_bridge() ) {
 			return;
 		}
@@ -39,19 +52,32 @@ class Woo_GA_Bridge {
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'empty_gtag_handle' ], 20 );
 	}
 
+	private static function scos_id() {
+		return trim( (string) get_option( 'brighter_ga4_measurement_id', '' ) );
+	}
+
 	/**
-	 * Bridge only when SCOS and the plugin are both configured with the same measurement ID.
+	 * Fill a blank plugin measurement ID with the SCOS one. The plugin disables all
+	 * tracking while ga_id is empty. A non-blank ID is never touched.
+	 */
+	public static function inherit_scos_id( $settings ) {
+		if ( ! is_array( $settings ) ) {
+			$settings = [];
+		}
+		if ( empty( $settings['ga_id'] ) ) {
+			$settings['ga_id'] = self::scos_id();
+		}
+		return $settings;
+	}
+
+	/**
+	 * Bridge only when the plugin (after inheriting) uses the SCOS measurement ID.
 	 */
 	private static function should_bridge() {
-		$scos_id = (string) get_option( 'brighter_ga4_measurement_id', '' );
-		if ( '' === $scos_id ) {
-			return false;
-		}
+		$settings  = get_option( self::SETTINGS_OPTION, [] );
+		$plugin_id = is_array( $settings ) && ! empty( $settings['ga_id'] ) ? trim( (string) $settings['ga_id'] ) : '';
 
-		$settings  = get_option( 'woocommerce_google_analytics_settings', [] );
-		$plugin_id = is_array( $settings ) && ! empty( $settings['ga_id'] ) ? (string) $settings['ga_id'] : '';
-
-		return '' !== $plugin_id && 0 === strcasecmp( trim( $scos_id ), trim( $plugin_id ) );
+		return '' !== $plugin_id && 0 === strcasecmp( self::scos_id(), $plugin_id );
 	}
 
 	/**

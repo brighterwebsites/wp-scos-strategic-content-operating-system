@@ -2,8 +2,12 @@
 /**
  * Agentic — WebMCP Widget
  *
- * v1.1 | 2026-10-21
+ * v1.2 | 2026-10-21
  *
+ * v1.2 | 2026-10-21 — Trigger button shows a small code-agent icon (</> in a
+ *                     robot head) instead of a blank square, gets a green dot
+ *                     when connected, and is keyboard reachable with a label.
+ *                     Done from the loader; the bundled webmcp.js is untouched.
  * v1.1 | 2026-10-21 — Tools now come from WebMCP_Tools (shared with the native
  *                     document.modelContext registration) and describe the
  *                     site by its own name, not the agency's.
@@ -78,6 +82,26 @@ class WebMCP_Widget {
 		);
 	}
 
+	// ── Trigger icon ──────────────────────────────────────────────────────────
+
+	/**
+	 * Small code-agent mark for the widget trigger: </> inside a rounded
+	 * robot head with an antenna. Drawn in currentColor so it follows the
+	 * trigger's text colour on any widget colour.
+	 *
+	 * @return string Inline SVG.
+	 */
+	private static function icon_svg(): string {
+		return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+			. '<line x1="12" y1="3.6" x2="12" y2="6"/>'
+			. '<circle cx="12" cy="2.6" r="1.1" fill="currentColor" stroke="none"/>'
+			. '<rect x="3" y="6" width="18" height="14" rx="4.5"/>'
+			. '<polyline points="9,10.2 6.8,13 9,15.8"/>'
+			. '<polyline points="15,10.2 17.2,13 15,15.8"/>'
+			. '<line x1="13.1" y1="9.8" x2="10.9" y2="16.2"/>'
+			. '</svg>';
+	}
+
 	// ── Tool registration ─────────────────────────────────────────────────────
 
 	/**
@@ -97,7 +121,7 @@ class WebMCP_Widget {
     var mcp = new WebMCP({
         color:    <?php echo wp_json_encode( $color ); ?>,
         position: 'bottom-right',
-        size:     '28px',
+        size:     '34px',
         padding:  '16px'
     });
 
@@ -113,6 +137,44 @@ class WebMCP_Widget {
             return key + '=' + encodeURIComponent(args[key]);
         }).join('&');
         return def.base.replace(/\/$/, '') + path + (qs ? '?' + qs : '');
+    }
+
+    // ── Trigger icon ─────────────────────────────────────────────────────
+    // webmcp.js blanks the trigger on disconnect and writes a check mark on
+    // connect, so the icon is repainted after every connection-state change.
+    var icon = <?php echo wp_json_encode( self::icon_svg() ); ?>;
+    var labels = <?php echo wp_json_encode( [
+        'off' => __( 'Connect an AI agent to this site (WebMCP)', 'site-essentials' ),
+        'on'  => __( 'AI agent connected (WebMCP)', 'site-essentials' ),
+    ] ); ?>;
+
+    function paintTrigger(connected) {
+        var el = document.querySelector('[data-webmcp-widget] .webmcp-trigger');
+        if (!el) { return; }
+        el.innerHTML = icon + (connected
+            ? '<span aria-hidden="true" style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid #fff"></span>'
+            : '');
+        el.style.position = 'relative';
+        el.style.color = '#fff';
+        el.setAttribute('role', 'button');
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('aria-label', connected ? labels.on : labels.off);
+        el.title = connected ? labels.on : labels.off;
+    }
+
+    var updateConnectionUI = mcp._updateConnectionUI;
+    if (typeof updateConnectionUI === 'function') {
+        mcp._updateConnectionUI = function (connected) {
+            updateConnectionUI.call(mcp, connected);
+            paintTrigger(connected);
+        };
+    }
+    var trigger = document.querySelector('[data-webmcp-widget] .webmcp-trigger');
+    paintTrigger(!!trigger && trigger.textContent === '✓');
+    if (trigger) {
+        trigger.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger.click(); }
+        });
     }
 
     // Same definitions as the native registration (WebMCP_Tools.php).

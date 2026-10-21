@@ -2,10 +2,11 @@
 /**
  * Agentic — /.well-known/ Router
  *
- * v1.1 | 2026-10-21
+ * v1.2 | 2026-10-21
  *
  * v1.1 | 2026-10-21 — Unregistered paths now return a hard 404 instead of
  *                     falling through to WP (which served the blog index, 200).
+ * v1.2 | 2026-10-21 — Optional 'headers' in a response (e.g. CORS for ARD).
  * WHAT THIS IS FOR
  * ----------------
  * RFC 8615 reserves /.well-known/ as the standard location for site-wide
@@ -128,7 +129,8 @@ class Well_Known_Router {
 		/**
 		 * Filter: scos_well_known_response
 		 *
-		 * @param array|null $response ['content' => string, 'type' => string] or null.
+		 * @param array|null $response ['content' => string, 'type' => string,
+		 *                             'headers' => [name => value] (optional)] or null.
 		 * @param string     $path     Requested path minus the /.well-known/ prefix.
 		 */
 		$response = apply_filters( 'scos_well_known_response', null, $path );
@@ -151,6 +153,10 @@ class Well_Known_Router {
 
 		// These files are small, static, and safe to cache at the edge.
 		header( 'Cache-Control: public, max-age=3600' );
+
+		foreach ( (array) ( $response['headers'] ?? [] ) as $name => $value ) {
+			header( $name . ': ' . $value );
+		}
 
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — pre-encoded JSON/markdown payload
 		echo $response['content'];

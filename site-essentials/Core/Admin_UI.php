@@ -953,6 +953,11 @@ class Admin_UI {
             absint( $_POST['scos_agentic_webmcp_page_id'] ?? 0 )
         );
 
+        // Experimental draft-spec files (#200 D14).
+        foreach ( [ 'scos_agentic_ard_enabled', 'scos_agentic_poppy_enabled' ] as $scos_option ) {
+            update_option( $scos_option, ! empty( $_POST[ $scos_option ] ) ? 1 : 0 );
+        }
+
         wp_safe_redirect(
             add_query_arg(
                 [

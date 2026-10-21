@@ -144,6 +144,55 @@ defined( 'ABSPATH' ) || exit;
 		</div>
 	</div>
 
+	<!-- ── Experimental: draft specs ─────────────────────────────────────── -->
+	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+		<div class="scos-card__header scos-card__header--plain">
+			<h2 class="scos-card__title">
+				<?php esc_html_e( 'Experimental: draft specs', 'site-essentials' ); ?>
+				<span class="scos-badge scos-badge--soft"><?php esc_html_e( 'Beta', 'site-essentials' ); ?></span>
+			</h2>
+			<p class="scos-card__desc">
+				<?php esc_html_e( 'Discovery files for agent standards that are still drafts and will change. Leave off on client sites: publishing an ARD file switches Lighthouse\'s agent audit from "not applicable" to strict.', 'site-essentials' ); ?>
+			</p>
+		</div>
+		<div class="scos-card__body">
+			<?php
+			$scos_drafts = [
+				'scos_agentic_ard_enabled'   => [
+					__( 'ARD catalog (Agentic Resource Discovery v0.91)', 'site-essentials' ),
+					__( 'Serves /.well-known/ard.json and /.well-known/ai-catalog.json, listing the API catalog, OpenAPI description and MCP server card.', 'site-essentials' ),
+					\SiteEssentials\Modules\Agentic\Ard_Catalog::get_url(),
+				],
+				'scos_agentic_poppy_enabled' => [
+					__( 'Personal Agent Protocol manifest (Draft 0.2)', 'site-essentials' ),
+					__( 'Serves /.well-known/poppy.json: business name and domain only. No agent, API or session declarations.', 'site-essentials' ),
+					\SiteEssentials\Modules\Agentic\Poppy_Manifest::get_url(),
+				],
+			];
+			foreach ( $scos_drafts as $scos_key => $scos_draft ) :
+				?>
+				<label class="scos-checkbox-row" style="cursor:pointer;margin-bottom:var(--scos-s-2)">
+					<input
+						type="checkbox"
+						name="<?php echo esc_attr( $scos_key ); ?>"
+						id="<?php echo esc_attr( $scos_key ); ?>"
+						value="1"
+						<?php checked( (bool) get_option( $scos_key, false ) ); ?>>
+					<span>
+						<strong><?php echo esc_html( $scos_draft[0] ); ?></strong>
+						<span class="description" style="display:block;margin-top:2px">
+							<?php echo esc_html( $scos_draft[1] ); ?>
+							<?php if ( get_option( $scos_key, false ) ) : ?>
+								<a href="<?php echo esc_url( $scos_draft[2] ); ?>" target="_blank" rel="noopener"><code><?php echo esc_html( $scos_draft[2] ); ?></code></a>
+							<?php endif; ?>
+						</span>
+					</span>
+				</label>
+				<div class="scos-form__slug" style="margin-bottom:var(--scos-s-4)"><?php echo esc_html( $scos_key ); ?></div>
+			<?php endforeach; ?>
+		</div>
+	</div>
+
 	<!-- ── Discovery Endpoints (read-only reference) ──────────────────────── -->
 	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
 		<div class="scos-card__header scos-card__header--plain">

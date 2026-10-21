@@ -19,6 +19,8 @@
  *   - RFC 9727 API Catalog at /.well-known/api-catalog
  *   - Agent Skills index at /.well-known/agent-skills/index.json
  *   - MCP Server Card at /.well-known/mcp/server-card.json
+ *   - Experimental, opt-in: ARD catalog (ard.json + ai-catalog.json) and
+ *     Personal Agent Protocol manifest (poppy.json)
  *
  * The discovery chain is deliberately layered: Link headers point at the
  * catalog, the catalog points at the OpenAPI document, and the skills index
@@ -84,6 +86,10 @@ class Agentic_Module implements Module_Interface {
 		Api_Catalog::init();
 		Agent_Skills::init();
 		Mcp_Server_Card::init();
+
+		// Experimental draft specs — each is off unless its own option is on.
+		Ard_Catalog::init();
+		Poppy_Manifest::init();
 
 		add_action( 'send_headers', [ __CLASS__, 'send_link_headers' ] );
 

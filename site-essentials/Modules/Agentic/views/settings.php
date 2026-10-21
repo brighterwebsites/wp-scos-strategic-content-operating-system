@@ -2,7 +2,7 @@
 /**
  * Agentic Module — settings view
  *
- * v1.1 | 2026-08-04
+ * v1.2 | 2026-10-21
  *
  * Template C (single-section settings). Rendered inside <div class="wrap scos">
  * by Admin_UI::render_agentic_page().
@@ -66,6 +66,23 @@ defined( 'ABSPATH' ) || exit;
 				</span>
 			</label>
 			<div class="scos-form__slug" style="margin-top:var(--scos-s-3)">scos_agentic_markdown_enabled</div>
+			<?php
+			$scos_md_rule = \SiteEssentials\Modules\Agentic\Markdown_Cache_Rule::status();
+			if ( $scos_md_rule['enabled'] && ! $scos_md_rule['ok'] ) :
+				?>
+				<div class="scos-notice scos-notice--warning" style="margin-top:var(--scos-s-3)">
+					<p>
+						<?php esc_html_e( 'The page-cache rule for Markdown requests is missing from .htaccess, so cached pages answer agents with HTML.', 'site-essentials' ); ?>
+						<?php if ( ! $scos_md_rule['writable'] ) : ?>
+							<?php esc_html_e( '.htaccess is not writable by WordPress. Run: wp scos markdown-cache-rule sync', 'site-essentials' ); ?>
+						<?php endif; ?>
+					</p>
+				</div>
+			<?php elseif ( $scos_md_rule['enabled'] ) : ?>
+				<p class="description" style="margin-top:var(--scos-s-2)">
+					<?php esc_html_e( 'Page-cache rule present in .htaccess (Markdown requests skip the LiteSpeed cache).', 'site-essentials' ); ?>
+				</p>
+			<?php endif; ?>
 		</div>
 	</div>
 

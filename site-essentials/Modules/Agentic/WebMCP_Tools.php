@@ -102,7 +102,7 @@ class WebMCP_Tools {
 			],
 			[
 				'name'        => 'get_site_info',
-				'description' => sprintf( 'Get context about %s: who they are, what they do, who they serve, their services and topic areas. Call this first to understand the site.', $site ),
+				'description' => sprintf( 'Get context about %s: what the business does, where it is, how to contact it and its services, with links. Call this first to understand the site.', $site ),
 				'inputSchema' => [
 					'type'       => 'object',
 					'properties' => new \stdClass(),

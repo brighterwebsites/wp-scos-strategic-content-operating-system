@@ -7,6 +7,7 @@
  * - Content Strategy Tracking
  * - Seeding
  *
+ * v1.3 | 2026-10-21 — dimension table: cluster/topic renames, pillar_* and content_topic removed (#98)
  * v1.2 | 2026-10-21 — event lists match the trimmed set (#159); content_plan row removed (#97)
  * v1.1 | 2026-10-21 — form_submit row removed; our form events no longer use enhanced-measurement names (#158)
  */
@@ -167,13 +168,13 @@ function brighter_analytics_render_page() {
                         </tr>
                   
                         <tr style="background-color: #e8f5e9;">
-                            <td><code>altc_primary</code></td>
-                            <td><strong>ALTC Strategic Lens</strong> (Authority cluster)</td>
+                            <td><code>cluster</code></td>
+                            <td><strong>Cluster</strong> (Authority cluster / known-for goal)</td>
                             <td>AI-First SEO, Conversion Optimization, etc.</td>
                         </tr>
                         <tr style="background-color: #e8f5e9;">
-                            <td><code>altc_topic</code></td>
-                            <td><strong>ALTC Topic</strong> (Specific focus area)</td>
+                            <td><code>topic</code></td>
+                            <td><strong>Topic</strong> (Specific focus area)</td>
                             <td>Content Strategy, Technical SEO, UX Design, etc.</td>
                         </tr>
                         <tr>
@@ -187,16 +188,6 @@ function brighter_analytics_render_page() {
                             <td>pillar, service-page, supporting, case-study, conversion-hub</td>
                         </tr>
 
-                        <tr>
-                            <td><code>pillar_page</code></td>
-                            <td>Parent pillar/service page</td>
-                            <td>Page title of linked pillar</td>
-                        </tr>
-                        <tr>
-                            <td><code>pillar_type</code></td>
-                            <td>Type of parent</td>
-                            <td>pillar, service, none</td>
-                        </tr>
                         <tr>
                             <td><code>service_pathway</code></td>
                             <td>Service/Product pathway page</td>
@@ -267,7 +258,7 @@ function brighter_analytics_render_page() {
                 </ol>
 
                 <div class="notice notice-info inline" style="margin-top: 15px;">
-                    <p><strong>💡 Pro Tip:</strong> Prioritize the ALTC dimensions (altc_primary, altc_topic, content_maturity)
+                    <p><strong>💡 Pro Tip:</strong> Prioritize the ALTC dimensions (cluster, topic, content_maturity)
                     if you're using the Authority-Led Topic Clusters strategy. These provide powerful insights into how your
                     strategic positioning affects conversions and engagement.</p>
                 </div>
@@ -283,11 +274,8 @@ function brighter_analytics_render_page() {
                 <h4>3. Example Reports You Can Build</h4>
                 <ul style="line-height: 1.8;">
                     <li>Conversion rate by <code>content_purpose</code> (which page types convert best?)</li>
-                    <li>Engagement by <code>content_topic</code> (which topics are most popular?)</li>
-                    <li>Form submissions by <code>pillar_page</code> (which pillar drives leads?)</li>
-                    <li>CTA clicks by <code>optimization_status</code> (do optimized pages perform better?)</li>
-                    <li><strong>🆕 ALTC Cluster ROI:</strong> Conversion rate by <code>altc_primary</code> (which authority clusters convert?)</li>
-                    <li><strong>🆕 Topic Performance:</strong> Engagement by <code>altc_topic</code> (which topics resonate most?)</li>
+                    <li><strong>🆕 ALTC Cluster ROI:</strong> Conversion rate by <code>cluster</code> (which authority clusters convert?)</li>
+                    <li><strong>🆕 Topic Performance:</strong> Engagement by <code>topic</code> (which topics resonate most?)</li>
                     <li><strong>🆕 Maturity Targeting:</strong> Bounce rate by <code>content_maturity</code> (are expert articles engaging?)</li>
                 </ul>
 

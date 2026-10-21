@@ -2,8 +2,10 @@
 /**
  * Agentic — /.well-known/ Router
  *
- * v1.0 | 2026-08-04
+ * v1.1 | 2026-10-21
  *
+ * v1.1 | 2026-10-21 — Unregistered paths now return a hard 404 instead of
+ *                     falling through to WP (which served the blog index, 200).
  * WHAT THIS IS FOR
  * ----------------
  * RFC 8615 reserves /.well-known/ as the standard location for site-wide
@@ -110,8 +112,8 @@ class Well_Known_Router {
 	/**
 	 * Resolve the requested .well-known path and emit the response.
 	 *
-	 * Returning without output lets WordPress carry on to a normal 404,
-	 * which is the correct behaviour for an unregistered path.
+	 * An unregistered path gets a hard 404 from send_not_found(), queued last
+	 * on template_redirect so another plugin can still serve it first.
 	 */
 	public static function serve(): void {
 		$path = (string) get_query_var( self::QV );
@@ -132,7 +134,11 @@ class Well_Known_Router {
 		$response = apply_filters( 'scos_well_known_response', null, $path );
 
 		if ( ! is_array( $response ) || ! isset( $response['content'] ) ) {
-			return; // Unhandled — let WordPress 404.
+			// Not ours. Stop the trailing-slash 301, give other plugins'
+			// template_redirect handlers their turn, then 404 if none answered.
+			remove_action( 'template_redirect', 'redirect_canonical' );
+			add_action( 'template_redirect', [ __CLASS__, 'send_not_found' ], PHP_INT_MAX );
+			return;
 		}
 
 		$type = $response['type'] ?? 'text/plain';
@@ -148,6 +154,27 @@ class Well_Known_Router {
 
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — pre-encoded JSON/markdown payload
 		echo $response['content'];
+		exit;
+	}
+
+	/**
+	 * Hard 404 for an unregistered .well-known path, then exit.
+	 *
+	 * Handing back to WordPress does NOT produce a 404: the only query var set
+	 * is ours, so WP treats the request as the posts page, redirect_canonical
+	 * adds a trailing slash (301) and the blog index is served with a 200.
+	 * Validators that probe for optional manifests (e.g. ai-catalog.json) then
+	 * parse that HTML and report "malformed JSON" instead of "not present".
+	 */
+	public static function send_not_found(): void {
+		self::bypass_page_cache();
+
+		status_header( 404 );
+		header( 'Content-Type: text/plain; charset=utf-8' );
+		header( 'X-Robots-Tag: noindex' );
+		header( 'Cache-Control: no-store' );
+
+		echo 'Not Found';
 		exit;
 	}
 

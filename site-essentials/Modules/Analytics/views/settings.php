@@ -4,6 +4,8 @@
  *
  * Replaces the legacy brighter-analytics multi-tab admin page.
  * Reset and save handlers are registered in Analytics_Module::admin_init hooks.
+ *
+ * v1.1 | 2026-10-21: events table matches the trimmed event set (#159)
  */
 defined( 'ABSPATH' ) || exit;
 
@@ -127,14 +129,13 @@ $reset_url = admin_url( 'admin.php?page=site-essentials-analytics&scos_reset_see
 				<tbody>
 					<tr><td><code>click_meeting</code></td><td><?php esc_html_e( 'Meetings', 'site-essentials' ); ?></td><td><strong><?php esc_html_e( 'High-value conversion', 'site-essentials' ); ?></strong></td></tr>
 					<tr><td><code>generate_lead</code></td><td><?php esc_html_e( 'Forms', 'site-essentials' ); ?></td><td><strong><?php esc_html_e( 'Primary conversion — mark as conversion in GA4 Admin → Events', 'site-essentials' ); ?></strong></td></tr>
-					<tr><td><code>form_submit</code></td><td><?php esc_html_e( 'Forms', 'site-essentials' ); ?></td><td><strong><?php esc_html_e( 'Primary conversion', 'site-essentials' ); ?></strong></td></tr>
 					<tr><td><code>click_main_cta</code></td><td><?php esc_html_e( 'Quote', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Conversion intent', 'site-essentials' ); ?></td></tr>
-					<tr><td><code>get_lead_magnet</code></td><td><?php esc_html_e( 'Lead Magnet', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Lead generation', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>form_quote</code> / <code>form_enquiry</code></td><td><?php esc_html_e( 'Forms', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Lead by form wrapper (ga-quote, ga-form)', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>form_lead_magnet</code></td><td><?php esc_html_e( 'Forms', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Lead generation (ga-lead_magnet)', 'site-essentials' ); ?></td></tr>
 					<tr><td><code>click_phone</code></td><td><?php esc_html_e( 'Contact', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Direct contact', 'site-essentials' ); ?></td></tr>
 					<tr><td><code>click_email</code></td><td><?php esc_html_e( 'Contact', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Direct contact', 'site-essentials' ); ?></td></tr>
-					<tr><td><code>view_pricing</code></td><td><?php esc_html_e( 'Trust', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Purchase consideration', 'site-essentials' ); ?></td></tr>
-					<tr><td><code>subscribe</code></td><td><?php esc_html_e( 'Subscribe', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Lead nurture', 'site-essentials' ); ?></td></tr>
-					<tr><td colspan="3"><?php esc_html_e( '+ 15 more engagement events', 'site-essentials' ); ?></td></tr>
+					<tr><td><code>form_subscribe</code></td><td><?php esc_html_e( 'Forms', 'site-essentials' ); ?></td><td><?php esc_html_e( 'Lead nurture (ga-subscribe)', 'site-essentials' ); ?></td></tr>
+					<tr><td colspan="3"><?php esc_html_e( 'Also: click_menu_cta, click_micro_cta, click_assist_cta, click_end_cta, lead_form_start, view_section (CTA milestones)', 'site-essentials' ); ?></td></tr>
 				</tbody>
 			</table>
 

@@ -47,12 +47,11 @@ This repo is Brighter Websites' implementation: a deployable MU plugin foundatio
 wp-scos-strategic-content-operating-system/
 ├── site-essentials.php          # Site Essentials loader (modular system)
 ├── brighter-core-loader.php     # Legacy brighter-core loader
-├── brighter-ga4-tracking.php    # GA4 front-end tracking
 ├── site-essentials/             # ✅ New architecture — build here
 │   ├── Core/                    # Admin UI, settings, module registry
 │   └── Modules/                 # Feature modules (see table below)
 ├── brighter-core/               # ⚠️ Legacy — migrate to site-essentials
-│   └── includes/                # CAR injection, schema output, GA4 seeder, API, ntfy…
+│   └── includes/                # CAR injection, schema output, API, ntfy…
 └── archive/                     # Retired one-off scripts (do not deploy)
 ```
 
@@ -78,7 +77,7 @@ Modules load only when enabled. Status reflects current `main` branch.
 | **Email Delivery** | `site-essentials/Modules/EmailDelivery/` | ✅ Active |
 | **Client Onboarding** | `site-essentials/Modules/ClientOnboarding/` | ✅ Active |
 | **CAR injection** | `brighter-core/includes/scos-car-injection.php` | ✅ Active — outputs `window.scosCAR` in `<head>` |
-| **GA4 enhanced tracking** | `brighter-core/js/brighter-ga4-enhanced.js` | ✅ Active — reads `window.scosCAR` |
+| **GA4 enhanced tracking** | `site-essentials/Modules/Analytics/assets/js/brighter-ga4-enhanced.js` | ✅ Active — reads `window.scosCAR` |
 | **REST API** | `brighter-core/includes/api/` | ✅ Active — `/scos`, posts, FAQs, social endpoints |
 | **ntfy monitoring** | `brighter-core/includes/ntfy/` | ✅ Active |
 | **CAM (Content Authority Map)** | — | ❌ Not built — next major milestone |

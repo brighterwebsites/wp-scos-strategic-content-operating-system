@@ -9,9 +9,12 @@
  * - Defines SCOS_ANALYTICS_ACTIVE (hides legacy brighter-core Analytics menu)
  * - Manages GA4 Measurement ID (option: brighter_ga4_measurement_id)
  * - Renders settings panel with seeding status + how-to
+ * - Outputs the gtag bootstrap and enhanced tracking script (GA4_Tracker)
+ * - Sends seed events on ?seedEvents=true (GA4_Seeder)
  * - Bridges the WooCommerce GA plugin onto the SCOS gtag (Woo_GA_Bridge, hooked on
  *   plugins_loaded in site-essentials.php because WooCommerce needs it before init)
  *
+ * v1.3 | 2026-10-23: owns GA4 tracking and seeding, moved from brighter-core (#93)
  * v1.2 | 2026-10-22: Woo_GA_Bridge::init() moved to plugins_loaded
  * v1.1 | 2026-10-21: Woo_GA_Bridge (#206)
  *
@@ -52,13 +55,16 @@ class Analytics_Module implements Module_Interface {
 	}
 
 	public static function get_version() {
-		return '1.1.0';
+		return '1.2.0';
 	}
 
 	public function init() {
 		if ( ! defined( 'SCOS_ANALYTICS_ACTIVE' ) ) {
 			define( 'SCOS_ANALYTICS_ACTIVE', true );
 		}
+
+		GA4_Tracker::init();
+		GA4_Seeder::init();
 
 		add_action( 'admin_init', [ __CLASS__, 'save_settings' ] );
 		add_action( 'admin_init', [ __CLASS__, 'handle_seed_reset' ] );
@@ -108,6 +114,7 @@ class Analytics_Module implements Module_Interface {
 	 * AJAX: mark GA4 events as seeded (fired by the seeder script on the frontend).
 	 */
 	public static function ajax_seed_complete() {
+		check_ajax_referer( GA4_Seeder::NONCE_ACTION, 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Unauthorized' );
 		}

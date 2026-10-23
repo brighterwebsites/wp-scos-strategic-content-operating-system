@@ -1,83 +1,86 @@
 <?php
 /**
- * GA4 Event Seeder - Low Traffic Site Edition
+ * GA4 Event Seeder — low-traffic site edition
  *
- * FOR LOW-VOLUME, HIGH-TICKET SITES (< 50 visitors/week)
+ * Pre-registers every tracked event name in GA4 so key events and custom
+ * dimensions can be set up from day 1 on low-volume, high-ticket sites.
+ * Trigger: /?seedEvents=true as an admin. Seed hits carry event_label
+ * "Seed Event - Ignore", a [SEED] page title and value 0.01.
  *
- * Purpose: Pre-register all event names in GA4 on initial setup
- * Trigger: ?seedEvents=true (admin only, runs once)
- *
- * This creates a complete event taxonomy immediately so you can:
- * - Mark conversions from day 1
- * - Set up proper attribution
- * - Track rare high-value events
- *
- * Safe for production - marks all events clearly as seed data
- *
+ * v2.0 | 2026-10-23 — moved from brighter-core/includes/bw-ga4-seeder.php v1.4
+ *                     into the Analytics module as a class (#93). GA4_Tracker now
+ *                     loads gtag on the seed request; before, the seeder ran only
+ *                     for admins while the loader skipped gtag for them, so it
+ *                     logged "GA4 not loaded" and sent nothing. It now also
+ *                     records the seed (brighter_ga4_seed_complete), which it never
+ *                     called, so the settings page always showed "not seeded".
  * v1.4 | 2026-10-21 — altc_primary → cluster, altc_topic → topic; content_topic and pillar_* dropped (#98)
  * v1.3 | 2026-10-21 — seed only the events still tracked (#159); content_plan dropped (#97)
  * v1.2 | 2026-10-21 — form_start → lead_form_start; form_submit dropped (#158)
  * v1.1 | 2026-10-20 — read CAR v1.2 keys (known-for-goal, topic-maturity, commercial-end-target)
+ *
+ * @package    SiteEssentials
+ * @subpackage Modules\Analytics
  */
 
-// Wrap everything in template_redirect hook to ensure WordPress is fully loaded
-add_action('template_redirect', function() {
-    // Only run for admins
-    if (!is_user_logged_in() || !current_user_can('manage_options')) {
-        return;
-    }
+namespace SiteEssentials\Modules\Analytics;
 
-    // Only run when explicitly requested
-    if (!isset($_GET['seedEvents']) || $_GET['seedEvents'] !== 'true') {
-        return;
-    }
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
-    // Check if already seeded (store in transient for 30 days)
-    $seeded_flag = get_transient('brighter_ga4_events_seeded');
-    if ($seeded_flag) {
-        add_action('admin_notices', function() {
-            echo '<div class="notice notice-success"><p>';
-            echo '<strong>GA4 Events Already Seeded</strong><br>';
-            echo 'Events were registered on ' . get_transient('brighter_ga4_seed_date');
-            echo '</p></div>';
-        });
-        return;
-    }
+class GA4_Seeder {
 
-// Add notice in admin bar
-add_action('wp_footer', function() {
-    if (is_user_logged_in() && current_user_can('manage_options')) {
-        echo '<style>
-            .ga4-seed-notice {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: #ff6b6b;
-                color: white;
-                padding: 15px 20px;
-                border-radius: 8px;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                font-size: 14px;
-                font-weight: 600;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                z-index: 999999;
-                animation: fadeIn 0.5s;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-        </style>
-        <div class="ga4-seed-notice">
-            ?? GA4 Event Seeding Active<br>
-            <small>Check GA4 Realtime in 30 seconds</small>
-        </div>';
-    }
-});
+	const NONCE_ACTION = 'scos_ga4_seed_complete';
 
-// Output seeding script
-add_action('wp_footer', function() {
-?>
+	public static function init() {
+		add_action( 'template_redirect', [ __CLASS__, 'maybe_seed' ] );
+	}
+
+	/** An admin asked for seeding with ?seedEvents=true. */
+	public static function is_seed_request() {
+		return isset( $_GET['seedEvents'] ) && 'true' === $_GET['seedEvents'] // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only trigger, admin-gated
+			&& is_user_logged_in() && current_user_can( 'manage_options' );
+	}
+
+	public static function maybe_seed() {
+		if ( ! self::is_seed_request() || get_transient( 'brighter_ga4_events_seeded' ) ) {
+			return;
+		}
+		add_action( 'wp_footer', [ __CLASS__, 'render_notice' ] );
+		add_action( 'wp_footer', [ __CLASS__, 'render_script' ], 999 ); // after the enhanced script's footer enqueue
+	}
+
+	public static function render_notice() {
+		echo '<style>
+		    .ga4-seed-notice {
+		        position: fixed;
+		        bottom: 20px;
+		        right: 20px;
+		        background: #ff6b6b;
+		        color: white;
+		        padding: 15px 20px;
+		        border-radius: 8px;
+		        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		        font-size: 14px;
+		        font-weight: 600;
+		        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+		        z-index: 999999;
+		        animation: fadeIn 0.5s;
+		    }
+		    @keyframes fadeIn {
+		        from { opacity: 0; transform: translateY(20px); }
+		        to { opacity: 1; transform: translateY(0); }
+		    }
+		</style>
+		<div class="ga4-seed-notice">
+		    ?? GA4 Event Seeding Active<br>
+		    <small>Check GA4 Realtime in 30 seconds</small>
+		</div>';
+	}
+
+	public static function render_script() {
+		?>
 <script>
 (function() {
     'use strict';
@@ -196,12 +199,14 @@ add_action('wp_footer', function() {
                 console.log(`%c✅ Seeded ${count} events`, 'background: #4CAF50; color: white; padding: 6px 12px; font-weight: bold;');
                 console.log('Check GA4 → Realtime → Events in ~30 seconds');
                 console.log('Then go to Admin → Events to mark conversions');
+                // Record the seed so the Analytics settings page shows it and a reload doesn't re-seed.
+                const body = new URLSearchParams({ action: 'brighter_ga4_seed_complete', nonce: <?php echo wp_json_encode( wp_create_nonce( GA4_Seeder::NONCE_ACTION ) ); ?> });
+                fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', credentials: 'same-origin', body: body });
             }
         }, index * 100); // 100ms between events
     });
 })();
 </script>
-<?php
-}, 999);
-
-}); // End template_redirect wrapper
+		<?php
+	}
+}

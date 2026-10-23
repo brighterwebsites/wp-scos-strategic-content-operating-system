@@ -1,12 +1,15 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.4.0
+ * Version: 4.5.0
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.5.0 - MOVE: bw-ga4-seeder and the GA4 enhanced tracking JS now live in the
+ *         site-essentials Analytics module (#93). bw-ga4-seed-admin (the legacy
+ *         Analytics page, shown only with the module off) removed.
  * 4.4.0 - REMOVE: class-content-analysis-seeder. Its backfill queue keyed off
  *         _bw_last_analyzed, which SCOS_CA_ACTIVE stopped writing, so the
  *         "posts pending analysis" admin notice could never clear and its
@@ -35,7 +38,7 @@ if (!defined('ABSPATH')) exit;
 //error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.4.0');
+define('BRIGHTER_CORE_VERSION', '4.5.0');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
@@ -66,8 +69,7 @@ function brighter_get_whitelisted_modules() {
             'privacy-policy-style',
             'technical-settings',
             'bw-content-strategy',
-            'bw-ga4-seeder',
-            'bw-ga4-seed-admin',
+            // bw-ga4-seeder, bw-ga4-seed-admin moved to site-essentials Analytics module (#93)
             // bw-schema-admin removed — site-wide schema UI is Site Essentials > Schema (SiteSchema_Module).
             'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
             'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
@@ -201,8 +203,6 @@ function brighter_load_modules() {
         'bw-custposts',
         'brighter-tweaks',
 	'bw-content-strategy',
- 	'bw-ga4-seeder',
- 	'bw-ga4-seed-admin',
 	'scos-car-injection',           // SCOS CAR data injection (consolidates content strategy + ALTC)
 	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
@@ -233,7 +233,6 @@ function brighter_load_modules() {
         'brighter-admin-branding',
         'brighter-support-image-settings',
         // NOTE: bw-admin-tweaks removed from admin-only because it contains frontend admin bar replacement
-       	'bw-ga4-seed-admin',
         // Legacy bw-schema-admin (Support > Schema) removed; use Site Essentials > Schema.
         // Content Analysis (admin-only)
         'class-content-stats-page',

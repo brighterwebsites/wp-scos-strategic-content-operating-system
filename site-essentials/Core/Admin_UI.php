@@ -962,6 +962,10 @@ class Admin_UI {
             'scos_agentic_enquiry_form',
             sanitize_text_field( wp_unslash( $_POST['scos_agentic_enquiry_form'] ?? '' ) )
         );
+        update_option(
+            'scos_agentic_enquiry_send_enabled',
+            ! empty( $_POST['scos_agentic_enquiry_send_enabled'] ) ? 1 : 0
+        );
         \SiteEssentials\Modules\Agentic\Enquiry_Form::flush();
 
         // Experimental draft-spec files (#200 D14).

@@ -83,6 +83,7 @@ class Agentic_Module implements Module_Interface {
 		WebMCP_Widget::init();
 		WebMCP_Native::init();
 		Enquiry_Form::init();
+		Enquiry_Send::init();
 		Enquiry_API::init();
 		Enquiry_Prefill::init();
 

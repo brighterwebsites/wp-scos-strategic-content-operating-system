@@ -192,6 +192,31 @@ defined( 'ABSPATH' ) || exit;
 							</p>
 						</td>
 					</tr>
+					<tr>
+						<th>
+							<label for="scos_agentic_enquiry_send_enabled"><?php esc_html_e( 'Agents can send', 'site-essentials' ); ?></label>
+							<div class="scos-form__slug">scos_agentic_enquiry_send_enabled</div>
+						</th>
+						<td>
+							<label class="scos-checkbox-row">
+								<input
+									type="checkbox"
+									id="scos_agentic_enquiry_send_enabled"
+									name="scos_agentic_enquiry_send_enabled"
+									value="1"
+									<?php checked( (bool) get_option( 'scos_agentic_enquiry_send_enabled', false ) ); ?>>
+								<span><?php esc_html_e( 'Let agents send the enquiry, confirmed by the person by email', 'site-essentials' ); ?></span>
+							</label>
+							<p class="description">
+								<?php esc_html_e( 'The person gets an email with a link to check the enquiry and press Send. Only then does it run through your form (email, stored submission, Slack, webhook). Mailing-list actions are never run, and agents can\'t tick consent boxes. Confirmation emails need working site email.', 'site-essentials' ); ?>
+							</p>
+							<?php if ( get_option( 'scos_agentic_enquiry_send_enabled', false ) && ! get_option( 'se_email_enabled', false ) ) : ?>
+								<div class="scos-notice scos-notice--warning">
+									<div class="scos-notice__body"><?php esc_html_e( 'Site Essentials email delivery is off. Make sure this site\'s email reaches inboxes, or confirmation emails may land in spam.', 'site-essentials' ); ?></div>
+								</div>
+							<?php endif; ?>
+						</td>
+					</tr>
 				</tbody>
 			</table>
 			<?php

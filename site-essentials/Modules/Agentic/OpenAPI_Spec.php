@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.3 | 2026-10-25 — POST /enquiry/send, when agent-sent enquiries are on (#225).
  * v1.2 | 2026-10-25 — GET /enquiry documents the `link` format (build the link without POST).
  * v1.1 | 2026-10-22 — enquiry handoff paths (/enquiry, /enquiry/link), listed
  *                     only when an enquiry page is set. (#200 D17)
@@ -333,6 +334,62 @@ class OpenAPI_Spec {
 							],
 						],
 						'503' => [ 'description' => 'The enquiry page has no annotated form.' ],
+					],
+				],
+			],
+		] + self::enquiry_send_path();
+	}
+
+	/**
+	 * POST /enquiry/send, listed only when agent-sent enquiries are on.
+	 *
+	 * @return array
+	 */
+	private static function enquiry_send_path(): array {
+		if ( ! Enquiry_Send::is_enabled() ) {
+			return [];
+		}
+
+		return [
+			'/enquiry/send' => [
+				'post' => [
+					'operationId' => 'sendEnquiry',
+					'summary'     => 'Send an enquiry for the person, confirmed by them by email',
+					'description' => 'Send the enquiry from the conversation. It must include the person\'s email address: they get an email with a link to check it and press Send, and nothing reaches the business until they do. Show the person what you are sending first, and tell them to look for the email. Newsletter and consent boxes are never ticked for them. Rate limited; on 429 use /enquiry/link instead.',
+					'requestBody' => [
+						'required' => true,
+						'content'  => [
+							'application/json' => [
+								'schema' => [
+									'type'       => 'object',
+									'required'   => [ 'fields' ],
+									'properties' => [
+										'fields' => [
+											'type'                 => 'object',
+											'description'          => 'Field name => value, or a list of values for multiple-choice fields. Include the email field.',
+											'additionalProperties' => [
+												'oneOf' => [
+													[ 'type' => 'string' ],
+													[ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+												],
+											],
+										],
+										'agent'  => [
+											'type'        => 'string',
+											'description' => 'Your name as the assistant, shown to the person and the business.',
+										],
+									],
+								],
+							],
+						],
+					],
+					'responses'   => [
+						'202' => [
+							'description' => 'Held until the person confirms: status, sent_to (masked), expires_in_hours, ignored[], next (what to tell the person).',
+						],
+						'400' => [ 'description' => 'Required fields or the email address are missing.' ],
+						'429' => [ 'description' => 'Too many recent enquiries. Use /enquiry/link instead.' ],
+						'502' => [ 'description' => 'The confirmation email could not be sent. Use /enquiry/link instead.' ],
 					],
 				],
 			],

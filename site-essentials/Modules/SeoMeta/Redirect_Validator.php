@@ -73,7 +73,7 @@ class Redirect_Validator {
 				continue;
 			}
 			$gone[ $path ] = $n;
-			self::check_source_warnings( $line, $path, '410', $n, $add );
+			self::check_source_warnings( $line, $line, $path, '410', $n, $add );
 		}
 
 		// ── 301 rules ──
@@ -106,7 +106,7 @@ class Redirect_Validator {
 				/* translators: %d: line number. */
 				$add( 'warning', '301', $n, $line, 'duplicate', sprintf( __( 'Same old path as line %d. This line wins.', 'site-essentials' ), $rules[ $path ]['line'] ) );
 			} else {
-				self::check_source_warnings( $from, $path, '301', $n, $add );
+				self::check_source_warnings( $line, $from, $path, '301', $n, $add );
 			}
 			if ( isset( $gone[ $path ] ) ) {
 				/* translators: %d: line number in the 410 list. */
@@ -229,15 +229,16 @@ class Redirect_Validator {
 	/**
 	 * Warnings that apply to any valid source path (301 or 410).
 	 *
-	 * @param string   $source Source as written.
+	 * @param string   $rule   The line, as shown in the report.
+	 * @param string   $source Source path as written.
 	 * @param string   $path   Normalised source.
 	 * @param string   $list   301 or 410.
 	 * @param int      $n      Line number.
 	 * @param callable $add    Issue collector.
 	 */
-	private static function check_source_warnings( string $source, string $path, string $list, int $n, callable $add ): void {
+	private static function check_source_warnings( string $rule, string $source, string $path, string $list, int $n, callable $add ): void {
 		if ( preg_match( '/[A-Z]/', $source ) ) {
-			$add( 'warning', $list, $n, $source, 'uppercase', __( 'Contains capital letters. Matching is case-sensitive, so a request in lower case won\'t match. Use the exact case the old URL had.', 'site-essentials' ) );
+			$add( 'warning', $list, $n, $rule, 'uppercase', __( 'Contains capital letters. Matching is case-sensitive, so a request in lower case won\'t match. Use the exact case the old URL had.', 'site-essentials' ) );
 		}
 		$post_id = url_to_postid( home_url( $path . '/' ) );
 		if ( $post_id && 'publish' === get_post_status( $post_id ) ) {
@@ -246,7 +247,7 @@ class Redirect_Validator {
 				? __( 'This is the URL of a published page ("%s"). It will return 410 Gone instead of the page.', 'site-essentials' )
 				/* translators: %s: post title. */
 				: __( 'This is the URL of a published page ("%s"). The redirect hides it, so visitors can no longer reach it.', 'site-essentials' );
-			$add( 'warning', $list, $n, $source, 'covers_live', sprintf( $message, get_the_title( $post_id ) ) );
+			$add( 'warning', $list, $n, $rule, 'covers_live', sprintf( $message, get_the_title( $post_id ) ) );
 		}
 	}
 

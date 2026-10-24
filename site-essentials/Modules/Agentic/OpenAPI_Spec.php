@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.2 | 2026-10-25 — GET /enquiry documents the `link` format (build the link without POST).
  * v1.1 | 2026-10-22 — enquiry handoff paths (/enquiry, /enquiry/link), listed
  *                     only when an enquiry page is set. (#200 D17)
  *
@@ -278,9 +279,9 @@ class OpenAPI_Spec {
 				'get' => [
 					'operationId' => 'getEnquiryForm',
 					'summary'     => 'Get the enquiry form\'s fields',
-					'description' => 'The fields of the site\'s enquiry or quote form: name, type, whether required, and the allowed options for multiple-choice fields. Read this before building a link.',
+					'description' => 'The fields of the site\'s enquiry or quote form: name, type, whether required, and the allowed options for multiple-choice fields. Read this before building a link. `link` gives the link format (base, rules, example), so an agent that can\'t POST can build the pre-filled link itself without calling /enquiry/link.',
 					'responses'   => [
-						'200' => [ 'description' => 'The form: form, description, url, fields[], how.' ],
+						'200' => [ 'description' => 'The form: form, description, url, fields[], link {base, rules, example}, how.' ],
 						'503' => [ 'description' => 'The enquiry page has no annotated form.' ],
 					],
 				],

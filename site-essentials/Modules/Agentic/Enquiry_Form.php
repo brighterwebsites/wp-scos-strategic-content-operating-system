@@ -3,6 +3,8 @@
  * Agentic — enquiry handoff: the form's fields and the pre-filled link
  *
  * v1.0 | 2026-10-22
+ * v1.1 | 2026-10-25 — link_format(): how an agent builds the link itself,
+ *                      for agents that can only make GET requests.
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -259,6 +261,33 @@ class Enquiry_Form {
 			'filled'           => array_keys( $filled ),
 			'missing_required' => $missing,
 			'ignored'          => $ignored,
+		];
+	}
+
+	/**
+	 * How to build the link without the POST route, for agents that can only
+	 * make GET requests (search-engine AI modes, most browsing agents). The
+	 * link is the form page plus a fragment, so any agent can assemble it and
+	 * the values still never reach the server.
+	 *
+	 * @return array|null { base, rules, example } or null with no form.
+	 */
+	public static function link_format(): ?array {
+		$schema = self::get_schema();
+		if ( ! $schema ) {
+			return null;
+		}
+
+		$base    = $schema['url'] . '#' . self::FRAGMENT;
+		$example = $base;
+		foreach ( array_slice( $schema['fields'], 0, 2 ) as $field ) {
+			$example .= '&' . rawurlencode( $field['name'] ) . '=' . rawurlencode( 'email' === $field['type'] ? 'jo@example.com' : 'Jo' );
+		}
+
+		return [
+			'base'    => $base,
+			'rules'   => __( 'Add &name=value to base for each field, using the field names above. URL-encode each value. For a multiple-choice field, repeat the name once per choice, with values exactly as listed in options.', 'site-essentials' ),
+			'example' => $example,
 		];
 	}
 

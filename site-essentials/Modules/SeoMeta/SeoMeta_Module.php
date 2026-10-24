@@ -23,6 +23,7 @@
  * v1.4 | 2026-07-18 — Remove SEOPress dual-writes and fallback reads; scos_seo_* is sole contract.
  * v1.5 | 2026-09-30 — Register the seo-meta-instructions WP-CLI command.
  * v1.6 | 2026-09-30 — Register the image-meta-instructions WP-CLI command.
+ * v1.7 | 2026-10-25 — Load Redirect_Validator; register the scos redirects WP-CLI command (#222).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -80,6 +81,7 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/Image_SEO.php';
 		require_once __DIR__ . '/Virtual_Files.php';
 		require_once __DIR__ . '/Exif_Stripper.php';
+		require_once __DIR__ . '/Redirect_Validator.php';
 		require_once __DIR__ . '/Redirections.php';
 		require_once __DIR__ . '/Author_SEO.php';
 		require_once __DIR__ . '/Admin_Columns.php';
@@ -118,6 +120,16 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/CLI/Fill_Image_Meta_Command.php';
 		require_once __DIR__ . '/CLI/Seo_Meta_Instructions_Command.php';
 		require_once __DIR__ . '/CLI/Image_Meta_Instructions_Command.php';
+		require_once __DIR__ . '/CLI/Redirects_Command.php';
+
+		\WP_CLI::add_command(
+			'scos redirects',
+			CLI\Redirects_Command::class,
+			[
+				'shortdesc' => 'Check 301 and 410 redirect rules.',
+				'longdesc'  => 'Runs the same check as the Redirections tab and the scos/validate-redirects ability. Exits 1 on errors.',
+			]
+		);
 
 		\WP_CLI::add_command(
 			'scos image-meta-instructions',

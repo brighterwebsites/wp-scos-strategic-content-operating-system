@@ -358,28 +358,25 @@ class Enquiry_Send {
 		$site = self::site_name();
 		$url  = add_query_arg( self::QUERY_VAR, $token, home_url( '/' ) );
 
-		$lines = [];
-		foreach ( $values as $key => $items ) {
-			$lines[] = self::label( $key, $fields ) . ': ' . implode( ', ', $items );
-		}
-
 		$intro = '' !== $agent
 			/* translators: 1: assistant name, 2: site name */
 			? sprintf( __( '%1$s prepared an enquiry to %2$s for you.', 'site-essentials' ), $agent, $site )
 			/* translators: %s: site name */
 			: sprintf( __( 'An AI assistant prepared an enquiry to %s for you.', 'site-essentials' ), $site );
 
-		$message = $intro . "\n\n"
-			. __( 'Nothing has been sent yet. To check it and send it, open this link:', 'site-essentials' ) . "\n"
-			. $url . "\n\n"
-			. implode( "\n", $lines ) . "\n\n"
-			. __( 'If you didn\'t ask for this, ignore this email. Nothing will be sent, and the link expires in 48 hours.', 'site-essentials' );
+		$message = '<p>' . esc_html( $intro ) . ' ' . esc_html__( 'Nothing has been sent yet.', 'site-essentials' ) . '</p>'
+			. self::details_html( $values, $fields )
+			. '<p style="margin:24px 0"><a href="' . esc_url( $url ) . '" style="background:#1d4ed8;color:#ffffff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600">'
+			. esc_html__( 'Check and send my enquiry', 'site-essentials' ) . '</a></p>'
+			. '<p>' . esc_html__( 'Or copy this link into your browser:', 'site-essentials' ) . '<br>' . esc_html( $url ) . '</p>'
+			. '<p style="color:#555">' . esc_html__( 'If you didn't ask for this, ignore this email. Nothing will be sent, and the link expires in 48 hours.', 'site-essentials' ) . '</p>';
 
 		return (bool) wp_mail(
 			$email,
 			/* translators: %s: site name */
 			sprintf( __( 'Confirm your enquiry to %s', 'site-essentials' ), $site ),
-			$message
+			$message,
+			[ 'Content-Type: text/html; charset=UTF-8' ]
 		);
 	}
 

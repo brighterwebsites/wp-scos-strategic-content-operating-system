@@ -280,7 +280,9 @@ class Enquiry_Form {
 
 		$base    = $schema['url'] . '#' . self::FRAGMENT;
 		$example = $base;
-		foreach ( array_slice( $schema['fields'], 0, 2 ) as $field ) {
+		// The first field and the first email field: enough to show the shape.
+		$email = current( array_filter( $schema['fields'], static function ( $f ) { return 'email' === $f['type']; } ) );
+		foreach ( array_filter( [ $schema['fields'][0] ?? null, $email ?: null ] ) as $field ) {
 			$example .= '&' . rawurlencode( $field['name'] ) . '=' . rawurlencode( 'email' === $field['type'] ? 'jo@example.com' : 'Jo' );
 		}
 

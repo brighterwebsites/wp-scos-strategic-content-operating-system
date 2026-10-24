@@ -369,7 +369,7 @@ class Enquiry_Send {
 			. '<p style="margin:24px 0"><a href="' . esc_url( $url ) . '" style="background:#1d4ed8;color:#ffffff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600">'
 			. esc_html__( 'Check and send my enquiry', 'site-essentials' ) . '</a></p>'
 			. '<p>' . esc_html__( 'Or copy this link into your browser:', 'site-essentials' ) . '<br>' . esc_html( $url ) . '</p>'
-			. '<p style="color:#555">' . esc_html__( 'If you didn't ask for this, ignore this email. Nothing will be sent, and the link expires in 48 hours.', 'site-essentials' ) . '</p>';
+			. '<p style="color:#555">' . esc_html__( 'If you didn\'t ask for this, ignore this email. Nothing will be sent, and the link expires in 48 hours.', 'site-essentials' ) . '</p>';
 
 		return (bool) wp_mail(
 			$email,

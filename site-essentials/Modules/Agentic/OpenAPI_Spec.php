@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.4 | 2026-10-25 — /content/{slug} returns stored Markdown for builder pages (format field).
  * v1.3 | 2026-10-25 — POST /enquiry/send, when agent-sent enquiries are on (#225).
  * v1.2 | 2026-10-25 — GET /enquiry documents the `link` format (build the link without POST).
  * v1.1 | 2026-10-22 — enquiry handoff paths (/enquiry, /enquiry/link), listed
@@ -219,7 +220,7 @@ class OpenAPI_Spec {
 			'get' => [
 				'operationId' => 'getContent',
 				'summary'     => 'Get one item by slug',
-				'description' => 'Full record for a single post or page. Note that pages built with the Breakdance page builder store layout outside post_content and will return an empty content field plus an explanatory _note — request the page URL with an Accept: text/markdown header to get readable text for those.',
+				'description' => 'Full record for a single post or page, including its readable text. For pages built with a page builder the text is the rendered page as Markdown (format: markdown). If a page has not been analysed yet, content is empty and _note says to request the page URL with an Accept: text/markdown header instead.',
 				'parameters'  => [
 					[
 						'name'        => 'slug',
@@ -515,7 +516,12 @@ class OpenAPI_Spec {
 				'intent'         => [ 'type' => 'string' ],
 				'content'        => [
 					'type'        => 'string',
-					'description' => 'Plain text with HTML and shortcodes stripped. Empty for Breakdance-built pages.',
+					'description' => 'The page text: plain text from post content, or Markdown rendered from the live page for builder pages (see format).',
+				],
+				'format'         => [
+					'type'        => 'string',
+					'enum'        => [ 'text', 'markdown' ],
+					'description' => 'How content is written.',
 				],
 				'_note'          => [
 					'type'        => 'string',

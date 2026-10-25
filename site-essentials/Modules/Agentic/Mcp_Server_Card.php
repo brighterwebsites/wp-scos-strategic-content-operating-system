@@ -140,7 +140,7 @@ class Mcp_Server_Card {
 			'name'        => sanitize_title( $site ) . '-website',
 			'title'       => $site,
 			'version'     => Agentic_Module::get_version(),
-			'description' => sprintf( 'Search and read %s\'s published pages and services%s.', $site, Enquiry_Send::is_enabled() ? ', and send an enquiry that the person confirms by email' : '' ),
+			'description' => sprintf( 'Search and read the published pages and services of %s%s.', $site, Enquiry_Send::is_enabled() ? ', and send an enquiry that the person confirms by email' : '' ),
 			'remotes'     => [
 				[
 					'type' => 'streamable-http',

@@ -187,7 +187,7 @@ class Mcp_Server {
 	private static function instructions(): string {
 		$site  = self::site_name();
 		$lines = [
-			sprintf( 'Tools for %s\'s website. Call get_site_info first to learn who the business is and what it offers. All tools return published content only.', $site ),
+			sprintf( 'Tools for the %s website. Call get_site_info first to learn who the business is and what it offers. All tools return published content only.', $site ),
 		];
 		if ( Enquiry_Send::is_enabled() ) {
 			$lines[] = 'To contact the business for the person you are helping: read the form with get_enquiry_form, draft the enquiry with them, show them exactly what you will send, and only after they agree call send_enquiry. Their email address is required. Nothing reaches the business until they confirm from the email we send them, so tell them to check their inbox. Never tick newsletter or consent boxes for them.';
@@ -263,7 +263,7 @@ class Mcp_Server {
 		$tools[] = [
 			'name'        => 'get_enquiry_form',
 			'title'       => 'Read the enquiry form',
-			'description' => sprintf( 'The fields of %s\'s enquiry form: name, type, whether required, and the options for multiple-choice fields. Read this before drafting an enquiry.', $site ),
+			'description' => sprintf( 'The fields of the %s enquiry form: name, type, whether required, and the options for multiple-choice fields. Read this before drafting an enquiry.', $site ),
 			'inputSchema' => [ 'type' => 'object', 'properties' => new \stdClass() ],
 			'annotations' => [ 'readOnlyHint' => true, 'openWorldHint' => false ],
 			'run'         => static function () {
@@ -274,7 +274,7 @@ class Mcp_Server {
 		$tools[] = [
 			'name'        => 'prepare_enquiry_link',
 			'title'       => 'Prepare a pre-filled enquiry link',
-			'description' => sprintf( 'Returns a link that opens %s\'s form already filled in with these values. Nothing is sent: give the link to the person, who checks the form and presses Send.', $site ),
+			'description' => sprintf( 'Returns a link that opens the %s form already filled in with these values. Nothing is sent: give the link to the person, who checks the form and presses Send.', $site ),
 			'inputSchema' => [ 'type' => 'object', 'properties' => [ 'fields' => $fields ], 'required' => [ 'fields' ] ],
 			'annotations' => [ 'readOnlyHint' => true, 'openWorldHint' => false ],
 			'run'         => static function ( array $args ) {

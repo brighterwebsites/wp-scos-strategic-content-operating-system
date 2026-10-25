@@ -2,6 +2,8 @@
 /**
  * SEO — Redirections tab view
  *
+ * v1.3 | 2026-10-25 — Rule check (#222): a blocked save shows its errors with the
+ *                      submitted text; stored rules are re-checked on load.
  * v1.2 | 2026-09-28 — Breakdance "Use default editor" card removed; it now lives on
  *                      Essentials → Tweaks → Admin UX/UI (same option key).
  * v1.1 | 2026-05-19
@@ -15,6 +17,7 @@
  */
 
 use SiteEssentials\Modules\SeoMeta\Redirections;
+use SiteEssentials\Modules\SeoMeta\Redirect_Validator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,12 +28,53 @@ $count_410 = count( Redirections::get_410_paths() );
 
 $disable_404_guess = (bool) get_option( Redirections::OPTION_DISABLE_404_GUESS, false );
 
-if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
-	echo '<div class="scos-notice scos-notice--success" style="margin-bottom:var(--scos-s-4)"><p>'
-	   . esc_html__( 'Redirections saved.', 'site-essentials' )
-	   . '</p></div>';
+// A blocked save: show what was typed, with its errors. Otherwise check what is stored.
+$pending = ( isset( $_GET['blocked'] ) && 'true' === $_GET['blocked'] ) ? Redirections::take_pending() : null;
+if ( $pending ) {
+	$raw_301           = $pending['raw_301'];
+	$raw_410           = $pending['raw_410'];
+	$disable_404_guess = (bool) $pending['disable_guess'];
+	$report            = $pending['report'];
+} else {
+	$report = Redirect_Validator::check_stored();
 }
-?>
+
+if ( ! $pending && isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
+	echo '<div class="scos-notice scos-notice--success"><div class="scos-notice__body">'
+	   . esc_html__( 'Redirections saved.', 'site-essentials' )
+	   . '</div></div>';
+}
+
+$issue_groups = [
+	[
+		'issues' => $report['errors'],
+		'class'  => 'scos-notice--danger',
+		'title'  => $pending
+			? __( 'Not saved — fix these lines and save again', 'site-essentials' )
+			: __( 'These saved rules are broken', 'site-essentials' ),
+	],
+	[
+		'issues' => $report['warnings'],
+		'class'  => 'scos-notice--warning',
+		'title'  => __( 'Check these rules', 'site-essentials' ),
+	],
+];
+foreach ( $issue_groups as $group ) :
+	if ( empty( $group['issues'] ) ) {
+		continue;
+	}
+	?>
+	<div class="scos-notice <?php echo esc_attr( $group['class'] ); ?>">
+		<div class="scos-notice__body">
+			<div class="scos-notice__title"><?php echo esc_html( $group['title'] ); ?></div>
+			<ul>
+				<?php foreach ( $group['issues'] as $issue ) : ?>
+					<li><?php echo esc_html( Redirect_Validator::format_issue( $issue ) ); ?></li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+	</div>
+<?php endforeach; ?>
 
 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<input type="hidden" name="action" value="scos_save_redirections">

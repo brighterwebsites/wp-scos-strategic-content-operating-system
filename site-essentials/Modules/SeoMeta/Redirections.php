@@ -21,6 +21,9 @@
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
  *
+ * v1.2 | 2026-10-25 — Rules are checked by Redirect_Validator on save (#222). Errors
+ *                      (loops, missing =>, relative targets…) block the save and the
+ *                      submitted text comes back for fixing; warnings save and show.
  * v1.1 | 2026-09-28 — Breakdance "Use default editor" moved off this tab to
  *                      Essentials → Tweaks → Admin UX/UI. Option key unchanged;
  *                      Breakdance_Editor_Guard now owns it.
@@ -39,6 +42,9 @@ class Redirections {
 
 	/** When true, WordPress will not guess a redirect URL for 404 requests (see Redirections tab). */
 	const OPTION_DISABLE_404_GUESS = 'scos_disable_404_redirect_guess';
+
+	/** A blocked save's submitted text and report, per user, shown back on the tab. */
+	const PENDING_TRANSIENT = 'se_redirects_pending_';
 
 	/**
 	 * @deprecated 1.1 Use Breakdance_Editor_Guard::OPTION_MODE. Kept as an alias only;
@@ -209,19 +215,57 @@ class Redirections {
 			? sanitize_textarea_field( wp_unslash( $_POST['scos_410_rules'] ) )
 			: '';
 
+		$disable_guess = ! empty( $_POST['scos_disable_404_redirect_guess'] );
+
+		$report = Redirect_Validator::validate( $raw_301, $raw_410 );
+		if ( ! $report['valid'] ) {
+			// Nothing is saved. Hand the text back so the fixes aren't retyped.
+			set_transient(
+				self::PENDING_TRANSIENT . get_current_user_id(),
+				[
+					'raw_301'       => $raw_301,
+					'raw_410'       => $raw_410,
+					'disable_guess' => $disable_guess,
+					'report'        => $report,
+				],
+				15 * MINUTE_IN_SECONDS
+			);
+			self::redirect_to_tab( [ 'blocked' => 'true' ] );
+		}
+
 		update_option( self::OPTION_301, $raw_301, false );
 		update_option( self::OPTION_410, $raw_410, false );
-
-		$disable_guess = ! empty( $_POST['scos_disable_404_redirect_guess'] );
 		update_option( self::OPTION_DISABLE_404_GUESS, $disable_guess, false );
 
+		self::redirect_to_tab( [ 'updated' => 'true' ] );
+	}
+
+	/**
+	 * Take a blocked save's submitted text and report, once.
+	 *
+	 * @return array|null raw_301, raw_410, disable_guess, report — or null.
+	 */
+	public static function take_pending(): ?array {
+		$key     = self::PENDING_TRANSIENT . get_current_user_id();
+		$pending = get_transient( $key );
+		delete_transient( $key );
+		return is_array( $pending ) ? $pending : null;
+	}
+
+	/**
+	 * @param array<string, string> $args Extra query args.
+	 * @return void
+	 */
+	private static function redirect_to_tab( array $args ): void {
 		wp_safe_redirect(
 			add_query_arg(
-				[
-					'page'    => \SiteEssentials\Core\Admin_UI::SEO_PAGE_SLUG,
-					'tab'     => 'redirections',
-					'updated' => 'true',
-				],
+				array_merge(
+					[
+						'page' => \SiteEssentials\Core\Admin_UI::SEO_PAGE_SLUG,
+						'tab'  => 'redirections',
+					],
+					$args
+				),
 				admin_url( 'admin.php' )
 			)
 		);

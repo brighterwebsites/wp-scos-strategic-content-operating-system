@@ -22,6 +22,8 @@
  *
  * v1.3 | 2026-05-25 — Added scos_faq_is_intent_goal checkbox, column, and auto-set logic.
  * v1.4 | 2026-06-23 — Auto-register 301 redirects to scos_redirects_301 when a published FAQ's scos_topic changes.
+ * v1.5 | 2026-10-25 — Topic change drops any rule redirecting away from the FAQ's new URL. Moving an
+ *                      FAQ back to an earlier topic used to leave new => old beside old => new: a loop (#222).
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -319,6 +321,9 @@ class FAQ_Module {
 
 		$raw      = (string) get_option( 'scos_redirects_301', '' );
 		$new_rule = $old_path . ' => ' . $new_path;
+
+		// The new path is live again, so a rule from an earlier move must stop redirecting it.
+		$raw = (string) preg_replace( '/^' . preg_quote( $new_path, '/' ) . '\/?[ \t]*=>.*\R?/m', '', $raw );
 		$pattern  = '/^' . preg_quote( $old_path, '/' ) . '\s*=>.*$/m';
 
 		if ( preg_match( $pattern, $raw ) ) {

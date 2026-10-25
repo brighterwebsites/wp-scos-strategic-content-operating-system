@@ -78,9 +78,13 @@ class Agent_Notices {
 	// ── [scos_agent_enquiry_hint] ───────────────────────────────────────────
 
 	public static function render_enquiry_hint(): string {
-		$format = Enquiry_Form::is_enabled() ? Enquiry_Form::link_format() : null;
-		if ( ! $format ) {
+		if ( ! Enquiry_Form::is_enabled() ) {
 			return '';
+		}
+		// Cached schema only: this usually renders on the enquiry page itself.
+		$format = Enquiry_Form::link_format( false );
+		if ( ! $format ) {
+			$format = [ 'base' => Enquiry_Form::page_url() . '#' . Enquiry_Form::FRAGMENT, 'example' => '' ];
 		}
 
 		$html  = '<div class="scos-agent-note scos-agent-note--enquiry">';
@@ -90,10 +94,13 @@ class Agent_Notices {
 		$html .= esc_html__( 'and add', 'site-essentials' ) . ' <code>&amp;name=value</code> ';
 		$html .= sprintf(
 			/* translators: %s: link to the form fields JSON */
-			esc_html__( 'for each field (%s). Example:', 'site-essentials' ),
+			esc_html__( 'for each field (%s).', 'site-essentials' ),
 			'<a href="' . esc_url( Enquiry_API::get_url() ) . '">' . esc_html__( 'field names', 'site-essentials' ) . '</a>'
 		);
-		$html .= ' <code>' . esc_html( $format['example'] ) . '</code></p>';
+		if ( '' !== $format['example'] ) {
+			$html .= ' ' . esc_html__( 'Example:', 'site-essentials' ) . ' <code>' . esc_html( $format['example'] ) . '</code>';
+		}
+		$html .= '</p>';
 
 		if ( Enquiry_Send::is_enabled() || Mcp_Server::is_enabled() ) {
 			$html .= '<p>';

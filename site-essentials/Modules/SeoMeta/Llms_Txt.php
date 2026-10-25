@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.3 | 2026-10-25 — the enquiry line mentions sending it, confirmed by email, when that's on.
  * v1.2 | 2026-10-25 — the enquiry line says the link can be built without POST.
  * v1.1 | 2026-10-22 — the enquiry line points at the enquiry handoff (form
  *                     fields + link route) when an enquiry page is set.
@@ -130,7 +131,11 @@ class Llms_Txt {
 
 		$contact = get_page_by_path( 'contact' );
 		if ( Agentic\Enquiry_Form::is_enabled() ) {
-			$lines[] = '- Enquiries: agents can\'t send them, but can prepare one. [Form fields](' . Agentic\Enquiry_API::get_url() . '), then `POST ' . Agentic\Enquiry_API::get_link_url() . '` returns a link that opens the [form](' . Agentic\Enquiry_Form::page_url() . ') filled in, for the person to check and send. Agents that can\'t POST can build the same link from `link` in the form fields.';
+			$lines[] = '- Enquiries: '
+				. ( Agentic\Enquiry_Send::is_enabled()
+					? 'agents can send one for the person: `POST ' . Agentic\Enquiry_API::get_send_url() . '` with the [form fields](' . Agentic\Enquiry_API::get_url() . '). The person confirms it by email before it reaches the business. Or '
+					: 'agents can\'t send them, but can prepare one. [Form fields](' . Agentic\Enquiry_API::get_url() . '), then ' )
+				. '`POST ' . Agentic\Enquiry_API::get_link_url() . '` returns a link that opens the [form](' . Agentic\Enquiry_Form::page_url() . ') filled in, for the person to check and send. Agents that can\'t POST can build the same link from `link` in the form fields.';
 		} elseif ( $contact && 'publish' === $contact->post_status ) {
 			$lines[] = '- Enquiries and bookings are not available through the API. Use the [contact page](' . get_permalink( $contact ) . ').';
 		}

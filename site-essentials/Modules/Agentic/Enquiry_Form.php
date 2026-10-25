@@ -5,6 +5,9 @@
  * v1.0 | 2026-10-22
  * v1.1 | 2026-10-25 — link_format(): how an agent builds the link itself,
  *                      for agents that can only make GET requests.
+ * v1.2 | 2026-10-25 — clean_values() shared with Enquiry_Send; parse() records
+ *                      the Breakdance form behind the page (target), kept out
+ *                      of the public schema (#225).
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -193,12 +196,40 @@ class Enquiry_Form {
 			return null;
 		}
 
-		return [
+		$schema = [
 			'form'        => $form->getAttribute( 'toolname' ),
 			'description' => self::text( $form->getAttribute( 'tooldescription' ) ),
 			'url'         => $url,
 			'fields'      => array_values( $fields ),
 		];
+
+		// A Breakdance form posts its own form and post IDs; Enquiry_Send runs that
+		// form's actions on a confirmed enquiry. Internal: public_schema() drops it.
+		$ids = [];
+		foreach ( [ 'form_id', 'post_id' ] as $hidden ) {
+			$input = $xpath->query( './/input[@name="' . $hidden . '"]', $form )->item( 0 );
+			if ( $input instanceof \DOMElement && absint( $input->getAttribute( 'value' ) ) ) {
+				$ids[ $hidden ] = absint( $input->getAttribute( 'value' ) );
+			}
+		}
+		if ( 2 === count( $ids ) ) {
+			$schema['target'] = [ 'builder' => 'breakdance' ] + $ids;
+		}
+
+		return $schema;
+	}
+
+	/**
+	 * The schema as agents see it: without the internal form target.
+	 *
+	 * @return array|null
+	 */
+	public static function public_schema(): ?array {
+		$schema = self::get_schema();
+		if ( $schema ) {
+			unset( $schema['target'] );
+		}
+		return $schema;
 	}
 
 	// ── Link ─────────────────────────────────────────────────────────────────
@@ -213,13 +244,42 @@ class Enquiry_Form {
 	 * @return array|\WP_Error { url, filled[], missing_required[], ignored[] }
 	 */
 	public static function build_link( array $values ) {
+		$clean = self::clean_values( $values );
+		if ( is_wp_error( $clean ) ) {
+			return $clean;
+		}
+
+		$pairs = [];
+		foreach ( $clean['values'] as $key => $items ) {
+			foreach ( $items as $item ) {
+				$pairs[] = rawurlencode( $key ) . '=' . rawurlencode( $item );
+			}
+		}
+
+		return [
+			'url'              => $clean['schema']['url'] . '#' . implode( '&', array_merge( [ self::FRAGMENT ], $pairs ) ),
+			'filled'           => array_keys( $clean['values'] ),
+			'missing_required' => $clean['missing'],
+			'ignored'          => $clean['ignored'],
+		];
+	}
+
+	/**
+	 * Check an agent's values against the form.
+	 *
+	 * Unknown fields and values that aren't one of a field's options are
+	 * dropped and reported, so the agent can correct itself.
+	 *
+	 * @param  array $values field name => string or string[].
+	 * @return array|\WP_Error { schema, values: [name => string[]], missing[], ignored[] }
+	 */
+	public static function clean_values( array $values ) {
 		$schema = self::get_schema();
 		if ( ! $schema ) {
 			return new \WP_Error( 'scos_enquiry_unavailable', __( 'No enquiry form is available on this site.', 'site-essentials' ), [ 'status' => 503 ] );
 		}
 
-		$pairs   = [];
-		$filled  = [];
+		$clean   = [];
 		$ignored = [];
 		$fields  = array_column( $schema['fields'], null, 'name' );
 
@@ -244,23 +304,22 @@ class Enquiry_Form {
 					}
 					$item = $match;
 				}
-				$pairs[]        = rawurlencode( $key ) . '=' . rawurlencode( $item );
-				$filled[ $key ] = true;
+				$clean[ $key ][] = $item;
 			}
 		}
 
 		$missing = [];
 		foreach ( $fields as $key => $field ) {
-			if ( ! empty( $field['required'] ) && empty( $filled[ $key ] ) ) {
+			if ( ! empty( $field['required'] ) && empty( $clean[ $key ] ) ) {
 				$missing[] = $key;
 			}
 		}
 
 		return [
-			'url'              => $schema['url'] . '#' . implode( '&', array_merge( [ self::FRAGMENT ], $pairs ) ),
-			'filled'           => array_keys( $filled ),
-			'missing_required' => $missing,
-			'ignored'          => $ignored,
+			'schema'  => $schema,
+			'values'  => $clean,
+			'missing' => $missing,
+			'ignored' => $ignored,
 		];
 	}
 

@@ -953,6 +953,12 @@ class Admin_UI {
             absint( $_POST['scos_agentic_webmcp_page_id'] ?? 0 )
         );
 
+        // Remote MCP server (#229).
+        update_option(
+            'scos_agentic_mcp_enabled',
+            ! empty( $_POST['scos_agentic_mcp_enabled'] ) ? 1 : 0
+        );
+
         // Enquiry handoff (#200 D17). Saving re-reads the form on next use.
         update_option(
             'scos_agentic_enquiry_page_id',

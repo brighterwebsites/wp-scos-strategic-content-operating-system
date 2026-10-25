@@ -85,6 +85,7 @@ class Agentic_Module implements Module_Interface {
 		Enquiry_Form::init();
 		Enquiry_Send::init();
 		Enquiry_API::init();
+		Mcp_Server::init();
 		Enquiry_Prefill::init();
 
 		// Discovery layer — the router must init before its consumers register.

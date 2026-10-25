@@ -86,6 +86,36 @@ defined( 'ABSPATH' ) || exit;
 		</div>
 	</div>
 
+	<!-- ── Remote MCP server ─────────────────────────────────────────────── -->
+	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+		<div class="scos-card__header scos-card__header--plain">
+			<h2 class="scos-card__title"><?php esc_html_e( 'MCP connector', 'site-essentials' ); ?></h2>
+			<p class="scos-card__desc">
+				<?php esc_html_e( 'A public MCP server people can add as a connector in Claude, ChatGPT (developer mode), Cursor or any MCP client, with no login. It offers the same read tools as WebMCP, plus the enquiry tools when enquiry handoff is set up. Sending an enquiry still needs the person to confirm it by email.', 'site-essentials' ); ?>
+			</p>
+		</div>
+		<div class="scos-card__body">
+			<label class="scos-checkbox-row" style="cursor:pointer;margin-bottom:var(--scos-s-2)">
+				<input
+					type="checkbox"
+					name="scos_agentic_mcp_enabled"
+					id="scos_agentic_mcp_enabled"
+					value="1"
+					<?php checked( (bool) get_option( 'scos_agentic_mcp_enabled', false ) ); ?>>
+				<span>
+					<strong><?php esc_html_e( 'Enable the MCP connector', 'site-essentials' ); ?></strong>
+					<?php if ( get_option( 'scos_agentic_mcp_enabled', false ) ) : ?>
+						<span class="description" style="display:block;margin-top:2px">
+							<?php esc_html_e( 'Connector URL:', 'site-essentials' ); ?>
+							<code><?php echo esc_html( \SiteEssentials\Modules\Agentic\Mcp_Server::get_url() ); ?></code>
+						</span>
+					<?php endif; ?>
+				</span>
+			</label>
+			<div class="scos-form__slug">scos_agentic_mcp_enabled</div>
+		</div>
+	</div>
+
 	<!-- ── WebMCP Widget ─────────────────────────────────────────────────── -->
 	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
 		<div class="scos-card__header scos-card__header--plain">

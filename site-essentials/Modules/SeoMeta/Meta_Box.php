@@ -20,6 +20,7 @@
  * v1.7 | 2026-09-30 — Load the Get_Image_Meta_Instructions ability.
  * v1.8 | 2026-09-30 — Tell the suggest script whether Content Architecture is active.
  * v1.9 | 2026-10-18 — Target query field (scos_seo_target_query).
+ * v1.10 | 2026-10-25 — Load the Validate_Redirects ability (#222).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -50,6 +51,7 @@ class Meta_Box {
 			require_once __DIR__ . '/Abilities/Suggest_Seo_Meta/Suggest_Seo_Meta.php';
 			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
 			require_once __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
+			require_once __DIR__ . '/Abilities/Validate_Redirects/Validate_Redirects.php';
 		}
 	}
 

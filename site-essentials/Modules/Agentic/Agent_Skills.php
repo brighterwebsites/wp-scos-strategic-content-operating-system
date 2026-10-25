@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.2 | 2026-10-25 — enquiry-handoff skill: build the link without POST.
  * v1.1 | 2026-10-22 — enquiry-handoff skill, listed only when an enquiry page
  *                     is set. (#200 D17)
  *
@@ -428,6 +429,11 @@ the business's own form already filled in. They check it and press send.
    ```json
    {"fields": {"name": "Jo", "email": "jo@example.com", "services": ["An option exactly as listed"], "message": "..."}}
    ```
+
+   Can't make a POST request? Build the link yourself instead: the
+   response from step 1 has `link.base`. Add `&name=value` for each field,
+   URL-encoding each value and repeating the name for each choice in a
+   multiple-choice field. Nothing needs sending.
 
 4. Read the response:
    - `url` is the link to give the person.

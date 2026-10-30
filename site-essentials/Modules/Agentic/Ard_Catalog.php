@@ -2,6 +2,7 @@
 /**
  * Agentic — ARD catalog (Agentic Resource Discovery) — EXPERIMENTAL
  *
+ * v1.1 | 2026-10-30 — Link headers, <head> links and a robots.txt Agentmap line point at the catalog
  * v1.0 | 2026-10-21
  *
  * WHAT THIS IS FOR
@@ -53,6 +54,10 @@ class Ard_Catalog {
 			return;
 		}
 		add_filter( 'scos_well_known_response', [ __CLASS__, 'maybe_serve' ], 10, 2 );
+		add_action( 'send_headers', [ __CLASS__, 'send_link_headers' ] );
+		add_action( 'wp_head', [ __CLASS__, 'output_head_links' ] );
+		// After Virtual_Files (99), which replaces the whole file with the site's own content.
+		add_filter( 'robots_txt', [ __CLASS__, 'add_robots_line' ], 100, 2 );
 	}
 
 	public static function is_enabled(): bool {
@@ -78,6 +83,39 @@ class Ard_Catalog {
 
 	public static function get_url(): string {
 		return home_url( '/.well-known/ard.json' );
+	}
+
+	public static function get_legacy_url(): string {
+		return home_url( '/.well-known/ai-catalog.json' );
+	}
+
+	// ── Pointers to the catalog ───────────────────────────────────────────────
+
+	/**
+	 * Link headers on every response: rel="ard" (spec) and rel="ai-catalog" (checkers).
+	 */
+	public static function send_link_headers(): void {
+		header( 'Link: <' . esc_url_raw( self::get_url() ) . '>; rel="ard"', false );
+		header( 'Link: <' . esc_url_raw( self::get_legacy_url() ) . '>; rel="ai-catalog"', false );
+	}
+
+	public static function output_head_links(): void {
+		printf( '<link rel="ard" href="%s">' . "\n", esc_url( self::get_url() ) );
+		printf( '<link rel="ai-catalog" href="%s">' . "\n", esc_url( self::get_legacy_url() ) );
+	}
+
+	/**
+	 * Append an Agentmap line to robots.txt unless the site's own content already has one.
+	 * Agentmap is not a robots.txt standard; crawlers ignore lines they don't know.
+	 *
+	 * @param string $output Robots.txt content.
+	 * @param bool   $public Whether the site allows indexing.
+	 */
+	public static function add_robots_line( string $output, $public ): string {
+		if ( false !== stripos( $output, 'agentmap:' ) ) {
+			return $output;
+		}
+		return rtrim( $output ) . "\n\nAgentmap: " . self::get_legacy_url() . "\n";
 	}
 
 	// ── Document ──────────────────────────────────────────────────────────────

@@ -8,6 +8,9 @@
  * v1.2 | 2026-10-25 — clean_values() shared with Enquiry_Send; parse() records
  *                      the Breakdance form behind the page (target), kept out
  *                      of the public schema (#225).
+ * v1.3 | 2026-10-25 — get_schema()/link_format() can skip the fetch, so the
+ *                      enquiry page can describe itself without requesting itself;
+ *                      the schema is rebuilt by cron 30s after a save.
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -62,8 +65,11 @@ class Enquiry_Form {
 
 	// ── Boot ─────────────────────────────────────────────────────────────────
 
+	const WARM_HOOK = 'se_enquiry_form_warm';
+
 	public static function init(): void {
 		add_action( 'save_post', [ __CLASS__, 'flush' ] );
+		add_action( self::WARM_HOOK, [ __CLASS__, 'warm' ] );
 	}
 
 	public static function is_enabled(): bool {
@@ -83,6 +89,15 @@ class Enquiry_Form {
 
 	public static function flush(): void {
 		delete_transient( self::TRANSIENT );
+		// Rebuild it shortly, so the enquiry page's own hint has the schema
+		// without the page having to fetch itself (see get_schema).
+		if ( self::is_enabled() && ! wp_next_scheduled( self::WARM_HOOK ) ) {
+			wp_schedule_single_event( time() + 30, self::WARM_HOOK );
+		}
+	}
+
+	public static function warm(): void {
+		self::get_schema();
 	}
 
 	// ── Schema ───────────────────────────────────────────────────────────────
@@ -93,7 +108,7 @@ class Enquiry_Form {
 	 * @return array|null { form, description, url, fields[] }, or null when
 	 *                    the feature is off or no annotated form was found.
 	 */
-	public static function get_schema(): ?array {
+	public static function get_schema( bool $fetch = true ): ?array {
 		$url = self::page_url();
 		if ( '' === $url ) {
 			return null;
@@ -102,6 +117,11 @@ class Enquiry_Form {
 		$cached = get_transient( self::TRANSIENT );
 		if ( is_array( $cached ) && ( $cached['url'] ?? '' ) === $url ) {
 			return $cached['schema'];
+		}
+		// Rendering the enquiry page must not fetch the enquiry page: the
+		// request would loop back through this code and cache a failed read.
+		if ( ! $fetch ) {
+			return null;
 		}
 
 		$schema = self::read_form( $url );
@@ -329,10 +349,11 @@ class Enquiry_Form {
 	 * link is the form page plus a fragment, so any agent can assemble it and
 	 * the values still never reach the server.
 	 *
+	 * @param  bool $fetch False to use only the cached schema (see get_schema).
 	 * @return array|null { base, rules, example } or null with no form.
 	 */
-	public static function link_format(): ?array {
-		$schema = self::get_schema();
+	public static function link_format( bool $fetch = true ): ?array {
+		$schema = self::get_schema( $fetch );
 		if ( ! $schema ) {
 			return null;
 		}

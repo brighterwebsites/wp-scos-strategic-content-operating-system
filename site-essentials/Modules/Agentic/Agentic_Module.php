@@ -3,6 +3,7 @@
  * Agentic Module
  *
  * v1.4 | 2026-10-22
+ * v1.5 | 2026-10-25 — Agent_Notices shortcodes (privacy note, enquiry hint).
  *
  * Handles AI agent discovery and content accessibility for client sites.
  *
@@ -66,7 +67,7 @@ class Agentic_Module implements Module_Interface {
 	}
 
 	public static function get_version(): string {
-		return '1.4';
+		return '1.5';
 	}
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ class Agentic_Module implements Module_Interface {
 		Enquiry_API::init();
 		Mcp_Server::init();
 		Enquiry_Prefill::init();
+		Agent_Notices::init();
 
 		// Discovery layer — the router must init before its consumers register.
 		Well_Known_Router::init();

@@ -13,6 +13,9 @@
  *                      schema matches the visible WooCommerce breadcrumb (Home > category > product).
  * v1.8 | 2026-10-20 — Topic sameAs reads scos_topic_same_as (the key the Topic screen saves), with
  *                      topic_sameas_url as the legacy altc_topic fallback. Drop supporting-topics TODO.
+ * v1.9 | 2026-10-30 — BreadcrumbList maps bw_get_breadcrumb_items(), the trail the [breadcrumbs]
+ *                      shortcode shows (#96). No hard-coded "Blog": the posts page title is used.
+ *                      WooCommerce trail helper moved to breadcrumb-shortcode.php.
  *
  * Outputs consolidated @graph schema for all page types.
  * Uses template_redirect to ensure WordPress conditionals work.
@@ -31,7 +34,7 @@
  *
  * @package    BrighterCore
  * @subpackage Schema
- * @version    1.6 | 2026-10-18
+ * @version    1.9 | 2026-10-30
  * @since      1.0.0
  */
 
@@ -170,52 +173,6 @@ function bw_output_schema_graph() {
     // The graph carries the BreadcrumbList. A WooCommerce breadcrumb element would
     // print a second one in the body; an empty array makes WC skip its markup.
     add_filter('woocommerce_structured_data_breadcrumblist', '__return_empty_array');
-}
-
-/**
- * Breadcrumb trail on WooCommerce pages, as WooCommerce's own breadcrumb builds it.
- *
- * Sites show WooCommerce's breadcrumb on shop pages (Home > category > product),
- * and WooCommerce's BreadcrumbList is suppressed while the graph is output, so the
- * graph has to carry the same trail. WC_Breadcrumb::generate() runs the
- * woocommerce_get_breadcrumb filter and leaves Home out.
- *
- * @param string $current_url From bw_schema_current_url(); used for the last crumb.
- * @param int    $post_id     Current post ID (0 off singulars).
- * @return array|null List of ['name' => string, 'url' => string], or null off WooCommerce pages.
- */
-function bw_schema_wc_breadcrumb_trail($current_url, $post_id) {
-    if (!function_exists('is_woocommerce') || !class_exists('WC_Breadcrumb') || !is_woocommerce()) {
-        return null;
-    }
-
-    $crumbs = (new WC_Breadcrumb())->generate();
-    if (empty($crumbs)) {
-        return null;
-    }
-
-    $trail = [];
-    $last  = count($crumbs) - 1;
-    foreach (array_values($crumbs) as $i => $crumb) {
-        $name = isset($crumb[0]) ? trim(wp_strip_all_tags((string) $crumb[0])) : '';
-        $url  = isset($crumb[1]) ? (string) $crumb[1] : '';
-
-        if ($i === $last) {
-            // The current page: WooCommerce leaves its URL empty.
-            $url = $current_url;
-            $override = (is_singular() && $post_id) ? get_post_meta($post_id, 'scos_seo_breadcrumb_title', true) : '';
-            if (!empty($override)) {
-                $name = $override;
-            }
-        }
-
-        if ('' === $name || '' === $url) {
-            continue;
-        }
-        $trail[] = ['name' => $name, 'url' => $url];
-    }
-
-    return $trail ?: null;
 }
 
 /**
@@ -767,7 +724,8 @@ function bw_render_schema_graph() {
     // second node, keeps every isPartOf / @id reference pointing at the same thing.
     if (is_home() || is_archive()) {
         if (is_home()) {
-            $archive_title = 'Blog';
+            $posts_crumb = function_exists('bw_get_posts_archive_crumb_item') ? bw_get_posts_archive_crumb_item() : null;
+            $archive_title = $posts_crumb ? $posts_crumb['name'] : get_bloginfo('name');
         } else {
             $archive_title = post_type_archive_title('', false) ?: single_term_title('', false) ?: 'Archive';
         }
@@ -1152,141 +1110,23 @@ function bw_render_schema_graph() {
     // BREADCRUMBS
     // ============================================
     
+    // The trail comes from bw_get_breadcrumb_items() (breadcrumb-shortcode.php), the same
+    // builder the visible [breadcrumbs] shortcode uses, so the two always match.
+    $trail = function_exists('bw_get_breadcrumb_items')
+        ? bw_get_breadcrumb_items($current_url)
+        : [['name' => 'Home', 'url' => home_url('/')]];
+
     $breadcrumbs = [];
     $position = 1;
-    
-    // Home - always first
-    $breadcrumbs[] = [
-        "@type" => "ListItem",
-        "position" => $position++,
-        "name" => "Home",
-        "item" => home_url('/')
-    ];
-
-    $wc_trail = bw_schema_wc_breadcrumb_trail($current_url, $post_id);
-
-    // WOOCOMMERCE PAGES - the trail WooCommerce's own breadcrumb shows
-    if ($wc_trail) {
-        foreach ($wc_trail as $crumb) {
-            $breadcrumbs[] = [
-                "@type" => "ListItem",
-                "position" => $position++,
-                "name" => $crumb['name'],
-                "item" => $crumb['url']
-            ];
+    foreach ($trail as $crumb) {
+        if (empty($crumb['name']) || empty($crumb['url'])) {
+            continue;
         }
-    }
-
-    // FRONT PAGE - just Home, nothing else
-    elseif (is_front_page()) {
-        // Only Home breadcrumb for front page
-    }
-    
-    // BLOG ARCHIVE (is_home() = true for blog posts page)
-    elseif (is_home()) {
         $breadcrumbs[] = [
             "@type" => "ListItem",
-            "position" => $position,
-            "name" => "Blog",
-            "item" => get_post_type_archive_link('post') ?: home_url('/blog/')
-        ];
-    }
-    
-    // OTHER ARCHIVES (categories, tags, CPT archives, date archives)
-    elseif (is_archive()) {
-        $post_type = get_post_type() ?: 'post';
-        $post_type_obj = get_post_type_object($post_type);
-        $queried = get_queried_object();
-        $post_type_link = $post_type_obj ? get_post_type_archive_link($post_type) : false;
-
-        if ($post_type_obj && $post_type_link) {
-            $breadcrumbs[] = [
-                "@type" => "ListItem",
-                "position" => $position++,
-                "name" => $post_type === 'post' ? 'Blog' : $post_type_obj->labels->name,
-                "item" => $post_type_link
-            ];
-        }
-
-        // Term archives: parent terms, then the term itself.
-        if ($queried instanceof WP_Term) {
-            $ancestors = array_reverse(get_ancestors($queried->term_id, $queried->taxonomy, 'taxonomy'));
-            foreach ($ancestors as $ancestor_id) {
-                $ancestor = get_term($ancestor_id, $queried->taxonomy);
-                if (!($ancestor instanceof WP_Term)) {
-                    continue;
-                }
-                $ancestor_link = get_term_link($ancestor);
-                if (is_wp_error($ancestor_link)) {
-                    continue;
-                }
-                $breadcrumbs[] = [
-                    "@type" => "ListItem",
-                    "position" => $position++,
-                    "name" => $ancestor->name,
-                    "item" => $ancestor_link
-                ];
-            }
-            $breadcrumbs[] = [
-                "@type" => "ListItem",
-                "position" => $position,
-                "name" => $queried->name,
-                "item" => $current_url
-            ];
-        }
-    }
-    
-    // SINGLES (posts, pages, CPTs)
-    elseif (is_singular()) {
-        $post_type = get_post_type();
-        
-        // Add post type archive for posts
-        if ($post_type === 'post') {
-            $breadcrumbs[] = [
-                "@type" => "ListItem",
-                "position" => $position++,
-                "name" => "Blog",
-                "item" => get_post_type_archive_link('post') ?: home_url('/blog/')
-            ];
-        }
-        
-        // Add CPT archive for custom post types (not pages)
-        if ($post_type !== 'post' && $post_type !== 'page') {
-            $post_type_obj = get_post_type_object($post_type);
-            if ($post_type_obj && $post_type_obj->has_archive) {
-                $breadcrumbs[] = [
-                    "@type" => "ListItem",
-                    "position" => $position++,
-                    "name" => $post_type_obj->labels->name,
-                    "item" => get_post_type_archive_link($post_type)
-                ];
-            }
-        }
-        
-        // Add parent pages for hierarchical post types (pages)
-        if (is_page()) {
-            $ancestors = get_post_ancestors($post_id);
-            $ancestors = array_reverse($ancestors);
-            
-            foreach ($ancestors as $ancestor_id) {
-                $breadcrumbs[] = [
-                    "@type" => "ListItem",
-                    "position" => $position++,
-                    "name" => get_the_title($ancestor_id),
-                    "item" => get_permalink($ancestor_id)
-                ];
-            }
-        }
-        
-        // Current page - check for breadcrumb override
-        $breadcrumb_override = get_post_meta($post_id, 'scos_seo_breadcrumb_title', true);
-        $current_name = !empty($breadcrumb_override) ? $breadcrumb_override : get_the_title();
-        
-        $breadcrumbs[] = [
-            "@type" => "ListItem",
-            "position" => $position,
-            "name" => $current_name,
-            "item" => get_permalink()
+            "position" => $position++,
+            "name" => wp_strip_all_tags((string) $crumb['name']),
+            "item" => $crumb['url']
         ];
     }
     

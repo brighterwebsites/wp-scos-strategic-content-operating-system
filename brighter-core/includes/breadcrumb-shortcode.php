@@ -287,8 +287,15 @@ function bw_get_breadcrumb_items($current_url = '') {
                         'current' => false
                     ];
                 }
+                if ($day) {
+                    $date_name = date_i18n('j', mktime(0, 0, 0, $month, $day, $year));
+                } elseif ($month) {
+                    $date_name = date_i18n('F', mktime(0, 0, 0, $month, 1, $year));
+                } else {
+                    $date_name = (string) $year;
+                }
                 $breadcrumbs[] = [
-                    'name' => wp_strip_all_tags(get_the_archive_title()),
+                    'name' => $date_name,
                     'url' => $current_url,
                     'current' => true
                 ];

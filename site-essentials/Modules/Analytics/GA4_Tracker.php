@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class GA4_Tracker {
 
-	/** Keep "brighter-ga4" in the handle: cache plugins' JS excludes match on it. */
+	/** The tag carries data-no-optimize (defer_enhanced), so LiteSpeed needs no JS exclude for it. */
 	const HANDLE = 'brighter-ga4-enhanced';
 
 	/** Keep in step with the JS header — busts LiteSpeed/browser cache. */

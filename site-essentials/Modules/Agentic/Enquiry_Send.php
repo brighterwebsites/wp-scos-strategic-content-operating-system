@@ -3,6 +3,9 @@
  * Agentic — agent-sent enquiries, confirmed by the person by email
  *
  * v1.0 | 2026-10-25
+ * v1.1 | 2026-10-25 — submit() takes a channel. Through the MCP connector every
+ *                      request comes from the assistant's servers, so the
+ *                      per-IP limit is skipped there (#229).
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -44,6 +47,8 @@ class Enquiry_Send {
 	const RATE           = 'se_enquiry_rate_';
 	const QUERY_VAR      = 'scos-enquiry';
 	const TTL            = 2 * DAY_IN_SECONDS;
+	const CHANNEL_REST   = 'rest';
+	const CHANNEL_MCP    = 'mcp';
 
 	/** Breakdance form actions run on a confirmed enquiry. Anything else (mailing lists, popups, custom JS) is skipped. */
 	const ACTIONS = [ 'email', 'store_submission', 'slack', 'discord', 'webhook' ];
@@ -76,11 +81,12 @@ class Enquiry_Send {
 	/**
 	 * Hold an agent's enquiry and email the person to confirm it.
 	 *
-	 * @param  array  $values field name => string or string[].
-	 * @param  string $agent  The assistant's name, if it gave one.
+	 * @param  array  $values  field name => string or string[].
+	 * @param  string $agent   The assistant's name, if it gave one.
+	 * @param  string $channel CHANNEL_REST or CHANNEL_MCP.
 	 * @return array|\WP_Error { status, sent_to, expires_in_hours, ignored[], next }
 	 */
-	public static function submit( array $values, string $agent = '' ) {
+	public static function submit( array $values, string $agent = '', string $channel = self::CHANNEL_REST ) {
 		$clean = Enquiry_Form::clean_values( $values );
 		if ( is_wp_error( $clean ) ) {
 			return $clean;
@@ -115,7 +121,7 @@ class Enquiry_Send {
 			);
 		}
 
-		$limited = self::hit_limits( $email );
+		$limited = self::hit_limits( $email, self::CHANNEL_MCP !== $channel );
 		if ( is_wp_error( $limited ) ) {
 			return $limited;
 		}
@@ -401,13 +407,16 @@ class Enquiry_Send {
 	 *
 	 * @return true|\WP_Error
 	 */
-	private static function hit_limits( string $email ) {
+	private static function hit_limits( string $email, bool $per_ip = true ) {
 		$ip      = (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
 		$buckets = [
 			'email' => self::RATE . 'e_' . md5( strtolower( $email ) ),
 			'ip'    => self::RATE . 'i_' . md5( wp_salt( 'nonce' ) . $ip ),
 			'site'  => self::RATE . 'site',
 		];
+		if ( ! $per_ip ) {
+			unset( $buckets['ip'] ); // Every connector request shares the assistant's IP.
+		}
 
 		foreach ( $buckets as $kind => $key ) {
 			$hits = get_transient( $key );

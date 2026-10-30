@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.4 | 2026-10-25 — an MCP connector line when the remote MCP server is on (#229).
  * v1.3 | 2026-10-25 — the enquiry line mentions sending it, confirmed by email, when that's on.
  * v1.2 | 2026-10-25 — the enquiry line says the link can be built without POST.
  * v1.1 | 2026-10-22 — the enquiry line points at the enquiry handoff (form
@@ -121,6 +122,10 @@ class Llms_Txt {
 		$lines[] = '- [Business details](' . $api . '/site-info): who the business is, where, how to contact it, and its services, as JSON.';
 		$lines[] = '- Search: `GET ' . $api . '/search?query={keyword}`. List everything: `GET ' . $api . '/list`. Read one page: `GET ' . $api . '/content/{slug}`. Read-only, no key needed.';
 		$lines[] = '- [OpenAPI description](' . Agentic\OpenAPI_Spec::get_spec_url() . ') of that API.';
+
+		if ( Agentic\Mcp_Server::is_enabled() ) {
+			$lines[] = '- MCP connector: add `' . Agentic\Mcp_Server::get_url() . '` as a custom connector in Claude, ChatGPT or any MCP client (Streamable HTTP, no login). It has the same tools' . ( Agentic\Enquiry_Send::is_enabled() ? ', plus `send_enquiry`, which the person confirms by email' : '' ) . '.';
+		}
 
 		if ( get_option( 'scos_agentic_webmcp_enabled' ) ) {
 			$lines[] = '- WebMCP: browsers with a built-in AI agent get the tools `get_site_info`, `search_content`, `list_content` and `get_content` on every page.';

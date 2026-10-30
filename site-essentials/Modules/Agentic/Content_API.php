@@ -4,6 +4,9 @@
  *
  * v1.1 | 2026-10-21
  *
+ * v1.2 | 2026-10-25 — /content/{slug} returns the rendered Markdown that
+ *                      Content Architecture stores (scos_ca_content_md) for
+ *                      builder pages, instead of an empty body and a note.
  * v1.1 | 2026-10-21 — site-info describes the site's own business from the
  *                     Business Info fields (Business_Profile). The default was
  *                     a hardcoded agency description, so every site without a
@@ -184,6 +187,15 @@ class Content_API {
 
 		$post    = $posts[0];
 		$content = self::strip_to_readable( $post->post_content );
+		$format  = 'text';
+
+		// Builder pages keep their body out of post_content. Use the Markdown the
+		// Content Architecture analysis rendered from the live page. Stored only:
+		// a public endpoint never triggers a render.
+		if ( '' === $content ) {
+			$content = trim( (string) get_post_meta( $post->ID, 'scos_ca_content_md', true ) );
+			$format  = '' !== $content ? 'markdown' : 'text';
+		}
 
 		$response = [
 			'title'          => esc_html( get_the_title( $post ) ),
@@ -193,12 +205,12 @@ class Content_API {
 			'purpose'        => get_post_meta( $post->ID, 'scos_ca_purpose', true ),
 			'intent'         => get_post_meta( $post->ID, 'scos_ca_intent', true ),
 			'content'        => $content,
+			'format'         => $format,
 		];
 
-		// Surface the Breakdance limitation to agents so they know to use the
-		// markdown endpoint instead (Accept: text/markdown on the page URL).
+		// Not analysed yet: point agents at the Markdown version of the page.
 		if ( '' === $content ) {
-			$response['_note'] = 'Content is empty — this page is built with Breakdance and its body is not stored in post_content. Request the page URL with the Accept: text/markdown header to retrieve full readable text.';
+			$response['_note'] = 'This page\'s text isn\'t available here yet. Request the page URL with the Accept: text/markdown header, or add ?format=md, for its full readable text.';
 		}
 
 		return new \WP_REST_Response( $response, 200 );
@@ -274,14 +286,8 @@ class Content_API {
 	/**
 	 * Strip shortcodes and HTML from post content for clean agent consumption.
 	 *
-	 * KNOWN LIMITATION — Breakdance pages return empty content:
-	 * Breakdance stores its layout in post meta (_breakdance_data), not in
-	 * post_content, so pages built with Breakdance will have an empty "content"
-	 * field in the /content/{slug} response. This is expected and not a bug.
-	 *
-	 * Future: a Breakdance-aware extractor could parse _breakdance_data and
-	 * extract text nodes, or the /mcp/ page can note that agents should use
-	 * the Markdown endpoint (Accept: text/markdown) for full page text instead.
+	 * Builder pages (Breakdance) come back empty here. handle_content() then
+	 * uses the stored scos_ca_content_md instead.
 	 *
 	 * @param  string $content Raw post_content.
 	 * @return string

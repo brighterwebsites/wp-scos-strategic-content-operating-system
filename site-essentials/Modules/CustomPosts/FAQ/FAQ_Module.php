@@ -24,6 +24,8 @@
  * v1.4 | 2026-06-23 — Auto-register 301 redirects to scos_redirects_301 when a published FAQ's scos_topic changes.
  * v1.5 | 2026-10-25 — Topic change drops any rule redirecting away from the FAQ's new URL. Moving an
  *                      FAQ back to an earlier topic used to leave new => old beside old => new: a loop (#222).
+ * v1.6 | 2026-10-30 — Schema answer expands shortcodes before stripping them, so a value shortcode
+ *                      (e.g. an ACF options-page price) reaches the FAQPage schema instead of vanishing.
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -839,11 +841,18 @@ class FAQ_Module {
 			if ( ! $post ) {
 				return false;
 			}
-			$answer = wp_trim_words( wp_strip_all_tags( $post->post_content ), 50, '...' );
+			$answer = $post->post_content;
 		}
 
-		$answer = wp_strip_all_tags( $answer );
+		// Expand first: a value shortcode (an ACF options-page price, say) is part of
+		// the answer. strip_shortcodes() then drops only what did not expand.
+		$answer = do_shortcode( $answer );
 		$answer = strip_shortcodes( $answer );
+		$answer = wp_strip_all_tags( $answer );
+		if ( '' === $schema_answer ) {
+			// Trim after expansion, so the word count never splits a shortcode.
+			$answer = wp_trim_words( $answer, 50, '...' );
+		}
 		$answer = preg_replace( '/\s+/', ' ', $answer );
 
 		return trim( (string) $answer );

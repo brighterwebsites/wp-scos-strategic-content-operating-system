@@ -26,6 +26,7 @@
  *                      FAQ back to an earlier topic used to leave new => old beside old => new: a loop (#222).
  * v1.6 | 2026-10-30 — Schema answer expands shortcodes before stripping them, so a value shortcode
  *                      (e.g. an ACF options-page price) reaches the FAQPage schema instead of vanishing.
+ * v1.7 | 2026-10-30 — Schema answer keeps a space between paragraphs, and is no longer cut to 50 words.
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -848,11 +849,10 @@ class FAQ_Module {
 		// the answer. strip_shortcodes() then drops only what did not expand.
 		$answer = do_shortcode( $answer );
 		$answer = strip_shortcodes( $answer );
+		// Block ends become spaces, or stripping the tags runs paragraphs together.
+		$answer = preg_replace( '#</(p|li|h[1-6]|div)>|<br\s*/?>#i', ' ', $answer );
 		$answer = wp_strip_all_tags( $answer );
-		if ( '' === $schema_answer ) {
-			// Trim after expansion, so the word count never splits a shortcode.
-			$answer = wp_trim_words( $answer, 50, '...' );
-		}
+		// No word limit: Google wants the full answer in FAQ schema. Shorten with the Schema Answer field.
 		$answer = preg_replace( '/\s+/', ' ', $answer );
 
 		return trim( (string) $answer );

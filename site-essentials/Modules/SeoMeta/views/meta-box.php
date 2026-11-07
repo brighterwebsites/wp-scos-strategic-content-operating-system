@@ -199,7 +199,8 @@ defined( 'ABSPATH' ) || exit;
 			</div>
 			<?php
 			// Blank here means "use the post type default" — say what that is (#228).
-			$type_default = empty( $robots )
+			// array_filter: Meta_Box casts a blank meta value to [''], which isn't empty().
+			$type_default = empty( array_filter( (array) $robots ) )
 				? \SiteEssentials\Modules\SeoMeta\Archive_Settings::single_robots( (string) $post->post_type )
 				: [];
 			if ( ! empty( $type_default ) ) :

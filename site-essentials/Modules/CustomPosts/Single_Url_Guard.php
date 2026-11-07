@@ -8,7 +8,8 @@
  * single post are stopped here, and sent somewhere useful with a 301.
  *
  * Caught, for each post type without singles:
- *   - any request that resolves to one of its posts (pretty URL, ?{query_var}=, ?p=)
+ *   - any request that resolves to one of its posts (pretty URL, ?{query_var}=)
+ *   - ?p=<id> of one of its published posts (WordPress 404s these: the types are exclude_from_search)
  *   - ?{query_var}=anything, even when it resolves to nothing
  *   - any 404 under the post type's rewrite base, e.g. /faq/old-topic/old-slug/
  *     (but not the bare base, /faq/, which belongs to the archive settings)
@@ -143,6 +144,17 @@ class Single_Url_Guard {
 		if ( is_singular( $blocked ) ) {
 			$post_id = (int) get_queried_object_id();
 			return [ (string) get_post_type( $post_id ), $post_id ];
+		}
+
+		// ?p=<id> of a blocked type: these types are exclude_from_search, so WordPress
+		// 404s the ID lookup and would then guess its way to the pretty URL (two hops).
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing check
+		$p = isset( $_GET['p'] ) ? absint( $_GET['p'] ) : 0;
+		if ( $p > 0 && is_404() ) {
+			$p_type = (string) get_post_type( $p );
+			if ( in_array( $p_type, $blocked, true ) && 'publish' === get_post_status( $p ) ) {
+				return [ $p_type, $p ];
+			}
 		}
 
 		$path = self::request_path();

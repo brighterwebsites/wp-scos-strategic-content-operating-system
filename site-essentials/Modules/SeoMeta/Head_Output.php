@@ -27,6 +27,8 @@
  * @since      1.0.0
  *
  * v1.5 | 2026-11-07 — Singular robots fall back to the post type's default when the post has none (#228).
+ *                      "Discourage search engines" now wins: our robots no longer strip WordPress's
+ *                      noindex, nofollow on a site with blog_public = 0.
  * v1.4 | 2026-10-01 — Paged canonical and rel prev/next drop the request's query string;
  *                      canonical_printed() lets fallback canonicals stand down.
  */
@@ -157,6 +159,13 @@ class Head_Output {
 	 * @return array
 	 */
 	public static function filter_robots( $robots ) {
+		// "Discourage search engines" (Settings › Reading) wins over everything: WordPress
+		// has already set noindex, nofollow, and per-post or per-type robots must never
+		// lift it on a dev or staging site.
+		if ( '0' === (string) get_option( 'blog_public' ) ) {
+			return $robots;
+		}
+
 		// ── Archive branch ────────────────────────────────────────────────────
 		$slug = self::archive_slug();
 		if ( null !== $slug ) {

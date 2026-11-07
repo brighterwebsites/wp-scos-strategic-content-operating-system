@@ -26,6 +26,9 @@
  *  pagination_noindex – bool — noindex on /page/2+
  *  canonical_paged    – bool — self-canonical on paginated pages
  *  rel_prevnext       – bool — output rel="prev" / rel="next"
+ *  single_robots      – array subset of: noindex, nofollow, noimageindex, nosnippet —
+ *                       the default for this type's SINGLE posts whose own robots is blank
+ *                       (#228). Stored here because this card is the per-post-type screen.
  *
  * Special archive extras:
  *  disabled      – bool — redirect to redirect_url (author / date / search)
@@ -50,7 +53,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.4 | 2026-10-19 — Field tokens also accept single % (%_acf_name%), like the other tokens.
+ * @version    1.5 | 2026-11-07 — single_robots: default robots for a post type's single posts (#228),
+ *                                plus Breakdance template detection to flag on that setting.
+ * v1.4 | 2026-10-19 — Field tokens also accept single % (%_acf_name%), like the other tokens.
  * v1.3 | 2026-10-18 — target_query field (CPT / posts archives).
  * v1.2 | 2026-10-18 — %%_acf_*%% / %%_cmeta_*%% field tokens.
  * @since      1.1.0
@@ -83,6 +88,7 @@ class Archive_Settings {
 			'pagination_noindex' => false,
 			'canonical_paged'    => false,
 			'rel_prevnext'       => false,
+			'single_robots'      => [],
 		];
 	}
 
@@ -217,6 +223,106 @@ class Archive_Settings {
 	 */
 	public static function save( string $slug, array $data ): void {
 		update_option( self::OPTION_PREFIX . sanitize_key( $slug ), $data, false );
+		self::$single_robots_cache = [];
+	}
+
+	// ── Single-post robots default (#228) ─────────────────────────────────────
+
+	/** @var array<string, string[]> Per-request cache, keyed by post type. */
+	private static $single_robots_cache = [];
+
+	/**
+	 * Default robots directives for a post type's single posts.
+	 *
+	 * Applies only to a post whose own scos_seo_robots is blank. Off (empty) unless
+	 * set under SEO › Meta Tags, so deploying this changes nothing on its own.
+	 *
+	 * @param string $post_type Post type slug ('post' or a public CPT).
+	 * @return string[] Subset of noindex, nofollow, noimageindex, nosnippet.
+	 */
+	public static function single_robots( string $post_type ): array {
+		if ( '' === $post_type || 'page' === $post_type ) {
+			return [];
+		}
+		if ( ! isset( self::$single_robots_cache[ $post_type ] ) ) {
+			$saved = get_option( self::OPTION_PREFIX . sanitize_key( $post_type ), [] );
+			$value = ( is_array( $saved ) && isset( $saved['single_robots'] ) && is_array( $saved['single_robots'] ) )
+				? array_values( array_intersect( $saved['single_robots'], [ 'noindex', 'nofollow', 'noimageindex', 'nosnippet' ] ) )
+				: [];
+			self::$single_robots_cache[ $post_type ] = $value;
+		}
+		return self::$single_robots_cache[ $post_type ];
+	}
+
+	/**
+	 * Robots directives in effect for one post: its own, else its post type's default.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array{directives:string[], source:string} source: 'post', 'post_type' or 'none'.
+	 */
+	public static function effective_single_robots( int $post_id ): array {
+		$own = get_post_meta( $post_id, 'scos_seo_robots', true );
+		if ( is_array( $own ) && ! empty( $own ) ) {
+			return [ 'directives' => array_values( $own ), 'source' => 'post' ];
+		}
+		$default = self::single_robots( (string) get_post_type( $post_id ) );
+		if ( ! empty( $default ) ) {
+			return [ 'directives' => $default, 'source' => 'post_type' ];
+		}
+		return [ 'directives' => [], 'source' => 'none' ];
+	}
+
+	/**
+	 * Published Breakdance templates that target a post type's single or archive.
+	 *
+	 * Detect, don't decide (#228): a designed FAQ template suggests the site means
+	 * those pages to be seen, so the settings screen flags it next to the default.
+	 * Admin-only; one query plus one meta-cache fill per screen.
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return string[] Template titles.
+	 */
+	public static function breakdance_templates_for( string $post_type ): array {
+		static $templates = null;
+
+		if ( null === $templates ) {
+			$templates = [];
+			if ( post_type_exists( 'breakdance_template' ) ) {
+				$ids = get_posts( [
+					'post_type'      => 'breakdance_template',
+					'post_status'    => 'publish',
+					'posts_per_page' => 200,
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+				] );
+				update_meta_cache( 'post', $ids );
+				foreach ( $ids as $id ) {
+					$raw = get_post_meta( $id, '_breakdance_template_settings', true );
+					// Stored as a JSON string, sometimes JSON-encoded twice.
+					$settings = is_string( $raw ) ? json_decode( $raw, true ) : $raw;
+					if ( is_string( $settings ) ) {
+						$settings = json_decode( $settings, true );
+					}
+					if ( ! is_array( $settings ) || ! empty( $settings['disabled'] ) ) {
+						continue;
+					}
+					$templates[] = [
+						'title' => get_the_title( $id ),
+						'type'  => (string) ( $settings['type'] ?? '' ),
+						'rules' => wp_json_encode( $settings['ruleGroups'] ?? [] ),
+					];
+				}
+			}
+		}
+
+		$found = [];
+		foreach ( $templates as $t ) {
+			// Single template: type is the post type. Archive or rule-based: the type is named in the rules.
+			if ( $t['type'] === $post_type || false !== strpos( (string) $t['rules'], '"' . $post_type . '"' ) ) {
+				$found[] = $t['title'];
+			}
+		}
+		return $found;
 	}
 
 	// ── Token parser ──────────────────────────────────────────────────────────
@@ -479,6 +585,10 @@ class Archive_Settings {
 				$data['pagination_noindex']  = ! empty( $raw['pagination_noindex'] );
 				$data['canonical_paged']     = ! empty( $raw['canonical_paged'] );
 				$data['rel_prevnext']        = ! empty( $raw['rel_prevnext'] );
+				$data['single_robots']       = self::sanitize_checkboxes(
+					$raw['single_robots'] ?? [],
+					[ 'noindex', 'nofollow', 'noimageindex', 'nosnippet' ]
+				);
 			} else {
 				// Special archive extras
 				if ( 'author' === $slug || 'date' === $slug || 'search' === $slug ) {

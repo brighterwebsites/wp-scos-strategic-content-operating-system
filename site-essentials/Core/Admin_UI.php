@@ -7,9 +7,12 @@
  *
  * @package    SiteEssentials
  * @subpackage Core
- * @version    1.4
+ * @version    1.6
  * @since      1.0.0
  *
+ * v1.6 | 2026-11-07 — save_cpt_settings() stores FAQ single pages on/off + single redirect
+ *                      (off needs scos_faq_archive_redirect, or it's refused) and the reviews
+ *                      single redirect.
  * v1.5 | 2026-10-01 — save_tweaks_settings() stores the disable_comments tweak.
  * v1.4 | 2026-09-28 — save_tweaks_settings() also stores the Breakdance "Use default
  *                      editor" mode (moved onto the Admin UX/UI group from SEO →
@@ -1881,13 +1884,36 @@ class Admin_UI {
         // FAQ archive / redirect settings — only persist these when the FAQ tab
         // form actually submitted them (the scos_faq[*] inputs only exist on the
         // FAQ tab). Otherwise saves from other tabs would wipe these options.
+        $notice = 'true';
         if ( isset( $_POST['scos_faq'] ) && is_array( $_POST['scos_faq'] ) ) {
-            $faq_opts = $_POST['scos_faq'];
+            $faq_opts         = wp_unslash( $_POST['scos_faq'] );
+            $archive_redirect = isset( $faq_opts['archive_redirect'] ) ? esc_url_raw( trim( (string) $faq_opts['archive_redirect'] ) ) : '';
+            $single_redirect  = isset( $faq_opts['single_redirect'] ) ? esc_url_raw( trim( (string) $faq_opts['single_redirect'] ) ) : '';
+            $singles_enabled  = ! empty( $faq_opts['singles_enabled'] );
+
+            // Singles off needs somewhere to send them: the archive redirect is required.
+            // Refuse to switch singles off without it; everything else still saves.
+            if ( ! $singles_enabled && '' === $archive_redirect ) {
+                $singles_enabled = true;
+                $notice          = 'faq_redirect_required';
+            }
+
             update_option('scos_faq_archive_enabled',  !empty($faq_opts['archive_enabled']));
-            update_option('scos_faq_archive_redirect', isset($faq_opts['archive_redirect']) ? esc_url_raw($faq_opts['archive_redirect']) : '');
+            update_option('scos_faq_archive_redirect', $archive_redirect);
             update_option('scos_faq_topic_redirect',   isset($faq_opts['topic_redirect'])   ? esc_url_raw($faq_opts['topic_redirect'])   : '');
+            update_option('scos_faq_singles_enabled',  $singles_enabled ? '1' : '0');
+            update_option('scos_faq_single_redirect',  $single_redirect);
             // Bump rewrite version so FAQ_Module re-flushes on next load
             delete_option('scos_faq_rewrite_version');
+        }
+
+        // Reviews single-URL redirect — only when the Reviews tab submitted it.
+        if ( isset( $_POST['scos_reviews'] ) && is_array( $_POST['scos_reviews'] ) ) {
+            $review_opts = wp_unslash( $_POST['scos_reviews'] );
+            update_option(
+                'scos_reviews_single_redirect',
+                isset( $review_opts['single_redirect'] ) ? esc_url_raw( trim( (string) $review_opts['single_redirect'] ) ) : ''
+            );
         }
 
         flush_rewrite_rules();
@@ -1902,7 +1928,7 @@ class Admin_UI {
         $redirect_url = add_query_arg([
             'page'    => self::CPT_PAGE_SLUG,
             'tab'     => $submitted_tab,
-            'updated' => 'true',
+            'updated' => $notice,
         ], admin_url('admin.php'));
 
         wp_safe_redirect($redirect_url);

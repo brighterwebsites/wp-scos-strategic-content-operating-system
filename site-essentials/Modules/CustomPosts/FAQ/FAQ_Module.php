@@ -12,7 +12,8 @@
  *                  back-compat with existing data; reads prefer scos_faq_* and
  *                  fall back to _faq_*)
  *   Options:      scos_faq_archive_enabled, scos_faq_archive_redirect,
- *                 scos_faq_topic_redirect, scos_faq_rewrite_version
+ *                 scos_faq_topic_redirect, scos_faq_rewrite_version,
+ *                 scos_faq_singles_enabled, scos_faq_single_redirect
  *   Block:        brighter/faq-selector (name retained for backward
  *                 compatibility with existing post_content references)
  *   Breakdance:    bd_brighter_elements_faq_post_type → POST_TYPE (faq)
@@ -27,6 +28,10 @@
  * v1.6 | 2026-10-30 — Schema answer expands shortcodes before stripping them, so a value shortcode
  *                      (e.g. an ACF options-page price) reaches the FAQPage schema instead of vanishing.
  * v1.7 | 2026-10-30 — Schema answer keeps a space between paragraphs, and is no longer cut to 50 words.
+ * v1.8 | 2026-11-07 — FAQ single pages can be switched off (scos_faq_singles_enabled); their URLs then
+ *                      301 via Single_Url_Guard to the intent-goal page, scos_faq_single_redirect, or
+ *                      scos_faq_archive_redirect. /faq/ now honours the archive redirect when the archive
+ *                      is off (it used to 404), and /faq/topic/ goes straight to the final URL in one hop.
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -64,6 +69,15 @@ class FAQ_Module {
 
 	/** Block name — retained for backward compatibility with existing post_content. */
 	const BLOCK_NAME = 'brighter/faq-selector';
+
+	/** Option: FAQ single pages on (default) or off. Off = single URLs 301 away. */
+	const OPTION_SINGLES_ENABLED = 'scos_faq_singles_enabled';
+
+	/** Option: where FAQ single URLs go when singles are off. Empty = the archive redirect. */
+	const OPTION_SINGLE_REDIRECT = 'scos_faq_single_redirect';
+
+	/** Option: where /faq/ goes when the archive is off. Required when singles are off. */
+	const OPTION_ARCHIVE_REDIRECT = 'scos_faq_archive_redirect';
 
 	// =========================================================================
 	// Bootstrap
@@ -159,10 +173,18 @@ class FAQ_Module {
 
 		// Single-segment /faq/topic-slug/ rule → handled by template_redirect redirect
 		add_rewrite_rule( '^faq/([^/]+)/?$', 'index.php?scos_faq_topic_browse=$matches[1]', 'top' );
-		add_filter( 'query_vars', static function ( array $vars ): array {
-			$vars[] = 'scos_faq_topic_browse';
-			return $vars;
-		} );
+		add_filter( 'query_vars', [ self::class, 'add_query_vars' ] );
+	}
+
+	/**
+	 * Register the topic-folder query var.
+	 *
+	 * @param array $vars Public query vars.
+	 * @return array
+	 */
+	public static function add_query_vars( array $vars ): array {
+		$vars[] = 'scos_faq_topic_browse';
+		return $vars;
 	}
 
 	/**
@@ -287,6 +309,11 @@ class FAQ_Module {
 			return;
 		}
 
+		// Singles off: the old URL redirects anyway (Single_Url_Guard), so no rule is needed.
+		if ( ! self::singles_enabled() ) {
+			return;
+		}
+
 		$post = get_post( $object_id );
 		if ( ! $post || self::POST_TYPE !== $post->post_type || 'publish' !== $post->post_status ) {
 			return;
@@ -372,38 +399,137 @@ class FAQ_Module {
 	 * Settings (stored as wp_options):
 	 *   scos_faq_archive_enabled  (bool)   — allow the /faq/ archive; false = redirect/404
 	 *   scos_faq_archive_redirect (string) — redirect /faq/ to this URL (empty = 404)
-	 *   scos_faq_topic_redirect   (string) — redirect /faq/topic/ to this URL (empty = /faq/)
+	 *   scos_faq_topic_redirect   (string) — redirect /faq/topic/ to this URL (empty = where /faq/ ends up)
+	 *
+	 * Single FAQ URLs (when singles are off) are Single_Url_Guard's job, not this method's.
 	 *
 	 * @since 1.0.0
 	 * @return void
 	 */
 	public static function handle_redirects(): void {
-		// /faq/ archive ───────────────────────────────────────────────────────
-		if ( is_post_type_archive( self::POST_TYPE ) ) {
-			$archive_enabled  = (bool) get_option( 'scos_faq_archive_enabled', false );
-			$archive_redirect = (string) get_option( 'scos_faq_archive_redirect', '' );
+		$archive_enabled  = (bool) get_option( 'scos_faq_archive_enabled', false );
+		$archive_redirect = (string) get_option( self::OPTION_ARCHIVE_REDIRECT, '' );
 
-			if ( ! $archive_enabled ) {
-				if ( ! empty( $archive_redirect ) ) {
-					wp_safe_redirect( esc_url_raw( $archive_redirect ), 301 );
-					exit;
-				}
-				// No redirect configured — fall through to 404
-				global $wp_query;
-				$wp_query->set_404();
-				status_header( 404 );
-				return;
+		// /faq/ with the archive off ──────────────────────────────────────────
+		// has_archive is false then, so WordPress 404s /faq/ before is_post_type_archive()
+		// could ever be true. Match the path instead; a real Page at /faq/ isn't a 404
+		// and is left alone.
+		if ( ! $archive_enabled && is_404() && '/faq/' === self::request_path() ) {
+			if ( '' !== $archive_redirect ) {
+				wp_safe_redirect( esc_url_raw( $archive_redirect ), 301 );
+				exit;
 			}
+			return; // No redirect configured: the 404 stands.
 		}
 
 		// /faq/topic-slug/ (single segment, matched by our rewrite rule) ──────
 		$topic_browse = get_query_var( 'scos_faq_topic_browse', '' );
 		if ( '' !== $topic_browse ) {
 			$topic_redirect = (string) get_option( 'scos_faq_topic_redirect', '' );
-			$target         = ! empty( $topic_redirect ) ? $topic_redirect : home_url( '/faq/' );
+
+			// One hop: go where /faq/ itself would end up, not via /faq/.
+			if ( '' !== $topic_redirect ) {
+				$target = $topic_redirect;
+			} elseif ( $archive_enabled ) {
+				$target = home_url( '/faq/' );
+			} else {
+				$target = $archive_redirect;
+			}
+
+			if ( '' === $target ) {
+				global $wp_query;
+				$wp_query->set_404();
+				status_header( 404 );
+				nocache_headers();
+				return;
+			}
+
 			wp_safe_redirect( esc_url_raw( $target ), 301 );
 			exit;
 		}
+	}
+
+	/**
+	 * The request path relative to home, e.g. '/faq/'.
+	 *
+	 * @return string
+	 */
+	private static function request_path(): string {
+		if ( class_exists( \SiteEssentials\Modules\CustomPosts\Single_Url_Guard::class ) ) {
+			return \SiteEssentials\Modules\CustomPosts\Single_Url_Guard::request_path();
+		}
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- compared, not output
+		return '/' . ltrim( trailingslashit( (string) wp_parse_url( $uri, PHP_URL_PATH ) ), '/' );
+	}
+
+	// =========================================================================
+	// Single pages on / off
+	// =========================================================================
+
+	/**
+	 * Whether FAQ single pages are on. Default on, so existing sites don't change.
+	 *
+	 * @return bool
+	 */
+	public static function singles_enabled(): bool {
+		return (bool) get_option( self::OPTION_SINGLES_ENABLED, true );
+	}
+
+	/**
+	 * The admin-set destination for FAQ single URLs: the single redirect, or the
+	 * archive redirect. Empty when neither is set.
+	 *
+	 * @return string
+	 */
+	public static function configured_single_redirect(): string {
+		$single = trim( (string) get_option( self::OPTION_SINGLE_REDIRECT, '' ) );
+		if ( '' !== $single ) {
+			return $single;
+		}
+		return trim( (string) get_option( self::OPTION_ARCHIVE_REDIRECT, '' ) );
+	}
+
+	/**
+	 * Where one FAQ's single URL goes when singles are off.
+	 *
+	 * 1. The published page that uses this FAQ as its intent goal (it answers the
+	 *    same question, so the redirect keeps its relevance).
+	 * 2. scos_faq_single_redirect.
+	 * 3. scos_faq_archive_redirect.
+	 * 4. Empty: Single_Url_Guard falls back to the home page, and an admin notice flags it.
+	 *
+	 * @param int $faq_id FAQ post ID, or 0 when the URL didn't resolve to an FAQ.
+	 * @return string
+	 */
+	public static function single_redirect_target( int $faq_id ): string {
+		if ( $faq_id > 0 ) {
+			$pages = get_posts( [
+				'post_type'              => 'any',
+				'post_status'            => 'publish',
+				'posts_per_page'         => 1,
+				'orderby'                => 'ID',
+				'order'                  => 'ASC',
+				'no_found_rows'          => true,
+				'fields'                 => 'ids',
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'meta_query'             => [
+					[
+						'key'   => 'scos_ca_intent_goal_faq_id',
+						'value' => $faq_id,
+						'type'  => 'NUMERIC',
+					],
+				],
+			] );
+			if ( ! empty( $pages ) ) {
+				$url = get_permalink( (int) $pages[0] );
+				if ( $url ) {
+					return (string) $url;
+				}
+			}
+		}
+
+		return self::configured_single_redirect();
 	}
 
 	// =========================================================================

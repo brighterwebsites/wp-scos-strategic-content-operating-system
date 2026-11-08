@@ -3,7 +3,7 @@
  * Plugin Name: Site Essentials
  * Plugin URI:  https://brighterwebsites.com.au
  * Description: Modular site management system - Performance, Analytics, SEO, and more
- * Version:     1.1.1
+ * Version:     1.3.0
  * Author:      Brighter Websites
  * Author URI:  https://brighterwebsites.com.au
  * License:     GPL-3.0-or-later
@@ -15,8 +15,10 @@
  * It sets up constants, autoloading, and bootstraps the plugin.
  *
  * @package SiteEssentials
- * @version 1.1.1
+ * @version 1.3.0
  *
+ * v1.3.0 | 2026-11-08 — Registers the Commerce module (store-only WooCommerce
+ *                       assets, optional loop add-to-cart removal).
  * v1.1.2 | 2026-10-22 — Registers the WooCommerce GA bridge on plugins_loaded,
  *                       ahead of WooCommerce's integrations (init 0).
  * v1.1.1 | 2026-08-17 — Removed the SERVER_ADDR licence gate, which silently
@@ -113,7 +115,7 @@ add_action( 'init', [ 'SE_Deployment_Check', 'init' ] );
  *
  * @since 1.0.0
  */
-define('SITE_ESSENTIALS_VERSION', '1.2.0');
+define('SITE_ESSENTIALS_VERSION', '1.3.0');
 
 /**
  * Site Essentials Base Path
@@ -239,6 +241,11 @@ add_action('init', function() {
         \SiteEssentials\Core\Module_Loader::register(
             'tables',
             \SiteEssentials\Modules\Tables\Tables_Module::class
+        );
+
+        \SiteEssentials\Core\Module_Loader::register(
+            'commerce',
+            \SiteEssentials\Modules\Commerce\Commerce_Module::class
         );
 
         // CRITICAL: Disable WordPress core sitemaps (wp-sitemap.xml) so only our sitemap.xml is used.

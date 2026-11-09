@@ -223,7 +223,10 @@ class Well_Known_Router {
 	 * site), and Lighthouse's 2 s fetch timeout fails the ARD audit from PSI.
 	 */
 	private static function allow_page_cache(): void {
-		do_action( 'litespeed_control_set_cacheable', 'scos well-known' );
+		// Force, not just set: the fleet's LiteSpeed "Do Not Cache URIs" lists
+		// ^/.well-known, to keep other plugins' discovery files (OAuth) from
+		// caching a 404. Forcing here only affects the 200s this router serves.
+		do_action( 'litespeed_control_force_cacheable', 'scos well-known' );
 		do_action( 'litespeed_control_set_ttl', HOUR_IN_SECONDS );
 		do_action( 'litespeed_tag_add', self::CACHE_TAG );
 	}

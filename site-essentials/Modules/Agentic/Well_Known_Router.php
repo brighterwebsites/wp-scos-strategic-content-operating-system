@@ -2,11 +2,16 @@
 /**
  * Agentic — /.well-known/ Router
  *
- * v1.2 | 2026-10-21
+ * v1.3 | 2026-11-09
  *
  * v1.1 | 2026-10-21 — Unregistered paths now return a hard 404 instead of
  *                     falling through to WP (which served the blog index, 200).
  * v1.2 | 2026-10-21 — Optional 'headers' in a response (e.g. CORS for ARD).
+ * v1.3 | 2026-11-09 — Served responses go into the LiteSpeed page cache (1 h,
+ *                     tag scos_well_known, purged when site or Agentic settings
+ *                     change). Uncached they took ~0.75 s, which pushed PSI's
+ *                     Lighthouse past its 2 s fetch timeout ("ARD manifest could
+ *                     not be loaded"). 404s are still never cached.
  * WHAT THIS IS FOR
  * ----------------
  * RFC 8615 reserves /.well-known/ as the standard location for site-wide
@@ -69,6 +74,15 @@ class Well_Known_Router {
 	const QV          = 'scos_well_known';
 	const REWRITE_VER = 'scos_well_known_rewrite_ver';
 
+	/** LiteSpeed cache tag on every served .well-known response. */
+	const CACHE_TAG = 'scos_well_known';
+
+	/** Options whose change alters what the .well-known files say. Prefix match. */
+	const PURGE_OPTION_PREFIXES = [ 'scos_agentic_', 'scos_biz_', 'scos_webmcp_' ];
+
+	/** Core options the files read (site name, description, URL). */
+	const PURGE_OPTIONS = [ 'blogname', 'blogdescription', 'home', 'siteurl' ];
+
 	/** Bump when the rewrite rule changes, to force a one-time flush. */
 	const RULE_VERSION = '1';
 
@@ -83,6 +97,10 @@ class Well_Known_Router {
 
 		add_filter( 'query_vars',        [ __CLASS__, 'add_query_var' ] );
 		add_action( 'template_redirect', [ __CLASS__, 'serve' ], 0 );
+
+		add_action( 'updated_option', [ __CLASS__, 'maybe_purge_on_option' ] );
+		add_action( 'added_option',   [ __CLASS__, 'maybe_purge_on_option' ] );
+		add_action( 'deleted_option', [ __CLASS__, 'maybe_purge_on_option' ] );
 
 		self::maybe_flush_rewrites();
 	}
@@ -130,7 +148,9 @@ class Well_Known_Router {
 		 * Filter: scos_well_known_response
 		 *
 		 * @param array|null $response ['content' => string, 'type' => string,
-		 *                             'headers' => [name => value] (optional)] or null.
+		 *                             'headers' => [name => value] (optional),
+		 *                             'cache' => bool (optional, default true:
+		 *                             false keeps it out of the page cache)] or null.
 		 * @param string     $path     Requested path minus the /.well-known/ prefix.
 		 */
 		$response = apply_filters( 'scos_well_known_response', null, $path );
@@ -145,7 +165,11 @@ class Well_Known_Router {
 
 		$type = $response['type'] ?? 'text/plain';
 
-		self::bypass_page_cache();
+		if ( false === ( $response['cache'] ?? true ) ) {
+			self::bypass_page_cache();
+		} else {
+			self::allow_page_cache();
+		}
 
 		status_header( 200 );
 		header( 'Content-Type: ' . $type . '; charset=utf-8' );
@@ -184,17 +208,59 @@ class Well_Known_Router {
 		exit;
 	}
 
-	// ── Cache bypass ──────────────────────────────────────────────────────────
+	// ── Page cache ────────────────────────────────────────────────────────────
 
 	/**
-	 * Keep these responses out of the LiteSpeed page cache.
+	 * Let LiteSpeed page-cache a served response, for an hour at most.
 	 *
-	 * The page cache keys on URL alone and would happily store a JSON body
-	 * against a URL a browser later requests as HTML. Mirrors the pattern in
-	 * Markdown_Renderer::bypass_page_cache().
+	 * Safe here, unlike Markdown_Renderer: a .well-known URL only ever returns
+	 * this one representation (the router runs at priority 0, before content
+	 * negotiation), so the URL-keyed page cache cannot mix it up with HTML.
+	 * None of the handlers vary by viewer. Same pattern as llms.txt in
+	 * Virtual_Files::serve_llms_txt().
 	 *
-	 * Note this only bypasses the *page* cache — the Cache-Control header above
-	 * still allows normal HTTP/CDN caching, which is what we want.
+	 * Without it every request boots WordPress in full (~0.75 s on a Breakdance
+	 * site), and Lighthouse's 2 s fetch timeout fails the ARD audit from PSI.
+	 */
+	private static function allow_page_cache(): void {
+		do_action( 'litespeed_control_set_cacheable', 'scos well-known' );
+		do_action( 'litespeed_control_set_ttl', HOUR_IN_SECONDS );
+		do_action( 'litespeed_tag_add', self::CACHE_TAG );
+	}
+
+	/**
+	 * Purge the cached .well-known files when an option they read changes.
+	 *
+	 * @param string $option Option name.
+	 */
+	public static function maybe_purge_on_option( $option ): void {
+		$option = (string) $option;
+		if ( ! in_array( $option, self::PURGE_OPTIONS, true ) && ! self::has_purge_prefix( $option ) ) {
+			return;
+		}
+		self::purge();
+	}
+
+	/** Purge every cached .well-known response. */
+	public static function purge(): void {
+		do_action( 'litespeed_purge', self::CACHE_TAG );
+	}
+
+	private static function has_purge_prefix( string $option ): bool {
+		foreach ( self::PURGE_OPTION_PREFIXES as $prefix ) {
+			if ( 0 === strpos( $option, $prefix ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Keep a response out of the LiteSpeed page cache (404s, and any handler
+	 * that returns 'cache' => false).
+	 *
+	 * Note this only bypasses the *page* cache. A 404 also sends
+	 * Cache-Control: no-store, so it stays out of CDN caches too.
 	 */
 	private static function bypass_page_cache(): void {
 		if ( function_exists( 'litespeed_control' ) ) {

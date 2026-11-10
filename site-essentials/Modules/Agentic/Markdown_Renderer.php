@@ -2,8 +2,10 @@
 /**
  * Markdown Renderer
  *
- * v1.2 | 2026-10-21
+ * v1.3 | 2026-11-07
  *
+ * v1.3 | 2026-11-07 — No markdown copy of a post type without single URLs (reviews; FAQs
+ *                     when switched off): the request falls through to Single_Url_Guard's 301.
  * v1.2 | 2026-10-21 — Clean output on page-builder markup (#211): heading and
  *                     link text trimmed and collapsed, empty ones dropped,
  *                     entities decoded, indentation and blank-line noise
@@ -95,6 +97,12 @@ class Markdown_Renderer {
 		}
 
 		if ( ! is_singular() && ! is_front_page() ) {
+			return;
+		}
+
+		// A post type without single URLs has no page to mirror; Single_Url_Guard redirects it.
+		$guard = '\SiteEssentials\Modules\CustomPosts\Single_Url_Guard';
+		if ( is_singular() && class_exists( $guard ) && $guard::is_blocked( (string) get_post_type( get_queried_object_id() ) ) ) {
 			return;
 		}
 

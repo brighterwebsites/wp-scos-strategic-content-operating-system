@@ -6,6 +6,8 @@
  * v1.2 | 2026-10-18 — Token table lists %%_acf_*%% / %%_cmeta_*%% field tokens.
  * v1.3 | 2026-10-18 — Target KW Query field on CPT / posts archives.
  * v1.4 | 2026-10-19 — Note that field tokens take single or double %.
+ * v1.5 | 2026-11-07 — "Single pages: default robots" per post type (#228), with a flag when a
+ *                      Breakdance template targets the type, and a note when singles are off.
  *
  * SCOS design system: scos-accordion replaces <details>, scos-form inside bodies,
  * scos-badge for status, scos-save-bar, scos__section-label. Inline <style> removed.
@@ -33,6 +35,7 @@ function scos_archive_has_data( array $s ): bool {
 	    || ! empty( $s['breadcrumb_title'] )
 	    || ! empty( $s['tldr'] )
 	    || ! empty( $s['robots'] )
+	    || ! empty( $s['single_robots'] )
 	    || ! empty( $s['og_image_id'] );
 }
 
@@ -242,6 +245,55 @@ $chevron_svg = '<svg class="scos-accordion__chevron" xmlns="http://www.w3.org/20
 					</label>
 					<?php endforeach; ?>
 				</fieldset>
+
+				<?php
+				$pt_obj       = get_post_type_object( $slug );
+				$single_label = $pt_obj ? $pt_obj->labels->name : $label;
+				$guard_class  = '\SiteEssentials\Modules\CustomPosts\Single_Url_Guard';
+				$no_singles   = class_exists( $guard_class ) && $guard_class::is_blocked( $slug );
+				$bd_templates = Archive_Settings::breakdance_templates_for( $slug );
+				?>
+				<h3 class="scos__section-label" style="font-size:var(--scos-fs-sm);margin-bottom:var(--scos-s-2)">
+					<?php
+					/* translators: %s: post type plural label */
+					echo esc_html( sprintf( __( 'Single pages: default robots (%s)', 'site-essentials' ), $single_label ) );
+					?>
+				</h3>
+				<?php if ( $no_singles ) : ?>
+					<p class="description" style="margin-bottom:var(--scos-s-4)">
+						<?php esc_html_e( 'This post type has no single pages on this site (they redirect), so there is nothing to index.', 'site-essentials' ); ?>
+					</p>
+					<?php // Keep any saved default, for when single pages are turned back on. ?>
+					<?php foreach ( (array) $s['single_robots'] as $kept ) : ?>
+						<input type="hidden" name="<?php echo esc_attr( $f ); ?>[single_robots][]" value="<?php echo esc_attr( $kept ); ?>">
+					<?php endforeach; ?>
+				<?php else : ?>
+					<?php if ( ! empty( $bd_templates ) ) : ?>
+						<div class="scos-notice scos-notice--info" style="margin-bottom:var(--scos-s-2)">
+							<p>
+								<?php
+								/* translators: %s: comma-separated Breakdance template titles */
+								echo esc_html( sprintf( __( 'A Breakdance template targets this post type (%s). That usually means its pages are meant to be seen, so check before setting noindex.', 'site-essentials' ), implode( ', ', $bd_templates ) ) );
+								?>
+							</p>
+						</div>
+					<?php endif; ?>
+					<fieldset style="margin-bottom:var(--scos-s-4)">
+						<legend class="screen-reader-text"><?php esc_html_e( 'Single pages: default robots', 'site-essentials' ); ?></legend>
+						<?php foreach ( $robots_opts as $val => $label_text ) : ?>
+						<label class="scos-checkbox-row" style="margin-bottom:var(--scos-s-1)">
+							<input type="checkbox"
+								name="<?php echo esc_attr( $f ); ?>[single_robots][]"
+								value="<?php echo esc_attr( $val ); ?>"
+								<?php checked( in_array( $val, (array) $s['single_robots'], true ) ); ?>>
+							<span><?php echo esc_html( $label_text ); ?></span>
+						</label>
+						<?php endforeach; ?>
+						<p class="description">
+							<?php esc_html_e( 'Applies to every single post of this type whose own Meta Robots is blank, including ones published later. A post\'s own Meta Robots replaces this completely. noindex posts also leave the XML sitemap. Don\'t block these pages in robots.txt, or crawlers never see the noindex.', 'site-essentials' ); ?>
+						</p>
+					</fieldset>
+				<?php endif; ?>
 
 				<h3 class="scos__section-label" style="font-size:var(--scos-fs-sm);margin-bottom:var(--scos-s-2)"><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></h3>
 				<fieldset style="margin-bottom:var(--scos-s-4)">

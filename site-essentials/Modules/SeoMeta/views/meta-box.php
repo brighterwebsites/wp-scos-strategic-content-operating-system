@@ -23,6 +23,7 @@
  * v1.1 | 2026-07-17 — TLDR field switched from plain textarea to a teeny
  *                      wp_editor() instance (bold/lists/link, no images).
  * v1.2 | 2026-10-18 — Target KW Query field.
+ * v1.3 | 2026-11-07 — Meta Robots shows the inherited post type default when nothing is ticked (#228).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -196,6 +197,26 @@ defined( 'ABSPATH' ) || exit;
 					</label>
 				<?php endforeach; ?>
 			</div>
+			<?php
+			// Blank here means "use the post type default" — say what that is (#228).
+			// array_filter: Meta_Box casts a blank meta value to [''], which isn't empty().
+			$type_default = empty( array_filter( (array) $robots ) )
+				? \SiteEssentials\Modules\SeoMeta\Archive_Settings::single_robots( (string) $post->post_type )
+				: [];
+			if ( ! empty( $type_default ) ) :
+				$type_obj = get_post_type_object( $post->post_type );
+				?>
+				<p class="description">
+					<?php
+					echo esc_html( sprintf(
+						/* translators: 1: post type plural label, 2: robots directives */
+						__( 'Nothing ticked, so this uses the default for %1$s: %2$s (SEO › Meta Tags). Ticking any box here replaces the default completely.', 'site-essentials' ),
+						$type_obj ? $type_obj->labels->name : $post->post_type,
+						implode( ', ', $type_default )
+					) );
+					?>
+				</p>
+			<?php endif; ?>
 		</div>
 
 		<!-- Freeze Modified Date -->
@@ -234,7 +255,7 @@ defined( 'ABSPATH' ) || exit;
 			<label><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></label>
 
 			<?php
-			$noindex_active   = in_array( 'noindex', $robots, true );
+			$noindex_active   = in_array( 'noindex', $robots, true ) || in_array( 'noindex', $type_default, true );
 			$non_self_canon   = ! empty( $canonical ) && $canonical !== get_permalink( $post->ID );
 			$auto_excluded    = $sitemap_noindex_auto || $non_self_canon;
 			?>

@@ -12,8 +12,12 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts
- * @version    1.2.1
+ * @version    1.3 | 2026-11-07
  * @since      1.0.0
+ *
+ * v1.3 | 2026-11-07 — Reviews are no longer publicly queryable, and Single_Url_Guard 301s any review
+ *                      or (when switched off) FAQ single URL (#247). Comments on the CPT flags now say
+ *                      what each flag actually does.
  */
 
 namespace SiteEssentials\Modules\CustomPosts;
@@ -121,7 +125,7 @@ class Cpt_Module implements Module_Interface {
      * @return string
      */
     public static function get_version() {
-        return '1.2.0';
+        return '1.3.0';
     }
 
     /**
@@ -239,6 +243,10 @@ class Cpt_Module implements Module_Interface {
         if (!empty($opts['enable_reviews']) || !empty($opts['enable_faq'])) {
             require_once __DIR__ . '/Pinned_Query_Types.php';
             Pinned_Query_Types::init();
+
+            // Single URLs of types without singles (reviews; FAQs when switched off) → 301.
+            require_once __DIR__ . '/Single_Url_Guard.php';
+            Single_Url_Guard::init();
         }
 
         // ─── General: default post permalinks & category base (optional) ───────
@@ -352,15 +360,17 @@ class Cpt_Module implements Module_Interface {
      * Queryable SSOT data source — no archive page, no single URLs, but queryable via WP_Query/BDE.
      *
      * Key flags:
-     *   public: true             — REQUIRED for front-end queryability in Breakdance loops
-     *   publicly_queryable: true — REQUIRED for WP_Query and BDE to find posts
-     *   query_var: true          — Required for query parameter parsing
-     *   show_in_rest: true       — Required for ACF, BDE field access, and Gutenberg
-     *   has_archive: false       — No /reviews/ archive page
-     *   rewrite: false           — No single post URLs
+     *   public: true              — lists the type in Breakdance's loop picker and Pinned_Query_Types
+     *   publicly_queryable: false — WordPress won't build a single-review request from the URL
+     *   query_var: true           — names the ?bw_reviews= param for Single_Url_Guard (not parsed)
+     *   show_in_rest: true        — ACF, BDE field access, and Gutenberg
+     *   has_archive: false        — No /reviews/ archive page
+     *   rewrite: false            — No pretty permalink
      *
-     * Note: public=true would normally include posts in sitemaps, but we exclude via
-     *       wp_sitemaps_post_types filter (see exclude_reviews_from_sitemap method).
+     * WP_Query with an explicit post_type (loops, renderers, schema) doesn't depend on
+     * publicly_queryable. Anything that still resolves a review single is 301'd by
+     * Single_Url_Guard. Sitemaps: excluded from core (filter below) and from the SCOS
+     * sitemap (Seo_Module drops post types without singles).
      *
      * @since 1.1.0
      * @return void
@@ -389,9 +399,14 @@ class Cpt_Module implements Module_Interface {
 
         $args = [
             'labels'              => $labels,
-            'public'              => true,          // REQUIRED: Makes post type queryable on front-end (for BDE loops)
-            'publicly_queryable'  => true,          // REQUIRED: Allows WP_Query and BDE loops to work
-            'query_var'           => true,          // REQUIRED: Enables query_posts() and WP_Query
+            // public: lists the type in Breakdance's loop post-type picker and in
+            // Pinned_Query_Types. Server-side WP_Query with an explicit post_type works either way.
+            'public'              => true,
+            // publicly_queryable false: WordPress no longer turns ?bw_reviews= or a pretty URL
+            // into a single-review request. This is what removes the single pages (#247);
+            // Single_Url_Guard 301s whatever is left (?p=<id>, stray ?bw_reviews=).
+            'publicly_queryable'  => false,
+            'query_var'           => true,          // Kept so Single_Url_Guard can name the ?bw_reviews= param
             'show_in_rest'        => true,          // REQUIRED: For ACF, BDE field access, and Gutenberg
             'has_archive'         => false,         // Disable archive page (/reviews/)
             'rewrite'             => false,         // Disable single post URLs

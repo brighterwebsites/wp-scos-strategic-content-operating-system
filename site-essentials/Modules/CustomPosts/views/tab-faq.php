@@ -3,6 +3,8 @@
  * CPT — FAQ System tab.
  *
  * v1.0 | 2026-05-19
+ * v1.1 | 2026-11-07 — FAQ single pages on/off + single redirect. Turning singles off needs
+ *                      "Redirect /faq/ to"; the save refuses otherwise and says so here.
  *
  * Variables in scope from cpt-page.php:
  * @var array $opts
@@ -20,6 +22,9 @@ $faq_total     = isset( $faq_count_obj->publish ) ? (int) $faq_count_obj->publis
 $archive_enabled  = (bool) get_option( 'scos_faq_archive_enabled', false );
 $archive_redirect = (string) get_option( 'scos_faq_archive_redirect', '' );
 $topic_redirect   = (string) get_option( 'scos_faq_topic_redirect', '' );
+$singles_enabled  = (bool) get_option( 'scos_faq_singles_enabled', true );
+$single_redirect  = (string) get_option( 'scos_faq_single_redirect', '' );
+$redirect_refused = isset( $_GET['updated'] ) && 'faq_redirect_required' === sanitize_key( wp_unslash( $_GET['updated'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display flag only
 
 // SchemaDance compatibility check — `is_plugin_active` lives in wp-admin/includes/plugin.php
 // which is NOT always loaded in mu-plugin context, so we load it here once.
@@ -28,6 +33,18 @@ if ( ! function_exists( 'is_plugin_active' ) ) {
 }
 $schemadance_active = function_exists( 'is_plugin_active' ) && is_plugin_active( 'schemadance/schemadance.php' );
 ?>
+
+<?php if ( $redirect_refused ) : ?>
+	<div class="scos-notice scos-notice--danger" role="alert">
+		<strong class="scos-notice__title"><?php esc_html_e( 'FAQ single pages are still on', 'site-essentials' ); ?></strong>
+		<p><?php esc_html_e( 'Set "Redirect /faq/ to" before turning single pages off, so old FAQ URLs have somewhere to go. Your other changes were saved.', 'site-essentials' ); ?></p>
+	</div>
+<?php elseif ( ! $singles_enabled && '' === trim( $archive_redirect ) && '' === trim( $single_redirect ) ) : ?>
+	<div class="scos-notice scos-notice--warning" role="alert">
+		<strong class="scos-notice__title"><?php esc_html_e( 'No redirect set for FAQ URLs', 'site-essentials' ); ?></strong>
+		<p><?php esc_html_e( 'FAQ single pages are off but "Redirect /faq/ to" is empty (it was probably changed outside this page). Old FAQ URLs are going to the home page until you set it.', 'site-essentials' ); ?></p>
+	</div>
+<?php endif; ?>
 
 <?php if ( $schemadance_active ) : ?>
 	<div class="scos-notice scos-notice--warning" role="alert">
@@ -133,12 +150,45 @@ $schemadance_active = function_exists( 'is_plugin_active' ) && is_plugin_active(
 		<div class="scos-card__header">
 			<h2 class="scos-card__title"><?php esc_html_e( 'Archive & URL settings', 'site-essentials' ); ?></h2>
 			<p class="scos-card__desc">
-				<?php esc_html_e( 'Control whether /faq/ behaves as an archive, and where topic-folder URLs redirect to.', 'site-essentials' ); ?>
+				<?php esc_html_e( 'Control whether FAQs have their own pages, whether /faq/ behaves as an archive, and where FAQ URLs redirect to.', 'site-essentials' ); ?>
 			</p>
 		</div>
 		<div class="scos-card__body">
 			<table class="scos-form">
 				<tbody>
+					<tr>
+						<th>
+							<label for="scos_faq_singles_enabled"><?php esc_html_e( 'FAQ single pages', 'site-essentials' ); ?></label>
+							<div class="scos-form__slug">scos_faq_singles_enabled</div>
+						</th>
+						<td>
+							<label class="scos-checkbox-row">
+								<input type="checkbox" id="scos_faq_singles_enabled" name="scos_faq[singles_enabled]" value="1" <?php checked( $singles_enabled ); ?>>
+								<?php esc_html_e( 'Each FAQ has its own page (/faq/topic/question/)', 'site-essentials' ); ?>
+							</label>
+							<p class="description">
+								<?php esc_html_e( 'When off, FAQs still show wherever they are placed (FAQ block, shortcode, Breakdance loops, FAQPage schema), but their own URLs, including ?faq= and anything under /faq/, 301 away. Each goes to the page that uses it as its intent goal, otherwise to the URL below. Needs "Redirect /faq/ to".', 'site-essentials' ); ?>
+							</p>
+							<p class="description">
+								<?php esc_html_e( 'When on, use SEO › Meta Tags › FAQs › "Single pages: default robots" to keep FAQ pages out of the index.', 'site-essentials' ); ?>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th>
+							<label for="scos_faq_single_redirect"><?php esc_html_e( 'Redirect FAQ pages to', 'site-essentials' ); ?></label>
+							<div class="scos-form__slug">scos_faq_single_redirect</div>
+						</th>
+						<td>
+							<input type="url" id="scos_faq_single_redirect" name="scos_faq[single_redirect]"
+								value="<?php echo esc_attr( $single_redirect ); ?>"
+								class="scos-input"
+								placeholder="<?php echo esc_attr( '' !== $archive_redirect ? $archive_redirect : home_url( '/' ) ); ?>">
+							<p class="description">
+								<?php esc_html_e( 'Only used when FAQ single pages are off, for FAQs that are not any page\'s intent goal. Leave empty to use "Redirect /faq/ to".', 'site-essentials' ); ?>
+							</p>
+						</td>
+					</tr>
 					<tr>
 						<th>
 							<label for="scos_faq_archive_enabled"><?php esc_html_e( 'Enable FAQ archive', 'site-essentials' ); ?></label>
@@ -165,7 +215,7 @@ $schemadance_active = function_exists( 'is_plugin_active' ) && is_plugin_active(
 								class="scos-input"
 								placeholder="https://example.com/frequently-asked-questions/">
 							<p class="description">
-								<?php esc_html_e( 'Only used when the archive is disabled. Leave empty to return a 404.', 'site-essentials' ); ?>
+								<?php esc_html_e( 'Used when the archive is disabled (empty = /faq/ returns a 404), and as the default for FAQ pages when single pages are off. Required to turn single pages off.', 'site-essentials' ); ?>
 							</p>
 						</td>
 					</tr>
@@ -180,7 +230,7 @@ $schemadance_active = function_exists( 'is_plugin_active' ) && is_plugin_active(
 								class="scos-input"
 								placeholder="<?php echo esc_attr( home_url( '/faq/' ) ); ?>">
 							<p class="description">
-								<?php esc_html_e( 'Where to send visitors who land on a topic-folder URL (e.g. /faq/pricing/). Defaults to /faq/ if empty.', 'site-essentials' ); ?>
+								<?php esc_html_e( 'Where to send visitors who land on a topic-folder URL (e.g. /faq/pricing/). If empty: /faq/ when the archive is on, otherwise "Redirect /faq/ to" (or a 404 when that is empty too).', 'site-essentials' ); ?>
 							</p>
 						</td>
 					</tr>

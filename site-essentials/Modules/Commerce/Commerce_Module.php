@@ -13,12 +13,16 @@
  *
  * Settings live in the module option `site_essentials_commerce`:
  *   [ 'store_only_assets' => bool, 'hide_loop_add_to_cart' => bool ]
- * e.g. wp option patch insert site_essentials_commerce hide_loop_add_to_cart 1
+ * Set them at Site Essentials › Commerce, or with WP-CLI, e.g.
+ *   wp option patch insert site_essentials_commerce hide_loop_add_to_cart 1
  *
  * @package    SiteEssentials
  * @subpackage Modules\Commerce
  * @since      1.2.0
  *
+ * v1.1 | 2026-11-11 — Settings page (views/settings.php): toggles, what each
+ *                     option changes, live store status. save_settings() owns
+ *                     sanitising so the page and WP-CLI share one path.
  * v1.0 | 2026-11-08
  */
 
@@ -32,6 +36,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Commerce_Module implements Module_Interface {
+
+	/** Module option, as stored by Settings_Manager (site_essentials_ + module ID). */
+	const OPTION = 'site_essentials_commerce';
+
+	/** Admin page slug (Site Essentials › Commerce). */
+	const PAGE_SLUG = 'site-essentials-commerce';
 
 	const DEFAULTS = [
 		'store_only_assets'     => true,
@@ -59,7 +69,7 @@ class Commerce_Module implements Module_Interface {
 	}
 
 	public static function get_version() {
-		return '1.0.0';
+		return '1.1.0';
 	}
 
 	/**
@@ -78,7 +88,59 @@ class Commerce_Module implements Module_Interface {
 		return $settings;
 	}
 
+	/**
+	 * Save settings. Unknown keys are dropped; values are cast to bool.
+	 * Callers own nonce and capability checks.
+	 *
+	 * @param array $input Raw key => value pairs (missing keys save as false).
+	 * @return array The saved settings.
+	 */
+	public static function save_settings( array $input ) {
+		$settings = [];
+		foreach ( array_keys( self::DEFAULTS ) as $key ) {
+			$settings[ $key ] = ! empty( $input[ $key ] );
+		}
+		Settings_Manager::instance()->update_module_settings( self::get_id(), $settings );
+		return $settings;
+	}
+
+	/**
+	 * admin-post handler for the settings page.
+	 */
+	public static function handle_save() {
+		if ( ! isset( $_POST['scos_commerce_nonce'] )
+			|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['scos_commerce_nonce'] ) ), 'scos_save_commerce' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'site-essentials' ) );
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
+		}
+
+		$raw   = isset( $_POST[ self::OPTION ] ) && is_array( $_POST[ self::OPTION ] ) ? wp_unslash( $_POST[ self::OPTION ] ) : [];
+		$input = array_map( 'absint', array_intersect_key( $raw, self::DEFAULTS ) );
+		self::save_settings( $input );
+
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'    => self::PAGE_SLUG,
+					'updated' => 'true',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+
 	public function init() {
+		if ( ! defined( 'SCOS_COMMERCE_ACTIVE' ) ) {
+			define( 'SCOS_COMMERCE_ACTIVE', true );
+		}
+
+		// Registered before the WooCommerce check so settings can be saved
+		// (and the page explains itself) on a site without WooCommerce.
+		add_action( 'admin_post_scos_save_commerce', [ self::class, 'handle_save' ] );
+
 		// Nothing to do without WooCommerce. The module can stay on harmlessly.
 		if ( ! class_exists( 'WooCommerce' ) ) {
 			return;
@@ -103,33 +165,24 @@ class Commerce_Module implements Module_Interface {
 	}
 
 	/**
-	 * Status panel. This module has no settings screen yet: settings are set
-	 * with WP-CLI (see the class docblock).
+	 * Settings page body. Admin_UI::render_commerce_page() wraps it in
+	 * <div class="wrap scos"> after its capability check.
 	 */
 	public function render_settings() {
-		$settings = self::get_settings();
-		$cart     = class_exists( __NAMESPACE__ . '\Store_Assets' ) ? Store_Assets::has_sitewide_cart() : null;
-
-		echo '<table class="widefat striped" style="max-width:640px"><tbody>';
-		printf(
-			'<tr><th>%s</th><td>%s</td></tr>',
-			esc_html__( 'Store-only assets', 'site-essentials' ),
-			$settings['store_only_assets'] ? esc_html__( 'On', 'site-essentials' ) : esc_html__( 'Off', 'site-essentials' )
-		);
-		printf(
-			'<tr><th>%s</th><td>%s</td></tr>',
-			esc_html__( 'Hide loop add-to-cart', 'site-essentials' ),
-			$settings['hide_loop_add_to_cart'] ? esc_html__( 'On', 'site-essentials' ) : esc_html__( 'Off', 'site-essentials' )
-		);
-		if ( null !== $cart ) {
-			printf(
-				'<tr><th>%s</th><td>%s</td></tr>',
-				esc_html__( 'Cart in header/footer', 'site-essentials' ),
-				$cart
-					? esc_html__( 'Yes: WooCommerce assets load on every page so the cart works.', 'site-essentials' )
-					: esc_html__( 'No', 'site-essentials' )
-			);
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'site-essentials' ) );
 		}
-		echo '</tbody></table>';
+
+		// Class only (no hooks), so the page can list what it strips even
+		// before WooCommerce is installed.
+		require_once __DIR__ . '/Store_Assets.php';
+
+		$settings    = self::get_settings();
+		$woo_active  = class_exists( 'WooCommerce' );
+		$sitewide    = $woo_active && Store_Assets::has_sitewide_cart();
+		$style_list  = Store_Assets::STYLE_HANDLES;
+		$script_list = Store_Assets::SCRIPT_HANDLES;
+
+		include __DIR__ . '/views/settings.php';
 	}
 }

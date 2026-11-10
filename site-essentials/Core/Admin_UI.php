@@ -7,9 +7,11 @@
  *
  * @package    SiteEssentials
  * @subpackage Core
- * @version    1.4
+ * @version    1.6
  * @since      1.0.0
  *
+ * v1.6 | 2026-11-11 — Commerce page (Site Essentials › Commerce) when the Commerce
+ *                      module is active; the module renders and saves it.
  * v1.5 | 2026-10-01 — save_tweaks_settings() stores the disable_comments tweak.
  * v1.4 | 2026-09-28 — save_tweaks_settings() also stores the Breakdance "Use default
  *                      editor" mode (moved onto the Admin UX/UI group from SEO →
@@ -68,6 +70,7 @@ class Admin_UI {
     const SUPPORT_PAGE_SLUG     = 'site-essentials-support';
     const AGENCY_PAGE_SLUG      = 'site-essentials-agency';
     const AGENTIC_PAGE_SLUG     = 'site-essentials-agentic';
+    const COMMERCE_PAGE_SLUG    = 'site-essentials-commerce'; // = Commerce_Module::PAGE_SLUG
 
     /**
      * Roles allowed to view the read-only Support hub.
@@ -382,6 +385,18 @@ class Admin_UI {
             );
         }
 
+        // 9b. Commerce (only when Commerce module is active)
+        if ( defined( 'SCOS_COMMERCE_ACTIVE' ) ) {
+            add_submenu_page(
+                self::PAGE_SLUG,
+                __( 'Commerce', 'site-essentials' ),
+                __( 'Commerce', 'site-essentials' ),
+                'manage_options',
+                self::COMMERCE_PAGE_SLUG,
+                [ $this, 'render_commerce_page' ]
+            );
+        }
+
         // 10. Settings (always visible)
         add_submenu_page(
             self::PAGE_SLUG,
@@ -445,6 +460,7 @@ class Admin_UI {
             self::PAGE_SLUG . '_page_' . self::CPT_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::SITE_SCHEMA_PAGE_SLUG,
             self::PAGE_SLUG . '_page_' . self::AGENTIC_PAGE_SLUG,
+            self::PAGE_SLUG . '_page_' . self::COMMERCE_PAGE_SLUG,
         ];
 
         if ( in_array( $hook, $scos_ui_hooks, true ) ) {
@@ -916,6 +932,29 @@ class Admin_UI {
 
         echo '<div class="wrap scos">';
         $module->render_settings();
+        echo '</div>';
+    }
+
+    /**
+     * Render Commerce page. The module owns the view and the save handler.
+     *
+     * @return void
+     */
+    public function render_commerce_page(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'site-essentials' ) );
+        }
+
+        $module = Module_Loader::get_module( 'commerce' );
+
+        echo '<div class="wrap scos">';
+        if ( ! $module ) {
+            echo '<div class="scos-notice scos-notice--warning"><p>';
+            esc_html_e( 'Commerce module is not loaded.', 'site-essentials' );
+            echo '</p></div>';
+        } else {
+            $module->render_settings();
+        }
         echo '</div>';
     }
 

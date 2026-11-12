@@ -7,7 +7,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.7 | 2026-08-26 — Sitemap: guard <lastmod>/changefreq against zero-date
+ * @version    1.8 | 2026-11-07 — Sitemap drops post types without single URLs (reviews; FAQs
+ *             when switched off) and honours a post type's default single robots (#228, #247).
+ * v1.7 | 2026-08-26 — Sitemap: guard <lastmod>/changefreq against zero-date
  *             post_modified_gmt (was rendering as invalid "-0001-11-30..." XML)
  * @since      1.0.0
  */
@@ -242,7 +244,24 @@ class Seo_Module implements Module_Interface {
      * @return array Sitemap settings
      */
     private function get_sitemap_settings() {
-        return $this->settings->get_module_setting('seo', 'sitemap', $this->get_default_sitemap_settings());
+        $settings = $this->settings->get_module_setting('seo', 'sitemap', $this->get_default_sitemap_settings());
+
+        // Post types without single URLs never belong in a sitemap, even if ticked earlier.
+        if ( is_array( $settings ) && ! empty( $settings['post_types'] ) && is_array( $settings['post_types'] ) ) {
+            $settings['post_types'] = array_values( array_diff( $settings['post_types'], self::post_types_without_singles() ) );
+        }
+
+        return $settings;
+    }
+
+    /**
+     * Post types whose single URLs are switched off (Custom Posts › Single_Url_Guard).
+     *
+     * @return string[]
+     */
+    private static function post_types_without_singles(): array {
+        $guard = '\SiteEssentials\Modules\CustomPosts\Single_Url_Guard';
+        return class_exists( $guard ) ? $guard::post_types() : [];
     }
 
     /**
@@ -857,6 +876,13 @@ class Seo_Module implements Module_Interface {
             return true;
         }
 
+        // No robots of its own: the post type's single default applies (#228).
+        $archive_settings = '\SiteEssentials\Modules\SeoMeta\Archive_Settings';
+        if ( ( ! is_array( $scos_robots ) || empty( $scos_robots ) ) && class_exists( $archive_settings )
+            && in_array( 'noindex', $archive_settings::single_robots( (string) get_post_type( $post_id ) ), true ) ) {
+            return true;
+        }
+
         // Check Yoast SEO meta
         $yoast_noindex = get_post_meta($post_id, '_yoast_wpseo_meta-robots-noindex', true);
         if ($yoast_noindex === '1' || $yoast_noindex === 'noindex') {
@@ -1048,6 +1074,10 @@ class Seo_Module implements Module_Interface {
     public function render_settings() {
         $sitemap_settings = $this->get_sitemap_settings();
         $all_post_types = get_post_types(['public' => true], 'objects');
+        // No single URLs = nothing to list, so don't offer them.
+        foreach ( self::post_types_without_singles() as $no_single_type ) {
+            unset( $all_post_types[ $no_single_type ] );
+        }
         $all_taxonomies = $this->get_available_taxonomies();
         $sitemap_stats = $this->calculate_sitemap_stats($sitemap_settings);
 

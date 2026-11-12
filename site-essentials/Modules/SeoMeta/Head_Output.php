@@ -8,7 +8,8 @@
  *
  * Read priority for singulars:
  *   1. scos_seo_*   — set via our SeoMeta metabox
- *   2. WordPress defaults
+ *   2. Robots only: the post type's single default (scos_seo_archive_{type}[single_robots])
+ *   3. WordPress defaults
  *
  * Read priority for archives:
  *   1. scos_seo_archive_{slug} option — set via SEO > Meta Tags admin tab
@@ -22,9 +23,12 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.4 | 2026-10-01
+ * @version    1.5 | 2026-11-07
  * @since      1.0.0
  *
+ * v1.5 | 2026-11-07 — Singular robots fall back to the post type's default when the post has none (#228).
+ *                      "Discourage search engines" now wins: our robots no longer strip WordPress's
+ *                      noindex, nofollow on a site with blog_public = 0.
  * v1.4 | 2026-10-01 — Paged canonical and rel prev/next drop the request's query string;
  *                      canonical_printed() lets fallback canonicals stand down.
  */
@@ -155,6 +159,13 @@ class Head_Output {
 	 * @return array
 	 */
 	public static function filter_robots( $robots ) {
+		// "Discourage search engines" (Settings › Reading) wins over everything: WordPress
+		// has already set noindex, nofollow, and per-post or per-type robots must never
+		// lift it on a dev or staging site.
+		if ( '0' === (string) get_option( 'blog_public' ) ) {
+			return $robots;
+		}
+
 		// ── Archive branch ────────────────────────────────────────────────────
 		$slug = self::archive_slug();
 		if ( null !== $slug ) {
@@ -179,13 +190,14 @@ class Head_Output {
 			return $robots;
 		}
 
-		$scos = get_post_meta( $pid, 'scos_seo_robots', true );
+		// The post's own robots, else its post type's default (SEO › Meta Tags, #228).
+		$effective = Archive_Settings::effective_single_robots( (int) $pid );
 
-		if ( ! is_array( $scos ) || empty( $scos ) ) {
+		if ( empty( $effective['directives'] ) ) {
 			return $robots; // WordPress defaults
 		}
 
-		return self::apply_robots_array( $robots, $scos );
+		return self::apply_robots_array( $robots, $effective['directives'] );
 	}
 
 	/**

@@ -11,6 +11,11 @@
  * v1.3 | 2026-10-25 — get_schema()/link_format() can skip the fetch, so the
  *                      enquiry page can describe itself without requesting itself;
  *                      the schema is rebuilt by cron 30s after a save.
+ * v1.4 | 2026-11-17 — The page is fetched from this server, not back through
+ *                      the CDN: a zone's bot protection challenged the site's
+ *                      own request (403), so /enquiry reported no form. Falls
+ *                      back to the public URL. A failed read keeps its reason
+ *                      for the settings page (last_error()).
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -32,6 +37,12 @@
  * read those, so the site describes its form once. The page is fetched
  * (loopback) and parsed, then cached until any post is saved. Builder-
  * agnostic: anything that renders a form with a toolname works.
+ *
+ * The loopback is pinned to this server (filter scos_enquiry_loopback_ip,
+ * default 127.0.0.1; '' turns pinning off). Through a CDN the request comes
+ * from a datacenter IP with a WordPress user agent, which bot protection
+ * such as Cloudflare's Bot Fight Mode challenges. The host name, SNI and
+ * certificate check are unchanged; only where the connection goes is.
  *
  * THE LINK
  * --------
@@ -124,21 +135,98 @@ class Enquiry_Form {
 			return null;
 		}
 
-		$schema = self::read_form( $url );
+		$error  = '';
+		$schema = self::read_form( $url, $error );
 
 		// A failed read is cached briefly so a broken page isn't refetched on every request.
-		set_transient( self::TRANSIENT, [ 'url' => $url, 'schema' => $schema ], $schema ? 12 * HOUR_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
+		set_transient(
+			self::TRANSIENT,
+			[ 'url' => $url, 'schema' => $schema, 'error' => $schema ? '' : $error ],
+			$schema ? 12 * HOUR_IN_SECONDS : 10 * MINUTE_IN_SECONDS
+		);
 
 		return $schema;
 	}
 
-	private static function read_form( string $url ): ?array {
-		$response = wp_remote_get( $url, [ 'timeout' => 8 ] );
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+	/**
+	 * Why the last read found no form, for the settings page. Never shown to agents.
+	 */
+	public static function last_error(): string {
+		$cached = get_transient( self::TRANSIENT );
+		return is_array( $cached ) ? (string) ( $cached['error'] ?? '' ) : '';
+	}
+
+	/** Host and port being pinned for the current request, or [] when none. */
+	private static $pin = [];
+
+	private static function read_form( string $url, string &$error = '' ): ?array {
+		$ip       = (string) apply_filters( 'scos_enquiry_loopback_ip', '127.0.0.1', $url );
+		$response = null;
+
+		if ( '' !== $ip && filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			$response = self::fetch_pinned( $url, $ip );
+			if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+				$response = null; // This server didn't answer for the host: try the public URL.
+			}
+		}
+
+		if ( null === $response ) {
+			$response = wp_remote_get( $url, [ 'timeout' => 8 ] );
+		}
+
+		if ( is_wp_error( $response ) ) {
+			$error = $response->get_error_message();
+			return null;
+		}
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			$mitigated = wp_remote_retrieve_header( $response, 'cf-mitigated' );
+			/* translators: 1: HTTP status code, 2: optional note */
+			$error = sprintf( __( 'The enquiry page returned HTTP %1$d%2$s.', 'site-essentials' ), $code, $mitigated ? ' (' . __( 'challenged by Cloudflare', 'site-essentials' ) . ')' : '' );
 			return null;
 		}
 
-		return self::parse( (string) wp_remote_retrieve_body( $response ), $url );
+		$schema = self::parse( (string) wp_remote_retrieve_body( $response ), $url );
+		if ( ! $schema ) {
+			$error = __( 'No form with a toolname attribute was found on the enquiry page.', 'site-essentials' );
+		}
+		return $schema;
+	}
+
+	/**
+	 * GET the page with its host resolved to $ip. cURL transport only; on any
+	 * other transport the hook never fires and this is an ordinary request.
+	 *
+	 * @return array|\WP_Error
+	 */
+	private static function fetch_pinned( string $url, string $ip ) {
+		$host = (string) wp_parse_url( $url, PHP_URL_HOST );
+		if ( '' === $host || ! defined( 'CURLOPT_RESOLVE' ) ) {
+			return new \WP_Error( 'scos_enquiry_no_pin', 'Pinning unavailable.' );
+		}
+		$port      = (int) ( wp_parse_url( $url, PHP_URL_PORT ) ?: ( 'http' === wp_parse_url( $url, PHP_URL_SCHEME ) ? 80 : 443 ) );
+		self::$pin = [ 'host' => $host, 'entry' => $host . ':' . $port . ':' . ( false !== strpos( $ip, ':' ) ? '[' . $ip . ']' : $ip ) ];
+
+		add_action( 'http_api_curl', [ __CLASS__, 'pin_curl' ], 10, 3 );
+		// No redirects: a redirect to another host must not be pinned to this server.
+		$response = wp_remote_get( $url, [ 'timeout' => 8, 'redirection' => 0 ] );
+		remove_action( 'http_api_curl', [ __CLASS__, 'pin_curl' ], 10 );
+		self::$pin = [];
+
+		return $response;
+	}
+
+	/**
+	 * http_api_curl callback: resolve the pinned host to this server.
+	 *
+	 * @param resource|\CurlHandle $handle
+	 * @param array                $args
+	 * @param string               $url
+	 */
+	public static function pin_curl( $handle, $args, $url ): void {
+		if ( self::$pin && wp_parse_url( (string) $url, PHP_URL_HOST ) === self::$pin['host'] ) {
+			curl_setopt( $handle, CURLOPT_RESOLVE, [ self::$pin['entry'] ] );
+		}
 	}
 
 	/**

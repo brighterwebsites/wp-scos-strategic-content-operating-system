@@ -267,7 +267,15 @@ defined( 'ABSPATH' ) || exit;
 					</p>
 				<?php else : ?>
 					<div class="scos-notice scos-notice--warning" style="margin-top:var(--scos-s-4)">
-						<p><?php esc_html_e( 'No form with a toolname attribute was found on that page, so agents are told no enquiry form is available. Add toolname and tooldescription to the form, then save this page again to re-check.', 'site-essentials' ); ?></p>
+						<p>
+							<?php
+							$scos_enquiry_error = \SiteEssentials\Modules\Agentic\Enquiry_Form::last_error();
+							if ( '' !== $scos_enquiry_error ) {
+								echo esc_html( $scos_enquiry_error ) . ' ';
+							}
+							esc_html_e( 'Agents are told no enquiry form is available. If the form has no toolname, add toolname and tooldescription to it. If the page was blocked, check the CDN\'s bot protection. Then save this page again to re-check.', 'site-essentials' );
+							?>
+						</p>
 					</div>
 					<?php
 				endif;

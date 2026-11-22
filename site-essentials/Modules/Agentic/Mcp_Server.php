@@ -325,6 +325,8 @@ class Mcp_Server {
 						'message'          => $result->get_error_message(),
 						'missing_required' => is_array( $data ) ? ( $data['missing_required'] ?? null ) : null,
 						'ignored'          => is_array( $data ) ? ( $data['ignored'] ?? null ) : null,
+						'invalid'          => is_array( $data ) ? ( $data['invalid'] ?? null ) : null,
+						'expected'         => is_array( $data ) ? ( $data['expected'] ?? null ) : null,
 					] ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ] ],
 					'isError' => true,
 				] );

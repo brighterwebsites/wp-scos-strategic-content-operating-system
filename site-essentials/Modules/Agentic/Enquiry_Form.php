@@ -16,6 +16,10 @@
  *                      own request (403), so /enquiry reported no form. Falls
  *                      back to the public URL. A failed read keeps its reason
  *                      for the settings page (last_error()).
+ * v1.5 | 2026-11-23 — Phone (tel) fields are checked and normalised by
+ *                      Enquiry_Phone. A bad number is a 400
+ *                      scos_enquiry_invalid_phone listing each field and why,
+ *                      and the public schema tells agents the expected format.
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -336,6 +340,13 @@ class Enquiry_Form {
 		$schema = self::get_schema();
 		if ( $schema ) {
 			unset( $schema['target'] );
+			// Added here, not in parse(), so a change of business country shows without a re-parse.
+			foreach ( $schema['fields'] as &$field ) {
+				if ( 'tel' === $field['type'] ) {
+					$field['format'] = Enquiry_Phone::format_hint();
+				}
+			}
+			unset( $field );
 		}
 		return $schema;
 	}
@@ -376,7 +387,9 @@ class Enquiry_Form {
 	 * Check an agent's values against the form.
 	 *
 	 * Unknown fields and values that aren't one of a field's options are
-	 * dropped and reported, so the agent can correct itself.
+	 * dropped and reported, so the agent can correct itself. A phone number
+	 * that fails Enquiry_Phone stops the whole request instead: dropping it
+	 * would send a lead nobody can call back.
 	 *
 	 * @param  array $values field name => string or string[].
 	 * @return array|\WP_Error { schema, values: [name => string[]], missing[], ignored[] }
@@ -389,6 +402,7 @@ class Enquiry_Form {
 
 		$clean   = [];
 		$ignored = [];
+		$invalid = [];
 		$fields  = array_column( $schema['fields'], null, 'name' );
 
 		foreach ( $values as $key => $value ) {
@@ -404,6 +418,14 @@ class Enquiry_Form {
 				if ( '' === $item ) {
 					continue;
 				}
+				if ( 'tel' === $field['type'] ) {
+					$phone = Enquiry_Phone::normalise( $item );
+					if ( is_wp_error( $phone ) ) {
+						$invalid[] = [ 'field' => $key, 'value' => $item, 'reason' => $phone->get_error_message() ];
+						continue;
+					}
+					$item = (string) $phone;
+				}
 				if ( ! empty( $field['options'] ) ) {
 					$match = self::match_option( $item, $field['options'] );
 					if ( null === $match ) {
@@ -414,6 +436,15 @@ class Enquiry_Form {
 				}
 				$clean[ $key ][] = $item;
 			}
+		}
+
+		if ( $invalid ) {
+			return new \WP_Error(
+				'scos_enquiry_invalid_phone',
+				/* translators: %s: comma-separated field names */
+				sprintf( __( 'The phone number is not valid: %s. Ask the person to check it, then try again. Nothing has been sent.', 'site-essentials' ), implode( ', ', array_column( $invalid, 'field' ) ) ),
+				[ 'status' => 400, 'invalid' => $invalid, 'expected' => Enquiry_Phone::format_hint(), 'ignored' => $ignored ]
+			);
 		}
 
 		$missing = [];

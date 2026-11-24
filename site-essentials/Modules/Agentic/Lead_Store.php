@@ -418,9 +418,12 @@ class Lead_Store {
 		return $n;
 	}
 
-	/** Stop a spreadsheet treating a value as a formula. */
+	/** Stop a spreadsheet treating a value as a formula. Plain numbers (+61412345678) are left alone. */
 	private static function csv_safe( $value ): string {
 		$value = (string) $value;
+		if ( preg_match( '/^[+\-]?[\d\s().]+$/', $value ) ) {
+			return $value;
+		}
 		return preg_match( '/^[=+\-@\t\r]/', $value ) ? "'" . $value : $value;
 	}
 
@@ -531,7 +534,10 @@ class Lead_Store {
 				}
 			} elseif ( 'tel' === $field['type'] || preg_match( '/phone|mobile/i', $words ) ) {
 				if ( '' === $contact['phone'] ) {
-					$contact['phone'] = $value;
+					// Same format as agent leads (+61…), so a CRM gets one format.
+					// A number that doesn't check out is kept as typed.
+					$phone            = Enquiry_Phone::normalise( $value );
+					$contact['phone'] = is_wp_error( $phone ) ? $value : $phone;
 				}
 			} elseif ( 'textarea' === $field['type'] ) {
 				if ( '' === $contact['message'] ) {

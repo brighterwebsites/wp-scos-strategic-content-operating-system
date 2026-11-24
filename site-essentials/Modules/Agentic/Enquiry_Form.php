@@ -30,9 +30,11 @@
  * person checks it and presses send. (#200 D17)
  *
  * The enquiry then goes through the form exactly like a typed one: the same
- * honeypot, the same notifications, the same inbox — on this site. Nothing
- * is stored or sent anywhere by SCOS, so there is no message routing to set
- * up and nothing crosses between sites.
+ * honeypot, the same notifications, the same inbox — on this site. SCOS
+ * sends nothing anywhere, so there is no message routing to set up and
+ * nothing crosses between sites. If the form has the "SCOS: Save lead"
+ * action ticked, the lead is also recorded on this site for its CRM to
+ * collect (Lead_Store, #269).
  *
  * WHERE THE FIELDS COME FROM
  * --------------------------

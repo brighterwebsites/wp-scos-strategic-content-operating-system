@@ -58,10 +58,16 @@ class Agent_Notices {
 
 		// Only say it when it's true: agent-sent enquiries always make a lead,
 		// form and link ones only when the form has "SCOS: Save lead" ticked.
-		if ( Enquiry_Send::is_enabled() || Lead_Store::enquiry_form_saves_leads( false ) ) {
+		if ( Lead_Store::enquiry_form_saves_leads( false ) ) {
 			$items[] = sprintf(
 				/* translators: %d: days a lead is kept */
 				__( 'Enquiries we receive, whether typed into the form or sent with an assistant\'s help, are kept on this site for up to %d days so we can follow them up, then deleted automatically.', 'site-essentials' ),
+				Lead_Store::retention_days()
+			);
+		} elseif ( Enquiry_Send::is_enabled() ) {
+			$items[] = sprintf(
+				/* translators: %d: days a lead is kept */
+				__( 'An enquiry an assistant sent for you is kept on this site for up to %d days after you confirm it, so we can follow it up, then deleted automatically.', 'site-essentials' ),
 				Lead_Store::retention_days()
 			);
 		}

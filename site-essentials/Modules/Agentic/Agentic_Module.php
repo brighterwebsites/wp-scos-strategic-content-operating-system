@@ -6,6 +6,8 @@
  * v1.5 | 2026-10-25 — Agent_Notices shortcodes (privacy note, enquiry hint).
  * v1.6 | 2026-11-24 — Lead table and pull feed for CRMs (Lead_Store, Leads_API,
  *                      scos/list-leads, wp scos leads) (#269).
+ * v1.7 | 2026-11-25 — Agent_Guide shortcodes: the rest of the /mcp/ page from
+ *                      live settings, so one page works on any site (#272).
  *
  * Handles AI agent discovery and content accessibility for client sites.
  *
@@ -71,7 +73,7 @@ class Agentic_Module implements Module_Interface {
 	}
 
 	public static function get_version(): string {
-		return '1.6';
+		return '1.7';
 	}
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -93,6 +95,7 @@ class Agentic_Module implements Module_Interface {
 		Mcp_Server::init();
 		Enquiry_Prefill::init();
 		Agent_Notices::init();
+		Agent_Guide::init();
 		Lead_Store::init();
 		Leads_API::init();
 

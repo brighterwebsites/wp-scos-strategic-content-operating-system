@@ -5,6 +5,8 @@
  * v1.0 | 2026-10-25
  * v1.1 | 2026-11-24 — The privacy note says leads are kept, and for how long (#269).
  * v1.2 | 2026-11-25 — The privacy note matches the delivery mode (#267).
+ * v1.3 | 2026-11-25 — The enquiry hint matches the delivery mode too (#272).
+ *                      The rest of the /mcp/ page: Agent_Guide.
  *
  * Two pieces of page copy that must match what this site actually does, so
  * they are generated from the live settings instead of typed into each page:
@@ -136,7 +138,9 @@ class Agent_Notices {
 
 		if ( Enquiry_Send::is_enabled() || Mcp_Server::is_enabled() ) {
 			$html .= '<p>';
-			if ( Enquiry_Send::is_enabled() ) {
+			if ( Enquiry_Send::delivers_first() ) {
+				$html .= esc_html__( 'Assistants that can send requests can also send it for them. It reaches us straight away, and the person confirms by email that it came from them.', 'site-essentials' ) . ' ';
+			} elseif ( Enquiry_Send::is_enabled() ) {
 				$html .= esc_html__( 'Assistants that can send requests can also send it for them; the person confirms by email first.', 'site-essentials' ) . ' ';
 			}
 			$mcp = self::guide_url();

@@ -147,7 +147,7 @@ class Agent_Guide {
 		}
 
 		$html .= '<p>' . esc_html__( 'No connection, token or POST request is needed. Build this link:', 'site-essentials' ) . '</p>';
-		$html .= '<pre><code>' . esc_html( $template ) . '</code></pre>';
+		$html .= '<p class="scos-agent-code"><code>' . esc_html( $template ) . '</code></p>';
 
 		$items = [];
 		foreach ( $schema['fields'] as $field ) {
@@ -161,7 +161,7 @@ class Agent_Guide {
 		] );
 
 		$html .= '<p>' . esc_html__( 'Example:', 'site-essentials' ) . '</p>';
-		$html .= '<pre><code>' . esc_html( self::example_link( $schema ) ) . '</code></pre>';
+		$html .= '<p class="scos-agent-code"><code>' . esc_html( self::example_link( $schema ) ) . '</code></p>';
 
 		$html .= '<p><strong>' . esc_html__( 'Browser agents:', 'site-essentials' ) . '</strong> ' . esc_html__( 'open the link. Our contact form fills in. Show the person, and press the form\'s Send button only once they say yes.', 'site-essentials' ) . '</p>';
 		$html .= '<p><strong>' . esc_html__( 'Read-only assistants:', 'site-essentials' ) . '</strong> ' . esc_html__( 'give the person the link. Opening it fills in our contact form, and nothing is sent until they press Send, so tell them that plainly.', 'site-essentials' ) . '</p>';
@@ -395,7 +395,7 @@ class Agent_Guide {
 			return '';
 		}
 
-		$html  = '<pre><code>' . esc_html( Mcp_Server::get_url() ) . '</code></pre>';
+		$html  = '<p class="scos-agent-code"><code>' . esc_html( Mcp_Server::get_url() ) . '</code></p>';
 		$html .= '<ul>';
 		$html .= '<li><strong>Claude:</strong> ' . esc_html__( 'Settings → Connectors → Add custom connector, then paste the address. No login needed.', 'site-essentials' ) . '</li>';
 		$html .= '<li><strong>ChatGPT:</strong> ' . esc_html__( 'custom connectors need developer mode (Settings → Apps → Advanced). Then add a new app with the address.', 'site-essentials' ) . '</li>';

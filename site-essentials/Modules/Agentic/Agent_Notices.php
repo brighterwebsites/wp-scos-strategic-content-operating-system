@@ -4,6 +4,7 @@
  *
  * v1.0 | 2026-10-25
  * v1.1 | 2026-11-24 — The privacy note says leads are kept, and for how long (#269).
+ * v1.2 | 2026-11-25 — The privacy note matches the delivery mode (#267).
  *
  * Two pieces of page copy that must match what this site actually does, so
  * they are generated from the live settings instead of typed into each page:
@@ -45,7 +46,15 @@ class Agent_Notices {
 			$items[] = __( 'If an assistant prepares an enquiry link for you, your details are only in the link. They reach us when you press send on the form, the same as typing them in yourself.', 'site-essentials' );
 		}
 
-		if ( Enquiry_Send::is_enabled() ) {
+		if ( Enquiry_Send::delivers_first() ) {
+			$hours   = (int) ( Enquiry_Send::TTL / HOUR_IN_SECONDS );
+			$items[] = sprintf(
+				/* translators: %d: hours the confirmation link works */
+				__( 'If an assistant sends an enquiry for you, the details it gives us (name, email, message and the other form fields) reach us straight away, marked unconfirmed. We email you a link, valid for %d hours, to confirm the enquiry came from you. If you don\'t confirm, we see that it was never confirmed.', 'site-essentials' ),
+				$hours
+			);
+			$items[] = __( 'To stop misuse we count how many enquiries come from each email address. The counter stores a one-way hash, not the address, and clears after a day.', 'site-essentials' );
+		} elseif ( Enquiry_Send::is_enabled() ) {
 			$hours   = (int) ( Enquiry_Send::TTL / HOUR_IN_SECONDS );
 			$items[] = sprintf(
 				/* translators: %d: hours an unconfirmed enquiry is kept */
@@ -62,6 +71,12 @@ class Agent_Notices {
 			$items[] = sprintf(
 				/* translators: %d: days a lead is kept */
 				__( 'Enquiries we receive, whether typed into the form or sent with an assistant\'s help, are kept on this site for up to %d days so we can follow them up, then deleted automatically.', 'site-essentials' ),
+				Lead_Store::retention_days()
+			);
+		} elseif ( Enquiry_Send::delivers_first() ) {
+			$items[] = sprintf(
+				/* translators: %d: days a lead is kept */
+				__( 'An enquiry an assistant sent for you is kept on this site for up to %d days, confirmed or not, so we can follow it up, then deleted automatically.', 'site-essentials' ),
 				Lead_Store::retention_days()
 			);
 		} elseif ( Enquiry_Send::is_enabled() ) {

@@ -5,6 +5,7 @@
  * v1.1 | 2026-10-22
  *
  * v1.3 | 2026-10-25 — enquiry-handoff skill: send it, confirmed by email, when that's on (#225).
+ * v1.4 | 2026-11-25 — enquiry-handoff skill matches the delivery mode (#267).
  * v1.2 | 2026-10-25 — enquiry-handoff skill: build the link without POST.
  * v1.1 | 2026-10-22 — enquiry-handoff skill, listed only when an enquiry page
  *                     is set. (#200 D17)
@@ -406,10 +407,15 @@ MD;
 		$schema    = Enquiry_API::get_url();
 		$link      = Enquiry_API::get_link_url();
 		$page      = Enquiry_Form::page_url();
+		$first     = Enquiry_Send::delivers_first();
 		$intro     = Enquiry_Send::is_enabled()
-			? "Draft the enquiry with the person. Then either send it for them (they confirm it
+			? ( $first
+				? "Draft the enquiry with the person. Then either send it for them (it reaches the
+business straight away and they confirm it by email, see \"Sending it for them\"),
+or give them a link that opens the business's own form already filled in."
+				: "Draft the enquiry with the person. Then either send it for them (they confirm it
 by email before it reaches the business, see \"Sending it for them\"), or give them
-a link that opens the business's own form already filled in."
+a link that opens the business's own form already filled in." )
 			: "You can't send an enquiry to this business, and nothing here pretends you can.
 What you can do is draft it with the person and give them a link that opens
 the business's own form already filled in. They check it and press send.";
@@ -418,7 +424,9 @@ the business's own form already filled in. They check it and press send.";
 				. "1. Show the person exactly what you will send and get their OK.\n"
 				. '2. `POST ' . Enquiry_API::get_send_url() . "` with the same body as the link route, plus `\"agent\": \"your name\"`.\n"
 				. "   The fields must include their email address.\n"
-				. "3. Tell them what `next` says: we have emailed them a link, and nothing is sent until they open it and press Send.\n"
+				. ( $first
+					? "3. Tell them what `next` says: it has gone to the business, marked unconfirmed, and we have emailed them a link to confirm it came from them. Give them the `reference`.\n"
+					: "3. Tell them what `next` says: we have emailed them a link, and nothing is sent until they open it and press Send.\n" )
 				. "4. On `429` or `502`, fall back to the pre-filled link.\n\n"
 				. "Never tick newsletter or consent boxes for them: those are dropped.\n"
 			: '';

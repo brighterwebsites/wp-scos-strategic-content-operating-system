@@ -3,6 +3,8 @@
  * Agentic — the lead table: one record per lead, for CRMs to collect
  *
  * v1.0 | 2026-11-24
+ * v1.1 | 2026-11-25 — insert() takes a ref made beforehand (new_ref()); unverified
+ *                      leads expire hourly after the confirmation window (#267).
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -18,8 +20,11 @@
  *
  * WHERE ROWS COME FROM (channel)
  * ------------------------------
- *   agent  An agent sent it through the API or MCP; the person confirmed by
- *          email (Enquiry_Send).
+ *   agent  An agent sent it through the API or MCP (Enquiry_Send). In
+ *          confirm_first mode it's written once the person confirms by email
+ *          (verified). In deliver_first mode it's written on delivery as
+ *          unverified, turns verified when they confirm, and expired if they
+ *          don't within the window (expire_unverified(), hourly).
  *   link   The person sent the form after opening an agent's pre-filled link.
  *   form   The person typed it into the form.
  * link and form are written by the Breakdance action "SCOS: Save lead"
@@ -52,6 +57,7 @@ class Lead_Store {
 	const OPTION_RETENTION  = 'scos_agentic_lead_retention_days';
 	const RETENTION_DEFAULT = 90;
 	const PRUNE_HOOK        = 'se_leads_prune';
+	const EXPIRE_HOOK       = 'se_leads_expire';
 	const CAPABILITY        = 'scos_read_leads';
 	const ROLE              = 'scos_lead_reader';
 	const FEED_VERSION      = 1;
@@ -78,6 +84,10 @@ class Lead_Store {
 		add_action( self::PRUNE_HOOK, [ __CLASS__, 'prune' ] );
 		if ( ! wp_next_scheduled( self::PRUNE_HOOK ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::PRUNE_HOOK );
+		}
+		add_action( self::EXPIRE_HOOK, [ __CLASS__, 'expire_unverified' ] );
+		if ( ! wp_next_scheduled( self::EXPIRE_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::EXPIRE_HOOK );
 		}
 
 		add_filter( 'wp_privacy_personal_data_exporters', [ __CLASS__, 'register_exporter' ] );
@@ -195,6 +205,8 @@ class Lead_Store {
 	 *
 	 * @param array $lead {
 	 *     @type string $channel agent | link | form.
+	 *     @type string $ref     Optional: a ref from new_ref(), when it must be known
+	 *                           before the row is written (it goes in the email).
 	 *     @type string $status  unverified | verified. Default verified.
 	 *     @type string $source  Detail within the channel (rest, mcp, breakdance).
 	 *     @type string $agent   The assistant's name.
@@ -221,7 +233,8 @@ class Lead_Store {
 		}
 
 		$now = self::now();
-		$ref = bin2hex( random_bytes( 12 ) );
+		$ref = (string) ( $lead['ref'] ?? '' );
+		$ref = preg_match( '/^[a-f0-9]{24}$/', $ref ) ? $ref : self::new_ref();
 		$ok  = $wpdb->insert(
 			self::table(),
 			[
@@ -262,6 +275,11 @@ class Lead_Store {
 		return $ref;
 	}
 
+	/** A new public lead ref: 24 hex characters. */
+	public static function new_ref(): string {
+		return bin2hex( random_bytes( 12 ) );
+	}
+
 	/** Change a lead's status. Bumps updated_at, so pulls see it again. */
 	public static function set_status( string $ref, string $status ): bool {
 		global $wpdb;
@@ -274,6 +292,21 @@ class Lead_Store {
 			$data['verified_at'] = $now;
 		}
 		return (bool) $wpdb->update( self::table(), $data, [ 'ref' => $ref ] );
+	}
+
+	/**
+	 * Mark leads still unverified after the confirmation window as expired.
+	 * Runs hourly. Bumps updated_at, so pulls see the change.
+	 *
+	 * @param int $max_age Seconds. Default: Enquiry_Send::TTL.
+	 * @return int Rows changed.
+	 */
+	public static function expire_unverified( int $max_age = 0 ): int {
+		global $wpdb;
+		$max_age = $max_age > 0 ? $max_age : Enquiry_Send::TTL;
+		$cutoff  = gmdate( 'Y-m-d H:i:s', time() - $max_age );
+		$table   = self::table();
+		return (int) $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = 'expired', updated_at = %s WHERE status = 'unverified' AND created_at < %s", self::now(), $cutoff ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
 	/** Delete rows older than the retention limit. Runs daily. */

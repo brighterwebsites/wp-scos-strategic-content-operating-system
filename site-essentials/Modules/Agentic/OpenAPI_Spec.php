@@ -4,6 +4,7 @@
  *
  * v1.1 | 2026-10-22
  *
+ * v1.5 | 2026-11-25 — /enquiry/send is described for the site's delivery mode (#267).
  * v1.4 | 2026-10-25 — /content/{slug} returns stored Markdown for builder pages (format field).
  * v1.3 | 2026-10-25 — POST /enquiry/send, when agent-sent enquiries are on (#225).
  * v1.2 | 2026-10-25 — GET /enquiry documents the `link` format (build the link without POST).
@@ -350,13 +351,18 @@ class OpenAPI_Spec {
 		if ( ! Enquiry_Send::is_enabled() ) {
 			return [];
 		}
+		$delivers_first = Enquiry_Send::delivers_first();
 
 		return [
 			'/enquiry/send' => [
 				'post' => [
 					'operationId' => 'sendEnquiry',
-					'summary'     => 'Send an enquiry for the person, confirmed by them by email',
-					'description' => 'Send the enquiry from the conversation. It must include the person\'s email address: they get an email with a link to check it and press Send, and nothing reaches the business until they do. Show the person what you are sending first, and tell them to look for the email. Newsletter and consent boxes are never ticked for them. Rate limited; on 429 use /enquiry/link instead.',
+					'summary'     => $delivers_first
+						? 'Send an enquiry for the person; it is delivered at once and they confirm it by email'
+						: 'Send an enquiry for the person, confirmed by them by email',
+					'description' => $delivers_first
+						? 'Send the enquiry from the conversation. It must include the person\'s email address. It reaches the business straight away, marked unconfirmed, and the person gets an email with a link to confirm it came from them. Show the person what you are sending first, tell them to look for the email, and give them the reference from the reply. Newsletter and consent boxes are never ticked for them. Rate limited; on 429 use /enquiry/link instead.'
+						: 'Send the enquiry from the conversation. It must include the person\'s email address: they get an email with a link to check it and press Send, and nothing reaches the business until they do. Show the person what you are sending first, and tell them to look for the email. Newsletter and consent boxes are never ticked for them. Rate limited; on 429 use /enquiry/link instead.',
 					'requestBody' => [
 						'required' => true,
 						'content'  => [
@@ -386,11 +392,13 @@ class OpenAPI_Spec {
 					],
 					'responses'   => [
 						'202' => [
-							'description' => 'Held until the person confirms: status, sent_to (masked), expires_in_hours, ignored[], next (what to tell the person).',
+							'description' => $delivers_first
+								? 'Delivered, unconfirmed: status (delivered_unverified), reference (the enquiry\'s id), sent_to (masked), expires_in_hours, ignored[], next (what to tell the person).'
+								: 'Held until the person confirms: status, sent_to (masked), expires_in_hours, ignored[], next (what to tell the person).',
 						],
 						'400' => [ 'description' => 'Required fields or the email address are missing.' ],
 						'429' => [ 'description' => 'Too many recent enquiries. Use /enquiry/link instead.' ],
-						'502' => [ 'description' => 'The confirmation email could not be sent. Use /enquiry/link instead.' ],
+						'502' => [ 'description' => $delivers_first ? 'The enquiry could not be delivered. Use /enquiry/link instead.' : 'The confirmation email could not be sent. Use /enquiry/link instead.' ],
 					],
 				],
 			],

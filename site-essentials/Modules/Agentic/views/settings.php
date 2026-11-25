@@ -3,6 +3,7 @@
  * Agentic Module — settings view
  *
  * v1.3 | 2026-10-22
+ * v1.5 | 2026-11-25 — Delivery mode for agent-sent enquiries (#267).
  * v1.4 | 2026-11-24 — Leads card: count, CSV download, retention, the CRM feed,
  *                      and a warning when the enquiry form doesn't save leads (#269).
  *
@@ -247,6 +248,22 @@ defined( 'ABSPATH' ) || exit;
 									<div class="scos-notice__body"><?php esc_html_e( 'Site Essentials email delivery is off. Make sure this site\'s email reaches inboxes, or confirmation emails may land in spam.', 'site-essentials' ); ?></div>
 								</div>
 							<?php endif; ?>
+						</td>
+					</tr>
+					<tr>
+						<th>
+							<label for="scos_agentic_enquiry_delivery"><?php esc_html_e( 'When agents send', 'site-essentials' ); ?></label>
+							<div class="scos-form__slug">scos_agentic_enquiry_delivery</div>
+						</th>
+						<td>
+							<?php $scos_delivery = \SiteEssentials\Modules\Agentic\Enquiry_Send::delivery_mode(); ?>
+							<select id="scos_agentic_enquiry_delivery" name="scos_agentic_enquiry_delivery" class="scos-select">
+								<option value="confirm_first" <?php selected( $scos_delivery, 'confirm_first' ); ?>><?php esc_html_e( 'Confirm first: hold it until the person confirms by email', 'site-essentials' ); ?></option>
+								<option value="deliver_first" <?php selected( $scos_delivery, 'deliver_first' ); ?>><?php esc_html_e( 'Deliver first: send it now, marked unverified, and the person confirms after', 'site-essentials' ); ?></option>
+							</select>
+							<p class="description">
+								<?php esc_html_e( 'Confirm first stops spam and impersonation, but a lead who never opens the email is lost. Deliver first gets every enquiry to you at once, with "Unverified" and a reference in the subject; when the person confirms you get a short follow-up with the same reference, and the lead turns verified in your CRM. Unconfirmed after 48 hours, it shows as expired. Treat unverified enquiries as unchecked: the details could be someone else\'s. Deliver first uses lower limits (1 per email address a day, 10 per site a day).', 'site-essentials' ); ?>
+							</p>
 						</td>
 					</tr>
 				</tbody>

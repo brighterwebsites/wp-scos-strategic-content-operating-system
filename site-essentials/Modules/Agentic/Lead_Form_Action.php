@@ -49,7 +49,7 @@ class Lead_Form_Action extends \Breakdance\Forms\Actions\Action {
 	}
 
 	/**
-	 * @param array $form     Fields: type, name (label), value, advanced.id.
+	 * @param array $form     Fields: type, label, name (input name), value, advanced.id.
 	 * @param array $settings The form's builder settings.
 	 * @param array $extra    formId, postId, fields (as submitted), ip, referer, userAgent, userId.
 	 * @return array{type: string, message: string}
@@ -67,7 +67,7 @@ class Lead_Form_Action extends \Breakdance\Forms\Actions\Action {
 				}
 				$fields[] = [
 					'name'  => $id,
-					'label' => (string) ( $field['name'] ?? '' ),
+					'label' => (string) ( $field['label'] ?? '' ), // 'name' is the input name, fields[...]
 					'type'  => (string) ( $field['type'] ?? 'text' ),
 					'value' => $field['value'] ?? '',
 				];

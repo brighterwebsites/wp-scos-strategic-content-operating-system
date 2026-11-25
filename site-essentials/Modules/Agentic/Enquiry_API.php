@@ -7,12 +7,14 @@
  *                      agent that can't POST builds the link itself.
  * v1.2 | 2026-10-25 — POST /enquiry/send when Enquiry_Send is on: the agent
  *                      sends, the person confirms by email (#225).
+ * v1.3 | 2026-11-25 — instructions() match the delivery mode (#267).
  *
  * Routes (only registered when an enquiry page is set):
  *   GET  /wp-json/scos/v1/enquiry       the form's fields, and how to use the link
  *   POST /wp-json/scos/v1/enquiry/link  build the pre-filled link from {"fields": {...}}
- *   POST /wp-json/scos/v1/enquiry/send  send it, held until the person confirms by email
- *                                       (only when Enquiry_Send is on)
+ *   POST /wp-json/scos/v1/enquiry/send  send it: held until the person confirms by email,
+ *                                       or delivered at once and verified by email
+ *                                       (deliver_first). Only when Enquiry_Send is on.
  *
  * Neither route stores or sends anything. The link route is POST only so the
  * values (a person's name, email, message) travel in the body, not the URL
@@ -123,6 +125,15 @@ class Enquiry_API {
 	 * Shared by the REST response, the agent skill and llms.txt.
 	 */
 	public static function instructions(): string {
+		if ( Enquiry_Send::delivers_first() ) {
+			return sprintf(
+				/* translators: 1: send route URL, 2: link route URL */
+				__( 'You can send an enquiry for the person. Draft it with them, show them what you will send, and only after they agree POST {"fields": {name: value}, "agent": "your name"} to %1$s. It must include their email address. It goes to the business straight away, marked unconfirmed, and we email the person a link to confirm it came from them. Tell them to click it. Give them the `reference` from the reply. Don\'t tick newsletter or consent boxes for them. If the person would rather send it themselves, POST the same fields to %2$s for a link that opens the form filled in, or build that link from `link` in GET /enquiry if you can\'t make a POST request.', 'site-essentials' ),
+				self::get_send_url(),
+				self::get_link_url()
+			);
+		}
+
 		if ( Enquiry_Send::is_enabled() ) {
 			return sprintf(
 				/* translators: 1: send route URL, 2: link route URL */

@@ -1014,6 +1014,10 @@ class Admin_UI {
             'scos_agentic_enquiry_send_enabled',
             ! empty( $_POST['scos_agentic_enquiry_send_enabled'] ) ? 1 : 0
         );
+        update_option(
+            'scos_agentic_enquiry_delivery',
+            'deliver_first' === sanitize_key( wp_unslash( $_POST['scos_agentic_enquiry_delivery'] ?? '' ) ) ? 'deliver_first' : 'confirm_first'
+        );
         \SiteEssentials\Modules\Agentic\Enquiry_Form::flush();
 
         // Experimental draft-spec files (#200 D14).

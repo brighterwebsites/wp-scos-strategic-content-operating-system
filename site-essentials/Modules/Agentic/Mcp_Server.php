@@ -3,6 +3,7 @@
  * Agentic — remote MCP server (Streamable HTTP, no login)
  *
  * v1.0 | 2026-10-25
+ * v1.1 | 2026-11-25 — Instructions and send_enquiry match the delivery mode (#267).
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -25,7 +26,8 @@
  * internally. With the enquiry handoff on, three more: get_enquiry_form,
  * prepare_enquiry_link and, when Enquiry_Send is on, send_enquiry. That one
  * still needs the person to confirm by email (D19), so a connector can't send
- * in anyone's name.
+ * in anyone's name. In deliver_first mode the business gets it first, marked
+ * unverified until the person confirms.
  *
  * Nothing here exposes more than the public REST API already does.
  *
@@ -189,7 +191,9 @@ class Mcp_Server {
 		$lines = [
 			sprintf( 'Tools for the %s website. Call get_site_info first to learn who the business is and what it offers. All tools return published content only.', $site ),
 		];
-		if ( Enquiry_Send::is_enabled() ) {
+		if ( Enquiry_Send::delivers_first() ) {
+			$lines[] = 'To contact the business for the person you are helping: read the form with get_enquiry_form, draft the enquiry with them, show them exactly what you will send, and only after they agree call send_enquiry. Their email address is required. It reaches the business straight away, marked unconfirmed, and we email the person a link to confirm it came from them, so tell them to check their inbox and give them the reference. Never tick newsletter or consent boxes for them.';
+		} elseif ( Enquiry_Send::is_enabled() ) {
 			$lines[] = 'To contact the business for the person you are helping: read the form with get_enquiry_form, draft the enquiry with them, show them exactly what you will send, and only after they agree call send_enquiry. Their email address is required. Nothing reaches the business until they confirm from the email we send them, so tell them to check their inbox. Never tick newsletter or consent boxes for them.';
 		} elseif ( Enquiry_Form::is_enabled() ) {
 			$lines[] = 'To contact the business: read the form with get_enquiry_form, draft the enquiry with the person, then call prepare_enquiry_link and give them the link. It opens the business\'s form filled in, and they press Send.';
@@ -286,7 +290,9 @@ class Mcp_Server {
 			$tools[] = [
 				'name'        => 'send_enquiry',
 				'title'       => sprintf( 'Send an enquiry to %s', $site ),
-				'description' => sprintf( 'Send an enquiry to %s for the person you are helping. Only call this after they have asked you to make contact and agreed to the exact details. Their email address is required. We email them a link to check and send it, and nothing reaches the business until they do, so tell them to look for that email. Never tick newsletter or consent boxes for them.', $site ),
+				'description' => Enquiry_Send::delivers_first()
+					? sprintf( 'Send an enquiry to %s for the person you are helping. Only call this after they have asked you to make contact and agreed to the exact details. Their email address is required. It goes to the business straight away, marked unconfirmed, and we email the person a link to confirm it came from them, so tell them to look for that email. The reply has a reference to give them. Never tick newsletter or consent boxes for them.', $site )
+					: sprintf( 'Send an enquiry to %s for the person you are helping. Only call this after they have asked you to make contact and agreed to the exact details. Their email address is required. We email them a link to check and send it, and nothing reaches the business until they do, so tell them to look for that email. Never tick newsletter or consent boxes for them.', $site ),
 				'inputSchema' => [
 					'type'       => 'object',
 					'properties' => [

@@ -16,6 +16,8 @@
  * v1.9 | 2026-10-30 — BreadcrumbList maps bw_get_breadcrumb_items(), the trail the [breadcrumbs]
  *                      shortcode shows (#96). No hard-coded "Blog": the posts page title is used.
  *                      WooCommerce trail helper moved to breadcrumb-shortcode.php.
+ * v1.10 | 2026-11-26 — Placeholder quoting leaves valid JSON alone and never touches a colon
+ *                      inside a string ("0151:%%abn%%"), which was dropping LocalBusiness.
  *
  * Outputs consolidated @graph schema for all page types.
  * Uses template_redirect to ensure WordPress conditionals work.
@@ -255,6 +257,10 @@ function bw_schema_get_singular_id() {
  * Allows "aggregateRating": %%_rating_json%% (invalid JSON) to decode; at output
  * the quoted "%%_rating_json%%" is then replaced by the resolved array/object.
  *
+ * Valid JSON is returned untouched. Only a placeholder straight after a key's
+ * colon is quoted, never a colon inside a string: "0151:%%abn%%" must stay as it
+ * is, or the whole block stops decoding and silently drops off the page.
+ *
  * @param string $json Raw schema JSON (may contain unquoted %%...%%)
  * @return string JSON string safe for json_decode
  */
@@ -262,7 +268,11 @@ function bw_schema_normalize_json_placeholders($json) {
     if (!is_string($json) || strpos($json, '%%') === false) {
         return $json;
     }
-    return preg_replace('/:\s*%%([^%]+)%%/', ': "%%$1%%"', $json);
+    json_decode($json);
+    if (json_last_error() === JSON_ERROR_NONE) {
+        return $json;
+    }
+    return preg_replace('/("\s*:\s*)%%([^%"\s]+)%%/', '$1"%%$2%%"', $json);
 }
 
 /**

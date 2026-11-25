@@ -257,7 +257,7 @@ class Agent_Guide {
 	 * A worked example with the required fields filled in.
 	 */
 	private static function example_link( array $schema ): string {
-		$service = self::services()[0]['title'] ?? '';
+		$service = self::search_term();
 		$pairs   = [];
 		foreach ( $schema['fields'] as $field ) {
 			if ( self::is_consent( $field ) ) {
@@ -273,7 +273,7 @@ class Agent_Guide {
 			} elseif ( 'textarea' === $field['type'] ) {
 				$value = '' !== $service
 					/* translators: %s: a service name */
-					? sprintf( __( 'Could I get a quote for %s?', 'site-essentials' ), strtolower( $service ) )
+					? sprintf( __( 'Could I get a quote for %s?', 'site-essentials' ), $service )
 					: __( 'Could I get a quote?', 'site-essentials' );
 			} elseif ( 'tel' === $field['type'] ) {
 				continue;
@@ -306,8 +306,7 @@ class Agent_Guide {
 		$term     = self::search_term();
 		$pages    = self::example_pages();
 
-		$purpose_list = $purposes ? implode( ', ', array_keys( $purposes ) ) : 'service-page, case-study';
-		$html         = '<p>' . esc_html__( 'All four tools are read-only. They return published pages only.', 'site-essentials' ) . '</p>';
+		$html = '<p>' . esc_html__( 'All four tools are read-only. They return published pages only.', 'site-essentials' ) . '</p>';
 
 		// get_site_info
 		$html .= '<p><strong><code>get_site_info</code></strong><br>' . esc_html__( 'Who we are, what we do, who we work with and the topics we cover. Agents should call this first.', 'site-essentials' );
@@ -323,10 +322,14 @@ class Agent_Guide {
 				$links[] = $link( $api( '/search', [ 'query' => $term, 'purpose' => 'service-page' ] ), sprintf( __( 'service pages about "%s"', 'site-essentials' ), $term ) );
 			}
 		}
-		$html .= '<p><strong><code>search_content</code></strong><br>' . esc_html( sprintf(
-			/* translators: %s: purpose values */
-			__( 'Search our pages and articles by keyword. It can be narrowed by content type (purpose: %s) or by what the visitor is trying to do (intent: informational, commercial, transact_lead, trust).', 'site-essentials' ),
-			$purpose_list
+		$by_purpose = $purposes
+			/* translators: %s: purpose values found on this site */
+			? sprintf( __( 'content type (purpose: %s)', 'site-essentials' ), implode( ', ', array_keys( $purposes ) ) )
+			: __( 'content type (purpose)', 'site-essentials' );
+		$html      .= '<p><strong><code>search_content</code></strong><br>' . esc_html( sprintf(
+			/* translators: %s: "content type (purpose: …)" */
+			__( 'Search our pages and articles by keyword. It can be narrowed by %s or by what the visitor is trying to do (intent: informational, commercial, transact_lead, trust).', 'site-essentials' ),
+			$by_purpose
 		) ) . $try( $links ) . '</p>';
 
 		// list_content
@@ -484,10 +487,11 @@ class Agent_Guide {
 	}
 
 	/**
-	 * A search term that finds something here: the first service's name.
+	 * A search term that finds something here: the first service's name, or
+	 * the first example page's when no page is marked as a service.
 	 */
 	private static function search_term(): string {
-		$title = self::services()[0]['title'] ?? '';
+		$title = self::example_pages()[0]['title'] ?? '';
 		$title = trim( preg_replace( '/\b(services?|and)\b/i', ' ', html_entity_decode( wp_strip_all_tags( $title ) ) ) );
 		return strtolower( trim( preg_replace( '/\s+/', ' ', $title ) ) );
 	}
@@ -500,8 +504,8 @@ class Agent_Guide {
 		if ( wp_count_posts( 'post' )->publish > 0 ) {
 			$kinds[] = __( 'articles', 'site-essentials' );
 		}
-		if ( ! $kinds ) {
-			return __( 'pages', 'site-essentials' );
+		if ( ! self::purposes() ) {
+			array_unshift( $kinds, __( 'pages', 'site-essentials' ) );
 		}
 		if ( 1 === count( $kinds ) ) {
 			return $kinds[0];

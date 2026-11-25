@@ -338,7 +338,20 @@ class Agent_Guide {
 			/* translators: %s: kind of content, e.g. "services" */
 			$links[] = $link( $api( '/list', [ 'purpose' => $purpose ] ), sprintf( __( 'all %s', 'site-essentials' ), $label ) );
 		}
-		$links[] = $link( $api( '/list', [ 'intent' => 'commercial' ] ), __( 'everything commercial', 'site-essentials' ) );
+		$commercial = (bool) Cache_Helper::remember( 'commercial', static function () {
+			return (bool) get_posts( [
+				'post_type'      => [ 'post', 'page' ],
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_key'       => 'scos_ca_intent',
+				'meta_value'     => 'commercial',
+			] );
+		}, 12 * HOUR_IN_SECONDS, self::CACHE_GROUP );
+		$links[]    = $commercial
+			? $link( $api( '/list', [ 'intent' => 'commercial' ] ), __( 'everything commercial', 'site-essentials' ) )
+			: $link( $api( '/list' ), __( 'everything published', 'site-essentials' ) );
 		$html   .= '<p><strong><code>list_content</code></strong><br>' . esc_html__( 'List everything published, with the same optional filters. This is useful for seeing everything we offer before looking at one page.', 'site-essentials' ) . $try( $links ) . '</p>';
 
 		// get_content

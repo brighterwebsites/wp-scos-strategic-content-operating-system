@@ -6,6 +6,8 @@
  * v1.1 | 2026-10-25 — submit() takes a channel. Through the MCP connector every
  *                      request comes from the assistant's servers, so the
  *                      per-IP limit is skipped there (#229).
+ * v1.2 | 2026-11-24 — A confirmed enquiry is recorded in the lead table
+ *                      (Lead_Store, channel agent), for CRMs to pull (#269).
  *
  * WHAT THIS IS FOR
  * ----------------
@@ -26,7 +28,11 @@
  *      newsletter boxes. Without a Breakdance form behind the page, it is
  *      emailed to the site's admin address instead.
  *
- * Nothing outlives the pending window: confirmed or expired, it's deleted.
+ *   4. The confirmed enquiry is recorded as a lead (Lead_Store, channel
+ *      agent, status verified), which the site's CRM can pull.
+ *
+ * The pending record never outlives its window: confirmed or expired, it's
+ * deleted. Only a confirmed enquiry becomes a lead.
  *
  * Settings:
  *   scos_agentic_enquiry_send_enabled  on/off (off by default; needs the
@@ -133,6 +139,7 @@ class Enquiry_Send {
 				'values'  => $clean['values'],
 				'email'   => $email,
 				'agent'   => mb_substr( sanitize_text_field( $agent ), 0, 60 ),
+				'channel' => $channel,
 				'created' => time(),
 			],
 			self::TTL
@@ -204,6 +211,8 @@ class Enquiry_Send {
 				self::page( __( 'That didn\'t go through', 'site-essentials' ), '<p>' . esc_html__( 'Your enquiry could not be sent just now. Please try again in a few minutes.', 'site-essentials' ) . '</p>' . self::form_link(), 500 );
 			}
 
+			self::record_lead( $pending, $schema );
+
 			self::page(
 				__( 'Enquiry sent', 'site-essentials' ),
 				'<p>' . esc_html( sprintf(
@@ -269,6 +278,38 @@ class Enquiry_Send {
 		}
 
 		return self::email_site( $values, $fields, $pending['email'] );
+	}
+
+	/**
+	 * Record a confirmed enquiry in the lead table. A failure is logged, never
+	 * shown: the business already has the enquiry.
+	 */
+	private static function record_lead( array $pending, ?array $schema ): void {
+		$fields = $schema ? array_column( $schema['fields'], null, 'name' ) : [];
+		$target = $schema['target'] ?? [];
+
+		$list = [];
+		foreach ( $pending['values'] as $key => $items ) {
+			$list[] = [
+				'name'  => $key,
+				'label' => $fields[ $key ]['label'] ?? '',
+				'type'  => $fields[ $key ]['type'] ?? 'text',
+				'value' => array_values( (array) $items ),
+			];
+		}
+
+		$ref = Lead_Store::insert( [
+			'channel' => 'agent',
+			'status'  => 'verified', // The person confirmed by email.
+			'source'  => (string) ( $pending['channel'] ?? self::CHANNEL_REST ),
+			'agent'   => (string) ( $pending['agent'] ?? '' ),
+			'post_id' => (int) ( $target['post_id'] ?? 0 ),
+			'form_id' => (int) ( $target['form_id'] ?? 0 ),
+			'fields'  => $list,
+		] );
+		if ( is_wp_error( $ref ) ) {
+			error_log( 'SCOS enquiry send: lead not recorded: ' . $ref->get_error_message() );
+		}
 	}
 
 	private static function breakdance_available(): bool {

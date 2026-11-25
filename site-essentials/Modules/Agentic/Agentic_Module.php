@@ -4,6 +4,8 @@
  *
  * v1.4 | 2026-10-22
  * v1.5 | 2026-10-25 — Agent_Notices shortcodes (privacy note, enquiry hint).
+ * v1.6 | 2026-11-24 — Lead table and pull feed for CRMs (Lead_Store, Leads_API,
+ *                      scos/list-leads, wp scos leads) (#269).
  *
  * Handles AI agent discovery and content accessibility for client sites.
  *
@@ -15,6 +17,8 @@
  *   - Native WebMCP: the same tools via document.modelContext on every page
  *   - Enquiry handoff: an agent builds a link that opens the site's own
  *     form pre-filled, for the person to check and send (opt-in, #200 D17)
+ *   - Leads: one row per lead from the forms, links and agents, which a CRM
+ *     pulls (GET /scos/v1/leads). The site never pushes to a CRM (#269)
  *
  * Discovery layer — how an agent finds the above without being told:
  *   - RFC 8288 Link headers (llms.txt, /mcp/, api-catalog)
@@ -67,7 +71,7 @@ class Agentic_Module implements Module_Interface {
 	}
 
 	public static function get_version(): string {
-		return '1.5';
+		return '1.6';
 	}
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -89,6 +93,13 @@ class Agentic_Module implements Module_Interface {
 		Mcp_Server::init();
 		Enquiry_Prefill::init();
 		Agent_Notices::init();
+		Lead_Store::init();
+		Leads_API::init();
+
+		add_action( 'wp_abilities_api_categories_init', [ __CLASS__, 'register_ability_category' ] );
+		if ( \SiteEssentials\Core\Abilities\Ability_Support::is_abilities_api_available() ) {
+			require_once __DIR__ . '/Abilities/List_Leads/List_Leads.php';
+		}
 
 		// Discovery layer — the router must init before its consumers register.
 		Well_Known_Router::init();
@@ -105,6 +116,16 @@ class Agentic_Module implements Module_Interface {
 		self::register_cli_commands();
 	}
 
+	public static function register_ability_category(): void {
+		if ( ! function_exists( 'wp_register_ability_category' ) ) {
+			return;
+		}
+		wp_register_ability_category( 'scos-agentic', [
+			'label'       => __( 'SCOS: Agentic', 'site-essentials' ),
+			'description' => __( 'Leads and enquiries the site has received from its forms and from AI agents.', 'site-essentials' ),
+		] );
+	}
+
 	private static function register_cli_commands(): void {
 		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 			return;
@@ -115,6 +136,14 @@ class Agentic_Module implements Module_Interface {
 			CLI\Markdown_Cache_Rule_Command::class,
 			[
 				'shortdesc' => 'Check or sync the .htaccess rule that lets Markdown requests skip the page cache.',
+			]
+		);
+
+		\WP_CLI::add_command(
+			'scos leads',
+			CLI\Leads_Command::class,
+			[
+				'shortdesc' => 'List, export or prune the leads a CRM collects from this site.',
 			]
 		);
 	}

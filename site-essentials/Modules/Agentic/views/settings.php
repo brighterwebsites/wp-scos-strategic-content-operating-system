@@ -3,6 +3,8 @@
  * Agentic Module — settings view
  *
  * v1.3 | 2026-10-22
+ * v1.4 | 2026-11-24 — Leads card: count, CSV download, retention, the CRM feed,
+ *                      and a warning when the enquiry form doesn't save leads (#269).
  *
  * Template C (single-section settings). Rendered inside <div class="wrap scos">
  * by Admin_UI::render_agentic_page().
@@ -179,7 +181,7 @@ defined( 'ABSPATH' ) || exit;
 		<div class="scos-card__header scos-card__header--plain">
 			<h2 class="scos-card__title"><?php esc_html_e( 'Enquiry handoff', 'site-essentials' ); ?></h2>
 			<p class="scos-card__desc">
-				<?php esc_html_e( 'Lets an agent in a chat or terminal draft an enquiry and give the person a link that opens your form filled in. The person checks it and presses send, so it arrives like any other form submission. Nothing is stored or sent by SCOS.', 'site-essentials' ); ?>
+				<?php esc_html_e( 'Lets an agent in a chat or terminal draft an enquiry and give the person a link that opens your form filled in. The person checks it and presses send, so it arrives like any other form submission. SCOS stores it only if the form saves leads (see Leads below).', 'site-essentials' ); ?>
 			</p>
 		</div>
 		<div class="scos-card__body">
@@ -281,6 +283,70 @@ defined( 'ABSPATH' ) || exit;
 				endif;
 			endif;
 			?>
+		</div>
+	</div>
+
+	<!-- ── Leads ─────────────────────────────────────────────────────────── -->
+	<?php
+	$scos_lead_store = \SiteEssentials\Modules\Agentic\Lead_Store::class;
+	$scos_leads_api  = \SiteEssentials\Modules\Agentic\Leads_API::class;
+	$scos_lead_form  = $scos_lead_store::enquiry_form_saves_leads(); // null: no Breakdance enquiry form to check.
+	?>
+	<div class="scos-card" style="margin-bottom:var(--scos-s-6)">
+		<div class="scos-card__header scos-card__header--plain">
+			<h2 class="scos-card__title"><?php esc_html_e( 'Leads', 'site-essentials' ); ?></h2>
+			<p class="scos-card__desc">
+				<?php esc_html_e( 'One record per lead: from forms that have the "SCOS: Save lead" action ticked in Breakdance, from agents\' pre-filled links, and from enquiries agents sent and the person confirmed. Your CRM collects them from the feed below. This site never sends them anywhere.', 'site-essentials' ); ?>
+			</p>
+		</div>
+		<div class="scos-card__body">
+			<?php if ( false === $scos_lead_form ) : ?>
+				<div class="scos-notice scos-notice--warning" style="margin-bottom:var(--scos-s-4)">
+					<p><?php esc_html_e( 'The enquiry form doesn\'t save leads yet, so leads typed in or sent from an agent\'s link are not recorded. Edit the form in Breakdance and add "SCOS: Save lead" under Actions After Submit.', 'site-essentials' ); ?></p>
+				</div>
+			<?php endif; ?>
+			<table class="scos-form">
+				<tbody>
+					<tr>
+						<th><?php esc_html_e( 'Stored', 'site-essentials' ); ?></th>
+						<td>
+							<?php
+							printf(
+								/* translators: %d: number of leads */
+								esc_html( _n( '%d lead', '%d leads', $scos_lead_store::count(), 'site-essentials' ) ),
+								(int) $scos_lead_store::count()
+							);
+							?>
+							&nbsp;<a class="scos-btn scos-btn--ghost" href="<?php echo esc_url( $scos_leads_api::csv_url() ); ?>"><?php esc_html_e( 'Download CSV', 'site-essentials' ); ?></a>
+						</td>
+					</tr>
+					<tr>
+						<th>
+							<?php esc_html_e( 'Kept for', 'site-essentials' ); ?>
+							<div class="scos-form__slug"><?php echo esc_html( $scos_lead_store::OPTION_RETENTION ); ?></div>
+						</th>
+						<td>
+							<?php
+							printf(
+								/* translators: %d: days */
+								esc_html__( '%d days, then deleted automatically.', 'site-essentials' ),
+								(int) $scos_lead_store::retention_days()
+							);
+							?>
+							<p class="description"><?php esc_html_e( 'Change it with WP-CLI: wp option update scos_agentic_lead_retention_days 180', 'site-essentials' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th><?php esc_html_e( 'Feed for your CRM', 'site-essentials' ); ?></th>
+						<td>
+							<code><?php echo esc_html( $scos_leads_api::get_url() ); ?></code>
+							<p class="description">
+								<?php esc_html_e( 'To connect a CRM: add a user with the Lead reader role, create an Application Password on that user\'s profile, and give the CRM the feed address, the username and that password (HTTP Basic auth). Use one user per CRM, so each can be revoked on its own. The CRM passes next_cursor back as ?since= to get only new and changed leads.', 'site-essentials' ); ?>
+							</p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
 		</div>
 	</div>
 

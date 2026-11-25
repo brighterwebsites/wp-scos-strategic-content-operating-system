@@ -3,6 +3,7 @@
  * Agentic — Agent Notices (shortcodes)
  *
  * v1.0 | 2026-10-25
+ * v1.1 | 2026-11-24 — The privacy note says leads are kept, and for how long (#269).
  *
  * Two pieces of page copy that must match what this site actually does, so
  * they are generated from the live settings instead of typed into each page:
@@ -53,6 +54,22 @@ class Agent_Notices {
 			);
 			$items[] = __( 'To stop misuse we count how many enquiries come from each email address. The counter stores a one-way hash, not the address, and clears after a day.', 'site-essentials' );
 			$items[] = __( 'Once you confirm, the enquiry is handled exactly like one sent through the contact form.', 'site-essentials' );
+		}
+
+		// Only say it when it's true: agent-sent enquiries always make a lead,
+		// form and link ones only when the form has "SCOS: Save lead" ticked.
+		if ( Lead_Store::enquiry_form_saves_leads( false ) ) {
+			$items[] = sprintf(
+				/* translators: %d: days a lead is kept */
+				__( 'Enquiries we receive, whether typed into the form or sent with an assistant\'s help, are kept on this site for up to %d days so we can follow them up, then deleted automatically.', 'site-essentials' ),
+				Lead_Store::retention_days()
+			);
+		} elseif ( Enquiry_Send::is_enabled() ) {
+			$items[] = sprintf(
+				/* translators: %d: days a lead is kept */
+				__( 'An enquiry an assistant sent for you is kept on this site for up to %d days after you confirm it, so we can follow it up, then deleted automatically.', 'site-essentials' ),
+				Lead_Store::retention_days()
+			);
 		}
 
 		$items[] = __( 'Whatever you tell your AI assistant is handled by the company that runs it, under their privacy policy, not ours.', 'site-essentials' );

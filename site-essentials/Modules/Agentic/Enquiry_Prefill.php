@@ -3,6 +3,9 @@
  * Agentic — enquiry handoff: fill the form from the link
  *
  * v1.0 | 2026-10-22
+ * v1.1 | 2026-11-24 — Adds a hidden fields[scos_lead_channel]=link to the
+ *                      filled form, so "SCOS: Save lead" records the lead as
+ *                      channel link, not form (#269).
  *
  * On the enquiry page only, a small inline script reads the #scos-enquiry
  * fragment built by Enquiry_Form::build_link(), fills the annotated form,
@@ -41,6 +44,7 @@ class Enquiry_Prefill {
 		$config = [
 			'fragment' => Enquiry_Form::FRAGMENT,
 			'form'     => trim( (string) get_option( Enquiry_Form::OPTION_FORM, '' ) ),
+			'marker'   => Lead_Store::LINK_MARKER,
 		];
 
 		wp_print_inline_script_tag(
@@ -89,10 +93,21 @@ function show(f, tries) {
 		setTimeout(function () { show(f, tries + 1); }, 250);
 	}
 }
+function mark(f) {
+	var m = f.querySelector('input[name="fields[' + c.marker + ']"]');
+	if (!m) {
+		m = document.createElement('input');
+		m.type = 'hidden';
+		m.name = 'fields[' + c.marker + ']';
+		f.appendChild(m);
+	}
+	m.value = 'link';
+}
 function go() {
 	var f = document.querySelector(c.form ? 'form[toolname="' + c.form.replace(/"/g, '') + '"]' : 'form[toolname]');
 	if (!f) return;
 	fill(f);
+	mark(f);
 	show(f, 0);
 }
 if (document.readyState === 'complete') go(); else window.addEventListener('load', go);

@@ -26,7 +26,8 @@
  * v1.12 | 2026-11-26 — Freeze modified date takes effect on the save that changes it: uses the
  *                       submitted checkbox, and in the block editor restores the date from
  *                       before the editor's REST save (#112 QA). Breakdance's automatic
- *                       launcher-block save on opening a page no longer bumps the date.
+ *                       launcher-block save on every block-editor open no longer bumps the
+ *                       date (builder saves over admin-ajax still do).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -267,21 +268,41 @@ class Meta_Box {
 	}
 
 	/**
-	 * Whether this save only swaps a Breakdance page's content for the launcher block,
-	 * as Breakdance does on its own when the page opens in the block editor.
+	 * Whether this is the block editor saving a Breakdance page whose content is (or
+	 * becomes) just the launcher block. Breakdance does this on its own every time the
+	 * page opens in the block editor: it checks for its launcher block before the editor
+	 * has loaded the blocks, re-adds it and calls savePost(). The page's real content
+	 * lives in _breakdance_data and is saved by the builder over admin-ajax, which this
+	 * does not match, so builder edits still bump the date.
 	 */
 	private static function is_breakdance_launcher_save( int $post_id, array $data ): bool {
 		$launcher = '<!-- wp:breakdance/block-breakdance-launcher /-->';
 		if ( trim( wp_unslash( (string) ( $data['post_content'] ?? '' ) ) ) !== $launcher ) {
 			return false;
 		}
+		if ( ! self::is_block_editor_rest_save() ) {
+			return false;
+		}
 		$old = get_post( $post_id );
-		if ( ! $old || trim( $old->post_content ) === $launcher || ! metadata_exists( 'post', $post_id, '_breakdance_data' ) ) {
+		if ( ! $old || ! metadata_exists( 'post', $post_id, '_breakdance_data' ) ) {
 			return false;
 		}
 		return wp_unslash( (string) ( $data['post_title'] ?? '' ) ) === $old->post_title
 			&& wp_unslash( (string) ( $data['post_excerpt'] ?? '' ) ) === $old->post_excerpt
 			&& (string) ( $data['post_status'] ?? '' ) === $old->post_status;
+	}
+
+	/** Whether this request is a core posts-endpoint REST save (/wp/v2/…), as the block editor sends. */
+	private static function is_block_editor_rest_save(): bool {
+		if ( ! defined( 'REST_REQUEST' ) || ! REST_REQUEST ) {
+			return false;
+		}
+		$route = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? (string) $GLOBALS['wp']->query_vars['rest_route'] : '';
+		if ( '' === $route ) {
+			$route = (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH );
+			$route = (string) preg_replace( '#^.*?/' . preg_quote( rest_get_url_prefix(), '#' ) . '#', '', $route );
+		}
+		return 0 === strpos( $route, '/wp/v2/' );
 	}
 
 	// -------------------------------------------------------------------------

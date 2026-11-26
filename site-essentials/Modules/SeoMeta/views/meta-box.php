@@ -16,6 +16,7 @@
  *   $sitemap_noindex_auto      bool   — internal: xml exclusion was auto-set by noindex
  *   $freeze_date               bool   — per-post freeze flag
  *   $global_freeze_date        bool   — site-wide freeze option
+ *   $advanced_overrides        string[] — Advanced-tab meta keys with a value (#113)
  *
  * @package SiteEssentials
  *
@@ -24,6 +25,7 @@
  *                      wp_editor() instance (bold/lists/link, no images).
  * v1.2 | 2026-10-18 — Target KW Query field.
  * v1.3 | 2026-11-07 — Meta Robots shows the inherited post type default when nothing is ticked (#228).
+ * v1.4 | 2026-11-26 — Dot on the Advanced tab when a field there holds a value (#113).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -38,8 +40,14 @@ defined( 'ABSPATH' ) || exit;
 			<?php esc_html_e( 'Core SEO', 'site-essentials' ); ?>
 		</button>
 		<button type="button" class="scos-seo-tab-btn" data-tab="advanced"
-			role="tab" aria-selected="false" aria-controls="scos-seo-tab-advanced">
+			role="tab" aria-selected="false" aria-controls="scos-seo-tab-advanced"
+			data-global-freeze="<?php echo $global_freeze_date ? '1' : '0'; ?>">
 			<?php esc_html_e( 'Advanced', 'site-essentials' ); ?>
+			<span class="scos-seo-tab-dot" id="scos-seo-advanced-dot"
+				title="<?php esc_attr_e( 'Set on this post: replaces the default', 'site-essentials' ); ?>"
+				<?php echo empty( $advanced_overrides ) ? 'hidden' : ''; ?>>
+				<span class="screen-reader-text"><?php esc_html_e( '(has settings)', 'site-essentials' ); ?></span>
+			</span>
 		</button>
 		<button type="button" class="scos-seo-tab-btn" data-tab="og"
 			role="tab" aria-selected="false" aria-controls="scos-seo-tab-og">

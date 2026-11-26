@@ -3,6 +3,7 @@
  * Tab switching + character counter with progress bar, and a guard that keeps
  * the TLDR editor usable inside the block editor's meta box pane.
  *
+ * v1.2 | 2026-11-26 — Advanced tab dot follows the fields live (#113).
  * v1.1 | 2026-09-11 — Rebuild the TLDR TinyMCE instance when its iframe is
  *                      reloaded by the block editor moving the meta box DOM.
  */
@@ -103,6 +104,29 @@
 	}
 
 	$(document).on('input blur', '#scos_seo_canonical', updateCanonicalHint);
+
+	// ── Advanced tab dot: a field there holds a value for this post (#113) ──
+	//
+	// Mirrors Url_Seo_State::post_overrides(): any value set here replaces (or stops
+	// following) the default, so the dot shows what the next save will store.
+
+	function updateAdvancedDot() {
+		var $panel = $('#scos-seo-tab-advanced');
+		if (!$panel.length) { return; }
+		var globalFreeze = String($('.scos-seo-tab-btn[data-tab="advanced"]').data('global-freeze')) === '1';
+		var freezeOn     = $panel.find('input[name="scos_seo_freeze_og_date"]').is(':checked');
+
+		var isSet = $.trim($('#scos_seo_canonical').val() || '') !== '' ||
+			$panel.find('input[name="scos_seo_robots[]"]:checked').length > 0 ||
+			freezeOn !== globalFreeze ||
+			$panel.find('input[name="scos_seo_sitemap_exclude[]"]:checked').length > 0 ||
+			$('#scos_seo_sitemap_noindex_override').is(':checked');
+
+		$('#scos-seo-advanced-dot').prop('hidden', !isSet);
+	}
+
+	$(document).on('input change', '#scos-seo-tab-advanced input', updateAdvancedDot);
+	$(updateAdvancedDot);
 
 	// ── TLDR editor: survive the block editor moving the meta box ────────────
 	//

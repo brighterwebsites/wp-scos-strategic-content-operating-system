@@ -3,6 +3,9 @@
  * Tab switching + character counter with progress bar, and a guard that keeps
  * the TLDR editor usable inside the block editor's meta box pane.
  *
+ * v1.5 | 2026-11-26 — "HTML sitemap: list for visitors" box follows noindex live (#281).
+ * v1.4 | 2026-11-26 — Canonical hints compare with scosSameUrl(), the mirror of
+ *                      Url_Seo_State::same_url() (#283).
  * v1.3 | 2026-11-26 — "Include in XML sitemap anyway" appears as soon as noindex is ticked or a
  *                      non-self canonical is typed (was looking for a non-existent #id).
  * v1.2 | 2026-11-26 — Advanced tab dot follows the fields live (#113).
@@ -10,6 +13,21 @@
  *                      reloaded by the block editor moving the meta box DOM.
  */
 /* global jQuery */
+
+// scos-same-url:start — mirror of Url_Seo_State::same_url(); tested against
+// scripts/tests/fixtures/same-url-cases.json by scripts/tests/same-url-test.js. Ignores trailing
+// slash, scheme, host case and #fragment; a query string or www makes it different.
+window.scosSameUrl = function (a, b) {
+	function key(u) {
+		u = String(u == null ? '' : u).trim().split('#')[0];
+		var m = u.match(/^(?:[a-z][a-z0-9+.-]*:)?(?:\/\/([^\/?]*))?([^?]*)(\?.*)?$/i);
+		if (!m) { return u; }
+		return '//' + (m[1] || '').toLowerCase() + (m[2] || '').replace(/\/+$/, '') + (m[3] || '');
+	}
+	return key(a) === key(b);
+};
+// scos-same-url:end
+
 (function ($) {
 	'use strict';
 
@@ -72,7 +90,7 @@
 			($('input[name="scos_seo_robots[]"]:checked').length === 0 && String($row.data('type-noindex')) === '1');
 		var $canonical = $('#scos_seo_canonical');
 		var canonVal   = $.trim($canonical.val() || '');
-		var isNonSelf  = canonVal !== '' && canonVal !== ($canonical.attr('placeholder') || '');
+		var isNonSelf  = canonVal !== '' && !window.scosSameUrl(canonVal, $canonical.attr('placeholder') || '');
 		var $notice    = $('#scos-noindex-sitemap-notice');
 
 		if (isNoindex) {
@@ -91,6 +109,7 @@
 
 		// Keep the override visible while it is ticked, so it can be unticked.
 		$row.prop('hidden', !(isNoindex || isNonSelf || $('#scos_seo_sitemap_noindex_override').is(':checked')));
+		$('#scos-seo-html-noindex-row').prop('hidden', !(isNoindex || $('#scos_seo_sitemap_html_noindex_include').is(':checked')));
 	}
 
 	$(document).on('change', 'input[name="scos_seo_robots[]"]', updateNoindexSitemapNotice);
@@ -103,7 +122,7 @@
 		var $canonical  = $('#scos_seo_canonical');
 		var selfUrl     = $canonical.attr('placeholder') || '';
 		var val         = $.trim($canonical.val());
-		var isNonSelf   = val !== '' && val !== selfUrl;
+		var isNonSelf   = val !== '' && !window.scosSameUrl(val, selfUrl);
 		$('.scos-seo-help--canonical-hint').toggle(isNonSelf);
 	}
 
@@ -124,7 +143,8 @@
 			$panel.find('input[name="scos_seo_robots[]"]:checked').length > 0 ||
 			freezeOn !== globalFreeze ||
 			$panel.find('input[name="scos_seo_sitemap_exclude[]"]:checked').length > 0 ||
-			$('#scos_seo_sitemap_noindex_override').is(':checked');
+			$('#scos_seo_sitemap_noindex_override').is(':checked') ||
+			$('#scos_seo_sitemap_html_noindex_include').is(':checked');
 
 		$('#scos-seo-advanced-dot').prop('hidden', !isSet);
 	}

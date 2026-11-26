@@ -21,6 +21,7 @@
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
  *
+ * v1.4 | 2026-11-26 — match_path() public, so Url_Seo_State matches rules once per sitemap build (#285).
  * v1.3 | 2026-11-26 — match_301() for Url_Seo_State (#245).
  * v1.2 | 2026-10-25 — Rules are checked by Redirect_Validator on save (#222). Errors
  *                      (loops, missing =>, relative targets…) block the save and the
@@ -194,7 +195,7 @@ class Redirections {
 	 * @param  array<string,string> $rules Parsed 301 rules map.
 	 * @return string|null Destination or null if no match.
 	 */
-	private static function match_path( string $path, array $rules ): ?string {
+	public static function match_path( string $path, array $rules ): ?string {
 		if ( isset( $rules[ $path ] ) ) {
 			return $rules[ $path ];
 		}

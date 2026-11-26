@@ -28,6 +28,12 @@
  *                       before the editor's REST save (#112 QA). Breakdance's automatic
  *                       launcher-block save on every block-editor open no longer bumps the
  *                       date (builder saves over admin-ajax still do).
+ * v1.13 | 2026-11-26 — On the posts page and the shop page, title, description, robots, canonical
+ *                       and sitemap fields are hidden with a link to Archive Settings, and a
+ *                       save leaves their stored values alone (#282).
+ * v1.14 | 2026-11-26 — Noindex no longer writes 'xml' into scos_seo_sitemap_exclude (the sitemap
+ *                       derives it); a save drops an earlier auto-added 'xml'. New "HTML sitemap:
+ *                       list for visitors" box; the XML override relabelled (#281).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -137,12 +143,19 @@ class Meta_Box {
 		$sitemap_exclude          = (array) get_post_meta( $post->ID, 'scos_seo_sitemap_exclude', true );
 		$sitemap_noindex_override = (bool) get_post_meta( $post->ID, 'scos_seo_sitemap_noindex_override', true );
 		$sitemap_noindex_auto     = (bool) get_post_meta( $post->ID, 'scos_seo_sitemap_noindex_auto', true );
+		$html_noindex_include     = '1' === (string) get_post_meta( $post->ID, 'scos_seo_sitemap_html_noindex_include', true );
 
 		$freeze_date        = (bool) get_post_meta( $post->ID, 'scos_seo_freeze_og_date', true );
 		$global_freeze_date = (bool) get_option( 'scos_seo_freeze_modified_date', false );
 
 		// Advanced-tab fields with a value on this post (#113): drives the tab's dot.
 		$advanced_overrides = Url_Seo_State::post_overrides( (int) $post->ID );
+
+		// The posts page and the shop are served as archives: their SEO is in Archive Settings (#282).
+		$archive_page      = Url_Seo_State::archive_slug_for_page( (int) $post->ID );
+		$archive_page_link = $archive_page
+			? add_query_arg( [ 'page' => \SiteEssentials\Core\Admin_UI::SEO_PAGE_SLUG, 'tab' => 'meta' ], admin_url( 'admin.php' ) ) . '#scos-archive-pt-' . $archive_page
+			: '';
 
 		include __DIR__ . '/views/meta-box.php';
 	}
@@ -175,6 +188,13 @@ class Meta_Box {
 		if ( isset( $_POST['scos_seo_tldr'] ) ) {
 			$val = wp_kses_post( $_POST['scos_seo_tldr'] );
 			self::update_or_delete( $post_id, 'scos_seo_tldr', $val );
+		}
+
+		// Posts page / shop: the title, description, canonical, robots and sitemap fields
+		// aren't shown (Archive Settings own them), so leave what is stored (#282).
+		if ( null !== Url_Seo_State::archive_slug_for_page( (int) $post_id ) ) {
+			update_post_meta( $post_id, 'scos_seo_freeze_og_date', ! empty( $_POST['scos_seo_freeze_og_date'] ) ? '1' : '0' );
+			return;
 		}
 
 		// ---- Meta title ----
@@ -226,28 +246,18 @@ class Meta_Box {
 			$exclude = [];
 		}
 
-		// ---- Noindex ↔ sitemap auto-sync ----
-		// If noindex is set and the "include despite noindex" override is not checked,
-		// silently add 'xml' to sitemap_exclude and record that we auto-set it.
-		// If noindex is cleared and we previously auto-set the xml exclusion, remove it.
-		$noindex_now      = in_array( 'noindex', $robots, true );
+		// ---- Noindex and the sitemaps ----
+		// Url_Seo_State applies noindex when the sitemaps are built, so nothing is written
+		// into the user's exclusions for it (#281). Before #281 a save added 'xml' here and
+		// set scos_seo_sitemap_noindex_auto: drop that 'xml' and the flag.
 		$sitemap_override = ! empty( $_POST['scos_seo_sitemap_noindex_override'] );
-		$was_auto_set     = (bool) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto', true );
-
-		if ( $noindex_now && ! $sitemap_override ) {
-			if ( ! in_array( 'xml', $exclude, true ) ) {
-				$exclude[] = 'xml';
-			}
-			update_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto', '1' );
-		} else {
-			// noindex cleared OR override checked — undo the auto-exclusion if we set it.
-			if ( $was_auto_set ) {
-				$exclude = array_values( array_diff( $exclude, [ 'xml' ] ) );
-			}
-			delete_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto' );
+		if ( (bool) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto', true ) ) {
+			$exclude = array_values( array_diff( $exclude, [ 'xml' ] ) );
 		}
+		delete_post_meta( $post_id, 'scos_seo_sitemap_noindex_auto' );
 
 		update_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', $sitemap_override ? '1' : '0' );
+		update_post_meta( $post_id, 'scos_seo_sitemap_html_noindex_include', ! empty( $_POST['scos_seo_sitemap_html_noindex_include'] ) ? '1' : '0' );
 		update_post_meta( $post_id, 'scos_seo_sitemap_exclude', $exclude );
 	}
 
@@ -419,7 +429,7 @@ class Meta_Box {
 			true
 		);
 		wp_localize_script( 'scos-seo-meta-box', 'scosSeoMeta', [
-			'noindexSitemapMsg' => esc_html__( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ),
+			'noindexSitemapMsg' => esc_html__( 'This page has been removed from the XML sitemap because noindex is set.', 'site-essentials' ),
 		] );
 
 		// AI suggest script — needs the AI client, since the buttons drive

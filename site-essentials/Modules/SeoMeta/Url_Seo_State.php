@@ -23,8 +23,20 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.2 | 2026-11-26
+ * @version    1.9 | 2026-11-26
  *
+ * v1.9 | 2026-11-26 — The live WooCommerce shop is recognised as the product archive (WooCommerce sets
+ *                      the shop Page as the queried object), so it gets SCOS head output (#282).
+ * v1.8 | 2026-11-26 — XML vs HTML rule table (#281): the HTML sitemap leaves out non-self canonical
+ *                      posts, and lists a noindex post only when its "list for visitors" box is ticked.
+ * v1.7 | 2026-11-26 — The posts page and the shop page are listed by their Archive Settings (robots,
+ *                      sitemap exclude, redirects), not the Page's own meta (#282).
+ * v1.6 | 2026-11-26 — A CPT archive's "Exclude from XML/HTML sitemap" is applied (excluded_by_archive) (#280).
+ * v1.5 | 2026-11-26 — noindex CPT archives and taxonomies are out of the sitemaps (archive_noindex);
+ *                      with "Discourage search engines" on, the XML sitemap lists nothing (#279).
+ * v1.4 | 2026-11-26 — sitemap_eligibility(): the one place a URL's sitemap inclusion is decided.
+ *                      A URL that redirects or returns 410 is in neither sitemap (#285).
+ * v1.3 | 2026-11-26 — One canonical comparison: same_url() / is_self_canonical() (#283).
  * v1.2 | 2026-11-26 — Sitemap noindex check no longer reads Yoast, Rank Math or `_robots_noindex` meta (#287).
  * v1.1 | 2026-11-26 — The blog paged past its last page reports as a 404, as it is served.
  * @since      1.0.0
@@ -92,7 +104,14 @@ class Url_Seo_State {
 		}
 		if ( $q->is_post_type_archive() ) {
 			$obj = $q->get_queried_object();
-			return ( $obj instanceof \WP_Post_Type ) ? $obj->name : null;
+			if ( $obj instanceof \WP_Post_Type ) {
+				return $obj->name;
+			}
+			// WooCommerce swaps the shop's queried object for the shop Page (WC_Query),
+			// so read the archive's post type from the query (#282).
+			$pt = $q->get( 'post_type' );
+			$pt = is_array( $pt ) ? ( 1 === count( $pt ) ? reset( $pt ) : '' ) : $pt;
+			return ( is_string( $pt ) && '' !== $pt && post_type_exists( $pt ) ) ? $pt : null;
 		}
 		if ( $q->is_author() ) { return 'author'; }
 		if ( $q->is_date() )   { return 'date'; }
@@ -521,8 +540,52 @@ class Url_Seo_State {
 	}
 
 	/**
+	 * Whether two URLs are the same page for canonical purposes (#283).
+	 *
+	 * Ignored: trailing slash, scheme (http/https), host letter case, #fragment.
+	 * Different: the query string, and www vs non-www (a different host).
+	 * Mirrored in assets/meta-box.js (scosSameUrl); cases in scripts/tests/fixtures/same-url-cases.json.
+	 *
+	 * @param string $a
+	 * @param string $b
+	 * @return bool
+	 */
+	public static function same_url( string $a, string $b ): bool {
+		return self::url_compare_key( $a ) === self::url_compare_key( $b );
+	}
+
+	/**
+	 * A URL reduced to the parts same_url() compares: //host[:port]/path?query.
+	 */
+	private static function url_compare_key( string $url ): string {
+		$url  = trim( $url );
+		$hash = strpos( $url, '#' );
+		if ( false !== $hash ) {
+			$url = substr( $url, 0, $hash );
+		}
+		$p = wp_parse_url( $url );
+		if ( ! is_array( $p ) ) {
+			return $url;
+		}
+		return '//' . strtolower( (string) ( $p['host'] ?? '' ) )
+			. ( isset( $p['port'] ) ? ':' . $p['port'] : '' )
+			. rtrim( (string) ( $p['path'] ?? '' ), '/' )
+			. ( isset( $p['query'] ) ? '?' . $p['query'] : '' );
+	}
+
+	/**
+	 * Whether a post's own canonical is itself (or empty, which prints the permalink).
+	 *
+	 * @param int $post_id
+	 * @return bool
+	 */
+	public static function is_self_canonical( int $post_id ): bool {
+		$canonical = trim( (string) get_post_meta( $post_id, 'scos_seo_canonical', true ) );
+		return '' === $canonical || self::same_url( $canonical, (string) get_permalink( $post_id ) );
+	}
+
+	/**
 	 * Whether a post's canonical points somewhere else, with no sitemap override.
-	 * Trailing slashes are ignored.
 	 *
 	 * @param int $post_id
 	 * @return bool
@@ -531,11 +594,7 @@ class Url_Seo_State {
 		if ( '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true ) ) {
 			return false;
 		}
-		$canonical = get_post_meta( $post_id, 'scos_seo_canonical', true );
-		if ( empty( $canonical ) ) {
-			return false;
-		}
-		return rtrim( (string) $canonical, '/' ) !== rtrim( (string) get_permalink( $post_id ), '/' );
+		return ! self::is_self_canonical( $post_id );
 	}
 
 	/**
@@ -563,19 +622,27 @@ class Url_Seo_State {
 	}
 
 	/**
-	 * HTML sitemap decision for one post, from its own meta. Unlike the XML sitemap
-	 * it ignores the canonical and the override.
+	 * HTML sitemap decision for one post, from its own meta (#281). The HTML sitemap
+	 * is for people: a non-self canonical is a duplicate (its target is listed), and a
+	 * noindex post is listed only when its "list for visitors" box is ticked. The XML
+	 * override does not apply here.
 	 *
 	 * @param int $post_id
-	 * @return array{included:bool, reason:string} reason: noindex, excluded_by_post or included.
+	 * @return array{included:bool, reason:string} reason: excluded_by_post, non_self_canonical,
+	 *                                             noindex, listed_for_visitors or included.
 	 */
 	public static function html_post_decision( int $post_id ): array {
-		if ( self::post_is_noindex( $post_id ) ) {
-			return [ 'included' => false, 'reason' => 'noindex' ];
-		}
 		$exclude = (array) get_post_meta( $post_id, 'scos_seo_sitemap_exclude', true );
 		if ( in_array( 'html', $exclude, true ) ) {
 			return [ 'included' => false, 'reason' => 'excluded_by_post' ];
+		}
+		if ( ! self::is_self_canonical( $post_id ) ) {
+			return [ 'included' => false, 'reason' => 'non_self_canonical' ];
+		}
+		if ( self::post_is_noindex( $post_id ) ) {
+			return '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_html_noindex_include', true )
+				? [ 'included' => true, 'reason' => 'listed_for_visitors' ]
+				: [ 'included' => false, 'reason' => 'noindex' ];
 		}
 		return [ 'included' => true, 'reason' => 'included' ];
 	}
@@ -623,6 +690,39 @@ class Url_Seo_State {
 		return array_map( 'intval', $users );
 	}
 
+	/**
+	 * Whether an archive's own settings (SEO › Archive Settings) serve it as noindex.
+	 * Robots are per archive / per taxonomy, so the sitemap checks this once per
+	 * taxonomy, not per term.
+	 *
+	 * @param string $slug Post type, taxonomy or special archive slug.
+	 * @return bool
+	 */
+	public static function archive_is_noindex( string $slug ): bool {
+		return in_array( 'noindex', (array) ( Archive_Settings::get( $slug )['robots'] ?? [] ), true );
+	}
+
+	/**
+	 * Whether an archive's own settings hide it from one sitemap channel
+	 * (CPT and posts archives only; a stored 'news' is ignored) (#280).
+	 *
+	 * @param string $slug
+	 * @param string $channel 'xml' or 'html'.
+	 * @return bool
+	 */
+	public static function archive_excludes( string $slug, string $channel ): bool {
+		return in_array( $channel, (array) ( Archive_Settings::get( $slug )['sitemap_exclude'] ?? [] ), true );
+	}
+
+	/**
+	 * False when Settings › Reading › "Discourage search engines" is ticked.
+	 *
+	 * @return bool
+	 */
+	public static function search_engines_allowed(): bool {
+		return '0' !== (string) get_option( 'blog_public' );
+	}
+
 	// =========================================================================
 	// Sitemaps — per context
 	// =========================================================================
@@ -634,7 +734,7 @@ class Url_Seo_State {
 	 * @param array $settings Sitemap settings (Seo_Module::sitemap_settings()).
 	 * @return array{included:bool, reason:string, listed_as?:int}
 	 */
-	public static function in_xml_sitemap( array $ctx, array $settings ): array {
+	private static function xml_listing( array $ctx, array $settings ): array {
 		$types = (array) ( $settings['post_types'] ?? [] );
 
 		if ( 'singular' === $ctx['type'] ) {
@@ -676,6 +776,9 @@ class Url_Seo_State {
 			if ( ! in_array( $slug, (array) ( $settings['taxonomies'] ?? [] ), true ) ) {
 				return [ 'included' => false, 'reason' => 'taxonomy_not_in_sitemap' ];
 			}
+			if ( self::archive_is_noindex( $slug ) ) {
+				return [ 'included' => false, 'reason' => 'archive_noindex' ];
+			}
 			$term = $ctx['query']->get_queried_object();
 			if ( ! ( $term instanceof \WP_Term ) || (int) $term->count < 1 ) {
 				return [ 'included' => false, 'reason' => 'empty_term' ];
@@ -684,17 +787,24 @@ class Url_Seo_State {
 		}
 
 		// CPT archive.
-		if ( ! in_array( $slug, $types, true ) ) {
-			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
-		}
 		$obj = get_post_type_object( $slug );
 		if ( ! $obj || ! $obj->has_archive || in_array( $slug, [ 'post', 'page' ], true ) ) {
 			return [ 'included' => false, 'reason' => 'no_archive' ];
 		}
+		// A Page as the archive URL (the shop): listed once, in the page sitemap (#282).
 		$archive_url = (string) get_post_type_archive_link( $slug );
 		$page_id     = self::archive_url_page_id( $archive_url );
 		if ( $page_id ) {
 			return self::xml_for_post( $page_id, $settings ) + [ 'listed_as' => $page_id ];
+		}
+		if ( ! in_array( $slug, $types, true ) ) {
+			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
+		}
+		if ( self::archive_is_noindex( $slug ) ) {
+			return [ 'included' => false, 'reason' => 'archive_noindex' ];
+		}
+		if ( self::archive_excludes( $slug, 'xml' ) ) {
+			return [ 'included' => false, 'reason' => 'excluded_by_archive' ];
 		}
 		return [ 'included' => true, 'reason' => 'included' ];
 	}
@@ -704,7 +814,49 @@ class Url_Seo_State {
 	 */
 	private static function xml_for_post( int $post_id, array $settings ): array {
 		$base = self::sitemap_query_filter( $post_id, $settings );
-		return null !== $base ? $base : self::xml_post_decision( $post_id );
+		return null !== $base ? $base : self::post_meta_decision( $post_id, 'xml' );
+	}
+
+	/**
+	 * The archive a Page is served as: 'post' for the posts page, 'product' for
+	 * the WooCommerce shop, else null. Those Pages' SEO comes from Archive Settings.
+	 *
+	 * @param int $page_id
+	 * @return string|null
+	 */
+	public static function archive_slug_for_page( int $page_id ): ?string {
+		if ( $page_id <= 0 ) {
+			return null;
+		}
+		if ( $page_id === (int) get_option( 'page_for_posts' ) ) {
+			return 'post';
+		}
+		if ( function_exists( 'wc_get_page_id' ) && post_type_exists( 'product' ) && $page_id === (int) wc_get_page_id( 'shop' ) ) {
+			return 'product';
+		}
+		return null;
+	}
+
+	/**
+	 * A post's own sitemap decision for one channel. The posts page and the shop
+	 * page follow their archive's settings, as the page they serve does (#282).
+	 *
+	 * @param int    $post_id
+	 * @param string $channel 'xml' or 'html'.
+	 * @return array{included:bool, reason:string}
+	 */
+	private static function post_meta_decision( int $post_id, string $channel ): array {
+		$archive = self::archive_slug_for_page( $post_id );
+		if ( null !== $archive ) {
+			if ( self::archive_is_noindex( $archive ) ) {
+				return [ 'included' => false, 'reason' => 'archive_noindex' ];
+			}
+			if ( self::archive_excludes( $archive, $channel ) ) {
+				return [ 'included' => false, 'reason' => 'excluded_by_archive' ];
+			}
+			return [ 'included' => true, 'reason' => 'included' ];
+		}
+		return 'html' === $channel ? self::html_post_decision( $post_id ) : self::xml_post_decision( $post_id );
 	}
 
 	/**
@@ -736,7 +888,7 @@ class Url_Seo_State {
 	 * @param array $settings Sitemap settings.
 	 * @return array{included:bool, reason:string, listed_as?:int}
 	 */
-	public static function in_html_sitemap( array $ctx, array $settings ): array {
+	private static function html_listing( array $ctx, array $settings ): array {
 		if ( empty( $settings['html_sitemap_enabled'] ) ) {
 			return [ 'included' => false, 'reason' => 'html_sitemap_off' ];
 		}
@@ -750,7 +902,7 @@ class Url_Seo_State {
 
 		if ( $post_id ) {
 			$base = self::sitemap_query_filter( $post_id, $settings );
-			$res  = null !== $base ? $base : self::html_post_decision( $post_id );
+			$res  = null !== $base ? $base : self::post_meta_decision( $post_id, 'html' );
 			return 'singular' === $ctx['type'] ? $res : $res + [ 'listed_as' => $post_id ];
 		}
 
@@ -759,7 +911,12 @@ class Url_Seo_State {
 			&& ! in_array( $ctx['slug'], [ 'post', 'page' ], true ) ) {
 			$obj = get_post_type_object( $ctx['slug'] );
 			if ( in_array( $ctx['slug'], (array) ( $settings['post_types'] ?? [] ), true ) && $obj && $obj->has_archive ) {
-				return [ 'included' => true, 'reason' => 'archive_link' ];
+				if ( self::archive_is_noindex( $ctx['slug'] ) ) {
+					return [ 'included' => false, 'reason' => 'archive_noindex' ];
+				}
+				return self::archive_excludes( $ctx['slug'], 'html' )
+					? [ 'included' => false, 'reason' => 'excluded_by_archive' ]
+					: [ 'included' => true, 'reason' => 'archive_link' ];
 			}
 			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
 		}
@@ -767,9 +924,143 @@ class Url_Seo_State {
 		return [ 'included' => false, 'reason' => 'not_listed_type' ];
 	}
 
+	/**
+	 * Whether a context's URL is in the XML sitemap, and why.
+	 *
+	 * @param array $ctx      Context.
+	 * @param array $settings Sitemap settings (Seo_Module::sitemap_settings()).
+	 * @return array{included:bool, reason:string, listed_as?:int}
+	 */
+	public static function in_xml_sitemap( array $ctx, array $settings ): array {
+		return self::sitemap_eligibility( $ctx, 'xml', $settings );
+	}
+
+	/**
+	 * Whether a context's URL is in the HTML sitemap ([site_essentials_sitemap]), and why.
+	 *
+	 * @param array $ctx      Context.
+	 * @param array $settings Sitemap settings.
+	 * @return array{included:bool, reason:string, listed_as?:int}
+	 */
+	public static function in_html_sitemap( array $ctx, array $settings ): array {
+		return self::sitemap_eligibility( $ctx, 'html', $settings );
+	}
+
+	/**
+	 * Whether a context's URL is listed in one sitemap, and why (#278).
+	 *
+	 * The single decision both sitemaps and report() use. Each rule has its own
+	 * reason code; a URL that redirects or returns 410 is out of both channels
+	 * with reason `redirects:<redirect reason>` (#285).
+	 *
+	 * @param array  $ctx      Context.
+	 * @param string $channel  'xml' or 'html'.
+	 * @param array  $settings Sitemap settings (Seo_Module::sitemap_settings()).
+	 * @return array{included:bool, reason:string, listed_as?:int}
+	 */
+	public static function sitemap_eligibility( array $ctx, string $channel, array $settings ): array {
+		if ( 'xml' === $channel && ! self::search_engines_allowed() ) {
+			return [ 'included' => false, 'reason' => 'blog_public' ];
+		}
+		$res = 'html' === $channel ? self::html_listing( $ctx, $settings ) : self::xml_listing( $ctx, $settings );
+		if ( ! $res['included'] ) {
+			return $res;
+		}
+
+		// The URL the sitemap would list: the permalink, or the archive's first page.
+		$own = self::listed_url( $ctx );
+		if ( '' !== $own ) {
+			$redirect = self::redirects( $ctx, (string) ( wp_parse_url( $own, PHP_URL_PATH ) ?: '/' ) );
+			if ( null !== $redirect ) {
+				return [ 'included' => false, 'reason' => 'redirects:' . $redirect['reason'] ]
+					+ array_intersect_key( $res, [ 'listed_as' => true ] );
+			}
+		}
+		return $res;
+	}
+
+	/**
+	 * Sitemap decision for one post as the sitemap generators list it, from its
+	 * own meta plus SEO › Redirections. The post type / status / exclude_ids
+	 * checks are the generator's query.
+	 *
+	 * @param int    $post_id
+	 * @param string $channel 'xml' or 'html'.
+	 * @return array{included:bool, reason:string}
+	 */
+	public static function post_sitemap_decision( int $post_id, string $channel ): array {
+		if ( 'xml' === $channel && ! self::search_engines_allowed() ) {
+			return [ 'included' => false, 'reason' => 'blog_public' ];
+		}
+		$res = self::post_meta_decision( $post_id, $channel );
+		if ( $res['included'] ) {
+			$rule = self::rule_redirect_for_url( (string) get_permalink( $post_id ) );
+			if ( null !== $rule ) {
+				return [ 'included' => false, 'reason' => 'redirects:' . $rule['reason'] ];
+			}
+		}
+		return $res;
+	}
+
+	/**
+	 * The URL a sitemap lists for a context ('' when it has none).
+	 */
+	private static function listed_url( array $ctx ): string {
+		if ( 'singular' === $ctx['type'] ) {
+			return (string) get_permalink( (int) $ctx['post_id'] );
+		}
+		if ( 'archive' === $ctx['type'] && $ctx['query'] instanceof \WP_Query ) {
+			return self::archive_base_url( $ctx['slug'], $ctx['query'] );
+		}
+		return '';
+	}
+
 	// =========================================================================
 	// Redirects
 	// =========================================================================
+
+	/** @var array{raw410:string, raw301:string, gone:array, rules:array}|null */
+	private static $rule_cache = null;
+
+	/**
+	 * The SEO › Redirections rule (410, then 301) for a path, as handle_redirect() matches it.
+	 * Parsed once per request (re-parsed if the options change), so sitemap builds can
+	 * call it per entry.
+	 *
+	 * @param string $path URL path.
+	 * @return array{to:string, status:int, reason:string}|null
+	 */
+	public static function rule_redirect( string $path ): ?array {
+		$raw410 = Redirections::get_410_raw();
+		$raw301 = Redirections::get_301_raw();
+		if ( null === self::$rule_cache || self::$rule_cache['raw410'] !== $raw410 || self::$rule_cache['raw301'] !== $raw301 ) {
+			self::$rule_cache = [
+				'raw410' => $raw410,
+				'raw301' => $raw301,
+				'gone'   => array_flip( Redirections::parse_410_paths( $raw410 ) ),
+				'rules'  => Redirections::parse_301_rules( $raw301 ),
+			];
+		}
+		$norm = rtrim( $path, '/' );
+		if ( isset( self::$rule_cache['gone'][ $norm ] ) ) {
+			return [ 'to' => '', 'status' => 410, 'reason' => 'redirect_rule_410' ];
+		}
+		$target = Redirections::match_path( $norm, self::$rule_cache['rules'] );
+		if ( null !== $target ) {
+			return [ 'to' => $target, 'status' => 301, 'reason' => 'redirect_rule_301' ];
+		}
+		return null;
+	}
+
+	/**
+	 * rule_redirect() for an absolute URL.
+	 *
+	 * @param string $url
+	 * @return array{to:string, status:int, reason:string}|null
+	 */
+	public static function rule_redirect_for_url( string $url ): ?array {
+		return '' === $url ? null : self::rule_redirect( (string) ( wp_parse_url( $url, PHP_URL_PATH ) ?: '/' ) );
+	}
 
 	/**
 	 * The redirect (or 410) a context's URL gets before any page renders, in
@@ -782,12 +1073,9 @@ class Url_Seo_State {
 	public static function redirects( array $ctx, string $path ): ?array {
 		// Priority 1: SEO › Redirections.
 		$norm = rtrim( $path, '/' );
-		if ( in_array( $norm, Redirections::get_410_paths(), true ) ) {
-			return [ 'to' => '', 'status' => 410, 'reason' => 'redirect_rule_410' ];
-		}
-		$target = Redirections::match_301( $norm );
-		if ( null !== $target ) {
-			return [ 'to' => $target, 'status' => 301, 'reason' => 'redirect_rule_301' ];
+		$rule = self::rule_redirect( $norm );
+		if ( null !== $rule ) {
+			return $rule;
 		}
 
 		// Priority 2: post types without single URLs — the single itself, ?p=<id>, or
@@ -926,7 +1214,8 @@ class Url_Seo_State {
 		} elseif ( ! $robots['index'] && $xml['included'] && 'override' !== $xml['reason'] ) {
 			$w[] = 'Served as noindex, but listed in the XML sitemap.';
 		}
-		if ( ! $robots['index'] && $html['included'] && 'blog_public' !== $robots['source'] ) {
+		if ( ! $robots['index'] && $html['included'] && 'blog_public' !== $robots['source']
+			&& 'listed_for_visitors' !== $html['reason'] ) {
 			$w[] = 'Served as noindex, but listed in the HTML sitemap.';
 		}
 
@@ -940,28 +1229,31 @@ class Url_Seo_State {
 			}
 		}
 
+		// Tripwire: the HTML sitemap leaves non-self canonicals out (#281), so this should never fire.
 		if ( 'singular' === $ctx['type'] && 'post' === $canonical['source']
-			&& rtrim( $canonical['url'], '/' ) !== rtrim( (string) get_permalink( (int) $ctx['post_id'] ), '/' ) && $html['included'] ) {
+			&& ! self::is_self_canonical( (int) $ctx['post_id'] ) && $html['included'] ) {
 			$w[] = 'Canonical points to another URL, but this URL is listed in the HTML sitemap.';
 		}
 
-		if ( 'override' === $xml['reason'] && $xml['included'] && ! $html['included'] && 'noindex' === $html['reason'] ) {
-			$w[] = 'In the XML sitemap by the "include anyway" override, but the HTML sitemap leaves it out (it ignores the override).';
-		}
 
-		// The posts page and the WooCommerce shop: an archive on the front end, a Page in the sitemap.
-		if ( 'archive' === $ctx['type'] && isset( $xml['listed_as'] ) ) {
+		// Tripwire: the posts page and the shop are listed by their archive settings (#282),
+		// so a decision from the Page's own meta should never appear here.
+		if ( 'archive' === $ctx['type'] && isset( $xml['listed_as'] )
+			&& in_array( $xml['reason'], [ 'noindex', 'non_self_canonical', 'excluded_by_post', 'override' ], true ) ) {
 			$w[] = sprintf(
-				'Served with the "%s" archive settings: Page %d\'s own SEO meta (title, description, robots, canonical) is not used, but the sitemap lists that Page using its own meta.',
+				'Served with the "%s" archive settings, but the sitemap decided on Page %d\'s own meta (%s).',
 				$ctx['slug'],
-				(int) $xml['listed_as']
+				(int) $xml['listed_as'],
+				$xml['reason']
 			);
 		}
 
-		if ( 'archive' === $ctx['type'] && ( $xml['included'] || $html['included'] ) ) {
-			$exclude = Archive_Settings::get( $ctx['slug'] )['sitemap_exclude'] ?? [];
-			if ( ! empty( array_filter( (array) $exclude ) ) ) {
-				$w[] = 'The archive settings hide this archive from sitemaps, but that setting is not applied yet: it is still listed.';
+		// Tripwire: sitemap_eligibility() applies the archive's exclusion, so this should never fire (#280).
+		if ( 'archive' === $ctx['type'] ) {
+			foreach ( [ 'xml' => $xml, 'html' => $html ] as $channel => $decision ) {
+				if ( $decision['included'] && self::archive_excludes( $ctx['slug'], $channel ) ) {
+					$w[] = sprintf( 'The archive settings hide this archive from the %s sitemap, but it is still listed.', strtoupper( $channel ) );
+				}
 			}
 		}
 
@@ -1003,6 +1295,9 @@ class Url_Seo_State {
 		}
 		if ( '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true ) ) {
 			$set[] = 'scos_seo_sitemap_noindex_override';
+		}
+		if ( '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_html_noindex_include', true ) ) {
+			$set[] = 'scos_seo_sitemap_html_noindex_include';
 		}
 
 		return $set;

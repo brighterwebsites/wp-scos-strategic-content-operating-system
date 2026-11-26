@@ -21,7 +21,7 @@
  * CPT / Posts archive only:
  *  tldr              – plain string
  *  target_query      – plain string, the GSC search term to win impressions for
- *  sitemap_exclude   – array subset of: xml, html, news
+ *  sitemap_exclude   – array subset of: xml, html (a stored 'news' is ignored)
  *  og_image_id       – attachment ID (int)
  *  pagination_noindex – bool — noindex on /page/2+
  *  canonical_paged    – bool — self-canonical on paginated pages
@@ -55,6 +55,7 @@
  * @subpackage Modules\SeoMeta
  * @version    1.5 | 2026-11-07 — single_robots: default robots for a post type's single posts (#228),
  *                                plus Breakdance template detection to flag on that setting.
+ * v1.6 | 2026-11-26 — sitemap_exclude drops 'news' (there is no news sitemap) (#280).
  * v1.5 | 2026-11-26 — Defaults for archives with no saved settings: search results noindex
  *                      (#284), paginated pages self-canonical (#290). Saved values still win.
  * v1.4 | 2026-10-19 — Field tokens also accept single % (%_acf_name%), like the other tokens.
@@ -586,7 +587,7 @@ class Archive_Settings {
 				$data['target_query']        = sanitize_text_field( $raw['target_query'] ?? '' );
 				$data['sitemap_exclude']     = self::sanitize_checkboxes(
 					$raw['sitemap_exclude'] ?? [],
-					[ 'xml', 'html', 'news' ]
+					[ 'xml', 'html' ]
 				);
 				$data['og_image_id']         = absint( $raw['og_image_id'] ?? 0 );
 				$data['pagination_noindex']  = ! empty( $raw['pagination_noindex'] );

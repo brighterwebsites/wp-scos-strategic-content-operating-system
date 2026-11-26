@@ -25,6 +25,8 @@
  * v1.6 | 2026-09-30 — Register the image-meta-instructions WP-CLI command.
  * v1.7 | 2026-10-25 — Load Redirect_Validator; register the scos redirects WP-CLI command (#222).
  * v1.8 | 2026-11-26 — Load Url_Seo_State; register the scos url-seo-state WP-CLI command (#245).
+ * v1.9 | 2026-11-26 — Register the scos archive-page-meta WP-CLI command (#282).
+ * v1.10 | 2026-11-26 — Register the scos sitemap-noindex-cleanup WP-CLI command (#281).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -78,6 +80,8 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Meta_Box.php';
 		require_once __DIR__ . '/Url_Seo_State.php';
+		require_once __DIR__ . '/Archive_Page_Meta_Migration.php';
+		require_once __DIR__ . '/Sitemap_Noindex_Cleanup.php';
 		require_once __DIR__ . '/Head_Output.php';
 		require_once __DIR__ . '/Archive_Settings.php';
 		require_once __DIR__ . '/Image_SEO.php';
@@ -124,6 +128,26 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/CLI/Image_Meta_Instructions_Command.php';
 		require_once __DIR__ . '/CLI/Redirects_Command.php';
 		require_once __DIR__ . '/CLI/Url_Seo_State_Command.php';
+		require_once __DIR__ . '/CLI/Archive_Page_Meta_Command.php';
+		require_once __DIR__ . '/CLI/Sitemap_Noindex_Cleanup_Command.php';
+
+		\WP_CLI::add_command(
+			'scos sitemap-noindex-cleanup',
+			CLI\Sitemap_Noindex_Cleanup_Command::class,
+			[
+				'shortdesc' => 'Remove the XML sitemap exclusion the meta box used to add for noindex posts.',
+				'longdesc'  => 'Dry run unless --apply. A post no longer noindex keeps its exclusion, so nothing enters the XML sitemap. No AI involved.',
+			]
+		);
+
+		\WP_CLI::add_command(
+			'scos archive-page-meta',
+			CLI\Archive_Page_Meta_Command::class,
+			[
+				'shortdesc' => 'Copy the posts page / shop page meta title and description into Archive Settings where empty.',
+				'longdesc'  => 'Dry run unless --apply. Never overwrites an archive value. No AI involved.',
+			]
+		);
 
 		\WP_CLI::add_command(
 			'scos url-seo-state',

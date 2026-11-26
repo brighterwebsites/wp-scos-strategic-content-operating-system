@@ -28,9 +28,31 @@
  * v1.4 | 2026-11-26 — Dot on the Advanced tab when a field there holds a value (#113).
  * v1.5 | 2026-11-26 — "Include in XML sitemap anyway" is always rendered and shown as soon as
  *                      noindex is ticked or a non-self canonical is typed, without a save (#112 QA).
+ * v1.6 | 2026-11-26 — Non-self canonical uses Url_Seo_State::is_self_canonical() (#283).
+ * v1.7 | 2026-11-26 — Posts page / shop page: title, description, robots, canonical and sitemap
+ *                      fields replaced by a notice linking to Archive Settings (#282).
+ * v1.8 | 2026-11-26 — "HTML sitemap: list for visitors" box for noindex posts; XML override
+ *                      relabelled; notices say which sitemap (#281).
+ *   $html_noindex_include      bool   — list in the HTML sitemap even though noindex (#281)
+ *   $archive_page              ?string — 'post' / 'product' when this Page is served as that archive
+ *   $archive_page_link         string  — Archive Settings link for it
  */
 
 defined( 'ABSPATH' ) || exit;
+
+$archive_notice = '';
+if ( ! empty( $archive_page ) ) {
+	$archive_notice = sprintf(
+		'<div class="scos-seo-notice scos-seo-notice--warn">%s <a href="%s">%s</a></div>',
+		esc_html( sprintf(
+			/* translators: %s: "blog (posts page)" or "shop" */
+			__( 'This page is served as the %s archive, so its meta title, description, robots, canonical and sitemap settings come from SEO › Archive Settings, not from here.', 'site-essentials' ),
+			'post' === $archive_page ? __( 'blog (posts page)', 'site-essentials' ) : __( 'shop', 'site-essentials' )
+		) ),
+		esc_url( $archive_page_link ),
+		esc_html__( 'Edit in Archive Settings', 'site-essentials' )
+	);
+}
 ?>
 
 <div class="scos-seo-wrap">
@@ -133,6 +155,7 @@ defined( 'ABSPATH' ) || exit;
 			<p class="scos-seo-help"><?php esc_html_e( 'Bold and lists are supported (no images). Shown via [tldr] shortcode. Also used for Google Speakable.', 'site-essentials' ); ?></p>
 		</div>
 
+		<?php if ( empty( $archive_page ) ) : ?>
 		<!-- Meta Title -->
 		<div class="scos-seo-field scos-seo-field--counted">
 			<label for="scos_seo_title">
@@ -168,11 +191,16 @@ defined( 'ABSPATH' ) || exit;
 			</div>
 		</div>
 
+		<?php else : ?>
+			<?php echo $archive_notice; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped when built ?>
+		<?php endif; ?>
+
 	</div><!-- /core -->
 
 	<!-- ══ ADVANCED TAB ══ -->
 	<div class="scos-seo-tab-panel" id="scos-seo-tab-advanced" role="tabpanel" hidden>
 
+		<?php if ( empty( $archive_page ) ) : ?>
 		<!-- Canonical URL -->
 		<div class="scos-seo-field">
 			<label for="scos_seo_canonical">
@@ -229,6 +257,10 @@ defined( 'ABSPATH' ) || exit;
 			<?php endif; ?>
 		</div>
 
+		<?php else : ?>
+			<?php echo $archive_notice; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped when built ?>
+		<?php endif; ?>
+
 		<!-- Freeze Modified Date -->
 		<div class="scos-seo-field">
 			<label><?php esc_html_e( 'Modified Date', 'site-essentials' ); ?></label>
@@ -260,23 +292,23 @@ defined( 'ABSPATH' ) || exit;
 			<?php endif; ?>
 		</div>
 
+		<?php if ( empty( $archive_page ) ) : ?>
 		<!-- Sitemap Visibility -->
 		<div class="scos-seo-field">
 			<label><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></label>
 
 			<?php
 			$noindex_active   = in_array( 'noindex', $robots, true ) || in_array( 'noindex', $type_default, true );
-			$non_self_canon   = ! empty( $canonical ) && $canonical !== get_permalink( $post->ID );
-			$auto_excluded    = $sitemap_noindex_auto || $non_self_canon;
+			$non_self_canon   = ! \SiteEssentials\Modules\SeoMeta\Url_Seo_State::is_self_canonical( $post->ID );
 			?>
 
 			<?php if ( $noindex_active && ! $sitemap_noindex_override ) : ?>
 				<div class="scos-seo-notice scos-seo-notice--warn" id="scos-noindex-sitemap-notice">
-					<?php esc_html_e( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ); ?>
+					<?php esc_html_e( 'This page has been removed from the XML sitemap because noindex is set.', 'site-essentials' ); ?>
 				</div>
 			<?php elseif ( $non_self_canon && ! $sitemap_noindex_override ) : ?>
 				<div class="scos-seo-notice scos-seo-notice--warn" id="scos-canonical-sitemap-notice">
-					<?php esc_html_e( 'This page has been removed from the sitemap because a non-self canonical is set.', 'site-essentials' ); ?>
+					<?php esc_html_e( 'This page has been removed from the XML and HTML sitemaps because a non-self canonical is set.', 'site-essentials' ); ?>
 				</div>
 			<?php endif; ?>
 
@@ -301,13 +333,29 @@ defined( 'ABSPATH' ) || exit;
 						id="scos_seo_sitemap_noindex_override"
 						value="1"
 						<?php checked( $sitemap_noindex_override ); ?>>
-					<span><?php esc_html_e( 'Include in XML sitemap anyway', 'site-essentials' ); ?></span>
+					<span><?php esc_html_e( 'XML sitemap: keep listed despite noindex/canonical (asks Google to recrawl and drop it)', 'site-essentials' ); ?></span>
 				</label>
 				<p class="scos-seo-help">
-					<?php esc_html_e( 'Edge case override — e.g. staging-style noindex pages you still want crawled, or deliberate cross-domain canonicals (syndicated content).', 'site-essentials' ); ?>
+					<?php esc_html_e( 'Edge case — e.g. a page you just set to noindex and want Google to recrawl sooner, or a deliberate cross-domain canonical (syndicated content). XML sitemap only.', 'site-essentials' ); ?>
+				</p>
+			</div>
+
+			<div id="scos-seo-html-noindex-row" <?php echo ( $noindex_active || $html_noindex_include ) ? '' : 'hidden'; ?>>
+				<label class="scos-seo-check-label" style="margin-top:6px">
+					<input type="checkbox"
+						name="scos_seo_sitemap_html_noindex_include"
+						id="scos_seo_sitemap_html_noindex_include"
+						value="1"
+						<?php checked( $html_noindex_include ); ?>>
+					<span><?php esc_html_e( 'HTML sitemap: list for visitors even though noindex', 'site-essentials' ); ?></span>
+				</label>
+				<p class="scos-seo-help">
+					<?php esc_html_e( 'The HTML sitemap is for people finding their way around. Search engines still get noindex.', 'site-essentials' ); ?>
 				</p>
 			</div>
 		</div>
+
+		<?php endif; ?>
 
 	</div><!-- /advanced -->
 

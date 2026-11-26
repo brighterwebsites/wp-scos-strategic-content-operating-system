@@ -6,7 +6,7 @@
  * Purpose: Adds custom styles to Privacy Policy and Terms pages, and improves
  * accessibility by adding a skip link for keyboard/screen reader users.
  *
- * Version: 4.0.0
+ * Version: 4.1.0 | 2026-11-26 - defers to the Business Info module's body class when it is on (#230)
  *
  * Responsibilities:
  * - Enqueue inline CSS only on the Privacy Policy page for consistent formatting.
@@ -28,6 +28,11 @@ defined('ABSPATH') || exit;
 
 // Add body class for privacy policy page to scope CSS
 add_filter('body_class', function($classes) {
+    // Business Info module on: SiteEssentials\Modules\BusinessInfo\Privacy_Policy::body_class()
+    // adds the class on the Settings > Privacy page, whatever its slug (#137, #230).
+    if (defined('SCOS_BIZ_ACTIVE')) {
+        return $classes;
+    }
     if (is_page('privacy-policy')) {
         $classes[] = 'page-slug-privacy-policy';
     }

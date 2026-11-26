@@ -7,7 +7,10 @@
  * scos_biz_ option prefix and skip legacy hook registrations.
  *
  * Option keys: scos_biz_* (migrated from bw_* on first admin_init via scos_biz_run_migration())
- * Shortcodes:  [business_info setting="..."], [site_copyright] (still in brighter-core)
+ * Shortcodes:  [business_info setting="..."], [site_copyright] (still in brighter-core),
+ *              [scos_privacy_policy] (Privacy_Policy, #230)
+ *
+ * v1.1 | 2026-11-26 — Privacy policy shortcode and its settings section.
  *
  * @package    SiteEssentials
  * @subpackage Modules\BusinessInfo
@@ -45,7 +48,7 @@ class BusinessInfo_Module implements Module_Interface {
 	}
 
 	public static function get_version() {
-		return '1.0.0';
+		return '1.1.0';
 	}
 
 	public function init() {
@@ -56,6 +59,8 @@ class BusinessInfo_Module implements Module_Interface {
 		// Register settings on admin_init — brighter-business-info.php's own hook
 		// will also fire but will bail early due to the static gate in its function.
 		add_action( 'admin_init', 'brighterweb_register_business_info_settings', 10 );
+
+		Privacy_Policy::init();
 	}
 
 	public function render_settings() {

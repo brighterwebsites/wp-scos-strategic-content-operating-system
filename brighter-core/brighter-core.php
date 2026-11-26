@@ -66,7 +66,7 @@ function brighter_get_whitelisted_modules() {
             'custom-wpemail',
             'helpers',
             'php-limits',
-            'privacy-policy-style',
+            'privacy-policy-body-class',
             'technical-settings',
             'bw-content-strategy',
             // bw-ga4-seeder, bw-ga4-seed-admin moved to site-essentials Analytics module (#93)
@@ -207,7 +207,7 @@ function brighter_load_modules() {
 	'scos-schema-output',           // SCOS Schema @graph output (JSON-LD)
  	'bw-support-cache-dashbrd',
         // bw-faq removed — see site-essentials/Modules/CustomPosts/FAQ/
-        'privacy-policy-style',
+        'privacy-policy-body-class',
         'class-author-extension',       // Module 15: Author Extension (E-E-A-T fields)
         'post-type-enhancements',       // Add author support to custom post types
 

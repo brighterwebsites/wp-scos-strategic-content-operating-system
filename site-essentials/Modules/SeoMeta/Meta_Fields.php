@@ -12,6 +12,7 @@
  * v1.4 | 2026-07-24 — Stop excluding 'product' from fallback post type list (only
  *                      used when ContentArchitecture module is inactive).
  * v1.5 | 2026-10-18 — Register scos_seo_target_query.
+ * v1.6 | 2026-11-26 — Register scos_seo_sitemap_html_noindex_include (#281).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -76,7 +77,17 @@ class Meta_Fields {
 			'auth_callback'     => function () { return current_user_can( 'edit_posts' ); },
 		] );
 
-		// Sitemap: internal flag — xml exclusion was auto-set by noindex (not manually set).
+		// Sitemap: list in the HTML sitemap for visitors even though the post is noindex (#281).
+		register_post_meta( '', 'scos_seo_sitemap_html_noindex_include', [
+			'type'              => 'boolean',
+			'single'            => true,
+			'sanitize_callback' => 'rest_sanitize_boolean',
+			'show_in_rest'      => false,
+			'auth_callback'     => function () { return current_user_can( 'edit_posts' ); },
+		] );
+
+		// Sitemap: legacy flag — xml exclusion was auto-set by noindex. No longer written (#281);
+		// a save clears it, and wp scos sitemap-noindex-cleanup clears it in bulk.
 		register_post_meta( '', 'scos_seo_sitemap_noindex_auto', [
 			'type'              => 'boolean',
 			'single'            => true,

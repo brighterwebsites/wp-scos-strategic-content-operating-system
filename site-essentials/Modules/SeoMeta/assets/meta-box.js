@@ -3,6 +3,7 @@
  * Tab switching + character counter with progress bar, and a guard that keeps
  * the TLDR editor usable inside the block editor's meta box pane.
  *
+ * v1.5 | 2026-11-26 — "HTML sitemap: list for visitors" box follows noindex live (#281).
  * v1.4 | 2026-11-26 — Canonical hints compare with scosSameUrl(), the mirror of
  *                      Url_Seo_State::same_url() (#283).
  * v1.3 | 2026-11-26 — "Include in XML sitemap anyway" appears as soon as noindex is ticked or a
@@ -108,6 +109,7 @@ window.scosSameUrl = function (a, b) {
 
 		// Keep the override visible while it is ticked, so it can be unticked.
 		$row.prop('hidden', !(isNoindex || isNonSelf || $('#scos_seo_sitemap_noindex_override').is(':checked')));
+		$('#scos-seo-html-noindex-row').prop('hidden', !(isNoindex || $('#scos_seo_sitemap_html_noindex_include').is(':checked')));
 	}
 
 	$(document).on('change', 'input[name="scos_seo_robots[]"]', updateNoindexSitemapNotice);
@@ -141,7 +143,8 @@ window.scosSameUrl = function (a, b) {
 			$panel.find('input[name="scos_seo_robots[]"]:checked').length > 0 ||
 			freezeOn !== globalFreeze ||
 			$panel.find('input[name="scos_seo_sitemap_exclude[]"]:checked').length > 0 ||
-			$('#scos_seo_sitemap_noindex_override').is(':checked');
+			$('#scos_seo_sitemap_noindex_override').is(':checked') ||
+			$('#scos_seo_sitemap_html_noindex_include').is(':checked');
 
 		$('#scos-seo-advanced-dot').prop('hidden', !isSet);
 	}

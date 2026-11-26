@@ -31,6 +31,9 @@
  * v1.6 | 2026-11-26 — Non-self canonical uses Url_Seo_State::is_self_canonical() (#283).
  * v1.7 | 2026-11-26 — Posts page / shop page: title, description, robots, canonical and sitemap
  *                      fields replaced by a notice linking to Archive Settings (#282).
+ * v1.8 | 2026-11-26 — "HTML sitemap: list for visitors" box for noindex posts; XML override
+ *                      relabelled; notices say which sitemap (#281).
+ *   $html_noindex_include      bool   — list in the HTML sitemap even though noindex (#281)
  *   $archive_page              ?string — 'post' / 'product' when this Page is served as that archive
  *   $archive_page_link         string  — Archive Settings link for it
  */
@@ -297,16 +300,15 @@ if ( ! empty( $archive_page ) ) {
 			<?php
 			$noindex_active   = in_array( 'noindex', $robots, true ) || in_array( 'noindex', $type_default, true );
 			$non_self_canon   = ! \SiteEssentials\Modules\SeoMeta\Url_Seo_State::is_self_canonical( $post->ID );
-			$auto_excluded    = $sitemap_noindex_auto || $non_self_canon;
 			?>
 
 			<?php if ( $noindex_active && ! $sitemap_noindex_override ) : ?>
 				<div class="scos-seo-notice scos-seo-notice--warn" id="scos-noindex-sitemap-notice">
-					<?php esc_html_e( 'This page has been removed from the sitemap because noindex is set.', 'site-essentials' ); ?>
+					<?php esc_html_e( 'This page has been removed from the XML sitemap because noindex is set.', 'site-essentials' ); ?>
 				</div>
 			<?php elseif ( $non_self_canon && ! $sitemap_noindex_override ) : ?>
 				<div class="scos-seo-notice scos-seo-notice--warn" id="scos-canonical-sitemap-notice">
-					<?php esc_html_e( 'This page has been removed from the sitemap because a non-self canonical is set.', 'site-essentials' ); ?>
+					<?php esc_html_e( 'This page has been removed from the XML and HTML sitemaps because a non-self canonical is set.', 'site-essentials' ); ?>
 				</div>
 			<?php endif; ?>
 
@@ -331,10 +333,24 @@ if ( ! empty( $archive_page ) ) {
 						id="scos_seo_sitemap_noindex_override"
 						value="1"
 						<?php checked( $sitemap_noindex_override ); ?>>
-					<span><?php esc_html_e( 'Include in XML sitemap anyway', 'site-essentials' ); ?></span>
+					<span><?php esc_html_e( 'XML sitemap: keep listed despite noindex/canonical (asks Google to recrawl and drop it)', 'site-essentials' ); ?></span>
 				</label>
 				<p class="scos-seo-help">
-					<?php esc_html_e( 'Edge case override — e.g. staging-style noindex pages you still want crawled, or deliberate cross-domain canonicals (syndicated content).', 'site-essentials' ); ?>
+					<?php esc_html_e( 'Edge case — e.g. a page you just set to noindex and want Google to recrawl sooner, or a deliberate cross-domain canonical (syndicated content). XML sitemap only.', 'site-essentials' ); ?>
+				</p>
+			</div>
+
+			<div id="scos-seo-html-noindex-row" <?php echo ( $noindex_active || $html_noindex_include ) ? '' : 'hidden'; ?>>
+				<label class="scos-seo-check-label" style="margin-top:6px">
+					<input type="checkbox"
+						name="scos_seo_sitemap_html_noindex_include"
+						id="scos_seo_sitemap_html_noindex_include"
+						value="1"
+						<?php checked( $html_noindex_include ); ?>>
+					<span><?php esc_html_e( 'HTML sitemap: list for visitors even though noindex', 'site-essentials' ); ?></span>
+				</label>
+				<p class="scos-seo-help">
+					<?php esc_html_e( 'The HTML sitemap is for people finding their way around. Search engines still get noindex.', 'site-essentials' ); ?>
 				</p>
 			</div>
 		</div>

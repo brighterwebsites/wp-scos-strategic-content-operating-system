@@ -23,8 +23,10 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.7 | 2026-11-26
+ * @version    1.8 | 2026-11-26
  *
+ * v1.8 | 2026-11-26 — XML vs HTML rule table (#281): the HTML sitemap leaves out non-self canonical
+ *                      posts, and lists a noindex post only when its "list for visitors" box is ticked.
  * v1.7 | 2026-11-26 — The posts page and the shop page are listed by their Archive Settings (robots,
  *                      sitemap exclude, redirects), not the Page's own meta (#282).
  * v1.6 | 2026-11-26 — A CPT archive's "Exclude from XML/HTML sitemap" is applied (excluded_by_archive) (#280).
@@ -611,19 +613,27 @@ class Url_Seo_State {
 	}
 
 	/**
-	 * HTML sitemap decision for one post, from its own meta. Unlike the XML sitemap
-	 * it ignores the canonical and the override.
+	 * HTML sitemap decision for one post, from its own meta (#281). The HTML sitemap
+	 * is for people: a non-self canonical is a duplicate (its target is listed), and a
+	 * noindex post is listed only when its "list for visitors" box is ticked. The XML
+	 * override does not apply here.
 	 *
 	 * @param int $post_id
-	 * @return array{included:bool, reason:string} reason: noindex, excluded_by_post or included.
+	 * @return array{included:bool, reason:string} reason: excluded_by_post, non_self_canonical,
+	 *                                             noindex, listed_for_visitors or included.
 	 */
 	public static function html_post_decision( int $post_id ): array {
-		if ( self::post_is_noindex( $post_id ) ) {
-			return [ 'included' => false, 'reason' => 'noindex' ];
-		}
 		$exclude = (array) get_post_meta( $post_id, 'scos_seo_sitemap_exclude', true );
 		if ( in_array( 'html', $exclude, true ) ) {
 			return [ 'included' => false, 'reason' => 'excluded_by_post' ];
+		}
+		if ( ! self::is_self_canonical( $post_id ) ) {
+			return [ 'included' => false, 'reason' => 'non_self_canonical' ];
+		}
+		if ( self::post_is_noindex( $post_id ) ) {
+			return '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_html_noindex_include', true )
+				? [ 'included' => true, 'reason' => 'listed_for_visitors' ]
+				: [ 'included' => false, 'reason' => 'noindex' ];
 		}
 		return [ 'included' => true, 'reason' => 'included' ];
 	}
@@ -1195,7 +1205,8 @@ class Url_Seo_State {
 		} elseif ( ! $robots['index'] && $xml['included'] && 'override' !== $xml['reason'] ) {
 			$w[] = 'Served as noindex, but listed in the XML sitemap.';
 		}
-		if ( ! $robots['index'] && $html['included'] && 'blog_public' !== $robots['source'] ) {
+		if ( ! $robots['index'] && $html['included'] && 'blog_public' !== $robots['source']
+			&& 'listed_for_visitors' !== $html['reason'] ) {
 			$w[] = 'Served as noindex, but listed in the HTML sitemap.';
 		}
 
@@ -1209,14 +1220,12 @@ class Url_Seo_State {
 			}
 		}
 
+		// Tripwire: the HTML sitemap leaves non-self canonicals out (#281), so this should never fire.
 		if ( 'singular' === $ctx['type'] && 'post' === $canonical['source']
 			&& ! self::is_self_canonical( (int) $ctx['post_id'] ) && $html['included'] ) {
 			$w[] = 'Canonical points to another URL, but this URL is listed in the HTML sitemap.';
 		}
 
-		if ( 'override' === $xml['reason'] && $xml['included'] && ! $html['included'] && 'noindex' === $html['reason'] ) {
-			$w[] = 'In the XML sitemap by the "include anyway" override, but the HTML sitemap leaves it out (it ignores the override).';
-		}
 
 		// Tripwire: the posts page and the shop are listed by their archive settings (#282),
 		// so a decision from the Page's own meta should never appear here.
@@ -1277,6 +1286,9 @@ class Url_Seo_State {
 		}
 		if ( '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true ) ) {
 			$set[] = 'scos_seo_sitemap_noindex_override';
+		}
+		if ( '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_html_noindex_include', true ) ) {
+			$set[] = 'scos_seo_sitemap_html_noindex_include';
 		}
 
 		return $set;

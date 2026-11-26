@@ -32,6 +32,9 @@
  *                      301 via Single_Url_Guard to the intent-goal page, scos_faq_single_redirect, or
  *                      scos_faq_archive_redirect. /faq/ now honours the archive redirect when the archive
  *                      is off (it used to 404), and /faq/topic/ goes straight to the final URL in one hop.
+ * v1.9 | 2026-11-27 — get_by_ids() leaves out FAQs with no visible answer (has_visible_answer()), so a
+ *                      published stub never shows as an empty question, and page and schema list the same
+ *                      FAQs (#248). Pass $answered_only = false to get them all.
  *
  * @package    SiteEssentials
  * @subpackage Modules\CustomPosts\FAQ
@@ -985,19 +988,36 @@ class FAQ_Module {
 	}
 
 	/**
+	 * Whether the FAQ's body has text a visitor would read. The visible answer is the
+	 * post body, so the Schema Answer field alone doesn't count (#248).
+	 *
+	 * Shortcode text counts as an answer (it renders), so no do_shortcode() here.
+	 *
+	 * @since 1.9
+	 * @param \WP_Post $faq FAQ post.
+	 */
+	public static function has_visible_answer( \WP_Post $faq ): bool {
+		return '' !== trim( html_entity_decode( wp_strip_all_tags( (string) $faq->post_content ), ENT_QUOTES, 'UTF-8' ), " \t\n\r\0\x0B\xC2\xA0" );
+	}
+
+	/**
 	 * Get multiple published FAQ posts by IDs, preserving order.
 	 *
+	 * Every caller renders them (block, [faqs], the Breakdance element, FAQPage
+	 * schema), so by default FAQs with no visible answer are left out (#248).
+	 *
 	 * @since 1.0.0
-	 * @param int[] $faq_ids FAQ post IDs.
+	 * @param int[] $faq_ids       FAQ post IDs.
+	 * @param bool  $answered_only Leave out FAQs with no visible answer.
 	 * @return \WP_Post[]
 	 */
-	public static function get_by_ids( array $faq_ids ): array {
+	public static function get_by_ids( array $faq_ids, bool $answered_only = true ): array {
 		$faq_ids = array_filter( array_map( 'intval', $faq_ids ) );
 		if ( empty( $faq_ids ) ) {
 			return [];
 		}
 
-		return get_posts( [
+		$faqs = get_posts( [
 			'post_type'      => self::POST_TYPE,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
@@ -1005,6 +1025,11 @@ class FAQ_Module {
 			'orderby'        => 'post__in',
 			'no_found_rows'  => true,
 		] );
+
+		if ( ! $answered_only ) {
+			return $faqs;
+		}
+		return array_values( array_filter( $faqs, [ self::class, 'has_visible_answer' ] ) );
 	}
 
 	/**

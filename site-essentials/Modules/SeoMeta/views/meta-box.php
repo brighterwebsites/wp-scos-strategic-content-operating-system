@@ -29,9 +29,27 @@
  * v1.5 | 2026-11-26 — "Include in XML sitemap anyway" is always rendered and shown as soon as
  *                      noindex is ticked or a non-self canonical is typed, without a save (#112 QA).
  * v1.6 | 2026-11-26 — Non-self canonical uses Url_Seo_State::is_self_canonical() (#283).
+ * v1.7 | 2026-11-26 — Posts page / shop page: title, description, robots, canonical and sitemap
+ *                      fields replaced by a notice linking to Archive Settings (#282).
+ *   $archive_page              ?string — 'post' / 'product' when this Page is served as that archive
+ *   $archive_page_link         string  — Archive Settings link for it
  */
 
 defined( 'ABSPATH' ) || exit;
+
+$archive_notice = '';
+if ( ! empty( $archive_page ) ) {
+	$archive_notice = sprintf(
+		'<div class="scos-seo-notice scos-seo-notice--warn">%s <a href="%s">%s</a></div>',
+		esc_html( sprintf(
+			/* translators: %s: "blog (posts page)" or "shop" */
+			__( 'This page is served as the %s archive, so its meta title, description, robots, canonical and sitemap settings come from SEO › Archive Settings, not from here.', 'site-essentials' ),
+			'post' === $archive_page ? __( 'blog (posts page)', 'site-essentials' ) : __( 'shop', 'site-essentials' )
+		) ),
+		esc_url( $archive_page_link ),
+		esc_html__( 'Edit in Archive Settings', 'site-essentials' )
+	);
+}
 ?>
 
 <div class="scos-seo-wrap">
@@ -134,6 +152,7 @@ defined( 'ABSPATH' ) || exit;
 			<p class="scos-seo-help"><?php esc_html_e( 'Bold and lists are supported (no images). Shown via [tldr] shortcode. Also used for Google Speakable.', 'site-essentials' ); ?></p>
 		</div>
 
+		<?php if ( empty( $archive_page ) ) : ?>
 		<!-- Meta Title -->
 		<div class="scos-seo-field scos-seo-field--counted">
 			<label for="scos_seo_title">
@@ -169,11 +188,16 @@ defined( 'ABSPATH' ) || exit;
 			</div>
 		</div>
 
+		<?php else : ?>
+			<?php echo $archive_notice; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped when built ?>
+		<?php endif; ?>
+
 	</div><!-- /core -->
 
 	<!-- ══ ADVANCED TAB ══ -->
 	<div class="scos-seo-tab-panel" id="scos-seo-tab-advanced" role="tabpanel" hidden>
 
+		<?php if ( empty( $archive_page ) ) : ?>
 		<!-- Canonical URL -->
 		<div class="scos-seo-field">
 			<label for="scos_seo_canonical">
@@ -230,6 +254,10 @@ defined( 'ABSPATH' ) || exit;
 			<?php endif; ?>
 		</div>
 
+		<?php else : ?>
+			<?php echo $archive_notice; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped when built ?>
+		<?php endif; ?>
+
 		<!-- Freeze Modified Date -->
 		<div class="scos-seo-field">
 			<label><?php esc_html_e( 'Modified Date', 'site-essentials' ); ?></label>
@@ -261,6 +289,7 @@ defined( 'ABSPATH' ) || exit;
 			<?php endif; ?>
 		</div>
 
+		<?php if ( empty( $archive_page ) ) : ?>
 		<!-- Sitemap Visibility -->
 		<div class="scos-seo-field">
 			<label><?php esc_html_e( 'Sitemap Visibility', 'site-essentials' ); ?></label>
@@ -309,6 +338,8 @@ defined( 'ABSPATH' ) || exit;
 				</p>
 			</div>
 		</div>
+
+		<?php endif; ?>
 
 	</div><!-- /advanced -->
 

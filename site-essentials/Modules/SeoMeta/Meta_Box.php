@@ -28,6 +28,9 @@
  *                       before the editor's REST save (#112 QA). Breakdance's automatic
  *                       launcher-block save on every block-editor open no longer bumps the
  *                       date (builder saves over admin-ajax still do).
+ * v1.13 | 2026-11-26 — On the posts page and the shop page, title, description, robots, canonical
+ *                       and sitemap fields are hidden with a link to Archive Settings, and a
+ *                       save leaves their stored values alone (#282).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -144,6 +147,12 @@ class Meta_Box {
 		// Advanced-tab fields with a value on this post (#113): drives the tab's dot.
 		$advanced_overrides = Url_Seo_State::post_overrides( (int) $post->ID );
 
+		// The posts page and the shop are served as archives: their SEO is in Archive Settings (#282).
+		$archive_page      = Url_Seo_State::archive_slug_for_page( (int) $post->ID );
+		$archive_page_link = $archive_page
+			? add_query_arg( [ 'page' => \SiteEssentials\Core\Admin_UI::SEO_PAGE_SLUG, 'tab' => 'meta' ], admin_url( 'admin.php' ) ) . '#scos-archive-pt-' . $archive_page
+			: '';
+
 		include __DIR__ . '/views/meta-box.php';
 	}
 
@@ -175,6 +184,13 @@ class Meta_Box {
 		if ( isset( $_POST['scos_seo_tldr'] ) ) {
 			$val = wp_kses_post( $_POST['scos_seo_tldr'] );
 			self::update_or_delete( $post_id, 'scos_seo_tldr', $val );
+		}
+
+		// Posts page / shop: the title, description, canonical, robots and sitemap fields
+		// aren't shown (Archive Settings own them), so leave what is stored (#282).
+		if ( null !== Url_Seo_State::archive_slug_for_page( (int) $post_id ) ) {
+			update_post_meta( $post_id, 'scos_seo_freeze_og_date', ! empty( $_POST['scos_seo_freeze_og_date'] ) ? '1' : '0' );
+			return;
 		}
 
 		// ---- Meta title ----

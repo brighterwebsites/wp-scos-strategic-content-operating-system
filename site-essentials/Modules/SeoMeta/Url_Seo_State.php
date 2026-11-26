@@ -23,8 +23,10 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.6 | 2026-11-26
+ * @version    1.7 | 2026-11-26
  *
+ * v1.7 | 2026-11-26 — The posts page and the shop page are listed by their Archive Settings (robots,
+ *                      sitemap exclude, redirects), not the Page's own meta (#282).
  * v1.6 | 2026-11-26 — A CPT archive's "Exclude from XML/HTML sitemap" is applied (excluded_by_archive) (#280).
  * v1.5 | 2026-11-26 — noindex CPT archives and taxonomies are out of the sitemaps (archive_noindex);
  *                      with "Discourage search engines" on, the XML sitemap lists nothing (#279).
@@ -766,17 +768,18 @@ class Url_Seo_State {
 		}
 
 		// CPT archive.
-		if ( ! in_array( $slug, $types, true ) ) {
-			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
-		}
 		$obj = get_post_type_object( $slug );
 		if ( ! $obj || ! $obj->has_archive || in_array( $slug, [ 'post', 'page' ], true ) ) {
 			return [ 'included' => false, 'reason' => 'no_archive' ];
 		}
+		// A Page as the archive URL (the shop): listed once, in the page sitemap (#282).
 		$archive_url = (string) get_post_type_archive_link( $slug );
 		$page_id     = self::archive_url_page_id( $archive_url );
 		if ( $page_id ) {
 			return self::xml_for_post( $page_id, $settings ) + [ 'listed_as' => $page_id ];
+		}
+		if ( ! in_array( $slug, $types, true ) ) {
+			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
 		}
 		if ( self::archive_is_noindex( $slug ) ) {
 			return [ 'included' => false, 'reason' => 'archive_noindex' ];
@@ -792,7 +795,49 @@ class Url_Seo_State {
 	 */
 	private static function xml_for_post( int $post_id, array $settings ): array {
 		$base = self::sitemap_query_filter( $post_id, $settings );
-		return null !== $base ? $base : self::xml_post_decision( $post_id );
+		return null !== $base ? $base : self::post_meta_decision( $post_id, 'xml' );
+	}
+
+	/**
+	 * The archive a Page is served as: 'post' for the posts page, 'product' for
+	 * the WooCommerce shop, else null. Those Pages' SEO comes from Archive Settings.
+	 *
+	 * @param int $page_id
+	 * @return string|null
+	 */
+	public static function archive_slug_for_page( int $page_id ): ?string {
+		if ( $page_id <= 0 ) {
+			return null;
+		}
+		if ( $page_id === (int) get_option( 'page_for_posts' ) ) {
+			return 'post';
+		}
+		if ( function_exists( 'wc_get_page_id' ) && post_type_exists( 'product' ) && $page_id === (int) wc_get_page_id( 'shop' ) ) {
+			return 'product';
+		}
+		return null;
+	}
+
+	/**
+	 * A post's own sitemap decision for one channel. The posts page and the shop
+	 * page follow their archive's settings, as the page they serve does (#282).
+	 *
+	 * @param int    $post_id
+	 * @param string $channel 'xml' or 'html'.
+	 * @return array{included:bool, reason:string}
+	 */
+	private static function post_meta_decision( int $post_id, string $channel ): array {
+		$archive = self::archive_slug_for_page( $post_id );
+		if ( null !== $archive ) {
+			if ( self::archive_is_noindex( $archive ) ) {
+				return [ 'included' => false, 'reason' => 'archive_noindex' ];
+			}
+			if ( self::archive_excludes( $archive, $channel ) ) {
+				return [ 'included' => false, 'reason' => 'excluded_by_archive' ];
+			}
+			return [ 'included' => true, 'reason' => 'included' ];
+		}
+		return 'html' === $channel ? self::html_post_decision( $post_id ) : self::xml_post_decision( $post_id );
 	}
 
 	/**
@@ -838,7 +883,7 @@ class Url_Seo_State {
 
 		if ( $post_id ) {
 			$base = self::sitemap_query_filter( $post_id, $settings );
-			$res  = null !== $base ? $base : self::html_post_decision( $post_id );
+			$res  = null !== $base ? $base : self::post_meta_decision( $post_id, 'html' );
 			return 'singular' === $ctx['type'] ? $res : $res + [ 'listed_as' => $post_id ];
 		}
 
@@ -928,7 +973,7 @@ class Url_Seo_State {
 		if ( 'xml' === $channel && ! self::search_engines_allowed() ) {
 			return [ 'included' => false, 'reason' => 'blog_public' ];
 		}
-		$res = 'html' === $channel ? self::html_post_decision( $post_id ) : self::xml_post_decision( $post_id );
+		$res = self::post_meta_decision( $post_id, $channel );
 		if ( $res['included'] ) {
 			$rule = self::rule_redirect_for_url( (string) get_permalink( $post_id ) );
 			if ( null !== $rule ) {
@@ -1173,12 +1218,15 @@ class Url_Seo_State {
 			$w[] = 'In the XML sitemap by the "include anyway" override, but the HTML sitemap leaves it out (it ignores the override).';
 		}
 
-		// The posts page and the WooCommerce shop: an archive on the front end, a Page in the sitemap.
-		if ( 'archive' === $ctx['type'] && isset( $xml['listed_as'] ) ) {
+		// Tripwire: the posts page and the shop are listed by their archive settings (#282),
+		// so a decision from the Page's own meta should never appear here.
+		if ( 'archive' === $ctx['type'] && isset( $xml['listed_as'] )
+			&& in_array( $xml['reason'], [ 'noindex', 'non_self_canonical', 'excluded_by_post', 'override' ], true ) ) {
 			$w[] = sprintf(
-				'Served with the "%s" archive settings: Page %d\'s own SEO meta (title, description, robots, canonical) is not used, but the sitemap lists that Page using its own meta.',
+				'Served with the "%s" archive settings, but the sitemap decided on Page %d\'s own meta (%s).',
 				$ctx['slug'],
-				(int) $xml['listed_as']
+				(int) $xml['listed_as'],
+				$xml['reason']
 			);
 		}
 

@@ -23,6 +23,9 @@
  * v1.10 | 2026-10-25 — Load the Validate_Redirects ability (#222).
  * v1.11 | 2026-11-26 — Load the Get_Url_Seo_State ability (#245); the Advanced tab shows a dot
  *                       when a field on it holds a value for this post (#113).
+ * v1.12 | 2026-11-26 — Freeze modified date takes effect on the save that changes it: uses the
+ *                       submitted checkbox, and in the block editor restores the date from
+ *                       before the editor's REST save (#112 QA).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -249,6 +252,22 @@ class Meta_Box {
 	// -------------------------------------------------------------------------
 
 	/**
+	 * The freeze checkbox as submitted with this save: '1', '0', or null when the
+	 * request did not come from this post's SEO meta box.
+	 */
+	private static function submitted_freeze_flag( int $post_id ): ?string {
+		if ( ! isset( $_POST['scos_seo_nonce'] )
+			|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['scos_seo_nonce'] ) ), 'scos_seo_meta_box' )
+			|| ( isset( $_POST['post_ID'] ) && absint( $_POST['post_ID'] ) !== $post_id )
+			|| ! current_user_can( 'edit_post', $post_id ) ) {
+			return null;
+		}
+		return ! empty( $_POST['scos_seo_freeze_og_date'] ) ? '1' : '0';
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
 	 * Prevent WP from bumping post_modified when:
 	 *   - The global "freeze all modified dates" option is on, OR
 	 *   - The per-post scos_seo_freeze_og_date flag is checked.
@@ -273,7 +292,20 @@ class Meta_Box {
 		}
 
 		$global_freeze = (bool) get_option( 'scos_seo_freeze_modified_date', false );
-		$per_post      = get_post_meta( $post_id, 'scos_seo_freeze_og_date', true );
+		$submitted     = self::submitted_freeze_flag( $post_id );
+		$per_post      = $submitted ?? get_post_meta( $post_id, 'scos_seo_freeze_og_date', true );
+
+		// The block editor saves the post over REST first and the meta box in a second
+		// request (meta-box-loader). Remember the date from before the first save, so the
+		// second request can restore it when this save ticks the box.
+		$is_meta_box_request = ! empty( $_REQUEST['meta-box-loader'] );
+		$snapshot_key        = 'se_seo_modified_before_' . $post_id;
+		if ( ! $is_meta_box_request ) {
+			set_transient( $snapshot_key, [
+				get_post_field( 'post_modified', $post_id ),
+				get_post_field( 'post_modified_gmt', $post_id ),
+			], 5 * MINUTE_IN_SECONDS );
+		}
 
 		// Resolve freeze intent:
 		// Global ON  → freeze, unless per-post is explicitly '0' (user override)
@@ -291,6 +323,11 @@ class Meta_Box {
 		// Preserve current modified date — on brand-new posts (no prior date) skip.
 		$original     = get_post_field( 'post_modified',     $post_id );
 		$original_gmt = get_post_field( 'post_modified_gmt', $post_id );
+		$snapshot     = $is_meta_box_request ? get_transient( $snapshot_key ) : false;
+		if ( is_array( $snapshot ) && ! empty( $snapshot[0] ) ) {
+			[ $original, $original_gmt ] = $snapshot;
+			delete_transient( $snapshot_key );
+		}
 
 		if ( $original && '0000-00-00 00:00:00' !== $original ) {
 			$data['post_modified']     = $original;

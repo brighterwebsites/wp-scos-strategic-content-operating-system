@@ -8,8 +8,14 @@
  *
  * @package    SiteEssentials
  * @subpackage Core
- * @version    1.0.0
+ * @version    1.1.0
  * @since      1.0.0
+ *
+ * v1.1 | 2026-11-26 — Object-cache keys include the group and global version, so
+ *                      flush() and flush_all() take effect with a persistent object
+ *                      cache (before, the version was bumped but never read: cached
+ *                      sitemaps outlived saves for up to an hour). flush() also uses
+ *                      wp_cache_flush_group() where the cache supports it (#286).
  */
 
 namespace SiteEssentials\Core;
@@ -90,7 +96,7 @@ class Cache_Helper {
     public static function get($key, $group = '') {
         $group = self::get_group($group);
         $found = false;
-        $value = wp_cache_get($key, $group, false, $found);
+        $value = wp_cache_get(self::versioned_key($key, $group), $group, false, $found);
 
         // If object cache not available, try transient
         if (!$found && !wp_using_ext_object_cache()) {
@@ -117,7 +123,7 @@ class Cache_Helper {
         $expiration = $expiration ?? self::DEFAULT_DURATION;
 
         // Set in object cache
-        $result = wp_cache_set($key, $value, $group, $expiration);
+        $result = wp_cache_set(self::versioned_key($key, $group), $value, $group, $expiration);
 
         // If object cache not available, use transient as fallback
         if (!wp_using_ext_object_cache()) {
@@ -140,7 +146,7 @@ class Cache_Helper {
         $group = self::get_group($group);
 
         // Delete from object cache
-        $result = wp_cache_delete($key, $group);
+        $result = wp_cache_delete(self::versioned_key($key, $group), $group);
 
         // Delete transient fallback
         if (!wp_using_ext_object_cache()) {
@@ -174,6 +180,11 @@ class Cache_Helper {
         $current_version = wp_cache_get($version_key, self::GROUP);
         $new_version = $current_version ? $current_version + 1 : 1;
         wp_cache_set($version_key, $new_version, self::GROUP, 0); // Never expire
+
+        // Drop the old entries too where the cache can do it per group.
+        if (function_exists('wp_cache_supports') && wp_cache_supports('flush_group')) {
+            wp_cache_flush_group($group);
+        }
 
         // For transients, we need to delete them individually
         // This is slower but necessary as fallback
@@ -262,6 +273,20 @@ class Cache_Helper {
      */
     private static function get_group($group) {
         return empty($group) ? self::GROUP : self::GROUP . '_' . $group;
+    }
+
+    /**
+     * Object-cache key for a group: the key plus the group's and the global flush
+     * version, so a flush makes every older entry unreachable.
+     *
+     * @param  string $key   Cache key
+     * @param  string $group Normalized group
+     * @return string
+     */
+    private static function versioned_key($key, $group) {
+        $group_v  = (int) wp_cache_get('cache_version_' . $group, self::GROUP);
+        $global_v = (int) wp_cache_get('cache_version_global', self::GROUP);
+        return $key . '__v' . $group_v . '.' . $global_v;
     }
 
     /**

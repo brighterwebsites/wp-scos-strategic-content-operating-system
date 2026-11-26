@@ -14,7 +14,7 @@
 /* global jQuery */
 
 // scos-same-url:start — mirror of Url_Seo_State::same_url(); tested against
-// tests/fixtures/same-url-cases.json by tests/same-url-test.js. Ignores trailing
+// scripts/tests/fixtures/same-url-cases.json by scripts/tests/same-url-test.js. Ignores trailing
 // slash, scheme, host case and #fragment; a query string or www makes it different.
 window.scosSameUrl = function (a, b) {
 	function key(u) {

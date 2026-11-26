@@ -1,7 +1,7 @@
 // Runs the JS mirror (assets/meta-box.js, scos-same-url block) against the fixture.
-// node tests/same-url-test.js
+// node scripts/tests/same-url-test.js
 const fs = require('fs'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '../site-essentials/Modules/SeoMeta/assets/meta-box.js'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '../../site-essentials/Modules/SeoMeta/assets/meta-box.js'), 'utf8');
 const block = src.split('// scos-same-url:start')[1].split('// scos-same-url:end')[0];
 const code = block.slice(block.indexOf('\n') + 1); // drop the rest of the marker comment line
 const window = {};

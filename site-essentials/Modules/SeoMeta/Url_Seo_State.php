@@ -526,7 +526,7 @@ class Url_Seo_State {
 	 *
 	 * Ignored: trailing slash, scheme (http/https), host letter case, #fragment.
 	 * Different: the query string, and www vs non-www (a different host).
-	 * Mirrored in assets/meta-box.js (scosSameUrl); cases in tests/fixtures/same-url-cases.json.
+	 * Mirrored in assets/meta-box.js (scosSameUrl); cases in scripts/tests/fixtures/same-url-cases.json.
 	 *
 	 * @param string $a
 	 * @param string $b

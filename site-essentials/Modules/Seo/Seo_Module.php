@@ -13,6 +13,9 @@
  *             scos/get-url-seo-state (#245). Sitemaps unchanged.
  * v1.9 | 2026-11-26 — Sitemap index skips child sitemaps with no entries; category
  *             archives off by default (#244).
+ * v1.11 | 2026-11-26 — <lastmod> was the GMT time labelled with the site's offset (10 h early
+ *              in AEST): now formatted as UTC. Sitemap cache flushes when archive settings
+ *              or the SEO module settings are saved (#286).
  * v1.8 | 2026-11-07 — Sitemap drops post types without single URLs (reviews; FAQs
  *             when switched off) and honours a post type's default single robots (#228, #247).
  * v1.7 | 2026-08-26 — Sitemap: guard <lastmod>/changefreq against zero-date
@@ -147,6 +150,9 @@ class Seo_Module implements Module_Interface {
 
         // Bust cached HTML sitemap whenever a post is published or its meta is updated.
         add_action('save_post', [$this, 'on_save_post_bust_sitemap_cache']);
+        // Archive settings and the sitemap settings change what the sitemaps list.
+        add_action('added_option', [$this, 'on_option_bust_sitemap_cache']);
+        add_action('updated_option', [$this, 'on_option_bust_sitemap_cache']);
 
         // Flush rewrite rules on activation
         if (!get_option('se_sitemap_rules_flushed')) {
@@ -369,7 +375,7 @@ class Seo_Module implements Module_Interface {
             $xml .= "\t<sitemap>\n";
             $xml .= "\t\t<loc>" . esc_url(home_url("/sitemap-{$post_type}.xml")) . "</loc>\n";
             if ($last_modified) {
-                $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
+                $xml .= "\t\t<lastmod>" . gmdate( DATE_W3C, strtotime( $last_modified . ' UTC' ) ) . "</lastmod>\n";
             }
             $xml .= "\t</sitemap>\n";
         }
@@ -395,7 +401,7 @@ class Seo_Module implements Module_Interface {
             $xml .= "\t<sitemap>\n";
             $xml .= "\t\t<loc>" . esc_url(home_url("/sitemap-{$taxonomy}.xml")) . "</loc>\n";
             if ($last_modified) {
-                $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
+                $xml .= "\t\t<lastmod>" . gmdate( DATE_W3C, strtotime( $last_modified . ' UTC' ) ) . "</lastmod>\n";
             }
             $xml .= "\t</sitemap>\n";
         }
@@ -492,7 +498,7 @@ class Seo_Module implements Module_Interface {
                 $xml .= "\t<url>\n";
                 $xml .= "\t\t<loc>" . esc_url($archive_url) . "</loc>\n";
                 if ($last_modified) {
-                    $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
+                    $xml .= "\t\t<lastmod>" . gmdate( DATE_W3C, strtotime( $last_modified . ' UTC' ) ) . "</lastmod>\n";
                 }
                 $xml .= "\t\t<changefreq>weekly</changefreq>\n";
                 $xml .= "\t\t<priority>0.8</priority>\n";
@@ -581,7 +587,7 @@ class Seo_Module implements Module_Interface {
         $xml = "\t<url>\n";
         $xml .= "\t\t<loc>" . esc_url(get_permalink($post)) . "</loc>\n";
         if ($last_modified) {
-            $xml .= "\t\t<lastmod>" . mysql2date('c', $last_modified, false) . "</lastmod>\n";
+            $xml .= "\t\t<lastmod>" . gmdate( DATE_W3C, strtotime( $last_modified . ' UTC' ) ) . "</lastmod>\n";
         }
         $xml .= "\t\t<changefreq>" . $this->get_changefreq($post, $last_modified) . "</changefreq>\n";
         $xml .= "\t\t<priority>" . $this->get_priority($post) . "</priority>\n";
@@ -1189,6 +1195,18 @@ class Seo_Module implements Module_Interface {
     }
 
     /**
+     * Flush the sitemap cache when an archive's settings or the module settings change.
+     *
+     * @param string $option Option name.
+     */
+    public function on_option_bust_sitemap_cache($option): void {
+        if (0 === strpos((string) $option, 'scos_seo_archive_')
+            || \SiteEssentials\Core\Settings_Manager::MODULE_OPTION_PREFIX . 'seo' === $option) {
+            Cache_Helper::flush('seo');
+        }
+    }
+
+    /**
      * Render HTML sitemap shortcode
      *
      * @since  1.0.0
@@ -1437,7 +1455,7 @@ class Seo_Module implements Module_Interface {
             $xml .= "\t<url>\n";
             $xml .= "\t\t<loc>" . esc_url( $url ) . "</loc>\n";
             if ( $last_mod ) {
-                $xml .= "\t\t<lastmod>" . mysql2date( 'c', $last_mod, false ) . "</lastmod>\n";
+                $xml .= "\t\t<lastmod>" . gmdate( DATE_W3C, strtotime( $last_mod . ' UTC' ) ) . "</lastmod>\n";
             }
             $xml .= "\t\t<changefreq>weekly</changefreq>\n";
             $xml .= "\t\t<priority>0.6</priority>\n";

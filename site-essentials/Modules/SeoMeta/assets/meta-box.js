@@ -3,6 +3,8 @@
  * Tab switching + character counter with progress bar, and a guard that keeps
  * the TLDR editor usable inside the block editor's meta box pane.
  *
+ * v1.3 | 2026-11-26 — "Include in XML sitemap anyway" appears as soon as noindex is ticked or a
+ *                      non-self canonical is typed (was looking for a non-existent #id).
  * v1.2 | 2026-11-26 — Advanced tab dot follows the fields live (#113).
  * v1.1 | 2026-09-11 — Rebuild the TLDR TinyMCE instance when its iframe is
  *                      reloaded by the block editor moving the meta box DOM.
@@ -64,14 +66,18 @@
 	// ── Noindex ↔ sitemap notice ─────────────────────────────────────────────
 
 	function updateNoindexSitemapNotice() {
-		var isNoindex  = $('#scos_seo_robots_noindex').is(':checked');
+		var $row       = $('#scos-seo-sitemap-override');
+		if (!$row.length) { return; }
+		var isNoindex  = $('input[name="scos_seo_robots[]"][value="noindex"]').is(':checked') ||
+			($('input[name="scos_seo_robots[]"]:checked').length === 0 && String($row.data('type-noindex')) === '1');
+		var $canonical = $('#scos_seo_canonical');
+		var canonVal   = $.trim($canonical.val() || '');
+		var isNonSelf  = canonVal !== '' && canonVal !== ($canonical.attr('placeholder') || '');
 		var $notice    = $('#scos-noindex-sitemap-notice');
-		var $override  = $('#scos_seo_sitemap_noindex_override').closest('label');
-		var $overrideP = $override.next('p.scos-seo-help');
 
 		if (isNoindex) {
-			if (!$notice.length) {
-				$('.scos-seo-field:has(#scos_seo_sitemap_noindex_override)').prepend(
+			if (!$notice.length && window.scosSeoMeta && scosSeoMeta.noindexSitemapMsg) {
+				$row.closest('.scos-seo-field').find('> label').first().after(
 					'<div class="scos-seo-notice scos-seo-notice--warn" id="scos-noindex-sitemap-notice">' +
 					scosSeoMeta.noindexSitemapMsg +
 					'</div>'
@@ -79,19 +85,17 @@
 			} else {
 				$notice.show();
 			}
-			$override.show();
-			$overrideP.show();
 		} else {
 			$notice.hide();
-			// Only hide the override row if it's not already checked (user may want to keep it)
-			if (!$('#scos_seo_sitemap_noindex_override').is(':checked')) {
-				$override.hide();
-				$overrideP.hide();
-			}
 		}
+
+		// Keep the override visible while it is ticked, so it can be unticked.
+		$row.prop('hidden', !(isNoindex || isNonSelf || $('#scos_seo_sitemap_noindex_override').is(':checked')));
 	}
 
-	$(document).on('change', '#scos_seo_robots_noindex', updateNoindexSitemapNotice);
+	$(document).on('change', 'input[name="scos_seo_robots[]"]', updateNoindexSitemapNotice);
+	$(document).on('change', '#scos_seo_sitemap_noindex_override', updateNoindexSitemapNotice);
+	$(document).on('input blur', '#scos_seo_canonical', updateNoindexSitemapNotice);
 
 	// ── Canonical non-self hint ──────────────────────────────────────────────
 

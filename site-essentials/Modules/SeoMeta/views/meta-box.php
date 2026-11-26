@@ -26,6 +26,8 @@
  * v1.2 | 2026-10-18 — Target KW Query field.
  * v1.3 | 2026-11-07 — Meta Robots shows the inherited post type default when nothing is ticked (#228).
  * v1.4 | 2026-11-26 — Dot on the Advanced tab when a field there holds a value (#113).
+ * v1.5 | 2026-11-26 — "Include in XML sitemap anyway" is always rendered and shown as soon as
+ *                      noindex is ticked or a non-self canonical is typed, without a save (#112 QA).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -290,7 +292,9 @@ defined( 'ABSPATH' ) || exit;
 				<?php endforeach; ?>
 			</div>
 
-			<?php if ( $noindex_active || $non_self_canon || $sitemap_noindex_override ) : ?>
+			<div id="scos-seo-sitemap-override"
+				data-type-noindex="<?php echo in_array( 'noindex', $type_default, true ) ? '1' : '0'; ?>"
+				<?php echo ( $noindex_active || $non_self_canon || $sitemap_noindex_override ) ? '' : 'hidden'; ?>>
 				<label class="scos-seo-check-label scos-seo-check-label--override" style="margin-top:6px">
 					<input type="checkbox"
 						name="scos_seo_sitemap_noindex_override"
@@ -302,7 +306,7 @@ defined( 'ABSPATH' ) || exit;
 				<p class="scos-seo-help">
 					<?php esc_html_e( 'Edge case override — e.g. staging-style noindex pages you still want crawled, or deliberate cross-domain canonicals (syndicated content).', 'site-essentials' ); ?>
 				</p>
-			<?php endif; ?>
+			</div>
 		</div>
 
 	</div><!-- /advanced -->

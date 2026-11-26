@@ -23,6 +23,11 @@
  * v1.10 | 2026-10-25 — Load the Validate_Redirects ability (#222).
  * v1.11 | 2026-11-26 — Load the Get_Url_Seo_State ability (#245); the Advanced tab shows a dot
  *                       when a field on it holds a value for this post (#113).
+ * v1.12 | 2026-11-26 — Freeze modified date takes effect on the save that changes it: uses the
+ *                       submitted checkbox, and in the block editor restores the date from
+ *                       before the editor's REST save (#112 QA). Breakdance's automatic
+ *                       launcher-block save on every block-editor open no longer bumps the
+ *                       date (builder saves over admin-ajax still do).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -249,6 +254,60 @@ class Meta_Box {
 	// -------------------------------------------------------------------------
 
 	/**
+	 * The freeze checkbox as submitted with this save: '1', '0', or null when the
+	 * request did not come from this post's SEO meta box.
+	 */
+	private static function submitted_freeze_flag( int $post_id ): ?string {
+		if ( ! isset( $_POST['scos_seo_nonce'] )
+			|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['scos_seo_nonce'] ) ), 'scos_seo_meta_box' )
+			|| ( isset( $_POST['post_ID'] ) && absint( $_POST['post_ID'] ) !== $post_id )
+			|| ! current_user_can( 'edit_post', $post_id ) ) {
+			return null;
+		}
+		return ! empty( $_POST['scos_seo_freeze_og_date'] ) ? '1' : '0';
+	}
+
+	/**
+	 * Whether this is the block editor saving a Breakdance page whose content is (or
+	 * becomes) just the launcher block. Breakdance does this on its own every time the
+	 * page opens in the block editor: it checks for its launcher block before the editor
+	 * has loaded the blocks, re-adds it and calls savePost(). The page's real content
+	 * lives in _breakdance_data and is saved by the builder over admin-ajax, which this
+	 * does not match, so builder edits still bump the date.
+	 */
+	private static function is_breakdance_launcher_save( int $post_id, array $data ): bool {
+		$launcher = '<!-- wp:breakdance/block-breakdance-launcher /-->';
+		if ( trim( wp_unslash( (string) ( $data['post_content'] ?? '' ) ) ) !== $launcher ) {
+			return false;
+		}
+		if ( ! self::is_block_editor_rest_save() ) {
+			return false;
+		}
+		$old = get_post( $post_id );
+		if ( ! $old || ! metadata_exists( 'post', $post_id, '_breakdance_data' ) ) {
+			return false;
+		}
+		return wp_unslash( (string) ( $data['post_title'] ?? '' ) ) === $old->post_title
+			&& wp_unslash( (string) ( $data['post_excerpt'] ?? '' ) ) === $old->post_excerpt
+			&& (string) ( $data['post_status'] ?? '' ) === $old->post_status;
+	}
+
+	/** Whether this request is a core posts-endpoint REST save (/wp/v2/…), as the block editor sends. */
+	private static function is_block_editor_rest_save(): bool {
+		if ( ! defined( 'REST_REQUEST' ) || ! REST_REQUEST ) {
+			return false;
+		}
+		$route = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? (string) $GLOBALS['wp']->query_vars['rest_route'] : '';
+		if ( '' === $route ) {
+			$route = (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH );
+			$route = (string) preg_replace( '#^.*?/' . preg_quote( rest_get_url_prefix(), '#' ) . '#', '', $route );
+		}
+		return 0 === strpos( $route, '/wp/v2/' );
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
 	 * Prevent WP from bumping post_modified when:
 	 *   - The global "freeze all modified dates" option is on, OR
 	 *   - The per-post scos_seo_freeze_og_date flag is checked.
@@ -273,7 +332,34 @@ class Meta_Box {
 		}
 
 		$global_freeze = (bool) get_option( 'scos_seo_freeze_modified_date', false );
-		$per_post      = get_post_meta( $post_id, 'scos_seo_freeze_og_date', true );
+		$submitted     = self::submitted_freeze_flag( $post_id );
+		$per_post      = $submitted ?? get_post_meta( $post_id, 'scos_seo_freeze_og_date', true );
+
+		// The block editor saves the post over REST first and the meta box in a second
+		// request (meta-box-loader). Remember the date from before the first save, so the
+		// second request can restore it when this save ticks the box.
+		$is_meta_box_request = ! empty( $_REQUEST['meta-box-loader'] );
+		$snapshot_key        = 'se_seo_modified_before_' . $post_id;
+		if ( ! $is_meta_box_request ) {
+			set_transient( $snapshot_key, [
+				get_post_field( 'post_modified', $post_id ),
+				get_post_field( 'post_modified_gmt', $post_id ),
+			], 5 * MINUTE_IN_SECONDS );
+		}
+
+		// Breakdance rewrites a page's content to its launcher block and saves it when the
+		// page is opened in the block editor without one. That is not an edit (the page's
+		// content lives in _breakdance_data), so the date stays, in the REST save and in the
+		// meta-box request that follows it.
+		$launcher_key  = 'se_seo_launcher_save_' . $post_id;
+		$launcher_save = false;
+		if ( $is_meta_box_request ) {
+			$launcher_save = (bool) get_transient( $launcher_key );
+			delete_transient( $launcher_key );
+		} elseif ( self::is_breakdance_launcher_save( $post_id, $data ) ) {
+			$launcher_save = true;
+			set_transient( $launcher_key, 1, MINUTE_IN_SECONDS );
+		}
 
 		// Resolve freeze intent:
 		// Global ON  → freeze, unless per-post is explicitly '0' (user override)
@@ -284,6 +370,10 @@ class Meta_Box {
 			$should_freeze = ( '1' === (string) $per_post );
 		}
 
+		if ( $launcher_save ) {
+			$should_freeze = true;
+		}
+
 		if ( ! $should_freeze ) {
 			return $data;
 		}
@@ -291,6 +381,11 @@ class Meta_Box {
 		// Preserve current modified date — on brand-new posts (no prior date) skip.
 		$original     = get_post_field( 'post_modified',     $post_id );
 		$original_gmt = get_post_field( 'post_modified_gmt', $post_id );
+		$snapshot     = $is_meta_box_request ? get_transient( $snapshot_key ) : false;
+		if ( is_array( $snapshot ) && ! empty( $snapshot[0] ) ) {
+			[ $original, $original_gmt ] = $snapshot;
+			delete_transient( $snapshot_key );
+		}
 
 		if ( $original && '0000-00-00 00:00:00' !== $original ) {
 			$data['post_modified']     = $original;

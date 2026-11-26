@@ -26,6 +26,7 @@
  * @version    1.6 | 2026-11-26
  * @since      1.0.0
  *
+ * v1.7 | 2026-11-26 — Archive og:updated_time formatted as UTC (was GMT labelled with the site offset).
  * v1.6 | 2026-11-26 — Robots, canonical, archive base URL and paged URL now come from
  *                      Url_Seo_State, shared with the sitemaps and scos/get-url-seo-state
  *                      (#245). Output unchanged.
@@ -490,7 +491,7 @@ class Head_Output {
 				}
 		}
 
-		return ( ! empty( $date ) ) ? mysql2date( 'c', $date, false ) : '';
+		return ( ! empty( $date ) ) ? gmdate( DATE_W3C, strtotime( $date . ' UTC' ) ) : '';
 	}
 
 	// ── Rel prev / next ───────────────────────────────────────────────────────

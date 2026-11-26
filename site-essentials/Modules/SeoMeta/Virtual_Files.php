@@ -22,7 +22,8 @@
  * v1.2 | 2026-11-26 — robots.txt: hand core's output back when the site discourages
  *                      search engines (#243). Blank content serves the default
  *                      template; the template gains an Agentmap line when the ARD
- *                      catalog is on. Saving text identical to the default robots
+ *                      catalog is on, and drops the feed block while Tweaks ›
+ *                      Disable RSS Feeds is on. Saving text identical to the default robots
  *                      or generated llms version stores '' so it keeps updating (#221).
  * v1.1 | 2026-10-21 — llms.txt with blank custom content serves the generated
  *                      version (Llms_Txt::build()), so it stays current.
@@ -68,9 +69,24 @@ class Virtual_Files {
 	/**
 	 * Gold-standard robots.txt template pre-filled with the site's sitemap URL,
 	 * plus the agent catalog when the ARD catalog is switched on.
+	 *
+	 * The feed block is left out while Tweaks › Disable RSS Feeds is on: feed
+	 * URLs then 301 to the post or home page, and a Disallow would stop crawlers
+	 * from seeing that redirect.
 	 */
 	public static function default_robots_txt(): string {
 		$sitemap = home_url( '/sitemap.xml' );
+		$feeds   = self::feeds_disabled() ? [] : [
+			'# Block RSS Feeds',
+			'Disallow: /feed/',
+			'Disallow: /*/feed/',
+			'Disallow: /*/feed$',
+			'Disallow: /feed/$',
+			'Disallow: /?feed=',
+			'Disallow: /wp-feed',
+			'Disallow: /comments/feed',
+			'',
+		];
 		$lines   = [
 			'# WordPress',
 			'User-agent: *',
@@ -86,22 +102,14 @@ class Virtual_Files {
 			'Disallow: /page/*/?s=',
 			'Disallow: /search/',
 			'',
-			'# Block RSS Feeds',
-			'# Remove this block if "Disable RSS Feeds" is on in Tweaks — feed URLs then redirect instead.',
-			'Disallow: /feed/',
-			'Disallow: /*/feed/',
-			'Disallow: /*/feed$',
-			'Disallow: /feed/$',
-			'Disallow: /?feed=',
-			'Disallow: /wp-feed',
-			'Disallow: /comments/feed',
-			'',
+		];
+		$lines = array_merge( $lines, $feeds, [
 			'# Block Comment Replies',
 			'Disallow: /*?replytocom=',
 			'',
 			'# Declare Sitemap',
 			'Sitemap: ' . $sitemap,
-		];
+		] );
 
 		$ard = '\\SiteEssentials\\Modules\\Agentic\\Ard_Catalog';
 		if ( class_exists( $ard ) && $ard::is_enabled() ) {
@@ -110,6 +118,22 @@ class Virtual_Files {
 		}
 
 		return implode( "\n", $lines );
+	}
+
+	/**
+	 * Whether Tweaks › Disable RSS Feeds is in force (module on and tweak ticked).
+	 */
+	private static function feeds_disabled(): bool {
+		$sm = '\\SiteEssentials\\Core\\Settings_Manager';
+		if ( ! class_exists( $sm ) ) {
+			return false;
+		}
+		$settings = $sm::instance();
+		if ( ! $settings->is_module_enabled( 'tweaks' ) ) {
+			return false;
+		}
+		$tweaks = $settings->get_module_setting( 'tweaks', 'enabled_tweaks', [] );
+		return is_array( $tweaks ) && ! empty( $tweaks['disable_rss_feeds'] );
 	}
 
 	/**

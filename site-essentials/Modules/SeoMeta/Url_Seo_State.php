@@ -23,8 +23,10 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.8 | 2026-11-26
+ * @version    1.9 | 2026-11-26
  *
+ * v1.9 | 2026-11-26 — The live WooCommerce shop is recognised as the product archive (WooCommerce sets
+ *                      the shop Page as the queried object), so it gets SCOS head output (#282).
  * v1.8 | 2026-11-26 — XML vs HTML rule table (#281): the HTML sitemap leaves out non-self canonical
  *                      posts, and lists a noindex post only when its "list for visitors" box is ticked.
  * v1.7 | 2026-11-26 — The posts page and the shop page are listed by their Archive Settings (robots,
@@ -102,7 +104,14 @@ class Url_Seo_State {
 		}
 		if ( $q->is_post_type_archive() ) {
 			$obj = $q->get_queried_object();
-			return ( $obj instanceof \WP_Post_Type ) ? $obj->name : null;
+			if ( $obj instanceof \WP_Post_Type ) {
+				return $obj->name;
+			}
+			// WooCommerce swaps the shop's queried object for the shop Page (WC_Query),
+			// so read the archive's post type from the query (#282).
+			$pt = $q->get( 'post_type' );
+			$pt = is_array( $pt ) ? ( 1 === count( $pt ) ? reset( $pt ) : '' ) : $pt;
+			return ( is_string( $pt ) && '' !== $pt && post_type_exists( $pt ) ) ? $pt : null;
 		}
 		if ( $q->is_author() ) { return 'author'; }
 		if ( $q->is_date() )   { return 'date'; }

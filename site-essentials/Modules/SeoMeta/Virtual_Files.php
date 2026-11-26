@@ -4,9 +4,10 @@
  *
  * robots.txt
  *   Hooks into WP's own `robots_txt` filter to replace the default output
- *   with custom content stored in `scos_robots_txt`. Only active when the
- *   site is set to allow indexing (blog_public = 1); WP short-circuits the
- *   filter when "discourage search engines" is on.
+ *   with custom content stored in `scos_robots_txt`. Blank content serves the
+ *   default template (default_robots_txt()), so it stays current. When
+ *   "Discourage search engines" is on, core still runs the filter (with
+ *   $public falsy); we hand its Disallow: / back untouched.
  *
  * llms.txt
  *   Registers a rewrite rule to serve /llms.txt as a virtual plain-text
@@ -18,6 +19,11 @@
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
  *
+ * v1.2 | 2026-11-26 — robots.txt: hand core's output back when the site discourages
+ *                      search engines (#243). Blank content serves the default
+ *                      template; the template gains an Agentmap line when the ARD
+ *                      catalog is on. Saving text identical to the default robots
+ *                      or generated llms version stores '' so it keeps updating (#221).
  * v1.1 | 2026-10-21 — llms.txt with blank custom content serves the generated
  *                      version (Llms_Txt::build()), so it stays current.
  * v1.0 | 2026-10-01 — Default robots.txt: Content-Signal line, Cloudflare email-protection
@@ -60,11 +66,12 @@ class Virtual_Files {
 	}
 
 	/**
-	 * Gold-standard robots.txt template pre-filled with the site's sitemap URL.
+	 * Gold-standard robots.txt template pre-filled with the site's sitemap URL,
+	 * plus the agent catalog when the ARD catalog is switched on.
 	 */
 	public static function default_robots_txt(): string {
 		$sitemap = home_url( '/sitemap.xml' );
-		return implode( "\n", [
+		$lines   = [
 			'# WordPress',
 			'User-agent: *',
 			'Content-Signal: ai-train=yes, search=yes, ai-input=yes',
@@ -94,7 +101,26 @@ class Virtual_Files {
 			'',
 			'# Declare Sitemap',
 			'Sitemap: ' . $sitemap,
-		] );
+		];
+
+		$ard = '\\SiteEssentials\\Modules\\Agentic\\Ard_Catalog';
+		if ( class_exists( $ard ) && $ard::is_enabled() ) {
+			$lines[] = '';
+			$lines[] = 'Agentmap: ' . $ard::get_legacy_url();
+		}
+
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * Whether two plain-text bodies match once line endings and outer whitespace
+	 * are ignored. Textareas post CRLF; generated text uses LF.
+	 */
+	private static function same_text( string $a, string $b ): bool {
+		$norm = static function ( string $t ): string {
+			return trim( str_replace( [ "\r\n", "\r" ], "\n", $t ) );
+		};
+		return $norm( $a ) === $norm( $b );
 	}
 
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
@@ -126,19 +152,23 @@ class Virtual_Files {
 	// ── robots.txt callback ───────────────────────────────────────────────────
 
 	/**
-	 * Completely replaces WP's default robots.txt output with stored content.
+	 * Replaces WP's default robots.txt output with the stored content, or the
+	 * default template when nothing custom is stored.
 	 *
-	 * Note: WP short-circuits this filter and outputs "Disallow: /" when
-	 * Settings > Reading > "Discourage search engines" is checked. In that
-	 * case this callback never fires — which is the correct behaviour.
+	 * When Settings › Reading › "Discourage search engines" is on, core builds
+	 * "Disallow: /" and still runs this filter with $public falsy ('0'). That
+	 * output is returned untouched so a dev/staging site stays hidden (#243).
 	 *
-	 * @param string $output  Current robots.txt text.
-	 * @param bool   $public  Whether the site allows indexing.
+	 * @param string          $output Current robots.txt text.
+	 * @param bool|int|string $public Whether the site allows indexing (blog_public).
 	 */
 	public static function output_robots_txt( string $output, $public ): string {
+		if ( ! $public ) {
+			return $output;
+		}
 		$robots  = self::get_robots();
 		$content = trim( $robots['content'] ?? '' );
-		return '' !== $content ? $content : $output;
+		return '' !== $content ? $content : self::default_robots_txt();
 	}
 
 	// ── llms.txt callbacks ────────────────────────────────────────────────────
@@ -183,11 +213,17 @@ class Virtual_Files {
 			? $post['scos_robots']
 			: [];
 
+		$robots_content = sanitize_textarea_field( $robots_post['content'] ?? '' );
+		// Unchanged template → store blank so the default keeps updating (#221).
+		if ( self::same_text( $robots_content, self::default_robots_txt() ) ) {
+			$robots_content = '';
+		}
+
 		update_option(
 			self::OPTION_ROBOTS,
 			[
 				'enabled' => ! empty( $robots_post['enabled'] ),
-				'content' => sanitize_textarea_field( $robots_post['content'] ?? '' ),
+				'content' => $robots_content,
 			],
 			false
 		);
@@ -200,11 +236,17 @@ class Virtual_Files {
 		$llms_was_enabled = ! empty( self::get_llms()['enabled'] );
 		$llms_now_enabled = ! empty( $llms_post['enabled'] );
 
+		$llms_content = sanitize_textarea_field( $llms_post['content'] ?? '' );
+		// Saved exactly as generated → store blank so it stays generated (#221).
+		if ( '' !== trim( $llms_content ) && self::same_text( $llms_content, sanitize_textarea_field( Llms_Txt::build() ) ) ) {
+			$llms_content = '';
+		}
+
 		update_option(
 			self::OPTION_LLMS,
 			[
 				'enabled' => $llms_now_enabled,
-				'content' => sanitize_textarea_field( $llms_post['content'] ?? '' ),
+				'content' => $llms_content,
 			],
 			false
 		);

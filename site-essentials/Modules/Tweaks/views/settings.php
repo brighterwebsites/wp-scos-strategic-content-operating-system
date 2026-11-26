@@ -113,7 +113,7 @@ $groups = [
             ],
             'disable_rss_feeds' => [
                 'label'       => __( 'Disable RSS Feeds', 'site-essentials' ),
-                'description' => __( 'Completely disables RSS feed generation (post feeds, comment feeds, category feeds) and removes <code>&lt;link rel="alternate"&gt;</code> tags from <code>&lt;head&gt;</code>. Visiting <code>/feed/</code> redirects to the homepage; visiting a post\'s <code>/feed/</code> redirects to the post URL. <strong>Note:</strong> Once enabled, feed disallow rules can be removed from <code>robots.txt</code>.', 'site-essentials' ),
+                'description' => __( 'Completely disables RSS feed generation (post feeds, comment feeds, category feeds) and removes <code>&lt;link rel="alternate"&gt;</code> tags from <code>&lt;head&gt;</code>. Visiting <code>/feed/</code> redirects to the homepage; visiting a post\'s <code>/feed/</code> redirects to the post URL. <strong>Note:</strong> While enabled, the default <code>robots.txt</code> leaves out the feed disallow rules. A custom robots.txt copy keeps whatever it has.', 'site-essentials' ),
             ],
             'disable_relational_links' => [
                 'label'       => __( 'Disable Relational Links', 'site-essentials' ),

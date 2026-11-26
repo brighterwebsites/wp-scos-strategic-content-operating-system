@@ -23,9 +23,12 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.5 | 2026-11-07
+ * @version    1.6 | 2026-11-26
  * @since      1.0.0
  *
+ * v1.6 | 2026-11-26 — Robots, canonical, archive base URL and paged URL now come from
+ *                      Url_Seo_State, shared with the sitemaps and scos/get-url-seo-state
+ *                      (#245). Output unchanged.
  * v1.5 | 2026-11-07 — Singular robots fall back to the post type's default when the post has none (#228).
  *                      "Discourage search engines" now wins: our robots no longer strip WordPress's
  *                      noindex, nofollow on a site with blog_public = 0.
@@ -96,23 +99,8 @@ class Head_Output {
 	 * @return string|null
 	 */
 	private static function archive_slug(): ?string {
-		if ( is_home() ) {
-			return 'post';
-		}
-		if ( is_post_type_archive() ) {
-			$obj = get_queried_object();
-			return ( $obj instanceof \WP_Post_Type ) ? $obj->name : null;
-		}
-		if ( is_author() )  { return 'author'; }
-		if ( is_date() )    { return 'date'; }
-		if ( is_search() )  { return 'search'; }
-		if ( is_404() )     { return '404'; }
-		// Taxonomy term archives (is_category, is_tag, is_tax all return a WP_Term)
-		if ( is_category() || is_tag() || is_tax() ) {
-			$obj = get_queried_object();
-			return ( $obj instanceof \WP_Term ) ? $obj->taxonomy : null;
-		}
-		return null;
+		global $wp_query;
+		return ( $wp_query instanceof \WP_Query ) ? Url_Seo_State::archive_slug( $wp_query ) : null;
 	}
 
 	// ── Title ─────────────────────────────────────────────────────────────────
@@ -166,77 +154,14 @@ class Head_Output {
 			return $robots;
 		}
 
-		// ── Archive branch ────────────────────────────────────────────────────
-		$slug = self::archive_slug();
-		if ( null !== $slug ) {
-			$settings = Archive_Settings::get( $slug );
-			$directives = is_array( $settings['robots'] ) ? $settings['robots'] : [];
-
-			// Paginated noindex override
-			$paged = max( 0, (int) get_query_var( 'paged' ) );
-			if ( $settings['pagination_noindex'] && $paged > 1 ) {
-				$directives[] = 'noindex';
-			}
-
-			return self::apply_robots_array( $robots, array_unique( $directives ) );
-		}
-
-		// ── Singular branch ───────────────────────────────────────────────────
-		if ( ! is_singular() ) {
-			return $robots;
-		}
-		$pid = get_the_ID();
-		if ( ! $pid ) {
+		// Archive settings (absolute), else the post's own robots, else its post type's
+		// default (#228), else WordPress's defaults untouched.
+		$rule = Url_Seo_State::robots_rule( Url_Seo_State::current_context() );
+		if ( null === $rule ) {
 			return $robots;
 		}
 
-		// The post's own robots, else its post type's default (SEO › Meta Tags, #228).
-		$effective = Archive_Settings::effective_single_robots( (int) $pid );
-
-		if ( empty( $effective['directives'] ) ) {
-			return $robots; // WordPress defaults
-		}
-
-		return self::apply_robots_array( $robots, $effective['directives'] );
-	}
-
-	/**
-	 * Apply a list of robots directive strings to the $robots array.
-	 *
-	 * @param  array    $robots     Existing wp_robots array.
-	 * @param  string[] $directives Subset of: noindex, nofollow, noimageindex, nosnippet.
-	 * @return array
-	 */
-	private static function apply_robots_array( array $robots, array $directives ): array {
-		if ( in_array( 'noindex', $directives, true ) ) {
-			$robots['noindex'] = true;
-			unset( $robots['max-image-preview'], $robots['max-snippet'], $robots['max-video-preview'] );
-		} else {
-			unset( $robots['noindex'] );
-			$robots['max-image-preview'] = 'large';
-			$robots['max-snippet']       = -1;
-			$robots['max-video-preview'] = -1;
-		}
-
-		if ( in_array( 'nofollow', $directives, true ) ) {
-			$robots['nofollow'] = true;
-		} else {
-			unset( $robots['nofollow'] );
-		}
-
-		if ( in_array( 'noimageindex', $directives, true ) ) {
-			$robots['noimageindex'] = true;
-		} else {
-			unset( $robots['noimageindex'] );
-		}
-
-		if ( in_array( 'nosnippet', $directives, true ) ) {
-			$robots['nosnippet'] = true;
-		} else {
-			unset( $robots['nosnippet'] );
-		}
-
-		return $robots;
+		return Url_Seo_State::apply_robots_array( $robots, $rule['directives'] );
 	}
 
 	// ── Description + Canonical ───────────────────────────────────────────────
@@ -286,11 +211,7 @@ class Head_Output {
 		}
 
 		// ── Canonical ────────────────────────────────────────────────────────
-		$canonical = get_post_meta( $pid, 'scos_seo_canonical', true );
-
-		if ( empty( $canonical ) ) {
-			$canonical = get_permalink( $pid );
-		}
+		$canonical = Url_Seo_State::canonical( [ 'type' => 'singular', 'post_id' => (int) $pid ] )['url'];
 
 		if ( ! empty( $canonical ) ) {
 			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
@@ -373,13 +294,18 @@ class Head_Output {
 		}
 
 		// ── Canonical ────────────────────────────────────────────────────────
-		$base_url  = self::archive_base_url( $slug );
+		global $wp_query;
+		$base_url  = Url_Seo_State::archive_base_url( $slug, $wp_query );
 		$canonical = '';
 
 		if ( ! empty( $base_url ) ) {
-			$canonical = ( $settings['canonical_paged'] && $paged > 1 )
-				? self::paged_url( $paged )
-				: $base_url;
+			$canonical = Url_Seo_State::canonical( [
+				'type'        => 'archive',
+				'slug'        => $slug,
+				'paged'       => $paged,
+				'query'       => $wp_query,
+				'request_uri' => null,
+			] )['url'];
 			echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
 			self::$canonical_printed = true;
 		}
@@ -595,35 +521,11 @@ class Head_Output {
 		$paged     = max( 1, (int) get_query_var( 'paged' ) );
 
 		if ( $paged > 1 ) {
-			echo '<link rel="prev" href="' . esc_url( self::paged_url( $paged - 1 ) ) . '" />' . "\n";
+			echo '<link rel="prev" href="' . esc_url( Url_Seo_State::paged_url( $paged - 1 ) ) . '" />' . "\n";
 		}
 		if ( $paged < $max_pages ) {
-			echo '<link rel="next" href="' . esc_url( self::paged_url( $paged + 1 ) ) . '" />' . "\n";
+			echo '<link rel="next" href="' . esc_url( Url_Seo_State::paged_url( $paged + 1 ) ) . '" />' . "\n";
 		}
-	}
-
-	/**
-	 * URL of page N of the current archive, without the visitor's query string.
-	 *
-	 * get_pagenum_link() builds on the current request URI, so it carries
-	 * whatever query string the visitor arrived with — utm_* tags, orderby,
-	 * filters — into the canonical and prev/next links. With pretty permalinks
-	 * the page number is part of the path, so the query string is never part
-	 * of the page's identity and is dropped. With plain permalinks the archive
-	 * and page are themselves query args, so the URL is left as WordPress
-	 * builds it.
-	 *
-	 * @param int $page Page number. 1 returns the archive's first page.
-	 * @return string
-	 */
-	private static function paged_url( int $page ): string {
-		$url = (string) get_pagenum_link( $page, false );
-
-		if ( '' === (string) get_option( 'permalink_structure' ) ) {
-			return $url;
-		}
-
-		return (string) preg_replace( '/[?#].*$/', '', $url );
 	}
 
 	// ── SEOPress suppression ──────────────────────────────────────────────────
@@ -655,59 +557,6 @@ class Head_Output {
 					}
 				}
 			}
-		}
-	}
-
-	// ── URL helpers ───────────────────────────────────────────────────────────
-
-	/**
-	 * Resolve the canonical base URL for an archive (non-paginated page 1).
-	 * Returns empty string for contexts where a canonical is inappropriate
-	 * (search results, 404).
-	 *
-	 * @param  string $slug
-	 * @return string
-	 */
-	private static function archive_base_url( string $slug ): string {
-		switch ( $slug ) {
-			case 'post':
-				$blog_page_id = (int) get_option( 'page_for_posts' );
-				return $blog_page_id
-					? (string) get_permalink( $blog_page_id )
-					: home_url( '/' );
-
-			case 'author':
-				return (string) get_author_posts_url( get_queried_object_id() );
-
-			case 'date':
-				if ( is_year() ) {
-					return (string) get_year_link( (int) get_query_var( 'year' ) );
-				}
-				if ( is_month() ) {
-					return (string) get_month_link( (int) get_query_var( 'year' ), (int) get_query_var( 'monthnum' ) );
-				}
-				if ( is_day() ) {
-					return (string) get_day_link( (int) get_query_var( 'year' ), (int) get_query_var( 'monthnum' ), (int) get_query_var( 'day' ) );
-				}
-				return '';
-
-			case 'search':
-			case '404':
-				// No canonical — search is query-specific; 404 has no URL to canonicalise to.
-				return '';
-
-			default:
-				// Taxonomy term archive — canonical is the term's own URL
-				if ( taxonomy_exists( $slug ) ) {
-					$term = get_queried_object();
-					if ( $term instanceof \WP_Term ) {
-						$link = get_term_link( $term );
-						return is_wp_error( $link ) ? '' : (string) $link;
-					}
-					return '';
-				}
-				// CPT archive
-				return (string) ( get_post_type_archive_link( $slug ) ?: '' );
 		}
 	}
 }

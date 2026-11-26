@@ -21,6 +21,7 @@
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
  *
+ * v1.3 | 2026-11-26 — match_301() for Url_Seo_State (#245).
  * v1.2 | 2026-10-25 — Rules are checked by Redirect_Validator on save (#222). Errors
  *                      (loops, missing =>, relative targets…) block the save and the
  *                      submitted text comes back for fixing; warnings save and show.
@@ -170,6 +171,17 @@ class Redirections {
 
 	public static function get_410_paths(): array {
 		return self::parse_410_paths( self::get_410_raw() );
+	}
+
+	/**
+	 * Destination of the saved 301 rule for a path, the way handle_redirect() matches it.
+	 * Used by Url_Seo_State to report redirects without making a request.
+	 *
+	 * @param string $path URL path, trailing slash stripped.
+	 * @return string|null
+	 */
+	public static function match_301( string $path ): ?string {
+		return self::match_path( $path, self::parse_301_rules( self::get_301_raw() ) );
 	}
 
 	// ── Helper ────────────────────────────────────────────────────────────────

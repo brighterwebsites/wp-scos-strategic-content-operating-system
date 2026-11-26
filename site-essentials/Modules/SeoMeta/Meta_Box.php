@@ -21,6 +21,8 @@
  * v1.8 | 2026-09-30 — Tell the suggest script whether Content Architecture is active.
  * v1.9 | 2026-10-18 — Target query field (scos_seo_target_query).
  * v1.10 | 2026-10-25 — Load the Validate_Redirects ability (#222).
+ * v1.11 | 2026-11-26 — Load the Get_Url_Seo_State ability (#245); the Advanced tab shows a dot
+ *                       when a field on it holds a value for this post (#113).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -52,6 +54,7 @@ class Meta_Box {
 			require_once __DIR__ . '/Abilities/Suggest_Tldr/Suggest_Tldr.php';
 			require_once __DIR__ . '/Abilities/Fill_Image_Meta/Fill_Image_Meta.php';
 			require_once __DIR__ . '/Abilities/Validate_Redirects/Validate_Redirects.php';
+			require_once __DIR__ . '/Abilities/Get_Url_Seo_State/Get_Url_Seo_State.php';
 		}
 	}
 
@@ -132,6 +135,9 @@ class Meta_Box {
 
 		$freeze_date        = (bool) get_post_meta( $post->ID, 'scos_seo_freeze_og_date', true );
 		$global_freeze_date = (bool) get_option( 'scos_seo_freeze_modified_date', false );
+
+		// Advanced-tab fields with a value on this post (#113): drives the tab's dot.
+		$advanced_overrides = Url_Seo_State::post_overrides( (int) $post->ID );
 
 		include __DIR__ . '/views/meta-box.php';
 	}

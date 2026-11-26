@@ -7,7 +7,11 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.9 | 2026-11-26 — Sitemap index skips child sitemaps with no entries; category
+ * @version    1.10 | 2026-11-26 — Per-post sitemap decisions (noindex, canonical, override,
+ *             exclusions), the shop-page check and the author list come from
+ *             SeoMeta\Url_Seo_State, shared with the page output and
+ *             scos/get-url-seo-state (#245). Sitemaps unchanged.
+ * v1.9 | 2026-11-26 — Sitemap index skips child sitemaps with no entries; category
  *             archives off by default (#244).
  * v1.8 | 2026-11-07 — Sitemap drops post types without single URLs (reviews; FAQs
  *             when switched off) and honours a post type's default single robots (#228, #247).
@@ -21,6 +25,7 @@ namespace SiteEssentials\Modules\Seo;
 use SiteEssentials\Core\Module_Interface;
 use SiteEssentials\Core\Settings_Manager;
 use SiteEssentials\Core\Cache_Helper;
+use SiteEssentials\Modules\SeoMeta\Url_Seo_State;
 
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
@@ -246,14 +251,25 @@ class Seo_Module implements Module_Interface {
      * @return array Sitemap settings
      */
     private function get_sitemap_settings() {
-        $settings = $this->settings->get_module_setting('seo', 'sitemap', $this->get_default_sitemap_settings());
+        return self::sitemap_settings();
+    }
+
+    /**
+     * Effective sitemap settings: stored values (or defaults), minus post types without single URLs.
+     *
+     * Public so Url_Seo_State reports the same settings the sitemaps use.
+     *
+     * @return array
+     */
+    public static function sitemap_settings(): array {
+        $settings = Settings_Manager::instance()->get_module_setting('seo', 'sitemap', self::default_sitemap_settings());
 
         // Post types without single URLs never belong in a sitemap, even if ticked earlier.
         if ( is_array( $settings ) && ! empty( $settings['post_types'] ) && is_array( $settings['post_types'] ) ) {
             $settings['post_types'] = array_values( array_diff( $settings['post_types'], self::post_types_without_singles() ) );
         }
 
-        return $settings;
+        return is_array( $settings ) ? $settings : self::default_sitemap_settings();
     }
 
     /**
@@ -273,6 +289,13 @@ class Seo_Module implements Module_Interface {
      * @return array Default settings
      */
     private function get_default_sitemap_settings() {
+        return self::default_sitemap_settings();
+    }
+
+    /**
+     * @return array Default sitemap settings.
+     */
+    public static function default_sitemap_settings(): array {
         return [
             'enabled'                => true,
             'post_types'             => ['post', 'page'],
@@ -592,9 +615,7 @@ class Seo_Module implements Module_Interface {
      * @return bool
      */
     private function archive_url_is_existing_page($archive_url) {
-        $page_id = url_to_postid($archive_url);
-
-        return $page_id > 0 && get_post_type($page_id) === 'page';
+        return Url_Seo_State::archive_url_page_id( (string) $archive_url ) > 0;
     }
 
     /**
@@ -901,47 +922,7 @@ class Seo_Module implements Module_Interface {
      * @return bool True if noindex, false otherwise
      */
     private function is_noindex($post_id) {
-        // Check SCOS native robots meta (primary source for Site Essentials).
-        $scos_robots = get_post_meta($post_id, 'scos_seo_robots', true);
-        if (is_array($scos_robots) && in_array('noindex', $scos_robots, true)) {
-            return true;
-        }
-
-        // No robots of its own: the post type's single default applies (#228).
-        $archive_settings = '\SiteEssentials\Modules\SeoMeta\Archive_Settings';
-        if ( ( ! is_array( $scos_robots ) || empty( $scos_robots ) ) && class_exists( $archive_settings )
-            && in_array( 'noindex', $archive_settings::single_robots( (string) get_post_type( $post_id ) ), true ) ) {
-            return true;
-        }
-
-        // Check Yoast SEO meta
-        $yoast_noindex = get_post_meta($post_id, '_yoast_wpseo_meta-robots-noindex', true);
-        if ($yoast_noindex === '1' || $yoast_noindex === 'noindex') {
-            return true;
-        }
-
-        // Check Rank Math meta
-        $rankmath_robots = get_post_meta($post_id, 'rank_math_robots', true);
-        if (is_array($rankmath_robots) && in_array('noindex', $rankmath_robots, true)) {
-            return true;
-        }
-
-        // Check generic custom field (for custom implementations)
-        $custom_noindex = get_post_meta($post_id, '_robots_noindex', true);
-        if ($custom_noindex === '1' || $custom_noindex === 'yes') {
-            return true;
-        }
-
-        // Check via wp_robots filter (WordPress core)
-        // This is a bit tricky since wp_robots is context-dependent
-        // We'll apply a simplified check using the filter
-        $robots = apply_filters('wp_robots', []);
-        if (isset($robots['noindex']) && $robots['noindex'] === true) {
-            // Note: This checks global setting, not per-post
-            // For per-post, SEO plugins usually handle via their own meta
-        }
-
-        return false;
+        return Url_Seo_State::post_is_noindex( (int) $post_id );
     }
 
     /**
@@ -955,17 +936,7 @@ class Seo_Module implements Module_Interface {
      * @return bool True when the post should be included.
      */
     private function should_include_in_xml_sitemap(int $post_id): bool {
-        $sitemap_exclude = (array) get_post_meta($post_id, 'scos_seo_sitemap_exclude', true);
-        if (in_array('xml', $sitemap_exclude, true)) {
-            return false;
-        }
-
-        $override = '1' === (string) get_post_meta($post_id, 'scos_seo_sitemap_noindex_override', true);
-        if ($override) {
-            return true;
-        }
-
-        return !$this->is_noindex($post_id) && !$this->is_non_self_canonical($post_id);
+        return Url_Seo_State::xml_post_decision( $post_id )['included'];
     }
 
     /**
@@ -981,21 +952,7 @@ class Seo_Module implements Module_Interface {
      * @return bool True if the post should be excluded.
      */
     private function is_non_self_canonical( int $post_id ): bool {
-        // Allow override — same flag covers both noindex and non-self-canonical.
-        $override = get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true );
-        if ( '1' === (string) $override ) {
-            return false;
-        }
-
-        $canonical = get_post_meta( $post_id, 'scos_seo_canonical', true );
-
-        if ( empty( $canonical ) ) {
-            return false;
-        }
-
-        // Compare without trailing slashes so minor URL format differences don't trigger.
-        $self = get_permalink( $post_id );
-        return rtrim( $canonical, '/' ) !== rtrim( $self, '/' );
+        return Url_Seo_State::post_is_non_self_canonical( $post_id );
     }
 
     /**
@@ -1312,11 +1269,7 @@ class Seo_Module implements Module_Interface {
             // Filter out noindex posts and individually HTML-sitemap-excluded posts.
             // Meta is already in cache from preload_noindex_meta() — no N+1 risk.
             $posts = array_filter($all_posts, function($post) {
-                if ($this->is_noindex($post->ID)) {
-                    return false;
-                }
-                $sitemap_exclude = (array) get_post_meta($post->ID, 'scos_seo_sitemap_exclude', true);
-                return !in_array('html', $sitemap_exclude, true);
+                return Url_Seo_State::html_post_decision( (int) $post->ID )['included'];
             });
 
             if (empty($posts)) {
@@ -1419,34 +1372,7 @@ class Seo_Module implements Module_Interface {
      * @return int[] User IDs.
      */
     private function get_sitemap_author_ids(): array {
-        $users = get_users( [
-            'who'                 => 'authors',
-            'has_published_posts' => true,
-            'fields'              => 'ID',
-        ] );
-
-        if ( empty( $users ) ) {
-            return [];
-        }
-
-        // Respect the "Disable author archives" flag from Archive_Settings.
-        $author_archive_settings = [];
-        if ( class_exists( '\SiteEssentials\Modules\SeoMeta\Archive_Settings' ) ) {
-            $author_archive_settings = \SiteEssentials\Modules\SeoMeta\Archive_Settings::get( 'author' );
-        }
-
-        // If the global author archive is disabled, no author URLs belong in the sitemap.
-        if ( ! empty( $author_archive_settings['disabled'] ) ) {
-            return [];
-        }
-
-        // If author archive is set noindex globally, exclude the whole sub-sitemap.
-        $author_robots = $author_archive_settings['robots'] ?? [];
-        if ( in_array( 'noindex', (array) $author_robots, true ) ) {
-            return [];
-        }
-
-        return array_map( 'intval', $users );
+        return Url_Seo_State::sitemap_author_ids();
     }
 
     /**

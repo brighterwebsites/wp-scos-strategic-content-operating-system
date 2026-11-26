@@ -24,6 +24,7 @@
  * v1.5 | 2026-09-30 — Register the seo-meta-instructions WP-CLI command.
  * v1.6 | 2026-09-30 — Register the image-meta-instructions WP-CLI command.
  * v1.7 | 2026-10-25 — Load Redirect_Validator; register the scos redirects WP-CLI command (#222).
+ * v1.8 | 2026-11-26 — Load Url_Seo_State; register the scos url-seo-state WP-CLI command (#245).
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -76,6 +77,7 @@ class SeoMeta_Module implements Module_Interface {
 
 		require_once __DIR__ . '/Meta_Fields.php';
 		require_once __DIR__ . '/Meta_Box.php';
+		require_once __DIR__ . '/Url_Seo_State.php';
 		require_once __DIR__ . '/Head_Output.php';
 		require_once __DIR__ . '/Archive_Settings.php';
 		require_once __DIR__ . '/Image_SEO.php';
@@ -121,6 +123,16 @@ class SeoMeta_Module implements Module_Interface {
 		require_once __DIR__ . '/CLI/Seo_Meta_Instructions_Command.php';
 		require_once __DIR__ . '/CLI/Image_Meta_Instructions_Command.php';
 		require_once __DIR__ . '/CLI/Redirects_Command.php';
+		require_once __DIR__ . '/CLI/Url_Seo_State_Command.php';
+
+		\WP_CLI::add_command(
+			'scos url-seo-state',
+			CLI\Url_Seo_State_Command::class,
+			[
+				'shortdesc' => 'Show what URLs or posts actually serve for SEO: robots, canonical, sitemaps, redirects.',
+				'longdesc'  => 'Runs the scos/get-url-seo-state ability. Each value says where it comes from; warnings list where the page and the sitemaps disagree. No AI involved.',
+			]
+		);
 
 		\WP_CLI::add_command(
 			'scos redirects',

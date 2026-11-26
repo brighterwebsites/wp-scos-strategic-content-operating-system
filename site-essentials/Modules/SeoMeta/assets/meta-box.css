@@ -33,6 +33,18 @@
 	border-bottom-color: #2271b1;
 }
 
+/* Advanced tab: a field there holds a value for this post (#113). */
+.scos-seo-tab-dot {
+	display: inline-block;
+	width: 7px;
+	height: 7px;
+	margin-left: 6px;
+	border-radius: 50%;
+	background: var(--scos-accent, #2271b1);
+	vertical-align: middle;
+}
+.scos-seo-tab-dot[hidden] { display: none; }
+
 /* ── Tab panels ── */
 .scos-seo-tab-panel { display: none; }
 .scos-seo-tab-panel.is-active { display: block; }

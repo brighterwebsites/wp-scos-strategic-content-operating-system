@@ -25,6 +25,8 @@
  *                      catalog is on, and drops the feed block while Tweaks ›
  *                      Disable RSS Feeds is on. Saving text identical to the default robots
  *                      or generated llms version stores '' so it keeps updating (#221).
+ *                      /robots.txt is purged from the page cache when it is saved,
+ *                      or when Discourage search engines or the ARD catalog changes.
  * v1.1 | 2026-10-21 — llms.txt with blank custom content serves the generated
  *                      version (Llms_Txt::build()), so it stays current.
  * v1.0 | 2026-10-01 — Default robots.txt: Content-Signal line, Cloudflare email-protection
@@ -150,6 +152,10 @@ class Virtual_Files {
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
 	public static function init(): void {
+		// Anything that changes what /robots.txt serves purges its cached copy.
+		add_action( 'update_option_blog_public', [ __CLASS__, 'purge_robots_cache' ] );
+		add_action( 'update_option_scos_agentic_ard_enabled', [ __CLASS__, 'purge_robots_cache' ] );
+
 		$robots = self::get_robots();
 		if ( ! empty( $robots['enabled'] ) ) {
 			// Priority 99 — run after other plugins so we take full ownership.
@@ -193,6 +199,15 @@ class Virtual_Files {
 		$robots  = self::get_robots();
 		$content = trim( $robots['content'] ?? '' );
 		return '' !== $content ? $content : self::default_robots_txt();
+	}
+
+	/**
+	 * Drop /robots.txt from the page cache. LiteSpeed caches it like a page, so
+	 * without this a site going private keeps its old file (or a launched site
+	 * keeps Disallow: /) until a manual purge. No-op without LiteSpeed Cache.
+	 */
+	public static function purge_robots_cache(): void {
+		do_action( 'litespeed_purge_url', home_url( '/robots.txt' ) );
 	}
 
 	// ── llms.txt callbacks ────────────────────────────────────────────────────
@@ -274,6 +289,8 @@ class Virtual_Files {
 			],
 			false
 		);
+
+		self::purge_robots_cache();
 
 		// Flush rewrite rules whenever the llms.txt enabled state changes.
 		if ( $llms_was_enabled !== $llms_now_enabled ) {

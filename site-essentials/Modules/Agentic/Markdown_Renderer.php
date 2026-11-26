@@ -4,9 +4,9 @@
  *
  * v1.4 | 2026-11-27
  *
- * v1.4 | 2026-11-27 — The HTML is re-serialised through DOMDocument before conversion, so a
- *                     tag with a stray quote (a builder ID field used to inject attributes)
- *                     no longer swallows the rest of the page at the final strip (#235).
+ * v1.4 | 2026-11-27 — A tag with a stray quote (a builder ID field used to inject attributes)
+ *                     no longer swallows the rest of the page at the final strip: strip_text()
+ *                     notices the loss, keeps the text and logs the post ID (#235).
  * v1.3 | 2026-11-07 — No markdown copy of a post type without single URLs (reviews; FAQs
  *                     when switched off): the request falls through to Single_Url_Guard's 301.
  * v1.2 | 2026-10-21 — Clean output on page-builder markup (#211): heading and
@@ -230,7 +230,6 @@ class Markdown_Renderer {
 	private static function content_to_markdown( string $content ): string {
 		// Run standard content filters (shortcodes, blocks, etc.) first.
 		$content = apply_filters( 'the_content', $content );
-		$content = self::normalise_html( $content );
 
 		// ── Images → ![alt](src), matching both attribute orderings ───────────
 		// Before links, so a linked image survives inside the link text.
@@ -278,48 +277,42 @@ class Markdown_Renderer {
 		$content = preg_replace( '/<br\s*\/?>/i', "\n", $content );
 
 		// ── Strip remaining HTML, then decode entities once ───────────────────
-		$content = wp_strip_all_tags( $content );
+		$content = self::strip_text( $content );
 		$content = self::decode_entities( $content );
 
 		return self::normalise_whitespace( $content );
 	}
 
 	/**
-	 * Re-serialise HTML through DOMDocument so every tag comes back well formed.
+	 * wp_strip_all_tags(), unless a malformed tag made it swallow the page.
 	 *
-	 * strip_tags() treats a stray quote inside a tag as an attribute that never
-	 * ends, so everything after it disappears (#235). libxml recovers from that,
-	 * and the regex conversions below then see balanced markup. Returns the input
-	 * unchanged when DOM is unavailable or the parse fails.
+	 * strip_tags() reads a stray quote inside a tag as an attribute that never
+	 * ends, so everything up to the next straight quote disappears (#235). A
+	 * strip that ignores quotes can't do that. When the normal strip keeps much
+	 * less text than the quote-blind one, the quote-blind result is used and the
+	 * post ID logged so the broken markup gets fixed. Normal pages are unchanged.
 	 *
-	 * @param string $html Rendered content.
+	 * @param string $html Converted content with the remaining HTML.
 	 * @return string
 	 */
-	private static function normalise_html( string $html ): string {
-		if ( '' === trim( $html ) || ! class_exists( '\DOMDocument' ) ) {
-			return $html;
-		}
+	private static function strip_text( string $html ): string {
+		$text = wp_strip_all_tags( $html );
 
-		$previous = libxml_use_internal_errors( true );
-		$doc      = new \DOMDocument();
-		// The XML declaration makes libxml read the string as UTF-8.
-		$loaded = $doc->loadHTML(
-			'<?xml encoding="UTF-8"?><html><body><div id="scos-md-root">' . $html . '</div></body></html>',
-			LIBXML_NONET | LIBXML_COMPACT
-		);
-		libxml_clear_errors();
-		libxml_use_internal_errors( $previous );
+		$blind = preg_replace( '@<(script|style)[^>]*?>.*?</\1>@si', '', $html );
+		$blind = preg_replace( '/<[^>]*>/', '', (string) $blind );
+		$kept  = strlen( trim( $text ) );
+		$full  = strlen( trim( (string) $blind ) );
 
-		$root = $loaded ? $doc->getElementById( 'scos-md-root' ) : null;
-		if ( ! $root ) {
-			return $html;
+		if ( $full > 200 && $kept < $full * 0.8 ) {
+			error_log( sprintf( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				'[SCOS markdown] post %d: a malformed tag hid %d of %d characters; check its HTML for a stray quote.',
+				(int) get_the_ID(),
+				$full - $kept,
+				$full
+			) );
+			return (string) $blind;
 		}
-
-		$out = '';
-		foreach ( $root->childNodes as $node ) {
-			$out .= $doc->saveHTML( $node );
-		}
-		return '' === trim( $out ) ? $html : $out;
+		return $text;
 	}
 
 	// ── Conversion callbacks ──────────────────────────────────────────────────

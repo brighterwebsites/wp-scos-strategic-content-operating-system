@@ -2,8 +2,11 @@
 /**
  * Markdown Renderer
  *
- * v1.3 | 2026-11-07
+ * v1.4 | 2026-11-27
  *
+ * v1.4 | 2026-11-27 — The HTML is re-serialised through DOMDocument before conversion, so a
+ *                     tag with a stray quote (a builder ID field used to inject attributes)
+ *                     no longer swallows the rest of the page at the final strip (#235).
  * v1.3 | 2026-11-07 — No markdown copy of a post type without single URLs (reviews; FAQs
  *                     when switched off): the request falls through to Single_Url_Guard's 301.
  * v1.2 | 2026-10-21 — Clean output on page-builder markup (#211): heading and
@@ -227,6 +230,7 @@ class Markdown_Renderer {
 	private static function content_to_markdown( string $content ): string {
 		// Run standard content filters (shortcodes, blocks, etc.) first.
 		$content = apply_filters( 'the_content', $content );
+		$content = self::normalise_html( $content );
 
 		// ── Images → ![alt](src), matching both attribute orderings ───────────
 		// Before links, so a linked image survives inside the link text.
@@ -278,6 +282,44 @@ class Markdown_Renderer {
 		$content = self::decode_entities( $content );
 
 		return self::normalise_whitespace( $content );
+	}
+
+	/**
+	 * Re-serialise HTML through DOMDocument so every tag comes back well formed.
+	 *
+	 * strip_tags() treats a stray quote inside a tag as an attribute that never
+	 * ends, so everything after it disappears (#235). libxml recovers from that,
+	 * and the regex conversions below then see balanced markup. Returns the input
+	 * unchanged when DOM is unavailable or the parse fails.
+	 *
+	 * @param string $html Rendered content.
+	 * @return string
+	 */
+	private static function normalise_html( string $html ): string {
+		if ( '' === trim( $html ) || ! class_exists( '\DOMDocument' ) ) {
+			return $html;
+		}
+
+		$previous = libxml_use_internal_errors( true );
+		$doc      = new \DOMDocument();
+		// The XML declaration makes libxml read the string as UTF-8.
+		$loaded = $doc->loadHTML(
+			'<?xml encoding="UTF-8"?><html><body><div id="scos-md-root">' . $html . '</div></body></html>',
+			LIBXML_NONET | LIBXML_COMPACT
+		);
+		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
+
+		$root = $loaded ? $doc->getElementById( 'scos-md-root' ) : null;
+		if ( ! $root ) {
+			return $html;
+		}
+
+		$out = '';
+		foreach ( $root->childNodes as $node ) {
+			$out .= $doc->saveHTML( $node );
+		}
+		return '' === trim( $out ) ? $html : $out;
 	}
 
 	// ── Conversion callbacks ──────────────────────────────────────────────────

@@ -7,6 +7,7 @@
  * v1.2 | 2026-11-25 — The privacy note matches the delivery mode (#267).
  * v1.3 | 2026-11-25 — The enquiry hint matches the delivery mode too (#272).
  * v1.4 | 2026-11-26 — privacy_items() split out for the privacy policy shortcode (#230).
+ * v1.5 | 2026-11-26 — No "See our privacy policy" link when shown on the privacy policy itself.
  *                      The rest of the /mcp/ page: Agent_Guide.
  *
  * Two pieces of page copy that must match what this site actually does, so
@@ -110,8 +111,10 @@ class Agent_Notices {
 		}
 		$html .= '</ul>';
 
-		$policy = get_privacy_policy_url();
-		if ( $policy ) {
+		// On the privacy policy itself the link would point at the page it's on.
+		$policy_id = (int) get_option( 'wp_page_for_privacy_policy' );
+		$policy    = get_privacy_policy_url();
+		if ( $policy && ! ( $policy_id && is_page( $policy_id ) ) ) {
 			$html .= '<p class="scos-agent-note">' . sprintf(
 				/* translators: %s: privacy policy link */
 				esc_html__( 'See our %s for how we handle enquiries.', 'site-essentials' ),

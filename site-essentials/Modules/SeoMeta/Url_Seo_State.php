@@ -801,11 +801,35 @@ class Url_Seo_State {
 			return [ 'to' => $target, 'status' => 301, 'reason' => 'redirect_rule_301' ];
 		}
 
-		// Priority 2: post types without single URLs.
-		if ( 'singular' === $ctx['type'] && class_exists( Single_Url_Guard::class ) ) {
-			$type = (string) get_post_type( (int) $ctx['post_id'] );
-			if ( Single_Url_Guard::is_blocked( $type ) ) {
-				return [ 'to' => Single_Url_Guard::target( $type, (int) $ctx['post_id'] ), 'status' => 301, 'reason' => 'single_url_guard' ];
+		// Priority 2: post types without single URLs — the single itself, ?p=<id>, or
+		// the type's raw query var (?faq=… / ?bw_reviews=…), as Single_Url_Guard matches them.
+		if ( class_exists( Single_Url_Guard::class ) ) {
+			if ( 'singular' === $ctx['type'] ) {
+				$type = (string) get_post_type( (int) $ctx['post_id'] );
+				if ( Single_Url_Guard::is_blocked( $type ) ) {
+					return [ 'to' => Single_Url_Guard::target( $type, (int) $ctx['post_id'] ), 'status' => 301, 'reason' => 'single_url_guard' ];
+				}
+			}
+			$get = [];
+			if ( ! empty( $ctx['request_uri'] ) && false !== strpos( $ctx['request_uri'], '?' ) ) {
+				wp_parse_str( (string) wp_parse_url( $ctx['request_uri'], PHP_URL_QUERY ), $get );
+			}
+			$p = isset( $get['p'] ) ? absint( $get['p'] ) : 0;
+			if ( $p && $ctx['query'] instanceof \WP_Query && $ctx['query']->is_404() ) {
+				$p_type = (string) get_post_type( $p );
+				if ( Single_Url_Guard::is_blocked( $p_type ) && 'publish' === get_post_status( $p ) ) {
+					return [ 'to' => Single_Url_Guard::target( $p_type, $p ), 'status' => 301, 'reason' => 'single_url_guard' ];
+				}
+			}
+			foreach ( Single_Url_Guard::post_types() as $blocked ) {
+				$obj = get_post_type_object( $blocked );
+				if ( ! $obj ) {
+					continue;
+				}
+				$var = ( is_string( $obj->query_var ) && '' !== $obj->query_var ) ? $obj->query_var : $blocked;
+				if ( isset( $get[ $var ] ) && '' !== $get[ $var ] ) {
+					return [ 'to' => Single_Url_Guard::target( $blocked, 0 ), 'status' => 301, 'reason' => 'single_url_guard' ];
+				}
 			}
 		}
 

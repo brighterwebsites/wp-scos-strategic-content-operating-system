@@ -25,7 +25,8 @@
  *                       when a field on it holds a value for this post (#113).
  * v1.12 | 2026-11-26 — Freeze modified date takes effect on the save that changes it: uses the
  *                       submitted checkbox, and in the block editor restores the date from
- *                       before the editor's REST save (#112 QA).
+ *                       before the editor's REST save (#112 QA). Breakdance's automatic
+ *                       launcher-block save on opening a page no longer bumps the date.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -265,6 +266,24 @@ class Meta_Box {
 		return ! empty( $_POST['scos_seo_freeze_og_date'] ) ? '1' : '0';
 	}
 
+	/**
+	 * Whether this save only swaps a Breakdance page's content for the launcher block,
+	 * as Breakdance does on its own when the page opens in the block editor.
+	 */
+	private static function is_breakdance_launcher_save( int $post_id, array $data ): bool {
+		$launcher = '<!-- wp:breakdance/block-breakdance-launcher /-->';
+		if ( trim( wp_unslash( (string) ( $data['post_content'] ?? '' ) ) ) !== $launcher ) {
+			return false;
+		}
+		$old = get_post( $post_id );
+		if ( ! $old || trim( $old->post_content ) === $launcher || ! metadata_exists( 'post', $post_id, '_breakdance_data' ) ) {
+			return false;
+		}
+		return wp_unslash( (string) ( $data['post_title'] ?? '' ) ) === $old->post_title
+			&& wp_unslash( (string) ( $data['post_excerpt'] ?? '' ) ) === $old->post_excerpt
+			&& (string) ( $data['post_status'] ?? '' ) === $old->post_status;
+	}
+
 	// -------------------------------------------------------------------------
 
 	/**
@@ -307,6 +326,20 @@ class Meta_Box {
 			], 5 * MINUTE_IN_SECONDS );
 		}
 
+		// Breakdance rewrites a page's content to its launcher block and saves it when the
+		// page is opened in the block editor without one. That is not an edit (the page's
+		// content lives in _breakdance_data), so the date stays, in the REST save and in the
+		// meta-box request that follows it.
+		$launcher_key  = 'se_seo_launcher_save_' . $post_id;
+		$launcher_save = false;
+		if ( $is_meta_box_request ) {
+			$launcher_save = (bool) get_transient( $launcher_key );
+			delete_transient( $launcher_key );
+		} elseif ( self::is_breakdance_launcher_save( $post_id, $data ) ) {
+			$launcher_save = true;
+			set_transient( $launcher_key, 1, MINUTE_IN_SECONDS );
+		}
+
 		// Resolve freeze intent:
 		// Global ON  → freeze, unless per-post is explicitly '0' (user override)
 		// Global OFF → freeze only if per-post is explicitly '1'
@@ -314,6 +347,10 @@ class Meta_Box {
 			$should_freeze = ( '0' !== (string) $per_post );
 		} else {
 			$should_freeze = ( '1' === (string) $per_post );
+		}
+
+		if ( $launcher_save ) {
+			$should_freeze = true;
 		}
 
 		if ( ! $should_freeze ) {

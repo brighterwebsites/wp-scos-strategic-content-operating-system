@@ -13,6 +13,8 @@
  *             scos/get-url-seo-state (#245). Sitemaps unchanged.
  * v1.9 | 2026-11-26 — Sitemap index skips child sitemaps with no entries; category
  *             archives off by default (#244).
+ * v1.13 | 2026-11-26 — noindex taxonomies and CPT archives leave the sitemaps; with "Discourage
+ *              search engines" on, every XML sitemap is served empty (#279).
  * v1.12 | 2026-11-26 — Sitemaps leave out URLs that redirect or return 410 (posts, CPT archives,
  *              terms, authors, the HTML archive links), via Url_Seo_State (#285).
  * v1.11 | 2026-11-26 — <lastmod> was the GMT time labelled with the site's offset (10 h early
@@ -235,6 +237,12 @@ class Seo_Module implements Module_Interface {
 
         // Get sitemap settings
         $settings = $this->get_sitemap_settings();
+
+        // "Discourage search engines" (Settings › Reading): list nothing (#279).
+        if ( ! Url_Seo_State::search_engines_allowed() ) {
+            $this->render_empty_sitemap( 'index' === $sitemap );
+            exit;
+        }
 
         if ($sitemap === 'index') {
             $this->render_sitemap_index($settings);
@@ -819,8 +827,8 @@ class Seo_Module implements Module_Interface {
         $xml .= 'xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 ';
         $xml .= 'http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">' . "\n";
 
-        // Get terms
-        $terms = $this->get_taxonomy_terms($taxonomy, $settings);
+        // Get terms: none when the taxonomy's archives are noindex, checked once (#279).
+        $terms = Url_Seo_State::archive_is_noindex( (string) $taxonomy ) ? [] : $this->get_taxonomy_terms($taxonomy, $settings);
 
         foreach ($terms as $term) {
             $link = get_term_link($term);
@@ -1402,6 +1410,23 @@ class Seo_Module implements Module_Interface {
         return array_values( array_filter( Url_Seo_State::sitemap_author_ids(), static function ( $id ) {
             return null === Url_Seo_State::rule_redirect_for_url( (string) get_author_posts_url( (int) $id ) );
         } ) );
+    }
+
+    /**
+     * An empty sitemap index or urlset (search engines discouraged).
+     *
+     * @param bool $index True for sitemap.xml.
+     * @return void
+     */
+    private function render_empty_sitemap( bool $index ): void {
+        $this->disable_litespeed_cache();
+        header( 'Content-Type: application/xml; charset=utf-8' );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0' );
+        header( 'X-LiteSpeed-Cache-Control: no-cache' );
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo $index
+            ? '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></sitemapindex>'
+            : '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
     }
 
     /**

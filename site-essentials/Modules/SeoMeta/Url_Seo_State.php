@@ -23,8 +23,10 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.4 | 2026-11-26
+ * @version    1.5 | 2026-11-26
  *
+ * v1.5 | 2026-11-26 — noindex CPT archives and taxonomies are out of the sitemaps (archive_noindex);
+ *                      with "Discourage search engines" on, the XML sitemap lists nothing (#279).
  * v1.4 | 2026-11-26 — sitemap_eligibility(): the one place a URL's sitemap inclusion is decided.
  *                      A URL that redirects or returns 410 is in neither sitemap (#285).
  * v1.3 | 2026-11-26 — One canonical comparison: same_url() / is_self_canonical() (#283).
@@ -666,6 +668,27 @@ class Url_Seo_State {
 		return array_map( 'intval', $users );
 	}
 
+	/**
+	 * Whether an archive's own settings (SEO › Archive Settings) serve it as noindex.
+	 * Robots are per archive / per taxonomy, so the sitemap checks this once per
+	 * taxonomy, not per term.
+	 *
+	 * @param string $slug Post type, taxonomy or special archive slug.
+	 * @return bool
+	 */
+	public static function archive_is_noindex( string $slug ): bool {
+		return in_array( 'noindex', (array) ( Archive_Settings::get( $slug )['robots'] ?? [] ), true );
+	}
+
+	/**
+	 * False when Settings › Reading › "Discourage search engines" is ticked.
+	 *
+	 * @return bool
+	 */
+	public static function search_engines_allowed(): bool {
+		return '0' !== (string) get_option( 'blog_public' );
+	}
+
 	// =========================================================================
 	// Sitemaps — per context
 	// =========================================================================
@@ -719,6 +742,9 @@ class Url_Seo_State {
 			if ( ! in_array( $slug, (array) ( $settings['taxonomies'] ?? [] ), true ) ) {
 				return [ 'included' => false, 'reason' => 'taxonomy_not_in_sitemap' ];
 			}
+			if ( self::archive_is_noindex( $slug ) ) {
+				return [ 'included' => false, 'reason' => 'archive_noindex' ];
+			}
 			$term = $ctx['query']->get_queried_object();
 			if ( ! ( $term instanceof \WP_Term ) || (int) $term->count < 1 ) {
 				return [ 'included' => false, 'reason' => 'empty_term' ];
@@ -738,6 +764,9 @@ class Url_Seo_State {
 		$page_id     = self::archive_url_page_id( $archive_url );
 		if ( $page_id ) {
 			return self::xml_for_post( $page_id, $settings ) + [ 'listed_as' => $page_id ];
+		}
+		if ( self::archive_is_noindex( $slug ) ) {
+			return [ 'included' => false, 'reason' => 'archive_noindex' ];
 		}
 		return [ 'included' => true, 'reason' => 'included' ];
 	}
@@ -802,7 +831,9 @@ class Url_Seo_State {
 			&& ! in_array( $ctx['slug'], [ 'post', 'page' ], true ) ) {
 			$obj = get_post_type_object( $ctx['slug'] );
 			if ( in_array( $ctx['slug'], (array) ( $settings['post_types'] ?? [] ), true ) && $obj && $obj->has_archive ) {
-				return [ 'included' => true, 'reason' => 'archive_link' ];
+				return self::archive_is_noindex( $ctx['slug'] )
+					? [ 'included' => false, 'reason' => 'archive_noindex' ]
+					: [ 'included' => true, 'reason' => 'archive_link' ];
 			}
 			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
 		}
@@ -845,6 +876,9 @@ class Url_Seo_State {
 	 * @return array{included:bool, reason:string, listed_as?:int}
 	 */
 	public static function sitemap_eligibility( array $ctx, string $channel, array $settings ): array {
+		if ( 'xml' === $channel && ! self::search_engines_allowed() ) {
+			return [ 'included' => false, 'reason' => 'blog_public' ];
+		}
 		$res = 'html' === $channel ? self::html_listing( $ctx, $settings ) : self::xml_listing( $ctx, $settings );
 		if ( ! $res['included'] ) {
 			return $res;
@@ -872,6 +906,9 @@ class Url_Seo_State {
 	 * @return array{included:bool, reason:string}
 	 */
 	public static function post_sitemap_decision( int $post_id, string $channel ): array {
+		if ( 'xml' === $channel && ! self::search_engines_allowed() ) {
+			return [ 'included' => false, 'reason' => 'blog_public' ];
+		}
 		$res = 'html' === $channel ? self::html_post_decision( $post_id ) : self::xml_post_decision( $post_id );
 		if ( $res['included'] ) {
 			$rule = self::rule_redirect_for_url( (string) get_permalink( $post_id ) );

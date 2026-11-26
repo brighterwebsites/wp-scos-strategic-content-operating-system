@@ -23,8 +23,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.5 | 2026-11-26
+ * @version    1.6 | 2026-11-26
  *
+ * v1.6 | 2026-11-26 — A CPT archive's "Exclude from XML/HTML sitemap" is applied (excluded_by_archive) (#280).
  * v1.5 | 2026-11-26 — noindex CPT archives and taxonomies are out of the sitemaps (archive_noindex);
  *                      with "Discourage search engines" on, the XML sitemap lists nothing (#279).
  * v1.4 | 2026-11-26 — sitemap_eligibility(): the one place a URL's sitemap inclusion is decided.
@@ -681,6 +682,18 @@ class Url_Seo_State {
 	}
 
 	/**
+	 * Whether an archive's own settings hide it from one sitemap channel
+	 * (CPT and posts archives only; a stored 'news' is ignored) (#280).
+	 *
+	 * @param string $slug
+	 * @param string $channel 'xml' or 'html'.
+	 * @return bool
+	 */
+	public static function archive_excludes( string $slug, string $channel ): bool {
+		return in_array( $channel, (array) ( Archive_Settings::get( $slug )['sitemap_exclude'] ?? [] ), true );
+	}
+
+	/**
 	 * False when Settings › Reading › "Discourage search engines" is ticked.
 	 *
 	 * @return bool
@@ -768,6 +781,9 @@ class Url_Seo_State {
 		if ( self::archive_is_noindex( $slug ) ) {
 			return [ 'included' => false, 'reason' => 'archive_noindex' ];
 		}
+		if ( self::archive_excludes( $slug, 'xml' ) ) {
+			return [ 'included' => false, 'reason' => 'excluded_by_archive' ];
+		}
 		return [ 'included' => true, 'reason' => 'included' ];
 	}
 
@@ -831,8 +847,11 @@ class Url_Seo_State {
 			&& ! in_array( $ctx['slug'], [ 'post', 'page' ], true ) ) {
 			$obj = get_post_type_object( $ctx['slug'] );
 			if ( in_array( $ctx['slug'], (array) ( $settings['post_types'] ?? [] ), true ) && $obj && $obj->has_archive ) {
-				return self::archive_is_noindex( $ctx['slug'] )
-					? [ 'included' => false, 'reason' => 'archive_noindex' ]
+				if ( self::archive_is_noindex( $ctx['slug'] ) ) {
+					return [ 'included' => false, 'reason' => 'archive_noindex' ];
+				}
+				return self::archive_excludes( $ctx['slug'], 'html' )
+					? [ 'included' => false, 'reason' => 'excluded_by_archive' ]
 					: [ 'included' => true, 'reason' => 'archive_link' ];
 			}
 			return [ 'included' => false, 'reason' => 'type_not_in_sitemap' ];
@@ -1163,10 +1182,12 @@ class Url_Seo_State {
 			);
 		}
 
-		if ( 'archive' === $ctx['type'] && ( $xml['included'] || $html['included'] ) ) {
-			$exclude = Archive_Settings::get( $ctx['slug'] )['sitemap_exclude'] ?? [];
-			if ( ! empty( array_filter( (array) $exclude ) ) ) {
-				$w[] = 'The archive settings hide this archive from sitemaps, but that setting is not applied yet: it is still listed.';
+		// Tripwire: sitemap_eligibility() applies the archive's exclusion, so this should never fire (#280).
+		if ( 'archive' === $ctx['type'] ) {
+			foreach ( [ 'xml' => $xml, 'html' => $html ] as $channel => $decision ) {
+				if ( $decision['included'] && self::archive_excludes( $ctx['slug'], $channel ) ) {
+					$w[] = sprintf( 'The archive settings hide this archive from the %s sitemap, but it is still listed.', strtoupper( $channel ) );
+				}
 			}
 		}
 

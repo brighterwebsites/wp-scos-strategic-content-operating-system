@@ -8,6 +8,7 @@
  * v1.4 | 2026-10-19 — Note that field tokens take single or double %.
  * v1.5 | 2026-11-07 — "Single pages: default robots" per post type (#228), with a flag when a
  *                      Breakdance template targets the type, and a note when singles are off.
+ * v1.6 | 2026-11-26 — Sitemap Visibility: no Google News option (no news sitemap exists) (#280).
  *
  * SCOS design system: scos-accordion replaces <details>, scos-form inside bodies,
  * scos-badge for status, scos-save-bar, scos__section-label. Inline <style> removed.
@@ -302,7 +303,6 @@ $chevron_svg = '<svg class="scos-accordion__chevron" xmlns="http://www.w3.org/20
 					$sitemap_opts = [
 						'xml'  => __( 'Exclude from XML Sitemap', 'site-essentials' ),
 						'html' => __( 'Exclude from HTML Sitemap', 'site-essentials' ),
-						'news' => __( 'Exclude from Google News Sitemap', 'site-essentials' ),
 					];
 					foreach ( $sitemap_opts as $val => $label_text ) :
 						$checked = in_array( $val, (array) $s['sitemap_exclude'], true );

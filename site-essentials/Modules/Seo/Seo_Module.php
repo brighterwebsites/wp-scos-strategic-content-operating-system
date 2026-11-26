@@ -13,6 +13,8 @@
  *             scos/get-url-seo-state (#245). Sitemaps unchanged.
  * v1.9 | 2026-11-26 — Sitemap index skips child sitemaps with no entries; category
  *             archives off by default (#244).
+ * v1.12 | 2026-11-26 — Sitemaps leave out URLs that redirect or return 410 (posts, CPT archives,
+ *              terms, authors, the HTML archive links), via Url_Seo_State (#285).
  * v1.11 | 2026-11-26 — <lastmod> was the GMT time labelled with the site's offset (10 h early
  *              in AEST): now formatted as UTC. Sitemap cache flushes when archive settings
  *              or the SEO module settings are saved (#286).
@@ -492,7 +494,8 @@ class Seo_Module implements Module_Interface {
         if ($post_type_obj && $post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
             $archive_url = get_post_type_archive_link($post_type);
             // WooCommerce (and similar) use a Page as the archive URL — already in sitemap-page.xml
-            if ($archive_url && ! $this->archive_url_is_existing_page($archive_url)) {
+            if ($archive_url && ! $this->archive_url_is_existing_page($archive_url)
+                && $this->archive_listed( (string) $archive_url, 'xml', $settings )) {
                 $last_modified = $this->get_post_type_last_modified($post_type);
 
                 $xml .= "\t<url>\n";
@@ -820,6 +823,11 @@ class Seo_Module implements Module_Interface {
         $terms = $this->get_taxonomy_terms($taxonomy, $settings);
 
         foreach ($terms as $term) {
+            $link = get_term_link($term);
+            // A term URL that redirects or returns 410 is not listed (#285).
+            if (is_wp_error($link) || null !== Url_Seo_State::rule_redirect_for_url((string) $link)) {
+                continue;
+            }
             $xml .= $this->generate_taxonomy_url_entry($term);
         }
 
@@ -942,7 +950,7 @@ class Seo_Module implements Module_Interface {
      * @return bool True when the post should be included.
      */
     private function should_include_in_xml_sitemap(int $post_id): bool {
-        return Url_Seo_State::xml_post_decision( $post_id )['included'];
+        return Url_Seo_State::post_sitemap_decision( $post_id, 'xml' )['included'];
     }
 
     /**
@@ -1287,7 +1295,7 @@ class Seo_Module implements Module_Interface {
             // Filter out noindex posts and individually HTML-sitemap-excluded posts.
             // Meta is already in cache from preload_noindex_meta() — no N+1 risk.
             $posts = array_filter($all_posts, function($post) {
-                return Url_Seo_State::html_post_decision( (int) $post->ID )['included'];
+                return Url_Seo_State::post_sitemap_decision( (int) $post->ID, 'html' )['included'];
             });
 
             if (empty($posts)) {
@@ -1301,7 +1309,7 @@ class Seo_Module implements Module_Interface {
             // Add archive link for CPTs (not for posts/pages)
             if ($post_type_obj->has_archive && $post_type !== 'post' && $post_type !== 'page') {
                 $archive_url = get_post_type_archive_link($post_type);
-                if ($archive_url) {
+                if ($archive_url && $this->archive_listed( (string) $archive_url, 'html', $settings )) {
                     $html .= ' <a href="' . esc_url($archive_url) . '" class="archive-link" title="View ' . esc_attr($post_type_obj->labels->name) . ' Archive">&rarr;</a>';
                 }
             }
@@ -1390,7 +1398,24 @@ class Seo_Module implements Module_Interface {
      * @return int[] User IDs.
      */
     private function get_sitemap_author_ids(): array {
-        return Url_Seo_State::sitemap_author_ids();
+        // Authors whose archive URL redirects or returns 410 are not listed (#285).
+        return array_values( array_filter( Url_Seo_State::sitemap_author_ids(), static function ( $id ) {
+            return null === Url_Seo_State::rule_redirect_for_url( (string) get_author_posts_url( (int) $id ) );
+        } ) );
+    }
+
+    /**
+     * Whether a CPT archive's own URL is listed in a sitemap: the shared decision
+     * in Url_Seo_State::sitemap_eligibility() (#278).
+     *
+     * @param string $archive_url
+     * @param string $channel 'xml' or 'html'.
+     * @param array  $settings
+     * @return bool
+     */
+    private function archive_listed( string $archive_url, string $channel, array $settings ): bool {
+        $ctx = Url_Seo_State::context_for_url( $archive_url );
+        return ! is_wp_error( $ctx ) && Url_Seo_State::sitemap_eligibility( $ctx, $channel, $settings )['included'];
     }
 
     /**

@@ -23,8 +23,10 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.3 | 2026-11-26
+ * @version    1.4 | 2026-11-26
  *
+ * v1.4 | 2026-11-26 — sitemap_eligibility(): the one place a URL's sitemap inclusion is decided.
+ *                      A URL that redirects or returns 410 is in neither sitemap (#285).
  * v1.3 | 2026-11-26 — One canonical comparison: same_url() / is_self_canonical() (#283).
  * v1.2 | 2026-11-26 — Sitemap noindex check no longer reads Yoast, Rank Math or `_robots_noindex` meta (#287).
  * v1.1 | 2026-11-26 — The blog paged past its last page reports as a 404, as it is served.
@@ -675,7 +677,7 @@ class Url_Seo_State {
 	 * @param array $settings Sitemap settings (Seo_Module::sitemap_settings()).
 	 * @return array{included:bool, reason:string, listed_as?:int}
 	 */
-	public static function in_xml_sitemap( array $ctx, array $settings ): array {
+	private static function xml_listing( array $ctx, array $settings ): array {
 		$types = (array) ( $settings['post_types'] ?? [] );
 
 		if ( 'singular' === $ctx['type'] ) {
@@ -777,7 +779,7 @@ class Url_Seo_State {
 	 * @param array $settings Sitemap settings.
 	 * @return array{included:bool, reason:string, listed_as?:int}
 	 */
-	public static function in_html_sitemap( array $ctx, array $settings ): array {
+	private static function html_listing( array $ctx, array $settings ): array {
 		if ( empty( $settings['html_sitemap_enabled'] ) ) {
 			return [ 'included' => false, 'reason' => 'html_sitemap_off' ];
 		}
@@ -808,9 +810,137 @@ class Url_Seo_State {
 		return [ 'included' => false, 'reason' => 'not_listed_type' ];
 	}
 
+	/**
+	 * Whether a context's URL is in the XML sitemap, and why.
+	 *
+	 * @param array $ctx      Context.
+	 * @param array $settings Sitemap settings (Seo_Module::sitemap_settings()).
+	 * @return array{included:bool, reason:string, listed_as?:int}
+	 */
+	public static function in_xml_sitemap( array $ctx, array $settings ): array {
+		return self::sitemap_eligibility( $ctx, 'xml', $settings );
+	}
+
+	/**
+	 * Whether a context's URL is in the HTML sitemap ([site_essentials_sitemap]), and why.
+	 *
+	 * @param array $ctx      Context.
+	 * @param array $settings Sitemap settings.
+	 * @return array{included:bool, reason:string, listed_as?:int}
+	 */
+	public static function in_html_sitemap( array $ctx, array $settings ): array {
+		return self::sitemap_eligibility( $ctx, 'html', $settings );
+	}
+
+	/**
+	 * Whether a context's URL is listed in one sitemap, and why (#278).
+	 *
+	 * The single decision both sitemaps and report() use. Each rule has its own
+	 * reason code; a URL that redirects or returns 410 is out of both channels
+	 * with reason `redirects:<redirect reason>` (#285).
+	 *
+	 * @param array  $ctx      Context.
+	 * @param string $channel  'xml' or 'html'.
+	 * @param array  $settings Sitemap settings (Seo_Module::sitemap_settings()).
+	 * @return array{included:bool, reason:string, listed_as?:int}
+	 */
+	public static function sitemap_eligibility( array $ctx, string $channel, array $settings ): array {
+		$res = 'html' === $channel ? self::html_listing( $ctx, $settings ) : self::xml_listing( $ctx, $settings );
+		if ( ! $res['included'] ) {
+			return $res;
+		}
+
+		// The URL the sitemap would list: the permalink, or the archive's first page.
+		$own = self::listed_url( $ctx );
+		if ( '' !== $own ) {
+			$redirect = self::redirects( $ctx, (string) ( wp_parse_url( $own, PHP_URL_PATH ) ?: '/' ) );
+			if ( null !== $redirect ) {
+				return [ 'included' => false, 'reason' => 'redirects:' . $redirect['reason'] ]
+					+ array_intersect_key( $res, [ 'listed_as' => true ] );
+			}
+		}
+		return $res;
+	}
+
+	/**
+	 * Sitemap decision for one post as the sitemap generators list it, from its
+	 * own meta plus SEO › Redirections. The post type / status / exclude_ids
+	 * checks are the generator's query.
+	 *
+	 * @param int    $post_id
+	 * @param string $channel 'xml' or 'html'.
+	 * @return array{included:bool, reason:string}
+	 */
+	public static function post_sitemap_decision( int $post_id, string $channel ): array {
+		$res = 'html' === $channel ? self::html_post_decision( $post_id ) : self::xml_post_decision( $post_id );
+		if ( $res['included'] ) {
+			$rule = self::rule_redirect_for_url( (string) get_permalink( $post_id ) );
+			if ( null !== $rule ) {
+				return [ 'included' => false, 'reason' => 'redirects:' . $rule['reason'] ];
+			}
+		}
+		return $res;
+	}
+
+	/**
+	 * The URL a sitemap lists for a context ('' when it has none).
+	 */
+	private static function listed_url( array $ctx ): string {
+		if ( 'singular' === $ctx['type'] ) {
+			return (string) get_permalink( (int) $ctx['post_id'] );
+		}
+		if ( 'archive' === $ctx['type'] && $ctx['query'] instanceof \WP_Query ) {
+			return self::archive_base_url( $ctx['slug'], $ctx['query'] );
+		}
+		return '';
+	}
+
 	// =========================================================================
 	// Redirects
 	// =========================================================================
+
+	/** @var array{raw410:string, raw301:string, gone:array, rules:array}|null */
+	private static $rule_cache = null;
+
+	/**
+	 * The SEO › Redirections rule (410, then 301) for a path, as handle_redirect() matches it.
+	 * Parsed once per request (re-parsed if the options change), so sitemap builds can
+	 * call it per entry.
+	 *
+	 * @param string $path URL path.
+	 * @return array{to:string, status:int, reason:string}|null
+	 */
+	public static function rule_redirect( string $path ): ?array {
+		$raw410 = Redirections::get_410_raw();
+		$raw301 = Redirections::get_301_raw();
+		if ( null === self::$rule_cache || self::$rule_cache['raw410'] !== $raw410 || self::$rule_cache['raw301'] !== $raw301 ) {
+			self::$rule_cache = [
+				'raw410' => $raw410,
+				'raw301' => $raw301,
+				'gone'   => array_flip( Redirections::parse_410_paths( $raw410 ) ),
+				'rules'  => Redirections::parse_301_rules( $raw301 ),
+			];
+		}
+		$norm = rtrim( $path, '/' );
+		if ( isset( self::$rule_cache['gone'][ $norm ] ) ) {
+			return [ 'to' => '', 'status' => 410, 'reason' => 'redirect_rule_410' ];
+		}
+		$target = Redirections::match_path( $norm, self::$rule_cache['rules'] );
+		if ( null !== $target ) {
+			return [ 'to' => $target, 'status' => 301, 'reason' => 'redirect_rule_301' ];
+		}
+		return null;
+	}
+
+	/**
+	 * rule_redirect() for an absolute URL.
+	 *
+	 * @param string $url
+	 * @return array{to:string, status:int, reason:string}|null
+	 */
+	public static function rule_redirect_for_url( string $url ): ?array {
+		return '' === $url ? null : self::rule_redirect( (string) ( wp_parse_url( $url, PHP_URL_PATH ) ?: '/' ) );
+	}
 
 	/**
 	 * The redirect (or 410) a context's URL gets before any page renders, in
@@ -823,12 +953,9 @@ class Url_Seo_State {
 	public static function redirects( array $ctx, string $path ): ?array {
 		// Priority 1: SEO › Redirections.
 		$norm = rtrim( $path, '/' );
-		if ( in_array( $norm, Redirections::get_410_paths(), true ) ) {
-			return [ 'to' => '', 'status' => 410, 'reason' => 'redirect_rule_410' ];
-		}
-		$target = Redirections::match_301( $norm );
-		if ( null !== $target ) {
-			return [ 'to' => $target, 'status' => 301, 'reason' => 'redirect_rule_301' ];
+		$rule = self::rule_redirect( $norm );
+		if ( null !== $rule ) {
+			return $rule;
 		}
 
 		// Priority 2: post types without single URLs — the single itself, ?p=<id>, or

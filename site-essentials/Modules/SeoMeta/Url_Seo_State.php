@@ -23,8 +23,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.1 | 2026-11-26
+ * @version    1.2 | 2026-11-26
  *
+ * v1.2 | 2026-11-26 — Sitemap noindex check no longer reads Yoast, Rank Math or `_robots_noindex` meta (#287).
  * v1.1 | 2026-11-26 — The blog paged past its last page reports as a 404, as it is served.
  * @since      1.0.0
  */
@@ -495,9 +496,9 @@ class Url_Seo_State {
 	/**
 	 * Whether the sitemaps treat a post as noindex.
 	 *
-	 * Its own scos_seo_robots, else its post type's default. Also honours legacy
-	 * Yoast, Rank Math and `_robots_noindex` meta, which the page itself never prints.
-	 * TODO: delete the three legacy checks (0 rows on every live site, 2026-11-26).
+	 * Its own scos_seo_robots, else its post type's default: the same rule the page
+	 * prints. (Legacy Yoast, Rank Math and `_robots_noindex` checks removed in v1.2:
+	 * 0 rows on every live site, re-checked 2026-11-26, #287.)
 	 *
 	 * Call update_meta_cache() for a batch of posts first.
 	 *
@@ -513,21 +514,6 @@ class Url_Seo_State {
 		// No robots of its own: the post type's single default applies (#228).
 		if ( ( ! is_array( $scos_robots ) || empty( $scos_robots ) )
 			&& in_array( 'noindex', Archive_Settings::single_robots( (string) get_post_type( $post_id ) ), true ) ) {
-			return true;
-		}
-
-		$yoast_noindex = get_post_meta( $post_id, '_yoast_wpseo_meta-robots-noindex', true );
-		if ( '1' === $yoast_noindex || 'noindex' === $yoast_noindex ) {
-			return true;
-		}
-
-		$rankmath_robots = get_post_meta( $post_id, 'rank_math_robots', true );
-		if ( is_array( $rankmath_robots ) && in_array( 'noindex', $rankmath_robots, true ) ) {
-			return true;
-		}
-
-		$custom_noindex = get_post_meta( $post_id, '_robots_noindex', true );
-		if ( '1' === $custom_noindex || 'yes' === $custom_noindex ) {
 			return true;
 		}
 

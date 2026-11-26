@@ -7,6 +7,7 @@
  *
  * v1.1 | 2026-09-30 — Add Main Product or Service (scos_biz_business_offering).
  * v1.2 | 2026-10-19 — Organisation Type submits the schema.org type (LocalBusiness); label unchanged.
+ * v1.3 | 2026-11-26 — Privacy Policy section: settings for [scos_privacy_policy] (#230).
  */
 defined( 'ABSPATH' ) || exit;
 
@@ -516,6 +517,96 @@ if ( isset( $_GET['settings-updated'] ) ) {
 				</table>
 			</div>
 		</div><!-- /media -->
+
+		<!-- Section: Privacy Policy ([scos_privacy_policy], #230) -->
+		<?php
+		$scos_pp          = \SiteEssentials\Modules\BusinessInfo\Privacy_Policy::settings();
+		$scos_pp_page_id  = (int) get_option( 'wp_page_for_privacy_policy', 0 );
+		$scos_pp_page_url = $scos_pp_page_id ? get_permalink( $scos_pp_page_id ) : '';
+		$scos_pp_toggles  = [
+			'woocommerce'       => [ __( 'Online orders', 'site-essentials' ), __( 'Order records, order retention and cart cookies. Default: on when WooCommerce is active.', 'site-essentials' ) ],
+			'stripe'            => [ __( 'Card payments by Stripe', 'site-essentials' ), __( 'Default: on when the WooCommerce Stripe gateway is enabled.', 'site-essentials' ) ],
+			'xero'              => [ __( 'Invoices through Xero', 'site-essentials' ), '' ],
+			'ai_services'       => [ __( 'AI services handle enquiries', 'site-essentials' ), __( 'Lists AI among service providers and states that AI makes no significant decisions without a person (APP 1.7, from 10 Dec 2026). Untick only if this site\'s enquiries never go through an AI service.', 'site-essentials' ) ],
+			'analytics_ga'      => [ __( 'Google Analytics', 'site-essentials' ), __( 'Default: on when a GA4 measurement ID is set.', 'site-essentials' ) ],
+			'analytics_clarity' => [ __( 'Microsoft Clarity', 'site-essentials' ), '' ],
+			'analytics_ahrefs'  => [ __( 'Ahrefs', 'site-essentials' ), '' ],
+		];
+		$scos_pp_texts    = [
+			'payments_other'  => [ __( 'Other payment providers', 'site-essentials' ), __( 'One per line: Name | privacy policy URL', 'site-essentials' ) ],
+			'analytics_other' => [ __( 'Other analytics tools', 'site-essentials' ), __( 'One per line: Name | what it does | privacy policy URL', 'site-essentials' ) ],
+			'extra_collect'   => [ __( 'Extra things we collect', 'site-essentials' ), __( 'One sentence per line, added under "What personal information we collect". E.g. a quiz kept in the browser.', 'site-essentials' ) ],
+			'extra_retention' => [ __( 'Extra retention lines', 'site-essentials' ), __( 'One sentence per line, added under "How long we keep your information".', 'site-essentials' ) ],
+			'extra_cookies'   => [ __( 'Extra cookie uses', 'site-essentials' ), __( 'One per line, completing "We use cookies and similar technologies to:" (end with a semicolon).', 'site-essentials' ) ],
+		];
+		?>
+		<div class="scos-accordion__item" id="scos-biz-section-privacy">
+			<button type="button" class="scos-accordion__trigger" aria-expanded="false" aria-controls="scos-biz-body-privacy">
+				<span class="scos-accordion__label">
+					<span class="scos-accordion__title"><?php esc_html_e( 'Privacy Policy', 'site-essentials' ); ?></span>
+					<span class="scos-accordion__hint"><?php esc_html_e( 'What [scos_privacy_policy] says: orders, payments, AI, analytics, site-specific lines', 'site-essentials' ); ?></span>
+				</span>
+				<svg class="scos-accordion__chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+			</button>
+			<div class="scos-accordion__body" id="scos-biz-body-privacy">
+				<p class="description">
+					<?php esc_html_e( 'Put the shortcode [scos_privacy_policy] on the privacy page. Business name, email and contact name come from the sections above.', 'site-essentials' ); ?>
+					<?php if ( $scos_pp_page_url ) : ?>
+						<a href="<?php echo esc_url( $scos_pp_page_url ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'View privacy page', 'site-essentials' ); ?></a>
+					<?php else : ?>
+						<a href="<?php echo esc_url( admin_url( 'options-privacy.php' ) ); ?>"><?php esc_html_e( 'Choose the privacy page (Settings › Privacy)', 'site-essentials' ); ?></a>
+					<?php endif; ?>
+				</p>
+				<table class="scos-form">
+					<tbody>
+						<?php foreach ( $scos_pp_toggles as $suffix => $field ) :
+							$key = 'scos_biz_privacy_' . $suffix;
+						?>
+						<tr>
+							<th>
+								<label for="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $field[0] ); ?></label>
+								<div class="scos-form__slug"><?php echo esc_html( $key ); ?></div>
+							</th>
+							<td>
+								<label class="scos-checkbox-row">
+									<input type="checkbox" id="<?php echo esc_attr( $key ); ?>" name="<?php echo esc_attr( $key ); ?>" value="1" <?php checked( $scos_pp[ $suffix ] ); ?>>
+									<?php esc_html_e( 'Include in the policy', 'site-essentials' ); ?>
+								</label>
+								<?php if ( '' !== $field[1] ) : ?>
+								<p class="description"><?php echo esc_html( $field[1] ); ?></p>
+								<?php endif; ?>
+							</td>
+						</tr>
+						<?php endforeach; ?>
+						<?php foreach ( $scos_pp_texts as $suffix => $field ) :
+							$key = 'scos_biz_privacy_' . $suffix;
+						?>
+						<tr>
+							<th>
+								<label for="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $field[0] ); ?></label>
+								<div class="scos-form__slug"><?php echo esc_html( $key ); ?></div>
+							</th>
+							<td>
+								<textarea id="<?php echo esc_attr( $key ); ?>" name="<?php echo esc_attr( $key ); ?>" class="scos-textarea" rows="3"><?php echo esc_textarea( $scos_pp[ $suffix ] ); ?></textarea>
+								<p class="description"><?php echo esc_html( $field[1] ); ?></p>
+							</td>
+						</tr>
+						<?php endforeach; ?>
+						<tr>
+							<th>
+								<label for="scos_biz_privacy_log_retention_days"><?php esc_html_e( 'Server log retention (days)', 'site-essentials' ); ?></label>
+								<div class="scos-form__slug">scos_biz_privacy_log_retention_days</div>
+							</th>
+							<td>
+								<input id="scos_biz_privacy_log_retention_days" name="scos_biz_privacy_log_retention_days" type="number" min="1" max="3650" class="scos-input"
+									value="<?php echo esc_attr( (string) $scos_pp['log_retention_days'] ); ?>">
+								<p class="description"><?php esc_html_e( 'Stated as "Our server logs are deleted after N days". Fleet log rotation is 90 days.', 'site-essentials' ); ?></p>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div><!-- /privacy -->
 
 	</div><!-- /.scos-accordion -->
 </form>

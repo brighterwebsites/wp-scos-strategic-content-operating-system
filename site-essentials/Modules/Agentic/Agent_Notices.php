@@ -6,6 +6,7 @@
  * v1.1 | 2026-11-24 — The privacy note says leads are kept, and for how long (#269).
  * v1.2 | 2026-11-25 — The privacy note matches the delivery mode (#267).
  * v1.3 | 2026-11-25 — The enquiry hint matches the delivery mode too (#272).
+ * v1.4 | 2026-11-26 — privacy_items() split out for the privacy policy shortcode (#230).
  *                      The rest of the /mcp/ page: Agent_Guide.
  *
  * Two pieces of page copy that must match what this site actually does, so
@@ -39,7 +40,13 @@ class Agent_Notices {
 
 	// ── [scos_agent_privacy] ────────────────────────────────────────────────
 
-	public static function render_privacy(): string {
+	/**
+	 * The privacy lines on their own, so the privacy policy ([scos_privacy_policy])
+	 * prints exactly the same text (#230).
+	 *
+	 * @return string[] Plain text, not escaped.
+	 */
+	public static function privacy_items(): array {
 		$items = [
 			__( 'Reading this site through the tools (search, page content, business details) needs no login and stores nothing about you beyond the normal server logs every website keeps.', 'site-essentials' ),
 		];
@@ -90,6 +97,12 @@ class Agent_Notices {
 		}
 
 		$items[] = __( 'Whatever you tell your AI assistant is handled by the company that runs it, under their privacy policy, not ours.', 'site-essentials' );
+
+		return $items;
+	}
+
+	public static function render_privacy(): string {
+		$items = self::privacy_items();
 
 		$html = '<ul class="scos-agent-note scos-agent-note--privacy">';
 		foreach ( $items as $item ) {

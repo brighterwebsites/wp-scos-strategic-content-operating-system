@@ -23,8 +23,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.2 | 2026-11-26
+ * @version    1.3 | 2026-11-26
  *
+ * v1.3 | 2026-11-26 — One canonical comparison: same_url() / is_self_canonical() (#283).
  * v1.2 | 2026-11-26 — Sitemap noindex check no longer reads Yoast, Rank Math or `_robots_noindex` meta (#287).
  * v1.1 | 2026-11-26 — The blog paged past its last page reports as a 404, as it is served.
  * @since      1.0.0
@@ -521,8 +522,52 @@ class Url_Seo_State {
 	}
 
 	/**
+	 * Whether two URLs are the same page for canonical purposes (#283).
+	 *
+	 * Ignored: trailing slash, scheme (http/https), host letter case, #fragment.
+	 * Different: the query string, and www vs non-www (a different host).
+	 * Mirrored in assets/meta-box.js (scosSameUrl); cases in tests/fixtures/same-url-cases.json.
+	 *
+	 * @param string $a
+	 * @param string $b
+	 * @return bool
+	 */
+	public static function same_url( string $a, string $b ): bool {
+		return self::url_compare_key( $a ) === self::url_compare_key( $b );
+	}
+
+	/**
+	 * A URL reduced to the parts same_url() compares: //host[:port]/path?query.
+	 */
+	private static function url_compare_key( string $url ): string {
+		$url  = trim( $url );
+		$hash = strpos( $url, '#' );
+		if ( false !== $hash ) {
+			$url = substr( $url, 0, $hash );
+		}
+		$p = wp_parse_url( $url );
+		if ( ! is_array( $p ) ) {
+			return $url;
+		}
+		return '//' . strtolower( (string) ( $p['host'] ?? '' ) )
+			. ( isset( $p['port'] ) ? ':' . $p['port'] : '' )
+			. rtrim( (string) ( $p['path'] ?? '' ), '/' )
+			. ( isset( $p['query'] ) ? '?' . $p['query'] : '' );
+	}
+
+	/**
+	 * Whether a post's own canonical is itself (or empty, which prints the permalink).
+	 *
+	 * @param int $post_id
+	 * @return bool
+	 */
+	public static function is_self_canonical( int $post_id ): bool {
+		$canonical = trim( (string) get_post_meta( $post_id, 'scos_seo_canonical', true ) );
+		return '' === $canonical || self::same_url( $canonical, (string) get_permalink( $post_id ) );
+	}
+
+	/**
 	 * Whether a post's canonical points somewhere else, with no sitemap override.
-	 * Trailing slashes are ignored.
 	 *
 	 * @param int $post_id
 	 * @return bool
@@ -531,11 +576,7 @@ class Url_Seo_State {
 		if ( '1' === (string) get_post_meta( $post_id, 'scos_seo_sitemap_noindex_override', true ) ) {
 			return false;
 		}
-		$canonical = get_post_meta( $post_id, 'scos_seo_canonical', true );
-		if ( empty( $canonical ) ) {
-			return false;
-		}
-		return rtrim( (string) $canonical, '/' ) !== rtrim( (string) get_permalink( $post_id ), '/' );
+		return ! self::is_self_canonical( $post_id );
 	}
 
 	/**
@@ -941,7 +982,7 @@ class Url_Seo_State {
 		}
 
 		if ( 'singular' === $ctx['type'] && 'post' === $canonical['source']
-			&& rtrim( $canonical['url'], '/' ) !== rtrim( (string) get_permalink( (int) $ctx['post_id'] ), '/' ) && $html['included'] ) {
+			&& ! self::is_self_canonical( (int) $ctx['post_id'] ) && $html['included'] ) {
 			$w[] = 'Canonical points to another URL, but this URL is listed in the HTML sitemap.';
 		}
 

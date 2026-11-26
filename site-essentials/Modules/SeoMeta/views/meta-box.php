@@ -28,6 +28,7 @@
  * v1.4 | 2026-11-26 — Dot on the Advanced tab when a field there holds a value (#113).
  * v1.5 | 2026-11-26 — "Include in XML sitemap anyway" is always rendered and shown as soon as
  *                      noindex is ticked or a non-self canonical is typed, without a save (#112 QA).
+ * v1.6 | 2026-11-26 — Non-self canonical uses Url_Seo_State::is_self_canonical() (#283).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -266,7 +267,7 @@ defined( 'ABSPATH' ) || exit;
 
 			<?php
 			$noindex_active   = in_array( 'noindex', $robots, true ) || in_array( 'noindex', $type_default, true );
-			$non_self_canon   = ! empty( $canonical ) && $canonical !== get_permalink( $post->ID );
+			$non_self_canon   = ! \SiteEssentials\Modules\SeoMeta\Url_Seo_State::is_self_canonical( $post->ID );
 			$auto_excluded    = $sitemap_noindex_auto || $non_self_canon;
 			?>
 

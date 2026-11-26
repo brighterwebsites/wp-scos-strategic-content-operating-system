@@ -88,6 +88,8 @@ class Analysis_MCP_Tool {
 
 **Format:** `v1.0`, `v1.1`, `v1.12` (top of file comment block). Update the date on every increment.
 
+**Plugin version:** the `Version:` header in `site-essentials.php` and `SITE_ESSENTIALS_VERSION` are one number. Bump both in the same commit, in the PR that ships a release-worthy change (minor for features, patch for fixes). Neither says which code a site runs: the deployed commit does (`deploy-wp --status scos` on the host). Gate a check on a feature (a function, ability or option exists), never on the plugin version alone.
+
 ---
 
 ### Commit & PR

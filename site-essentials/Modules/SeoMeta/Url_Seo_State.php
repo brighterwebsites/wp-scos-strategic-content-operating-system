@@ -887,6 +887,16 @@ class Url_Seo_State {
 		$html      = self::in_html_sitemap( $ctx, $settings );
 		$redirect  = self::redirects( $ctx, '' !== $path ? $path : '/' );
 
+		// A redirect matched on the query string (?bw_reviews=…) is for a URL no sitemap
+		// lists: the page it routes to is not what this URL serves.
+		$self = 'singular' === $ctx['type'] ? (string) get_permalink( (int) $ctx['post_id'] )
+			: ( 'archive' === $ctx['type'] ? self::archive_base_url( $ctx['slug'], $ctx['query'] ) : '' );
+		if ( null !== $redirect && '' !== $self && false !== strpos( $url, '?' )
+			&& rtrim( $url, '/' ) !== rtrim( $self, '/' ) ) {
+			$xml  = [ 'included' => false, 'reason' => 'url_not_listed' ];
+			$html = [ 'included' => false, 'reason' => 'url_not_listed' ];
+		}
+
 		$target = [ 'type' => $ctx['type'] ];
 		if ( 'singular' === $ctx['type'] ) {
 			$target['post_id']   = (int) $ctx['post_id'];

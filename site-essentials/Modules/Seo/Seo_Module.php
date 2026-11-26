@@ -7,7 +7,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\Seo
- * @version    1.8 | 2026-11-07 — Sitemap drops post types without single URLs (reviews; FAQs
+ * @version    1.9 | 2026-11-26 — Sitemap index skips child sitemaps with no entries; category
+ *             archives off by default (#244).
+ * v1.8 | 2026-11-07 — Sitemap drops post types without single URLs (reviews; FAQs
  *             when switched off) and honours a post type's default single robots (#228, #247).
  * v1.7 | 2026-08-26 — Sitemap: guard <lastmod>/changefreq against zero-date
  *             post_modified_gmt (was rendering as invalid "-0001-11-30..." XML)
@@ -274,7 +276,7 @@ class Seo_Module implements Module_Interface {
         return [
             'enabled'                => true,
             'post_types'             => ['post', 'page'],
-            'taxonomies'             => ['category'], // Categories ON by default, tags and custom tax OFF
+            'taxonomies'             => [], // All taxonomy archives OFF by default (#244): thin on most service sites
             'include_images'         => true,
             'exclude_ids'            => [],
             'entries_per_sitemap'    => 2000,
@@ -331,6 +333,13 @@ class Seo_Module implements Module_Interface {
                 continue;
             }
 
+            // Skip a post type whose sitemap would have no <url> entries (#244).
+            if ( ! $this->sitemap_has_entries( 'sitemap_' . $post_type, function() use ($post_type, $settings) {
+                return $this->generate_post_type_sitemap($post_type, $settings);
+            } ) ) {
+                continue;
+            }
+
             // Get last modified date
             $last_modified = $this->get_post_type_last_modified($post_type);
 
@@ -347,6 +356,13 @@ class Seo_Module implements Module_Interface {
         foreach ($taxonomies as $taxonomy) {
             $taxonomy_obj = get_taxonomy($taxonomy);
             if (!$taxonomy_obj) {
+                continue;
+            }
+
+            // Skip a taxonomy with no non-empty terms (#244).
+            if ( ! $this->sitemap_has_entries( 'sitemap_tax_' . $taxonomy, function() use ($taxonomy, $settings) {
+                return $this->generate_taxonomy_sitemap($taxonomy, $settings);
+            } ) ) {
                 continue;
             }
 
@@ -374,6 +390,21 @@ class Seo_Module implements Module_Interface {
         $xml .= '</sitemapindex>';
 
         return $xml;
+    }
+
+    /**
+     * Whether a child sitemap has at least one <url> entry.
+     *
+     * Builds the child through the same cache key its own request uses, so the
+     * index and the child can't disagree, and the child is warm when fetched.
+     *
+     * @param string   $cache_key Child sitemap cache key (see render_*_sitemap()).
+     * @param callable $generate  Returns the child sitemap XML.
+     * @return bool
+     */
+    private function sitemap_has_entries( string $cache_key, callable $generate ): bool {
+        $xml = Cache_Helper::remember( $cache_key, $generate, 3600, 'seo' );
+        return false !== strpos( (string) $xml, '<url>' );
     }
 
     /**

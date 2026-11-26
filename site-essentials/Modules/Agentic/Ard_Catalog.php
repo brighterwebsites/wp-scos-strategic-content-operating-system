@@ -2,6 +2,7 @@
 /**
  * Agentic — ARD catalog (Agentic Resource Discovery) — EXPERIMENTAL
  *
+ * v1.2 | 2026-11-26 — No Agentmap line when the site discourages search engines (#243).
  * v1.1 | 2026-10-30 — Link headers, <head> links and a robots.txt Agentmap line point at the catalog
  * v1.0 | 2026-10-21
  *
@@ -107,12 +108,13 @@ class Ard_Catalog {
 	/**
 	 * Append an Agentmap line to robots.txt unless the site's own content already has one.
 	 * Agentmap is not a robots.txt standard; crawlers ignore lines they don't know.
+	 * Skipped when the site discourages search engines, so a hidden site isn't advertised.
 	 *
-	 * @param string $output Robots.txt content.
-	 * @param bool   $public Whether the site allows indexing.
+	 * @param string          $output Robots.txt content.
+	 * @param bool|int|string $public Whether the site allows indexing (blog_public).
 	 */
 	public static function add_robots_line( string $output, $public ): string {
-		if ( false !== stripos( $output, 'agentmap:' ) ) {
+		if ( ! $public || false !== stripos( $output, 'agentmap:' ) ) {
 			return $output;
 		}
 		return rtrim( $output ) . "\n\nAgentmap: " . self::get_legacy_url() . "\n";

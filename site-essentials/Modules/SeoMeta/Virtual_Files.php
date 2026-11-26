@@ -4,9 +4,10 @@
  *
  * robots.txt
  *   Hooks into WP's own `robots_txt` filter to replace the default output
- *   with custom content stored in `scos_robots_txt`. Only active when the
- *   site is set to allow indexing (blog_public = 1); WP short-circuits the
- *   filter when "discourage search engines" is on.
+ *   with custom content stored in `scos_robots_txt`. Blank content serves the
+ *   default template (default_robots_txt()), so it stays current. When
+ *   "Discourage search engines" is on, core still runs the filter (with
+ *   $public falsy); we hand its Disallow: / back untouched.
  *
  * llms.txt
  *   Registers a rewrite rule to serve /llms.txt as a virtual plain-text
@@ -18,6 +19,14 @@
  * @subpackage Modules\SeoMeta
  * @since      1.0.0
  *
+ * v1.2 | 2026-11-26 — robots.txt: hand core's output back when the site discourages
+ *                      search engines (#243). Blank content serves the default
+ *                      template; the template gains an Agentmap line when the ARD
+ *                      catalog is on, and drops the feed block while Tweaks ›
+ *                      Disable RSS Feeds is on. Saving text identical to the default robots
+ *                      or generated llms version stores '' so it keeps updating (#221).
+ *                      /robots.txt is purged from the page cache when it is saved,
+ *                      or when Discourage search engines or the ARD catalog changes.
  * v1.1 | 2026-10-21 — llms.txt with blank custom content serves the generated
  *                      version (Llms_Txt::build()), so it stays current.
  * v1.0 | 2026-10-01 — Default robots.txt: Content-Signal line, Cloudflare email-protection
@@ -60,11 +69,27 @@ class Virtual_Files {
 	}
 
 	/**
-	 * Gold-standard robots.txt template pre-filled with the site's sitemap URL.
+	 * Gold-standard robots.txt template pre-filled with the site's sitemap URL,
+	 * plus the agent catalog when the ARD catalog is switched on.
+	 *
+	 * The feed block is left out while Tweaks › Disable RSS Feeds is on: feed
+	 * URLs then 301 to the post or home page, and a Disallow would stop crawlers
+	 * from seeing that redirect.
 	 */
 	public static function default_robots_txt(): string {
 		$sitemap = home_url( '/sitemap.xml' );
-		return implode( "\n", [
+		$feeds   = self::feeds_disabled() ? [] : [
+			'# Block RSS Feeds',
+			'Disallow: /feed/',
+			'Disallow: /*/feed/',
+			'Disallow: /*/feed$',
+			'Disallow: /feed/$',
+			'Disallow: /?feed=',
+			'Disallow: /wp-feed',
+			'Disallow: /comments/feed',
+			'',
+		];
+		$lines   = [
 			'# WordPress',
 			'User-agent: *',
 			'Content-Signal: ai-train=yes, search=yes, ai-input=yes',
@@ -79,27 +104,58 @@ class Virtual_Files {
 			'Disallow: /page/*/?s=',
 			'Disallow: /search/',
 			'',
-			'# Block RSS Feeds',
-			'# Remove this block if "Disable RSS Feeds" is on in Tweaks — feed URLs then redirect instead.',
-			'Disallow: /feed/',
-			'Disallow: /*/feed/',
-			'Disallow: /*/feed$',
-			'Disallow: /feed/$',
-			'Disallow: /?feed=',
-			'Disallow: /wp-feed',
-			'Disallow: /comments/feed',
-			'',
+		];
+		$lines = array_merge( $lines, $feeds, [
 			'# Block Comment Replies',
 			'Disallow: /*?replytocom=',
 			'',
 			'# Declare Sitemap',
 			'Sitemap: ' . $sitemap,
 		] );
+
+		$ard = '\\SiteEssentials\\Modules\\Agentic\\Ard_Catalog';
+		if ( class_exists( $ard ) && $ard::is_enabled() ) {
+			$lines[] = '';
+			$lines[] = 'Agentmap: ' . $ard::get_legacy_url();
+		}
+
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * Whether Tweaks › Disable RSS Feeds is in force (module on and tweak ticked).
+	 */
+	private static function feeds_disabled(): bool {
+		$sm = '\\SiteEssentials\\Core\\Settings_Manager';
+		if ( ! class_exists( $sm ) ) {
+			return false;
+		}
+		$settings = $sm::instance();
+		if ( ! $settings->is_module_enabled( 'tweaks' ) ) {
+			return false;
+		}
+		$tweaks = $settings->get_module_setting( 'tweaks', 'enabled_tweaks', [] );
+		return is_array( $tweaks ) && ! empty( $tweaks['disable_rss_feeds'] );
+	}
+
+	/**
+	 * Whether two plain-text bodies match once line endings and outer whitespace
+	 * are ignored. Textareas post CRLF; generated text uses LF.
+	 */
+	private static function same_text( string $a, string $b ): bool {
+		$norm = static function ( string $t ): string {
+			return trim( str_replace( [ "\r\n", "\r" ], "\n", $t ) );
+		};
+		return $norm( $a ) === $norm( $b );
 	}
 
 	// ── Bootstrap ─────────────────────────────────────────────────────────────
 
 	public static function init(): void {
+		// Anything that changes what /robots.txt serves purges its cached copy.
+		add_action( 'update_option_blog_public', [ __CLASS__, 'purge_robots_cache' ] );
+		add_action( 'update_option_scos_agentic_ard_enabled', [ __CLASS__, 'purge_robots_cache' ] );
+
 		$robots = self::get_robots();
 		if ( ! empty( $robots['enabled'] ) ) {
 			// Priority 99 — run after other plugins so we take full ownership.
@@ -126,19 +182,32 @@ class Virtual_Files {
 	// ── robots.txt callback ───────────────────────────────────────────────────
 
 	/**
-	 * Completely replaces WP's default robots.txt output with stored content.
+	 * Replaces WP's default robots.txt output with the stored content, or the
+	 * default template when nothing custom is stored.
 	 *
-	 * Note: WP short-circuits this filter and outputs "Disallow: /" when
-	 * Settings > Reading > "Discourage search engines" is checked. In that
-	 * case this callback never fires — which is the correct behaviour.
+	 * When Settings › Reading › "Discourage search engines" is on, core builds
+	 * "Disallow: /" and still runs this filter with $public falsy ('0'). That
+	 * output is returned untouched so a dev/staging site stays hidden (#243).
 	 *
-	 * @param string $output  Current robots.txt text.
-	 * @param bool   $public  Whether the site allows indexing.
+	 * @param string          $output Current robots.txt text.
+	 * @param bool|int|string $public Whether the site allows indexing (blog_public).
 	 */
 	public static function output_robots_txt( string $output, $public ): string {
+		if ( ! $public ) {
+			return $output;
+		}
 		$robots  = self::get_robots();
 		$content = trim( $robots['content'] ?? '' );
-		return '' !== $content ? $content : $output;
+		return '' !== $content ? $content : self::default_robots_txt();
+	}
+
+	/**
+	 * Drop /robots.txt from the page cache. LiteSpeed caches it like a page, so
+	 * without this a site going private keeps its old file (or a launched site
+	 * keeps Disallow: /) until a manual purge. No-op without LiteSpeed Cache.
+	 */
+	public static function purge_robots_cache(): void {
+		do_action( 'litespeed_purge_url', home_url( '/robots.txt' ) );
 	}
 
 	// ── llms.txt callbacks ────────────────────────────────────────────────────
@@ -183,11 +252,17 @@ class Virtual_Files {
 			? $post['scos_robots']
 			: [];
 
+		$robots_content = sanitize_textarea_field( $robots_post['content'] ?? '' );
+		// Unchanged template → store blank so the default keeps updating (#221).
+		if ( self::same_text( $robots_content, self::default_robots_txt() ) ) {
+			$robots_content = '';
+		}
+
 		update_option(
 			self::OPTION_ROBOTS,
 			[
 				'enabled' => ! empty( $robots_post['enabled'] ),
-				'content' => sanitize_textarea_field( $robots_post['content'] ?? '' ),
+				'content' => $robots_content,
 			],
 			false
 		);
@@ -200,14 +275,22 @@ class Virtual_Files {
 		$llms_was_enabled = ! empty( self::get_llms()['enabled'] );
 		$llms_now_enabled = ! empty( $llms_post['enabled'] );
 
+		$llms_content = sanitize_textarea_field( $llms_post['content'] ?? '' );
+		// Saved exactly as generated → store blank so it stays generated (#221).
+		if ( '' !== trim( $llms_content ) && self::same_text( $llms_content, sanitize_textarea_field( Llms_Txt::build() ) ) ) {
+			$llms_content = '';
+		}
+
 		update_option(
 			self::OPTION_LLMS,
 			[
 				'enabled' => $llms_now_enabled,
-				'content' => sanitize_textarea_field( $llms_post['content'] ?? '' ),
+				'content' => $llms_content,
 			],
 			false
 		);
+
+		self::purge_robots_cache();
 
 		// Flush rewrite rules whenever the llms.txt enabled state changes.
 		if ( $llms_was_enabled !== $llms_now_enabled ) {

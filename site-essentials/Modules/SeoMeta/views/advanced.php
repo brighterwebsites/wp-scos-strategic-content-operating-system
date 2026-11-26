@@ -4,6 +4,8 @@
  *
  * v1.2 | 2026-06-21
  * v1.3 | 2026-07-01 — Add extra_media_columns toggle.
+ * v1.5 | 2026-11-26 — robots.txt and llms.txt show whether the default/generated
+ *                      version or a custom copy is live (#221).
  * v1.4 | 2026-10-21 — llms.txt: blank serves the generated version; "Start from
  *                      generated version" button.
  *
@@ -103,7 +105,7 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 			<strong><?php esc_html_e( 'Heads up:', 'site-essentials' ); ?></strong>
 			<?php
 			printf(
-				esc_html__( 'Your site is set to "Discourage search engines" in %s. WordPress outputs Disallow: / before this editor runs, so custom robots.txt content will have no effect until that setting is turned off.', 'site-essentials' ),
+				esc_html__( 'Your site is set to "Discourage search engines" in %s. While it is on, /robots.txt serves Disallow: / and the content below is ignored.', 'site-essentials' ),
 				'<a href="' . esc_url( admin_url( 'options-reading.php' ) ) . '">' . esc_html__( 'Settings › Reading', 'site-essentials' ) . '</a>'
 			);
 			?>
@@ -127,6 +129,11 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--scos-s-2)">
 					<label for="scos_robots_content" style="font-size:var(--scos-fs-lg);font-weight:600;color:var(--scos-ink)">
 						<?php esc_html_e( 'robots.txt content', 'site-essentials' ); ?>
+						<?php if ( '' === trim( (string) $robots_opts['content'] ) ) : ?>
+							<span class="scos-badge scos-badge--success"><?php esc_html_e( 'Default — updates automatically', 'site-essentials' ); ?></span>
+						<?php else : ?>
+							<span class="scos-badge scos-badge--soft"><?php esc_html_e( 'Custom copy', 'site-essentials' ); ?></span>
+						<?php endif; ?>
 					</label>
 					<button type="button" id="scos-robots-reset" class="scos-btn scos-btn--ghost"
 						data-default="<?php echo esc_attr( Virtual_Files::default_robots_txt() ); ?>">
@@ -136,7 +143,7 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 				<textarea name="scos_robots[content]" id="scos_robots_content" rows="22"
 					class="scos-input scos-input--mono"
 					placeholder="<?php esc_attr_e( 'Enter robots.txt content…', 'site-essentials' ); ?>"><?php echo esc_textarea( $robots_opts['content'] ?: Virtual_Files::default_robots_txt() ); ?></textarea>
-				<p class="description" style="margin-top:var(--scos-s-1)"><?php esc_html_e( 'Each directive on its own line. No PHP, no HTML — plain text only.', 'site-essentials' ); ?></p>
+				<p class="description" style="margin-top:var(--scos-s-1)"><?php esc_html_e( 'Each directive on its own line. No PHP, no HTML — plain text only. Saving the template unchanged keeps the default, which picks up template updates. Any edit saves a custom copy; reset to the template and save to go back.', 'site-essentials' ); ?></p>
 			</div>
 		</div>
 	</div>
@@ -166,6 +173,11 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--scos-s-2)">
 					<label for="scos_llms_content" style="font-size:var(--scos-fs-lg);font-weight:600;color:var(--scos-ink)">
 						<?php esc_html_e( 'llms.txt content', 'site-essentials' ); ?>
+						<?php if ( '' === trim( (string) $llms_opts['content'] ) ) : ?>
+							<span class="scos-badge scos-badge--success"><?php esc_html_e( 'Generated — updates automatically', 'site-essentials' ); ?></span>
+						<?php else : ?>
+							<span class="scos-badge scos-badge--soft"><?php esc_html_e( 'Custom copy — not updating', 'site-essentials' ); ?></span>
+						<?php endif; ?>
 					</label>
 					<button type="button" id="scos-llms-generated" class="scos-btn scos-btn--ghost"
 						data-default="<?php echo esc_attr( Llms_Txt::build() ); ?>">
@@ -312,7 +324,7 @@ if ( isset( $_GET['updated'] ) && 'true' === $_GET['updated'] ) {
 		var llmsTa  = document.getElementById( 'scos_llms_content' );
 		if ( llmsGen && llmsTa ) {
 			llmsGen.addEventListener( 'click', function () {
-				if ( '' === llmsTa.value.trim() || window.confirm( '<?php echo esc_js( __( 'Replace the current content with the generated version? Saving it freezes it: it will no longer update on its own.', 'site-essentials' ) ); ?>' ) ) {
+				if ( '' === llmsTa.value.trim() || window.confirm( '<?php echo esc_js( __( 'Replace the current content with the generated version? Saved unchanged, it stays generated and keeps updating. Any edit saves a custom copy that does not update.', 'site-essentials' ) ); ?>' ) ) {
 					llmsTa.value = this.dataset.default;
 				}
 			} );

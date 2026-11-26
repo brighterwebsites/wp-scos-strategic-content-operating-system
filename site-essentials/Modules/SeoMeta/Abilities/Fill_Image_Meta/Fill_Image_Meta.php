@@ -22,6 +22,10 @@
  * v1.0 | 2026-07-01
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  * v2.1 | 2026-09-30 — Send the image files to the model, not just their URLs, and work in chunks of six.
+ * v2.2 | 2026-11-26 — Alt and title are filled independently: without overwrite, a good alt or a
+ *                      good title is kept (#161). Results report alt_kept / title_kept. One run
+ *                      handles at most MAX_IMAGES_PER_RUN images; the rest come back in
+ *                      `remaining` for the caller to send again (#148).
  */
 
 declare( strict_types=1 );
@@ -40,6 +44,9 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 
 	/** Images sent to the model in one request. */
 	const MAX_IMAGES_PER_CALL = 6;
+
+	/** Images generated in one run (four requests), so a run fits inside a web request's time limit. */
+	const MAX_IMAGES_PER_RUN = 24;
 
 	/** Largest image file sent to the model. Bigger files are described from context only. */
 	const MAX_PROMPT_IMAGE_BYTES = 4194304; // 4 MB
@@ -109,7 +116,7 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 				],
 				'overwrite' => [
 					'type'        => 'boolean',
-					'description' => 'Optional. When true, overwrites existing alt text and titles. Default false (fill-empty-only).',
+					'description' => 'Optional. When true, overwrites existing alt text and titles. Default false: only empty fields are filled (a title equal to the file name counts as empty), and a good alt or title is kept as is.',
 				],
 			],
 			'required' => [ 'attachment_ids' ],
@@ -137,9 +144,16 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 							'title'    => [ 'type' => 'string',  'description' => 'Generated media title (3–5 words).' ],
 							'category' => [ 'type' => 'string',  'description' => 'Assigned attachment_category slug.' ],
 							'tag'      => [ 'type' => 'string',  'description' => 'Assigned attachment_tag name (projects only).' ],
-							'skipped'  => [ 'type' => 'boolean', 'description' => 'True when the image already had metadata and overwrite was false.' ],
+								'skipped'    => [ 'type' => 'boolean', 'description' => 'True when the image already had metadata and overwrite was false.' ],
+							'alt_kept'   => [ 'type' => 'boolean', 'description' => 'True when the existing alt text was kept (it was set and overwrite was false).' ],
+							'title_kept' => [ 'type' => 'boolean', 'description' => 'True when the existing title was kept (it was set and overwrite was false).' ],
 						],
 					],
+				],
+				'remaining' => [
+					'type'        => 'array',
+					'description' => 'Attachment IDs not processed in this run because it reached its limit. Call again with these IDs.',
+					'items'       => [ 'type' => 'integer' ],
 				],
 				'processed' => [ 'type' => 'integer', 'description' => 'Number of images updated.' ],
 				'skipped'   => [ 'type' => 'integer', 'description' => 'Number of images skipped (already had meta, overwrite=false).' ],
@@ -208,17 +222,30 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 				continue;
 			}
 
+			// Each field is written only when it is empty, or when overwriting (#161).
 			$attachments_to_process[] = [
 				'id'            => $id,
 				'url'           => $url,
 				'existing_alt'  => $existing_alt,
 				'current_title' => $current_title,
+				'write_alt'     => $overwrite || $alt_is_empty,
+				'write_title'   => $overwrite || $title_is_empty,
 			];
 		}
+
+		// Keep one run inside a web request's time limit; hand the rest back.
+		$remaining = array_map(
+			static function ( array $att ): int {
+				return (int) $att['id'];
+			},
+			array_slice( $attachments_to_process, self::MAX_IMAGES_PER_RUN )
+		);
+		$attachments_to_process = array_slice( $attachments_to_process, 0, self::MAX_IMAGES_PER_RUN );
 
 		if ( empty( $attachments_to_process ) ) {
 			return [
 				'results'   => $skipped_results,
+				'remaining' => $remaining,
 				'processed' => 0,
 				'skipped'   => count( $skipped_results ),
 				'errors'    => 0,
@@ -288,14 +315,18 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 			$result_entry = [ 'id' => $id ];
 			$ok           = true;
 
-			// Save alt text.
-			if ( '' !== $alt ) {
+			// Save alt text, unless a good one is being kept.
+			if ( ! $att['write_alt'] ) {
+				$result_entry['alt_kept'] = true;
+			} elseif ( '' !== $alt ) {
 				update_post_meta( $id, '_wp_attachment_image_alt', $alt );
 				$result_entry['alt'] = $alt;
 			}
 
-			// Save title (wp_update_post only if changed — avoids touching post_modified).
-			if ( '' !== $title ) {
+			// Save title, unless a good one is being kept.
+			if ( ! $att['write_title'] ) {
+				$result_entry['title_kept'] = true;
+			} elseif ( '' !== $title ) {
 				$update = wp_update_post( [
 					'ID'         => $id,
 					'post_title' => $title,
@@ -333,6 +364,7 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 
 		return [
 			'results'   => array_merge( $saved_results, $skipped_results ),
+			'remaining' => $remaining,
 			'processed' => $processed_count,
 			'skipped'   => count( $skipped_results ),
 			'errors'    => $error_count,
@@ -584,10 +616,15 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 		}
 
 		// Images list — IDs + URLs. The files themselves are attached after
-		// this text (see attach_images()); the URL is reference only.
+		// this text (see attach_images()); the URL is reference only. `fields`
+		// names what will be saved, so nothing is written for a field being kept.
 		$prompt .= "<images>\n";
 		foreach ( $attachments as $att ) {
-			$prompt .= '<image id="' . absint( $att['id'] ) . '">' . esc_url( $att['url'] ) . '</image>' . "\n";
+			$fields = array_keys( array_filter( [
+				'alt'   => $att['write_alt'] ?? true,
+				'title' => $att['write_title'] ?? true,
+			] ) );
+			$prompt .= '<image id="' . absint( $att['id'] ) . '" fields="' . esc_attr( implode( ',', $fields ) ) . '">' . esc_url( $att['url'] ) . '</image>' . "\n";
 		}
 		$prompt .= "</images>\n";
 

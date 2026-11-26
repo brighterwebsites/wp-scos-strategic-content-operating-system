@@ -16,6 +16,7 @@
  * @subpackage Modules\SeoMeta\Abilities\Get_Image_Meta_Instructions
  *
  * v1.0 | 2026-09-30
+ * v1.1 | 2026-11-26 — No attachment / parent serialises as {} not [] (#148).
  */
 
 declare( strict_types=1 );
@@ -149,7 +150,14 @@ class Get_Image_Meta_Instructions extends Abstract_Scos_Ability {
 			);
 		}
 
-		return Image_Meta_Instructions::get( $input );
+		$result = Image_Meta_Instructions::get( $input );
+		// An empty array serialises as [] — the schema says object.
+		foreach ( [ 'attachment', 'attached_to' ] as $key ) {
+			if ( isset( $result[ $key ] ) && [] === $result[ $key ] ) {
+				$result[ $key ] = (object) [];
+			}
+		}
+		return $result;
 	}
 
 	/**

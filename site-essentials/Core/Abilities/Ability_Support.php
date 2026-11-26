@@ -19,6 +19,7 @@
  * v1.0 | 2026-09-29
  * v1.1 | 2026-09-30 — get_post_content_for_prompt() renders the page or parses builder data when no stored markdown exists.
  * v1.2 | 2026-09-30 — text_prompt() sends temperature only with a preferred-model list.
+ * v1.4 | 2026-11-26 — ai_unavailable_message(): one wording for "no AI available" (#148).
  * v1.3 | 2026-10-07 — text_prompt() never sends temperature; it made the AI Client skip the preferred model.
  */
 
@@ -59,6 +60,19 @@ class Ability_Support {
 	 */
 	public static function is_ai_client_available(): bool {
 		return function_exists( 'wp_ai_client_prompt' );
+	}
+
+	/**
+	 * What to tell a person when the AI Client is unavailable.
+	 *
+	 * Generation needs a connected AI provider, not any particular plugin, so
+	 * every admin notice and CLI error uses this one wording.
+	 *
+	 * @since 1.4.0
+	 * @return string
+	 */
+	public static function ai_unavailable_message(): string {
+		return __( 'No AI provider is available. Connect an AI provider (install an AI Provider plugin and add its key), then try again.', 'site-essentials' );
 	}
 
 	/**

@@ -15,6 +15,8 @@
  *
  * v1.0 | 2026-07-01
  * v1.1 | 2026-07-02 — Use wp_get_ability()->execute() instead of direct instantiation.
+ * v1.3 | 2026-11-26 — Keeps calling the ability while it hands back `remaining` IDs (#148).
+ *                      "No AI" errors name a provider, not the AI plugin.
  * v1.2 | 2026-07-13 — Auto-establish a current-user context (WP-CLI defaults to user 0,
  *                      which fails the ability's upload_files permission_callback).
  *
@@ -87,7 +89,7 @@ class Fill_Image_Meta_Command extends WP_CLI_Command {
 	 */
 	public function __invoke( $args, $assoc_args ) {
 		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
-			WP_CLI::error( 'The WordPress AI plugin is not active. scos/fill-image-meta requires it.' );
+			WP_CLI::error( \SiteEssentials\Core\Abilities\Ability_Support::ai_unavailable_message() );
 		}
 
 		$this->ensure_current_user_context();
@@ -202,26 +204,37 @@ class Fill_Image_Meta_Command extends WP_CLI_Command {
 
 		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'scos/fill-image-meta' ) : null;
 		if ( ! $ability ) {
-			WP_CLI::error( 'scos/fill-image-meta is not registered. Ensure the WordPress AI plugin is active and abilities are loaded.' );
+			WP_CLI::error( 'scos/fill-image-meta is not registered. It needs the WordPress Abilities API and the SEO module.' );
 		}
 
 		$progress = \WP_CLI\Utils\make_progress_bar( 'Processing groups', count( $groups ) );
 
 		foreach ( $groups as $group ) {
-			$result = $ability->execute( [
-				'attachment_ids' => $group['attachment_ids'],
-				'parent_post_id' => $group['parent_post_id'],
-				'overwrite'      => $overwrite,
-			] );
+			// One run handles a limited number of images; send the rest again.
+			$ids = $group['attachment_ids'];
+			while ( ! empty( $ids ) ) {
+				$result = $ability->execute( [
+					'attachment_ids' => $ids,
+					'parent_post_id' => $group['parent_post_id'],
+					'overwrite'      => $overwrite,
+				] );
 
-			if ( is_wp_error( $result ) ) {
-				WP_CLI::warning( 'Group (parent ' . $group['parent_post_id'] . '): ' . $result->get_error_message() );
-				$grand_errors += count( $group['attachment_ids'] );
-			} else {
+				if ( is_wp_error( $result ) ) {
+					WP_CLI::warning( 'Group (parent ' . $group['parent_post_id'] . '): ' . $result->get_error_message() );
+					$grand_errors += count( $ids );
+					break;
+				}
+
 				$grand_processed += (int) ( $result['processed'] ?? 0 );
 				$grand_skipped   += (int) ( $result['skipped']   ?? 0 );
 				$grand_errors    += (int) ( $result['errors']    ?? 0 );
 				$all_results      = array_merge( $all_results, $result['results'] ?? [] );
+
+				$next = array_values( array_map( 'absint', (array) ( $result['remaining'] ?? [] ) ) );
+				if ( $next === $ids ) {
+					break; // No progress — don't loop forever.
+				}
+				$ids = $next;
 			}
 
 			$progress->tick();
@@ -234,8 +247,8 @@ class Fill_Image_Meta_Command extends WP_CLI_Command {
 			foreach ( $all_results as $r ) {
 				$rows[] = [
 					'ID'       => $r['id']       ?? '—',
-					'Alt'      => isset( $r['alt'] )   ? mb_substr( $r['alt'], 0, 60 )   . ( mb_strlen( $r['alt'] ) > 60 ? '…' : '' ) : '—',
-					'Title'    => $r['title']    ?? '—',
+					'Alt'      => isset( $r['alt'] )   ? mb_substr( $r['alt'], 0, 60 )   . ( mb_strlen( $r['alt'] ) > 60 ? '…' : '' ) : ( ! empty( $r['alt_kept'] ) ? '(kept)' : '—' ),
+					'Title'    => $r['title']    ?? ( ! empty( $r['title_kept'] ) ? '(kept)' : '—' ),
 					'Category' => $r['category'] ?? '—',
 					'Tag'      => $r['tag']      ?? '—',
 					'Skipped'  => ! empty( $r['skipped'] ) ? 'yes' : 'no',

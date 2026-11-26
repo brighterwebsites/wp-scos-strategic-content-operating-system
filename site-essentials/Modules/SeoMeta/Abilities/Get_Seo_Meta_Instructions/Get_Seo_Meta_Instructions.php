@@ -19,6 +19,8 @@
  * v1.0 | 2026-09-30
  * v1.1 | 2026-09-30 — Output gains business and purpose.
  * v1.2 | 2026-09-30 — Covers the TLDR field; output gains intent_goal.
+ * v1.3 | 2026-11-26 — Unknown post_id is a 404 from the permission check, as in suggest-seo-meta;
+ *                      no post serialises as {} not [] (#148).
  */
 
 declare( strict_types=1 );
@@ -182,7 +184,12 @@ class Get_Seo_Meta_Instructions extends Abstract_Scos_Ability {
 			);
 		}
 
-		return Seo_Meta_Instructions::get( $input );
+		$result = Seo_Meta_Instructions::get( $input );
+		// An empty array serialises as [] — the schema says object.
+		if ( isset( $result['post'] ) && [] === $result['post'] ) {
+			$result['post'] = (object) [];
+		}
+		return $result;
 	}
 
 	/**
@@ -193,6 +200,15 @@ class Get_Seo_Meta_Instructions extends Abstract_Scos_Ability {
 		$post_id = is_array( $input ) && isset( $input['post_id'] ) ? absint( $input['post_id'] ) : 0;
 
 		if ( $post_id > 0 ) {
+			// A missing post is a 404, not a permissions error (matches scos/suggest-seo-meta).
+			if ( ! get_post( $post_id ) instanceof \WP_Post ) {
+				return new WP_Error(
+					'post_not_found',
+					/* translators: %d: Post ID. */
+					sprintf( esc_html__( 'Post with ID %d not found.', 'site-essentials' ), $post_id ),
+					[ 'status' => 404 ]
+				);
+			}
 			return current_user_can( 'edit_post', $post_id );
 		}
 

@@ -25,7 +25,9 @@
  * v2.2 | 2026-11-26 — Alt and title are filled independently: without overwrite, a good alt or a
  *                      good title is kept (#161). Results report alt_kept / title_kept. One run
  *                      handles at most MAX_IMAGES_PER_RUN images; the rest come back in
- *                      `remaining` for the caller to send again (#148).
+ *                      `remaining` for the caller to send again (#148). Without overwrite,
+ *                      an existing media category is kept and the project tag is added,
+ *                      not swapped for the image's other tags.
  */
 
 declare( strict_types=1 );
@@ -339,8 +341,9 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 				}
 			}
 
-			// Assign attachment_category via MLA taxonomy.
-			if ( '' !== $cat_slug && taxonomy_exists( 'attachment_category' ) ) {
+			// Assign attachment_category via MLA taxonomy — only replaces one already set when overwriting.
+			if ( '' !== $cat_slug && taxonomy_exists( 'attachment_category' )
+				&& ( $overwrite || ! wp_get_object_terms( $id, 'attachment_category', [ 'fields' => 'ids' ] ) ) ) {
 				$term = get_term_by( 'slug', $cat_slug, 'attachment_category' );
 				if ( $term && ! is_wp_error( $term ) ) {
 					wp_set_object_terms( $id, [ $term->term_id ], 'attachment_category', false );
@@ -350,7 +353,8 @@ class Fill_Image_Meta extends Abstract_Scos_Ability {
 
 			// Assign attachment_tag when parent is a Project.
 			if ( $has_tag && '' !== $tag_name && taxonomy_exists( 'attachment_tag' ) ) {
-				wp_set_object_terms( $id, [ $tag_name ], 'attachment_tag', false );
+				// Append: the image's other tags stay (replace them only when overwriting).
+				wp_set_object_terms( $id, [ $tag_name ], 'attachment_tag', ! $overwrite );
 				$result_entry['tag'] = $tag_name;
 			}
 

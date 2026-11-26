@@ -23,7 +23,9 @@
  *
  * @package    SiteEssentials
  * @subpackage Modules\SeoMeta
- * @version    1.0 | 2026-11-26
+ * @version    1.1 | 2026-11-26
+ *
+ * v1.1 | 2026-11-26 — The blog paged past its last page reports as a 404, as it is served.
  * @since      1.0.0
  */
 
@@ -259,7 +261,8 @@ class Url_Seo_State {
 		if ( $q->is_author() && $obj instanceof \WP_User && ! $q->is_paged() ) {
 			return;
 		}
-		if ( $q->is_home() || $q->is_search() || $q->is_feed() ) {
+		// The blog past its last page is a 404 (as WordPress serves it); page 1 with no posts is not.
+		if ( ( $q->is_home() && ! $q->is_paged() ) || $q->is_search() || $q->is_feed() ) {
 			return;
 		}
 		$q->set_404();

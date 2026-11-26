@@ -20,6 +20,9 @@
  * v1.2 | 2026-07-02 — Register MLA hooks on init; MLA bulk via custom_bulk_action; UI on Assistant page.
  * v1.3 | 2026-10-01 — Overwrite bulk action; bulk notice reports skipped images; "Generate" box on
  *                      the Edit Media screen.
+ * v1.4 | 2026-11-26 — "Fill All Empty" sends one model request per AJAX call; bulk actions stop at
+ *                      one run's limit and say how many are left (#148). "No AI" notices name a
+ *                      provider, not the AI plugin.
  */
 
 namespace SiteEssentials\Modules\SeoMeta;
@@ -146,13 +149,17 @@ class Media_Meta_Filler {
 			$groups[ $parent ][] = $id;
 		}
 
-		// Convert to array of group objects.
+		// Convert to array of group objects. A large group is split so each
+		// AJAX call makes one model request and stays well inside the time limit.
+		$chunk_size = \SiteEssentials\Modules\SeoMeta\Abilities\Fill_Image_Meta\Fill_Image_Meta::MAX_IMAGES_PER_CALL;
 		$group_list = [];
 		foreach ( $groups as $parent_id => $ids ) {
-			$group_list[] = [
-				'parent_post_id' => $parent_id,
-				'attachment_ids' => $ids,
-			];
+			foreach ( array_chunk( $ids, $chunk_size ) as $chunk ) {
+				$group_list[] = [
+					'parent_post_id' => $parent_id,
+					'attachment_ids' => $chunk,
+				];
+			}
 		}
 
 		// Sort: groups with a parent first (more context), then orphans.
@@ -182,7 +189,7 @@ class Media_Meta_Filler {
 		}
 
 		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
-			wp_send_json_error( [ 'message' => __( 'WordPress AI plugin is required for this feature.', 'site-essentials' ) ] );
+			wp_send_json_error( [ 'message' => \SiteEssentials\Core\Abilities\Ability_Support::ai_unavailable_message() ] );
 		}
 
 		$parent_post_id = absint( $_POST['parent_post_id'] ?? 0 );
@@ -253,6 +260,7 @@ class Media_Meta_Filler {
 				'scos_fim_processed' => $totals['processed'],
 				'scos_fim_skipped'   => $totals['skipped'],
 				'scos_fim_errors'    => $totals['errors'],
+				'scos_fim_remaining' => $totals['remaining'],
 			],
 			$redirect_to
 		);
@@ -306,7 +314,7 @@ class Media_Meta_Filler {
 
 		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
 			return [
-				'message'         => __( 'WordPress AI plugin is required.', 'site-essentials' ),
+				'message'         => \SiteEssentials\Core\Abilities\Ability_Support::ai_unavailable_message(),
 				'body'            => '',
 				'prevent_default' => true,
 			];
@@ -333,6 +341,10 @@ class Media_Meta_Filler {
 			$totals['skipped'],
 			$totals['errors']
 		);
+		if ( $totals['remaining'] > 0 ) {
+			/* translators: %d: images not processed yet */
+			$message .= ' ' . sprintf( __( '%d not processed yet: run it again on the same selection.', 'site-essentials' ), $totals['remaining'] );
+		}
 
 		return [
 			'message'         => $message,
@@ -372,7 +384,7 @@ class Media_Meta_Filler {
 				'running'        => __( 'Running…', 'site-essentials' ),
 				'done'           => __( 'Complete', 'site-essentials' ),
 				'noImages'       => __( 'No images need updating.', 'site-essentials' ),
-				'noAiPlugin'     => __( 'WordPress AI plugin required. Please install and connect a provider.', 'site-essentials' ),
+				'noAiPlugin'     => \SiteEssentials\Core\Abilities\Ability_Support::ai_unavailable_message(),
 				'processed'      => __( 'Updated', 'site-essentials' ),
 				'skipped'        => __( 'Skipped', 'site-essentials' ),
 				'errors'         => __( 'Errors', 'site-essentials' ),
@@ -412,7 +424,7 @@ class Media_Meta_Filler {
 
 		if ( isset( $_GET['scos_fim_error'] ) ) {
 			$msg = 'no_ai_plugin' === sanitize_key( $_GET['scos_fim_error'] )
-				? __( 'Fill Image Meta: WordPress AI plugin is required. Please install and connect a provider.', 'site-essentials' )
+				? __( 'Fill Image Meta:', 'site-essentials' ) . ' ' . \SiteEssentials\Core\Abilities\Ability_Support::ai_unavailable_message()
 				: __( 'Fill Image Meta: An error occurred.', 'site-essentials' );
 			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
 			return;
@@ -422,6 +434,7 @@ class Media_Meta_Filler {
 			$processed = absint( $_GET['scos_fim_processed'] );
 			$skipped   = absint( $_GET['scos_fim_skipped'] ?? 0 );
 			$errors    = absint( $_GET['scos_fim_errors'] ?? 0 );
+			$remaining = absint( $_GET['scos_fim_remaining'] ?? 0 );
 			/* translators: 1: images updated count, 2: error count */
 			$msg = sprintf(
 				__( 'Fill Image Meta: %1$d image(s) updated.', 'site-essentials' ),
@@ -434,6 +447,10 @@ class Media_Meta_Filler {
 			if ( $errors > 0 ) {
 				/* translators: %d: error count */
 				$msg .= ' ' . sprintf( __( '%d error(s).', 'site-essentials' ), $errors );
+			}
+			if ( $remaining > 0 ) {
+				/* translators: %d: images not processed yet */
+				$msg .= ' ' . sprintf( __( '%d not processed yet: run it again on the same selection.', 'site-essentials' ), $remaining );
 			}
 			$type = $errors > 0 && 0 === $processed ? 'notice-error' : 'notice-success';
 			echo '<div class="notice ' . esc_attr( $type ) . ' is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
@@ -462,7 +479,7 @@ class Media_Meta_Filler {
 		if ( ! $ability ) {
 			return new WP_Error(
 				'ability_not_registered',
-				__( 'Fill Image Meta ability is not registered. Ensure the WordPress AI plugin is active.', 'site-essentials' )
+				__( 'Fill Image Meta ability is not registered. It needs the WordPress Abilities API and the SEO module.', 'site-essentials' )
 			);
 		}
 
@@ -492,34 +509,50 @@ class Media_Meta_Filler {
 	}
 
 	/**
-	 * Run one or more parent groups through the ability.
+	 * Run one or more parent groups through the ability, inside one page load.
+	 *
+	 * Stops generating once one run's worth of images (Fill_Image_Meta::MAX_IMAGES_PER_RUN)
+	 * has been sent, so a large selection can't run past the request time limit.
+	 * Images left over are counted in `remaining`; running the action again on the
+	 * same selection picks them up (filled images are skipped).
 	 *
 	 * @param array<int, int[]> $groups    Map of parent_post_id => attachment IDs.
 	 * @param bool              $overwrite
-	 * @return array{processed: int, skipped: int, errors: int}
+	 * @return array{processed: int, skipped: int, errors: int, remaining: int}
 	 */
 	private static function run_groups( array $groups, bool $overwrite ): array {
 		$processed = 0;
 		$skipped   = 0;
 		$errors    = 0;
+		$remaining = 0;
+		$budget    = \SiteEssentials\Modules\SeoMeta\Abilities\Fill_Image_Meta\Fill_Image_Meta::MAX_IMAGES_PER_RUN;
 
 		foreach ( $groups as $parent_id => $ids ) {
+			if ( $budget <= 0 ) {
+				$remaining += count( $ids );
+				continue;
+			}
+
 			$result = self::execute_fill_image_meta( $ids, (int) $parent_id, $overwrite );
 
 			if ( is_wp_error( $result ) ) {
 				$errors += count( $ids );
+				$budget -= count( $ids );
 				continue;
 			}
 
 			$processed += (int) ( $result['processed'] ?? 0 );
 			$skipped   += (int) ( $result['skipped'] ?? 0 );
 			$errors    += (int) ( $result['errors'] ?? 0 );
+			$remaining += count( (array) ( $result['remaining'] ?? [] ) );
+			$budget    -= (int) ( $result['processed'] ?? 0 ) + (int) ( $result['errors'] ?? 0 );
 		}
 
 		return [
 			'processed' => $processed,
 			'skipped'   => $skipped,
 			'errors'    => $errors,
+			'remaining' => $remaining,
 		];
 	}
 

@@ -119,7 +119,7 @@ class ContentArchitecture_Module implements Module_Interface {
 			CLI\Suggest_Intent_Goal_Command::class,
 			[
 				'shortdesc' => 'Suggest search intent goal phrasings for a post using AI.',
-				'longdesc'  => 'Wraps the scos/suggest-intent-goal ability. Requires the WordPress AI plugin. ' .
+				'longdesc'  => 'Wraps the scos/suggest-intent-goal ability. Requires a connected AI provider. ' .
 					'Use --apply to auto-save the top suggestion to scos_ca_intent_goal.',
 			]
 		);
@@ -129,7 +129,7 @@ class ContentArchitecture_Module implements Module_Interface {
 			CLI\Suggest_Topics_Command::class,
 			[
 				'shortdesc' => 'Suggest scos_topic taxonomy terms for a post using AI.',
-				'longdesc'  => 'Wraps the scos/suggest-topics ability. Requires the WordPress AI plugin. ' .
+				'longdesc'  => 'Wraps the scos/suggest-topics ability. Requires a connected AI provider. ' .
 					'Use --apply to auto-assign the top-confidence topic to the post.',
 			]
 		);

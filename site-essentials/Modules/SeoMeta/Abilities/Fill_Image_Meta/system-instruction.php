@@ -13,6 +13,7 @@
  * @package SiteEssentials
  *
  * v1.1 | 2026-09-30 — Alt and title rules now come from Image_Meta_Instructions instead of being written out here.
+ * v1.2 | 2026-11-26 — Each image names the fields wanted; the others are omitted.
  */
 
 $scos_instructions = \SiteEssentials\Modules\SeoMeta\Image_Meta_Instructions::get();
@@ -46,6 +47,10 @@ Output format:
 Return ONLY a valid JSON object with an "images" array. No explanation, no markdown, no code fences.
 
 {"images":[{"id":123,"alt":"...","title":"...","category":"slug","tag":"project title"},{"id":456,"alt":"...","title":"..."}]}
+
+Fields wanted:
+- Each <image> has a fields attribute: "alt", "title" or "alt,title"
+- Write only the fields it names. Omit the other key: that value is already good and is kept
 
 Rules for the JSON:
 - Every image in the input must appear in the output

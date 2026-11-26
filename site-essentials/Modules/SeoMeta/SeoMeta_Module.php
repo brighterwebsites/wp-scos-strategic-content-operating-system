@@ -155,7 +155,7 @@ class SeoMeta_Module implements Module_Interface {
 			[
 				'shortdesc' => 'Suggest breadcrumb label, meta title, and meta description for a post using AI.',
 				'longdesc'  => 'Wraps the scos/suggest-seo-meta ability. All three fields are generated in a single AI call. ' .
-					'Requires the WordPress AI plugin. Use --apply to auto-save the top suggestion for each field.',
+					'Requires a connected AI provider. Use --apply to auto-save the top suggestion for each field.',
 			]
 		);
 
@@ -166,7 +166,7 @@ class SeoMeta_Module implements Module_Interface {
 				'shortdesc' => 'Suggest TLDR article summary options for a post using AI.',
 				'longdesc'  => 'Wraps the scos/suggest-tldr ability. When the post has a linked Search Intent Goal, ' .
 					'the TLDR is written to directly answer that question. ' .
-					'Requires the WordPress AI plugin. Use --apply to auto-save the top option to scos_seo_tldr.',
+					'Requires a connected AI provider. Use --apply to auto-save the top option to scos_seo_tldr.',
 			]
 		);
 
@@ -178,7 +178,7 @@ class SeoMeta_Module implements Module_Interface {
 				'longdesc'  => 'Wraps the scos/fill-image-meta ability. Images are grouped by parent post — one AI call per group. ' .
 					'Supports --attachment-id, --post-id, or no flag (all qualifying images). ' .
 					'Use --overwrite to replace existing metadata. Use --dry-run to preview without saving. ' .
-					'Requires the WordPress AI plugin.',
+					'Requires a connected AI provider.',
 			]
 		);
 	}

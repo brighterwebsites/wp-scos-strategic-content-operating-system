@@ -28,7 +28,7 @@ class Suggest_Topics_Command extends WP_CLI_Command {
 	/**
 	 * Suggest scos_topic taxonomy terms for a post using AI.
 	 *
-	 * Wraps the scos/suggest-topics ability. Requires the WordPress AI plugin
+	 * Wraps the scos/suggest-topics ability. Requires a connected AI provider
 	 * to be active.
 	 *
 	 * ## OPTIONS
@@ -62,7 +62,7 @@ class Suggest_Topics_Command extends WP_CLI_Command {
 	 */
 	public function __invoke( $args, $assoc_args ) {
 		if ( ! \SiteEssentials\Core\Abilities\Ability_Support::is_ai_client_available() ) {
-			WP_CLI::error( 'The WordPress AI plugin is not active. scos/suggest-topics requires it.' );
+			WP_CLI::error( \SiteEssentials\Core\Abilities\Ability_Support::ai_unavailable_message() );
 		}
 
 		$post_id = isset( $assoc_args['post-id'] ) ? (int) $assoc_args['post-id'] : 0;
@@ -85,7 +85,7 @@ class Suggest_Topics_Command extends WP_CLI_Command {
 
 		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'scos/suggest-topics' ) : null;
 		if ( ! $ability ) {
-			WP_CLI::error( 'scos/suggest-topics is not registered. Ensure the WordPress AI plugin is active and abilities are loaded.' );
+			WP_CLI::error( 'scos/suggest-topics is not registered. It needs the WordPress Abilities API and its SCOS module.' );
 		}
 
 		$result  = $ability->execute( [ 'post_id' => $post_id ] );

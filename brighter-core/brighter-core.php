@@ -1,12 +1,15 @@
 <?php
 /**
  * Brighter Core MU Plugin Loader
- * Version: 4.5.0
+ * Version: 4.5.1
  *
  * File: brighter-core.php
  * Purpose: Load all Brighter Core modules and manage plugin infrastructure
  *
  * Changelog:
+ * 4.5.1 - REMOVE: php-limits.php. Every check was dead: core defines the memory
+ *         constants before MU plugins load, and the ini values are PERDIR or
+ *         already set server-side (#167).
  * 4.5.0 - MOVE: bw-ga4-seeder and the GA4 enhanced tracking JS now live in the
  *         site-essentials Analytics module (#93). bw-ga4-seed-admin (the legacy
  *         Analytics page, shown only with the module off) removed.
@@ -38,7 +41,7 @@ if (!defined('ABSPATH')) exit;
 //error_log('Module file exists? ' . (file_exists(plugin_dir_path(__FILE__) . 'includes/brighter-business-info.php') ? 'YES' : 'NO'));
 
 // Define plugin constants
-define('BRIGHTER_CORE_VERSION', '4.5.0');
+define('BRIGHTER_CORE_VERSION', '4.5.1');
 define('BRIGHTER_CORE_PATH', plugin_dir_path(__FILE__));
 define('BRIGHTER_CORE_URL', plugin_dir_url(__FILE__));
 
@@ -65,7 +68,6 @@ function brighter_get_whitelisted_modules() {
             'brighter-settings',
             'custom-wpemail',
             'helpers',
-            'php-limits',
             'privacy-policy-body-class',
             'technical-settings',
             'bw-content-strategy',

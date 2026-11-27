@@ -10,6 +10,7 @@
  * v1.2 | 2026-07-01
  * v1.3 | 2026-07-21 — Remove Make.com settings tab and Post Framing card (deprecated,
  *                      unused on all sites).
+ * v1.4 | 2026-11-27 — Knowledge file tiles open through the logged-in viewer (#249).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -697,25 +698,25 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
 
       <div class="scos-support__grid">
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/301-social-brand-voice.md' ) ); ?>"
+        <a href="<?php echo esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( '301-social-brand-voice.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
           <strong>301-social-brand-voice.md</strong>
           <span><?php esc_html_e( 'Brand voice for social media — how your posts should sound, tone, style, and personality.', 'site-essentials' ); ?></span>
         </a>
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/302-social-media-meta.md' ) ); ?>"
+        <a href="<?php echo esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( '302-social-media-meta.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
           <strong>302-social-media-meta.md</strong>
           <span><?php esc_html_e( 'Rules for Facebook & Instagram posts — word length, hashtag and emoji usage, link inclusion.', 'site-essentials' ); ?></span>
         </a>
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/303-social-media-gmb.md' ) ); ?>"
+        <a href="<?php echo esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( '303-social-media-gmb.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
           <strong>303-social-media-gmb.md</strong>
           <span><?php esc_html_e( 'Rules for Google Business posts — ensures GMB terms of use compliance (no contact details or URLs in body).', 'site-essentials' ); ?></span>
         </a>
 
-        <a href="<?php echo esc_url( content_url( 'ai-knowledge/304-brand-vocabulary.md' ) ); ?>"
+        <a href="<?php echo esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( '304-brand-vocabulary.md' ) ); ?>"
            target="_blank" rel="noopener" class="scos-support__tile">
           <strong>304-brand-vocabulary.md</strong>
           <span><?php esc_html_e( 'Words and phrases to use and never use in generated content.', 'site-essentials' ); ?></span>

@@ -10,12 +10,14 @@
  *   {user_first_name} {user_login} {user_email} {user_display_name}
  *   {password_set_link} {password_link_expiry_days}
  *   {support_page_url} {login_url}
+ *   {reports_index_url} {reports_folder_url}  (logged-in report viewer, #249)
  *   {agency_name} {agency_email} {agency_phone} {agency_url} {agency_logo_url}
  *   {current_year}
  *
  * Inline CSS only — email clients ignore most external/embedded styles.
  *
  * v1.0 | 2026-05-22
+ * v1.1 | 2026-11-27 — Report links go through the logged-in viewer; ai-knowledge/ is blocked over HTTP (#249).
  *
  * @package    SiteEssentials
  * @subpackage Modules\ClientOnboarding
@@ -112,8 +114,8 @@ if ( ! defined( 'ABSPATH' ) ) {
                   <p style="margin:0 0 4px 0;font-size:13px;color:#4338ca;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Your reports</p>
                   <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:#4b5563;">We've prepared baseline reports on the health, content, and performance of your site. These are updated periodically — your Support hub will always have the latest.</p>
                   <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.8;color:#1f2937;">
-                    <li><a href="{site_url}/wp-content/ai-knowledge/agency-reports/agency-reports-index.html" style="color:#4f46e5;text-decoration:none;">Website Status Reports — site health, content &amp; performance</a></li>
-                    <li><a href="{site_url}/wp-content/ai-knowledge/agency-reports/" style="color:#4f46e5;text-decoration:none;">Go-live health check &amp; authority-building reports</a></li>
+                    <li><a href="{reports_index_url}" style="color:#4f46e5;text-decoration:none;">Website Status Reports — site health, content &amp; performance</a></li>
+                    <li><a href="{reports_folder_url}" style="color:#4f46e5;text-decoration:none;">Go-live health check &amp; authority-building reports</a></li>
                   </ul>
                 </td>
               </tr>

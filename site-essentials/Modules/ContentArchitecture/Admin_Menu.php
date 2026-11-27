@@ -9,6 +9,7 @@
  *
  * v1.3.0 | 2026-05-29 — Strategy Configuration section added to Overview (read-only display of scos_ca_strategy_* options).
  * v1.4.0 | 2026-07-18 — Retire Airtable CAR sync integration; remove Integrations submenu, render/save methods.
+ * v1.4.1 | 2026-11-27 — Strategy file links open through the logged-in knowledge viewer (#249).
  *
  * @package    SiteEssentials
  * @subpackage Modules\ContentArchitecture
@@ -205,9 +206,9 @@ class Admin_Menu {
 					<span class="scos-card__desc">
 						<?php esc_html_e( 'Read-only — populate via MCP or WP-CLI.', 'site-essentials' ); ?>
 						&nbsp;&middot;&nbsp;
-						<a href="<?php echo esc_url( home_url( '/wp-content/ai-knowledge/202-authority-content-strategy.md' ) ); ?>" target="_blank" rel="noopener">202 Authority Strategy &#8599;</a>
+						<a href="<?php echo esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( '202-authority-content-strategy.md' ) ); ?>" target="_blank" rel="noopener">202 Authority Strategy &#8599;</a>
 						&nbsp;&middot;&nbsp;
-						<a href="<?php echo esc_url( home_url( '/wp-content/ai-knowledge/105-competitive-positioning.md' ) ); ?>" target="_blank" rel="noopener">105 Competitive Positioning &#8599;</a>
+						<a href="<?php echo esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( '105-competitive-positioning.md' ) ); ?>" target="_blank" rel="noopener">105 Competitive Positioning &#8599;</a>
 					</span>
 				</div>
 			</div>

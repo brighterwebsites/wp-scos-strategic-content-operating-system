@@ -18,7 +18,7 @@
  * So the guard doesn't assume, it checks. Once per VERSION (on `init`) it
  * writes the folder's .htaccess, index.php and a probe file, then a cron event
  * requests the probe over HTTP:
- *   - 200 (exposed): writes the root .htaccess block (Apache/LiteSpeed only)
+ *   - the file itself comes back (exposed): writes the root .htaccess block (Apache/LiteSpeed only)
  *     and checks again. Sites that already block the folder are never touched.
  *   - still exposed, or nginx: status `exposed`, and admins get a notice with
  *     the rule to add.
@@ -110,7 +110,7 @@ class Ai_Knowledge_Guard {
 			}
 			self::write_if_changed(
 				$dir . '/' . self::PROBE,
-				"Site Essentials uses this file to check that this folder is blocked over HTTP.\nIf you can read it in a browser, the folder is exposed.\n"
+				self::PROBE_TEXT . "\nIf you can read it in a browser, the folder is exposed.\n"
 			);
 		}
 
@@ -128,48 +128,63 @@ class Ai_Knowledge_Guard {
 	 */
 	public static function probe(): array {
 		$state = self::state();
-		$code  = self::http_status();
+		$hit   = self::fetch_probe();
 
-		if ( 200 === $code && self::write_root_rule() ) {
+		if ( $hit['served'] && self::write_root_rule() ) {
 			$state['root_written'] = time();
-			$code                  = self::http_status();
+			$hit                   = self::fetch_probe();
 		}
 
-		if ( 200 === $code ) {
+		if ( $hit['served'] ) {
 			$state['status'] = 'exposed';
 			error_log( self::LOG . ' the folder is readable over HTTP; see the admin notice for the server rule to add.' );
-		} elseif ( $code >= 300 && $code < 500 ) {
-			// Denied, not found or redirected away: either way the file isn't served.
+		} elseif ( $hit['code'] >= 200 && $hit['code'] < 500 ) {
+			// Denied, not found, or some other page answered: the file itself isn't served.
 			$state['status'] = 'protected';
 		} else {
 			$state['status'] = 'unchecked';
 		}
-		$state['code']    = $code;
+		$state['code']    = $hit['code'];
 		$state['checked'] = time();
 		update_option( self::OPT, $state, true );
 
 		return $state;
 	}
 
+	/** Text the probe file starts with; only a response carrying it counts as the file being served. */
+	const PROBE_TEXT = 'Site Essentials uses this file to check that this folder is blocked over HTTP.';
+
 	/**
-	 * HTTP status of the probe file, or 0 when the request itself failed
-	 * (some hosts can't reach their own URL).
+	 * Request the probe file and say whether the file itself came back.
+	 *
+	 * Follows redirects (WP-CLI builds http:// URLs, and the edge redirects them
+	 * to https://), but a 200 alone isn't proof: a site that redirects unknown
+	 * URLs to the home page answers 200 too. So it's `served` only when the body
+	 * is the probe's own text. `code` is the final status, 0 when the request
+	 * failed (some hosts can't reach their own URL).
+	 *
+	 * @return array{code:int,served:bool}
 	 */
-	public static function http_status(): int {
+	public static function fetch_probe(): array {
 		$url = add_query_arg( 'scos-guard', (string) time(), content_url( Ai_Knowledge::DIR . '/' . self::PROBE ) );
-		$res = wp_remote_head(
+		$res = wp_remote_get(
 			$url,
 			[
-				'timeout'     => 8,
-				'redirection' => 0,
-				'headers'     => [ 'Cache-Control' => 'no-cache' ],
+				'timeout'             => 8,
+				'redirection'         => 3,
+				'limit_response_size' => 2048,
+				'headers'             => [ 'Cache-Control' => 'no-cache' ],
 			]
 		);
 		if ( is_wp_error( $res ) ) {
 			error_log( self::LOG . ' probe request failed: ' . $res->get_error_message() );
-			return 0;
+			return [ 'code' => 0, 'served' => false ];
 		}
-		return (int) wp_remote_retrieve_response_code( $res );
+		$code = (int) wp_remote_retrieve_response_code( $res );
+		return [
+			'code'   => $code,
+			'served' => 200 === $code && false !== strpos( (string) wp_remote_retrieve_body( $res ), self::PROBE_TEXT ),
+		];
 	}
 
 	/**

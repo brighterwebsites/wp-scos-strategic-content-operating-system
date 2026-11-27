@@ -3,9 +3,13 @@
  * Brighter Tools: Tweaks
  *
  * File: brighter-tweaks.php
- * Version: 4.4.1
+ * Version: 4.5.0 | 2026-11-27
  *
  * Changelog:
+ * 4.5.0 - FIXED: the posts page and the WooCommerce shop got no preloads. Every preload path
+ *         opened with is_singular(), and both are archives on the front end. preload_page_id()
+ *         now resolves them to their Page for the manual preloads and fetchpriority. The
+ *         featured-image preload stays singular-only (#294).
  * 4.4.1 - FIXED theme-color meta: output_theme_color_meta() read the legacy option
  *         bw_mobile_theme_color, but Business Info has saved scos_biz_mobile_theme_color since
  *         the scos_biz_ migration, so the tag stopped outputting. Now reads through
@@ -528,6 +532,23 @@ class Brighter_Tweaks {
     }
 
     /**
+     * The post whose preloads apply to this request: the queried singular, the Page set as
+     * the posts page, or the WooCommerce shop Page. 0 for any other archive (#294).
+     */
+    private static function preload_page_id() {
+        if (is_singular()) {
+            return (int) get_queried_object_id();
+        }
+        if (is_home() && 'page' === get_option('show_on_front')) {
+            return (int) get_option('page_for_posts');
+        }
+        if (function_exists('is_shop') && is_shop() && function_exists('wc_get_page_id')) {
+            return max(0, (int) wc_get_page_id('shop'));
+        }
+        return 0;
+    }
+
+    /**
      * Output preloads for current page
      */
     public static function output_preloads() {
@@ -537,11 +558,8 @@ class Brighter_Tweaks {
            echo $google_fonts . "\n";
         }
         
-        // Work on any singular page/post
-        if (!is_singular()) return;
-        
-        global $post;
-        $pid = $post ? $post->ID : get_queried_object_id();
+        // Singulars, plus the posts page and the shop (their own Page's preloads)
+        $pid = self::preload_page_id();
         if (!$pid) return;
         
         $urls = [];
@@ -587,6 +605,8 @@ class Brighter_Tweaks {
      * (Site Essentials > Performance > Asset Preloading > Preload Featured Images on Singles).
      */
     public static function output_featured_image_preload() {
+        // Singulars only: an archive template may not show its Page's featured image,
+        // so preloading it on the posts page or shop could cost LCP instead (#294).
         if (!is_singular()) return;
 
         $post_type = get_post_type();
@@ -693,9 +713,8 @@ class Brighter_Tweaks {
      * Add fetchpriority=high to preloaded images
      */
     public static function add_fetchpriority($attrs, $attachment, $size) {
-        if (!is_singular()) return $attrs;
-        
-        $pid = get_queried_object_id();
+        $pid = self::preload_page_id();
+        if (!$pid) return $attrs;
         $urls = self::get_preload_urls($pid);
         
         if (empty($urls) || empty($attrs['src'])) return $attrs;
@@ -715,9 +734,8 @@ class Brighter_Tweaks {
      * Add fetchpriority to images in content
      */
     public static function add_fetchpriority_to_content($html) {
-        if (!is_singular()) return $html;
-        
-        $pid = get_queried_object_id();
+        $pid = self::preload_page_id();
+        if (!$pid) return $html;
         $urls = self::get_preload_urls($pid);
         
         if (empty($urls) || stripos($html, '<img') === false) return $html;

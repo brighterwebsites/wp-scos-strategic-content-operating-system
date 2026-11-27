@@ -7,6 +7,8 @@
  * so REST / WP-CLI / MCP tooling can call send() directly.
  *
  * v1.0 | 2026-05-22
+ * v1.1 | 2026-11-27 — {reports_index_url} / {reports_folder_url} tokens; saved templates that still
+ *                      link into ai-knowledge/agency-reports/ are pointed at the viewer on send (#249).
  *
  * @package    SiteEssentials
  * @subpackage Modules\ClientOnboarding
@@ -119,6 +121,10 @@ class Onboarding_Email_Sender {
 		$site_logo_id  = (int) get_theme_mod( 'custom_logo', 0 );
 		$site_logo_url = $site_logo_id ? wp_get_attachment_image_url( $site_logo_id, 'medium' ) : '';
 
+		// Going into href attributes, so escaped here (& becomes &#038;).
+		$reports_index  = esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( 'agency-reports/agency-reports-index.html' ) );
+		$reports_folder = esc_url( \SiteEssentials\Core\Ai_Knowledge_Viewer::url( 'agency-reports/' ) );
+
 		$tokens = [
 			'{site_name}'                 => get_bloginfo( 'name' ),
 			'{site_url}'                  => home_url(),
@@ -137,6 +143,12 @@ class Onboarding_Email_Sender {
 			'{agency_url}'                => get_option( 'se_agency_url', '' ),
 			'{agency_logo_url}'           => $agency_logo_url ?: '',
 			'{current_year}'              => date_i18n( 'Y' ),
+			'{reports_index_url}'         => $reports_index,
+			'{reports_folder_url}'        => $reports_folder,
+			// Saved templates written before #249 link straight into the folder, which is
+			// blocked over HTTP. strtr() prefers the longest key, so these win over {site_url}.
+			'{site_url}/wp-content/ai-knowledge/agency-reports/agency-reports-index.html' => $reports_index,
+			'{site_url}/wp-content/ai-knowledge/agency-reports/' => $reports_folder,
 		];
 
 		return strtr( $template, $tokens );

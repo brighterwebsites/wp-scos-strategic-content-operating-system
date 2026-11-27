@@ -335,6 +335,7 @@ add_action(
 		\SiteEssentials\Core\Migration_Deprecated::init();
 		\SiteEssentials\Core\Support_Scripts::init();
 		\SiteEssentials\Core\Scos_Rest_Field::init();
+		\SiteEssentials\Core\Ai_Knowledge_Viewer::init();
 	},
 	6
 );

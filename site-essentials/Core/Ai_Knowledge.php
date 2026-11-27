@@ -7,6 +7,9 @@
  * returns an empty string when the file is absent, so callers can always carry
  * on without it.
  *
+ * The folder is not reachable over HTTP. Admin screens and emails link to
+ * Ai_Knowledge_Viewer instead, which serves a file to logged-in editors (#249).
+ *
  * TODO: Caption_Generator (Social Amplification) has its own private copy of
  *       this read + UTF-8 logic, plus the HTTP access guard for the directory.
  *       Point it here when that module is next touched.
@@ -15,6 +18,7 @@
  * @subpackage Core
  *
  * v1.0 | 2026-09-30
+ * v1.1 | 2026-11-27 - read_path() split out so the viewer reads agency-reports/ the same way.
  */
 
 declare( strict_types=1 );
@@ -75,12 +79,24 @@ class Ai_Knowledge {
 			return '';
 		}
 
-		$content = file_get_contents( self::path( $filename ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		return self::read_path( self::path( $filename ) );
+	}
+
+	/**
+	 * Read a file already resolved to a path inside the knowledge directory, as
+	 * valid UTF-8 (see read()). Callers resolve and check the path first.
+	 *
+	 * @param string $path Absolute path.
+	 * @return string Trimmed contents, or an empty string when unreadable.
+	 */
+	public static function read_path( string $path ): string {
+		$content = is_readable( $path ) ? file_get_contents( $path ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions
 		if ( false === $content || '' === $content ) {
 			return '';
 		}
 
 		if ( function_exists( 'mb_check_encoding' ) && ! mb_check_encoding( $content, 'UTF-8' ) ) {
+			$filename = basename( $path );
 			error_log( "[SCOS AI Knowledge] ai-knowledge/{$filename} is not UTF-8 — converted from Windows-1252. Resave it as UTF-8 to silence this." );
 			$converted = mb_convert_encoding( $content, 'UTF-8', 'Windows-1252' );
 			$content   = is_string( $converted ) ? $converted : $content;

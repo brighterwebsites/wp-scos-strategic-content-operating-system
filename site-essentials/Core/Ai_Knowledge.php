@@ -7,12 +7,12 @@
  * returns an empty string when the file is absent, so callers can always carry
  * on without it.
  *
- * The folder is not reachable over HTTP. Admin screens and emails link to
- * Ai_Knowledge_Viewer instead, which serves a file to logged-in editors (#249).
+ * The folder is not reachable over HTTP (Ai_Knowledge_Guard). Admin screens and
+ * emails link to Ai_Knowledge_Viewer instead, which serves a file to logged-in
+ * editors (#249).
  *
  * TODO: Caption_Generator (Social Amplification) has its own private copy of
- *       this read + UTF-8 logic, plus the HTTP access guard for the directory.
- *       Point it here when that module is next touched.
+ *       this read + UTF-8 logic. Point it here when that module is next touched.
  *
  * @package    SiteEssentials
  * @subpackage Core

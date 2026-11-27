@@ -242,15 +242,17 @@ class Ai_Knowledge_Guard {
 	/** @return string[] */
 	private static function root_block(): array {
 		$path = untrailingslashit( (string) wp_parse_url( content_url( Ai_Knowledge::DIR ), PHP_URL_PATH ) );
+		// A URL path: keep it to safe characters and escape only the dot, so the rule stays readable.
+		$path = str_replace( '.', '\.', (string) preg_replace( '~[^A-Za-z0-9/_.-]~', '', $path ) );
 		return [
 			'# BEGIN ' . self::MARKER,
 			'# Managed by Site Essentials (Ai_Knowledge_Guard). Blocks HTTP access to ai-knowledge/,',
-			'# which PHP reads from disk. Written only because the folder answered 200 over HTTP.',
+			'# which PHP reads from disk. Written only because the folder was readable over HTTP.',
 			'# REQUEST_URI is used because a wp-content/.htaccess creates a per-directory rewrite',
 			'# context that strips the wp-content/ prefix from the match string.',
 			'<IfModule mod_rewrite.c>',
 			'RewriteEngine On',
-			'RewriteCond %{REQUEST_URI} ^' . preg_quote( $path, '' ) . '(/|$) [NC]',
+			'RewriteCond %{REQUEST_URI} ^' . $path . '(/|$) [NC]',
 			'RewriteRule .* - [F,L]',
 			'</IfModule>',
 			'# END ' . self::MARKER,

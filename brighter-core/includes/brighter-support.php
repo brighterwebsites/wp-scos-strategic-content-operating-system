@@ -274,10 +274,12 @@ function brighter_support_output_main() {
             </table>
             
             <div class="support-backup-note">
+                <?php if ( function_exists( 'bw_user_can_take_backup' ) && bw_user_can_take_backup() ) : ?>
                 <p><strong><?php esc_html_e('Backups:', 'brighterwebsites'); ?></strong> 
                     <a href="<?php echo esc_url(admin_url('admin.php?page=WPvivid')); ?>"><?php esc_html_e('Go to Backups', 'brighterwebsites'); ?></a>
                 </p>
                 <p><em><?php esc_html_e('Create a backup of your website before making major changes so you can make restorations yourself if needed. (log in with your administrator account to access backups)', 'brighterwebsites'); ?></em></p>
+                <?php endif; ?>
                 <p><?php esc_html_e('Your website is automatically backed up on your managed hosting server weekly - The last 2 backups are kept by default. If something goes wrong, contact us to restore a previous version. - Care Plans have at least 4 restore from server backups each year', 'brighterwebsites'); ?></p>
             </div>
             

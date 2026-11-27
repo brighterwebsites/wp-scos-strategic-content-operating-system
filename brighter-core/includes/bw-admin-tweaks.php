@@ -5,9 +5,11 @@
  * File: custom-admin.php
  * Purpose: Enhancements and modifications to the WordPress admin UI.
  *
- * Version: 4.1.1 | 2026-07-30
+ * Version: 4.1.2 | 2026-11-27
  *
  * Changelog:
+ * 4.1.2 - FIXED: the "take a backup" login notice only shows when WPvivid is active and the
+ *         user is an admin (WPvivid's own pages are admin-only) (#289).
  * 4.1.1 - FIXED: login_redirect double-prefixed absolute URLs with admin_url(), causing
  *         /wp-admin/https:/site/wp-admin/ 404s. Editors now fall back to the dashboard
  *         instead of the Support hub when no redirect is configured.
@@ -128,7 +130,9 @@ function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
     }
 
     // Set a transient to show the notice (expires in 60 seconds)
-    set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
+    if ( bw_user_can_take_backup( $user ) ) {
+        set_transient( 'bw_backup_reminder_' . $user->ID, true, 60 );
+    }
 
     // SCOS-SUPPORT-PASS2 — removed hardcoded redirect, now controlled via Agency > Access tab
     $support   = admin_url( 'admin.php?page=site-essentials-support' ); // SCOS-SUPPORT-PASS2 — updated fallback from brighter_support to site-essentials-support
@@ -151,6 +155,19 @@ function bw_redirect_to_support_page( $redirect_to, $request, $user ) {
 }
 
 /**
+ * Can this user take a backup from wp-admin? Only when WPvivid is active, and only for
+ * admins: WPvivid's pages need manage_options, so anyone else would get a dead link (#289).
+ *
+ * @param WP_User|null $user Defaults to the current user.
+ */
+function bw_user_can_take_backup( $user = null ) {
+    if ( ! defined( 'WPVIVID_PLUGIN_VERSION' ) ) {
+        return false;
+    }
+    return $user instanceof WP_User ? user_can( $user, 'manage_options' ) : current_user_can( 'manage_options' );
+}
+
+/**
  * Display backup reminder notice after login redirect should move this to agency settings
  */
 add_action( 'admin_notices', 'bw_backup_reminder_notice' );
@@ -158,7 +175,7 @@ function bw_backup_reminder_notice() {
     $user_id = get_current_user_id();
     
     // Check if the transient exists for this user
-    if ( get_transient( 'bw_backup_reminder_' . $user_id ) ) {
+    if ( get_transient( 'bw_backup_reminder_' . $user_id ) && bw_user_can_take_backup() ) {
         // Delete the transient so it only shows once
         delete_transient( 'bw_backup_reminder_' . $user_id );
         

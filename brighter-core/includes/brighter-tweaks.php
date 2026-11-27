@@ -3,9 +3,15 @@
  * Brighter Tools: Tweaks
  *
  * File: brighter-tweaks.php
- * Version: 4.5.0 | 2026-11-27
+ * Version: 4.6.0 | 2026-11-27
  *
  * Changelog:
+ * 4.6.0 - ADDED a per-post featured-image preload control (se_preload_featured: default, off
+ *         or on) in the Preload Assets box, which now shows on every public post type. Default
+ *         follows the post-type size, except that a post with its own manual preloads skips
+ *         the automatic one: a manual entry names the real LCP asset (a video poster, a hero
+ *         background). The posts page and the shop preload their Page's featured image only
+ *         when that Page is set to "on" (#304).
  * 4.5.0 - FIXED: the posts page and the WooCommerce shop got no preloads. Every preload path
  *         opened with is_singular(), and both are archives on the front end. preload_page_id()
  *         now resolves them to their Page for the manual preloads and fetchpriority. The
@@ -36,7 +42,7 @@
  *
  * Purpose: Site tweaks and performance optimizations
  * - Per-page image/asset preloads
- * - Auto-preload featured images on singles (using OG image size)
+ * - Auto-preload featured images on singles (per post type size; per-post off/on override)
  * - Remove Google Fonts completely
  * - LCP image optimization with fetchpriority=high
  * - Normalize /core/storage/ paths
@@ -50,6 +56,8 @@ class Brighter_Tweaks {
     const OPT_POST_TYPE_SIZES = 'brighter_preload_post_type_sizes';
     const OPT_GOOGLE_FONTS = 'bw_google_fonts_preload';
     const OPT_PTSIZES_MIGRATED = 'brighter_tweaks_ptsizes_migrated';
+    // TODO: migrate to site-essentials — preloads still live in brighter-core (#304).
+    const META_FEATURED = 'se_preload_featured'; // '' (follow post-type size) | 'off' | 'on'
 
     public static function boot() {
         // Admin
@@ -67,7 +75,8 @@ class Brighter_Tweaks {
         
         // Meta box for individual pages
         add_action('add_meta_boxes', [__CLASS__, 'add_meta_box']);
-        add_action('save_post_page', [__CLASS__, 'save_meta_box']);
+        add_action('save_post', [__CLASS__, 'save_meta_box']);
+        add_action('init', [__CLASS__, 'register_featured_meta']);
         
         // LCP optimization filters
         add_filter('wp_get_attachment_image_attributes', [__CLASS__, 'add_fetchpriority'], 99, 3);
@@ -172,7 +181,7 @@ class Brighter_Tweaks {
             'preload_on_singles',
             'Preload Featured Images on Singles',
             function () {
-                echo '<p>' . esc_html__('Choose which registered image size (if any) to preload as the featured image on singles, per post type.', 'brighterwebsites') . '</p>';
+                echo '<p>' . esc_html__('Choose which registered image size (if any) to preload as the featured image on singles, per post type. A post with its own manual preloads skips this, and any post can turn it off or on in its Preload Assets box.', 'brighterwebsites') . '</p>';
             },
             'brighter_tweaks'
         );
@@ -600,23 +609,38 @@ class Brighter_Tweaks {
     }
 
     /**
-     * Output featured image preload for singles.
-     * Preloads the registered image size chosen for the current post type
-     * (Site Essentials > Performance > Asset Preloading > Preload Featured Images on Singles).
+     * Output the featured image preload.
+     * Preloads the registered image size chosen for the post type
+     * (Site Essentials > Performance > Asset Preloading > Preload Featured Images on Singles),
+     * subject to the post's own se_preload_featured setting (#304):
+     * - off:     never.
+     * - on:      always, including on the posts page and the shop (size falls back to large).
+     * - default: singulars only, when the post-type size is set and the post has no manual
+     *            preloads. A manual entry names the real LCP asset, so the automatic guess
+     *            would only compete with it. Archives are opt-in: their template may not show
+     *            the Page's featured image, so preloading it could cost LCP instead (#294).
      */
     public static function output_featured_image_preload() {
-        // Singulars only: an archive template may not show its Page's featured image,
-        // so preloading it on the posts page or shop could cost LCP instead (#294).
-        if (!is_singular()) return;
+        $pid = self::preload_page_id();
+        if (!$pid) return;
 
-        $post_type = get_post_type();
+        $mode = self::featured_mode($pid);
+        if ('off' === $mode) return;
+
         $sizes_map = (array) get_option(self::OPT_POST_TYPE_SIZES, []);
+        $post_type = get_post_type($pid);
         $size = isset($sizes_map[$post_type]) ? $sizes_map[$post_type] : 'none';
+        $has_size = !empty($size) && 'none' !== $size;
 
-        if (empty($size) || $size === 'none') return;
-        if (!has_post_thumbnail()) return;
+        if ('on' !== $mode) {
+            if (!is_singular() || !$has_size) return;
+            if (array_filter(self::get_preload_urls($pid))) return;
+        }
+        if (!$has_size) $size = 'large';
 
-        $id = get_post_thumbnail_id();
+        if (!has_post_thumbnail($pid)) return;
+
+        $id = get_post_thumbnail_id($pid);
 
         $src = wp_get_attachment_image_url($id, $size);
 
@@ -798,10 +822,54 @@ class Brighter_Tweaks {
             'bw_preloads',
             __('Preload Assets', 'brighterwebsites'),
             [__CLASS__, 'render_meta_box'],
-            'page',
+            self::meta_box_post_types(),
             'side',
             'default'
         );
+    }
+
+    /** Every public post type except attachments (#304: was Pages only). */
+    private static function meta_box_post_types() {
+        $types = get_post_types(['public' => true]);
+        unset($types['attachment']);
+        return array_values($types);
+    }
+
+    /** The Pages that stand in for the posts page and the shop (see preload_page_id()). */
+    private static function archive_page_ids() {
+        $ids = [];
+        if ('page' === get_option('show_on_front')) {
+            $ids[] = (int) get_option('page_for_posts');
+        }
+        if (function_exists('wc_get_page_id')) {
+            $ids[] = (int) wc_get_page_id('shop');
+        }
+        return array_filter($ids, function ($id) { return $id > 0; });
+    }
+
+    /** Registered on init (not admin_init) so REST and WP-CLI see the key too. */
+    public static function register_featured_meta() {
+        register_post_meta('', self::META_FEATURED, [
+            'type' => 'string',
+            'single' => true,
+            'default' => '',
+            'sanitize_callback' => [__CLASS__, 'sanitise_featured_mode'],
+            'show_in_rest' => true,
+            'auth_callback' => [__CLASS__, 'can_edit_post_meta'],
+        ]);
+    }
+
+    public static function can_edit_post_meta($allowed, $meta_key, $post_id) {
+        return current_user_can('edit_post', $post_id);
+    }
+
+    public static function sanitise_featured_mode($value) {
+        return in_array($value, ['off', 'on'], true) ? $value : '';
+    }
+
+    /** '' (follow the post-type size), 'off' or 'on'. */
+    public static function featured_mode($pid) {
+        return self::sanitise_featured_mode(get_post_meta($pid, self::META_FEATURED, true));
     }
 
     public static function render_meta_box($post) {
@@ -810,13 +878,37 @@ class Brighter_Tweaks {
         
         echo '<p>' . esc_html__('Enter one asset URL per line. Supports CSS, JS, fonts, and images.', 'brighterwebsites') . '</p>';
         echo '<textarea style="width:100%;min-height:140px" name="bw_preloads_field">' . esc_textarea($text) . '</textarea>';
+
+        $mode = self::featured_mode($post->ID);
+        $default = in_array((int) $post->ID, self::archive_page_ids(), true)
+            ? __('Default: off (this Page is the posts page or shop)', 'brighterwebsites')
+            : __('Default: post-type setting, skipped when manual preloads are set above', 'brighterwebsites');
+        $choices = [
+            ''    => $default,
+            'off' => __('Never preload the featured image', 'brighterwebsites'),
+            'on'  => __('Always preload the featured image', 'brighterwebsites'),
+        ];
+        echo '<p><label for="' . esc_attr(self::META_FEATURED) . '"><strong>' . esc_html__('Featured image preload', 'brighterwebsites') . '</strong></label></p>';
+        echo '<select class="widefat" id="' . esc_attr(self::META_FEATURED) . '" name="' . esc_attr(self::META_FEATURED) . '">';
+        foreach ($choices as $val => $label) {
+            printf('<option value="%s"%s>%s</option>', esc_attr($val), selected($mode, $val, false), esc_html($label));
+        }
+        echo '</select>';
         wp_nonce_field('bw_preloads_save', 'bw_preloads_nonce');
     }
 
     public static function save_meta_box($post_id) {
         if (wp_is_post_revision($post_id)) return;
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!isset($_POST['bw_preloads_nonce']) || !wp_verify_nonce($_POST['bw_preloads_nonce'], 'bw_preloads_save')) return;
-        if (!current_user_can('edit_page', $post_id)) return;
+        if (!current_user_can('edit_post', $post_id)) return;
+
+        $mode = isset($_POST[self::META_FEATURED]) ? self::sanitise_featured_mode(sanitize_key(wp_unslash($_POST[self::META_FEATURED]))) : '';
+        if ('' === $mode) {
+            delete_post_meta($post_id, self::META_FEATURED);
+        } else {
+            update_post_meta($post_id, self::META_FEATURED, $mode);
+        }
         
         $lines = isset($_POST['bw_preloads_field']) ? (string) wp_unslash($_POST['bw_preloads_field']) : '';
         $arr = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $lines)));
@@ -827,7 +919,11 @@ class Brighter_Tweaks {
             if ($u) $clean[] = $u;
         }
         
-        update_post_meta($post_id, '_bw_preloads', array_values(array_unique($clean)));
+        if ($clean) {
+            update_post_meta($post_id, '_bw_preloads', array_values(array_unique($clean)));
+        } else {
+            delete_post_meta($post_id, '_bw_preloads');
+        }
     }
 
     /**

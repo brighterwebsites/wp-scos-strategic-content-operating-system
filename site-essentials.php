@@ -3,7 +3,7 @@
  * Plugin Name: Site Essentials
  * Plugin URI:  https://brighterwebsites.com.au
  * Description: Modular site management system - Performance, Analytics, SEO, and more
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      Brighter Websites
  * Author URI:  https://brighterwebsites.com.au
  * License:     GPL-3.0-or-later
@@ -15,8 +15,10 @@
  * It sets up constants, autoloading, and bootstraps the plugin.
  *
  * @package SiteEssentials
- * @version 1.3.0
+ * @version 1.4.0
  *
+ * v1.4.0 | 2026-11-27 — ai-knowledge/ guard moves to Core (runs on every site, checks itself
+ *                       over HTTP) and a logged-in viewer replaces direct file links (#249).
  * v1.3.0 | 2026-11-08 — Registers the Commerce module (store-only WooCommerce
  *                       assets, optional loop add-to-cart removal).
  * v1.1.2 | 2026-10-22 — Registers the WooCommerce GA bridge on plugins_loaded,
@@ -115,7 +117,7 @@ add_action( 'init', [ 'SE_Deployment_Check', 'init' ] );
  *
  * @since 1.0.0
  */
-define('SITE_ESSENTIALS_VERSION', '1.3.0');
+define('SITE_ESSENTIALS_VERSION', '1.4.0');
 
 /**
  * Site Essentials Base Path
@@ -304,6 +306,9 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 		// Legacy meta registry + cleanup (Core, not a module — always available).
 		\WP_CLI::add_command( 'scos legacy-meta', \SiteEssentials\Core\CLI\Legacy_Meta_Command::class );
 
+		// ai-knowledge/ HTTP guard: install + probe now (run after pushing strategy files).
+		\WP_CLI::add_command( 'scos ai-knowledge-guard', [ \SiteEssentials\Core\Ai_Knowledge_Guard::class, 'cli' ] );
+
 		if ( file_exists( $backfill_file ) ) {
 			require_once $backfill_file;
 			\WP_CLI::add_command(
@@ -336,6 +341,7 @@ add_action(
 		\SiteEssentials\Core\Support_Scripts::init();
 		\SiteEssentials\Core\Scos_Rest_Field::init();
 		\SiteEssentials\Core\Ai_Knowledge_Viewer::init();
+		\SiteEssentials\Core\Ai_Knowledge_Guard::init();
 	},
 	6
 );

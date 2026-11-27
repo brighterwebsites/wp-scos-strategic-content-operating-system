@@ -18,9 +18,8 @@
  *   303-social-media-gmb.md   — Google Business post rules
  *   304-brand-vocabulary.md   — approved / banned word list
  *
- * Guards wp-content/ai-knowledge/ against HTTP access on every call: creates
- * the folder if needed, writes an Apache 2.2 + 2.4 deny .htaccess, and drops
- * an index.php fallback (hardening carried over from Anthropic_Client 1.1.0).
+ * The HTTP guard for wp-content/ai-knowledge/ now lives in Core\Ai_Knowledge_Guard
+ * and runs on every site, not only when captions are generated (#249).
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\Amplification
@@ -28,6 +27,7 @@
  * v1.1 | 2026-09-11 — Normalise ai-knowledge files to UTF-8 (Windows-1252 files
  *                      broke the strict AI Client JSON encoding); scrub prompts.
  * v1.2 | 2026-10-07 — Stop sending temperature; it made the AI Client skip the preferred model.
+ * v1.3 | 2026-11-27 — Private ai-knowledge .htaccess guard removed; Core\Ai_Knowledge_Guard owns it (#249).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -57,7 +57,7 @@ class Caption_Generator {
 	 * @throws \RuntimeException on generation error or unparseable response.
 	 */
 	public static function generate_captions( array $post_context, array $frames = [], int $count = 3 ): array {
-		self::maybe_create_htaccess();
+		\SiteEssentials\Core\Ai_Knowledge_Guard::maybe_install();
 
 		$count  = max( 1, $count );
 		$frames = array_values( array_filter( $frames, 'strlen' ) );
@@ -92,7 +92,7 @@ class Caption_Generator {
 	 * @throws \RuntimeException
 	 */
 	public static function generate_gmb_caption( array $post_context ): string {
-		self::maybe_create_htaccess();
+		\SiteEssentials\Core\Ai_Knowledge_Guard::maybe_install();
 
 		$knowledge = self::read_knowledge_files();
 		$system    = self::system_prompt_gmb( $knowledge );
@@ -426,63 +426,5 @@ class Caption_Generator {
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Ensure wp-content/ai-knowledge/ is not reachable over HTTP.
-	 *
-	 * The folder holds client strategy documents, so exposure is a confidentiality
-	 * problem rather than an execution one. PHP reads the files from disk, so
-	 * blocking direct HTTP access costs nothing.
-	 *
-	 * @since 1.1.0 Creates the directory guard unconditionally, emits both Apache
-	 *              2.2 and 2.4 syntax, adds an index.php, and reports write failures.
-	 */
-	private static function maybe_create_htaccess(): void {
-		$dir = WP_CONTENT_DIR . '/ai-knowledge';
-
-		// Previously this returned early when the directory did not exist, so a
-		// folder created later by another process (CLI sync, deploy) was left
-		// unguarded until something happened to call this again.
-		if ( ! is_dir( $dir ) ) {
-			if ( ! wp_mkdir_p( $dir ) ) {
-				return;
-			}
-		}
-
-		if ( ! is_writable( $dir ) ) {
-			error_log( self::LOG_PREFIX . ' ai-knowledge directory is not writable; cannot install access guard.' );
-			return;
-		}
-
-		$htaccess = $dir . '/.htaccess';
-		if ( ! file_exists( $htaccess ) ) {
-			// Order/Deny is Apache 2.2 (mod_access). Apache 2.4 needs mod_authz_core
-			// syntax, and without it the old directives are either ignored or fatal
-			// depending on whether mod_access_compat is loaded — either way the
-			// folder was not reliably protected.
-			$content = "# Block direct HTTP access - PHP reads this folder from disk.\n"
-					 . "<IfModule mod_authz_core.c>\n"
-					 . "\tRequire all denied\n"
-					 . "</IfModule>\n"
-					 . "<IfModule !mod_authz_core.c>\n"
-					 . "\tOrder deny,allow\n"
-					 . "\tDeny from all\n"
-					 . "</IfModule>\n"
-					 . "\n"
-					 . "# Nginx ignores .htaccess. Add to the server block:\n"
-					 . "# location ^~ /wp-content/ai-knowledge/ { deny all; }\n";
-
-			if ( false === file_put_contents( $htaccess, $content ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
-				error_log( self::LOG_PREFIX . ' failed to write ai-knowledge/.htaccess; folder may be publicly readable.' );
-			}
-		}
-
-		// Second line of defence: stops directory listing where .htaccess is not
-		// honoured at all (nginx), though it does not stop direct file requests.
-		$index = $dir . '/index.php';
-		if ( ! file_exists( $index ) ) {
-			@file_put_contents( $index, "<?php\n// Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-		}
 	}
 }

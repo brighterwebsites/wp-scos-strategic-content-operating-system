@@ -2,8 +2,11 @@
 /**
  * Markdown Renderer
  *
- * v1.3 | 2026-11-07
+ * v1.4 | 2026-11-27
  *
+ * v1.4 | 2026-11-27 — A tag with a stray quote (a builder ID field used to inject attributes)
+ *                     no longer swallows the rest of the page at the final strip: strip_text()
+ *                     notices the loss, keeps the text and logs the post ID (#235).
  * v1.3 | 2026-11-07 — No markdown copy of a post type without single URLs (reviews; FAQs
  *                     when switched off): the request falls through to Single_Url_Guard's 301.
  * v1.2 | 2026-10-21 — Clean output on page-builder markup (#211): heading and
@@ -274,10 +277,42 @@ class Markdown_Renderer {
 		$content = preg_replace( '/<br\s*\/?>/i', "\n", $content );
 
 		// ── Strip remaining HTML, then decode entities once ───────────────────
-		$content = wp_strip_all_tags( $content );
+		$content = self::strip_text( $content );
 		$content = self::decode_entities( $content );
 
 		return self::normalise_whitespace( $content );
+	}
+
+	/**
+	 * wp_strip_all_tags(), unless a malformed tag made it swallow the page.
+	 *
+	 * strip_tags() reads a stray quote inside a tag as an attribute that never
+	 * ends, so everything up to the next straight quote disappears (#235). A
+	 * strip that ignores quotes can't do that. When the normal strip keeps much
+	 * less text than the quote-blind one, the quote-blind result is used and the
+	 * post ID logged so the broken markup gets fixed. Normal pages are unchanged.
+	 *
+	 * @param string $html Converted content with the remaining HTML.
+	 * @return string
+	 */
+	private static function strip_text( string $html ): string {
+		$text = wp_strip_all_tags( $html );
+
+		$blind = preg_replace( '@<(script|style)[^>]*?>.*?</\1>@si', '', $html );
+		$blind = preg_replace( '/<[^>]*>/', '', (string) $blind );
+		$kept  = strlen( trim( $text ) );
+		$full  = strlen( trim( (string) $blind ) );
+
+		if ( $full > 200 && $kept < $full * 0.8 ) {
+			error_log( sprintf( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				'[SCOS markdown] post %d: a malformed tag hid %d of %d characters; check its HTML for a stray quote.',
+				(int) get_the_ID(),
+				$full - $kept,
+				$full
+			) );
+			return (string) $blind;
+		}
+		return $text;
 	}
 
 	// ── Conversion callbacks ──────────────────────────────────────────────────

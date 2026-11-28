@@ -286,7 +286,7 @@ class Backfill_Command {
 		}
 		$data = json_decode( (string) file_get_contents( $path ), true );
 		if ( ! is_array( $data ) || ( $data && array_is_list( $data ) ) ) {
-			\WP_CLI::error( '--captions-file: expected a JSON object keyed by post ID, e.g. {"123": {"captions": ["..."]}}. ' . json_last_error_msg() );
+			\WP_CLI::error( '--captions-file: expected a JSON object keyed by post ID, e.g. {"123": {"captions": ["..."]}}.' . ( JSON_ERROR_NONE !== json_last_error() ? ' ' . json_last_error_msg() . '.' : '' ) );
 		}
 
 		$out = [];

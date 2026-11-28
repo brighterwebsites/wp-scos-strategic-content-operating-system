@@ -1,4 +1,5 @@
 <?php
+// v1.5 | 2026-11-28 — REST restriction lets bw-social/ and scos/ through; named callback, also matches ?rest_route= (#95).
 // v1.4 | 2026-10-01 — disable_comments tweak (Comments_Disabler).
 // v1.3 | 2026-06-18
 /**
@@ -618,42 +619,63 @@ class Tweaks_Module implements Module_Interface {
     }
 
     /**
-     * Disable REST API for non-logged users
+     * Restrict the REST API to logged-in users, apart from the namespaces that
+     * must answer unauthenticated callers. Each of those routes still runs its
+     * own permission_callback (a shared secret, or a public read).
      *
      * @since 1.0.0
      * @return void
      */
     private function disable_rest_api() {
-        add_filter('rest_authentication_errors', function($result) {
-            // Allow if user is logged in
-            if (is_user_logged_in()) {
+        add_filter( 'rest_authentication_errors', [ $this, 'restrict_rest_to_logged_in' ] );
+    }
+
+    /**
+     * REST namespaces (route prefixes) let through when the restriction is on.
+     * - wc/            WooCommerce (store API, webhooks)
+     * - brighter/      Brighter custom endpoints
+     * - brighter-core/ brighter-core API (MCP connector reads)
+     * - brighter-x/    Brighter-X endpoints
+     * - bw-social/     Social Amplification amplify + backfill: the publish hook's
+     *                  loopback has no logged-in user; routes check the webhook secret (#95)
+     * - scos/          SCOS agent Content API (public reads by design); Leads checks its own capability
+     */
+    const REST_OPEN_NAMESPACES = [ 'wc/', 'brighter/', 'brighter-core/', 'brighter-x/', 'bw-social/', 'scos/' ];
+
+    /**
+     * rest_authentication_errors callback for disable_rest_api().
+     *
+     * @param  \WP_Error|null|true $result
+     * @return \WP_Error|null|true
+     */
+    public function restrict_rest_to_logged_in( $result ) {
+        if ( is_user_logged_in() ) {
+            return $result;
+        }
+
+        // Matches both /wp-json/<route> and ?rest_route=/<route>.
+        $route = isset( $GLOBALS['wp']->query_vars['rest_route'] )
+            ? '/' . ltrim( (string) $GLOBALS['wp']->query_vars['rest_route'], '/' )
+            : '';
+        if ( '' === $route ) {
+            $uri   = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+            $path  = (string) wp_parse_url( $uri, PHP_URL_PATH );
+            $base  = '/' . trim( (string) rest_get_url_prefix(), '/' );
+            $at    = strpos( $path, $base . '/' );
+            $route = false === $at ? '' : substr( $path, $at + strlen( $base ) );
+        }
+
+        foreach ( self::REST_OPEN_NAMESPACES as $namespace ) {
+            if ( 0 === strpos( $route, '/' . $namespace ) ) {
                 return $result;
             }
-            
-            // CRITICAL: Whitelist specific REST API endpoints that need unauthenticated access
-            $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
-            
-            // Whitelist patterns:
-            $whitelist_patterns = [
-                '/wp-json/wc/',           // WooCommerce endpoints
-                '/wp-json/brighter/',     // Brighter custom endpoints (GPT, Make, etc.)
-                '/wp-json/brighter-core/', // Brighter Core endpoints (social amplification, etc.)
-                '/wp-json/brighter-x/',   // Brighter-X endpoints
-            ];
-            
-            foreach ($whitelist_patterns as $pattern) {
-                if (strpos($request_uri, $pattern) !== false) {
-                    return $result; // Allow this endpoint
-                }
-            }
-            
-            // Block all other unauthenticated REST requests
-            return new \WP_Error(
-                'rest_not_logged_in',
-                __('You are not currently logged in.', 'site-essentials'),
-                ['status' => 401]
-            );
-        });
+        }
+
+        return new \WP_Error(
+            'rest_not_logged_in',
+            __( 'You are not currently logged in.', 'site-essentials' ),
+            [ 'status' => 401 ]
+        );
     }
 
     /**

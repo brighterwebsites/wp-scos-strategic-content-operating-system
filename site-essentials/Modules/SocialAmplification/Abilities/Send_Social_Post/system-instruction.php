@@ -20,7 +20,7 @@ Who writes the captions:
 - Omit those inputs when you have not been given enough context to write good captions. The pipeline will then generate them server-side from the site's stored brand voice, vocabulary and platform rules.
 
 Caption requirements when you write them:
-- Standard channels: 2-4 sentences, include the post link naturally, 3-5 hashtags at the end.
+- Standard channels: 2-4 sentences, 3-5 hashtags at the end. Include the post link naturally by writing {link} where it goes; it becomes the tracked link. Do not paste the permalink yourself, or the visit is not attributed.
 - Google Business: 1-3 sentences, 150-300 characters, no URLs, no phone numbers, no hashtags, no dashes, plain Australian English, lead with the customer benefit.
 
 Report clearly which path was used, and surface any scheduling errors verbatim rather than summarising them away.

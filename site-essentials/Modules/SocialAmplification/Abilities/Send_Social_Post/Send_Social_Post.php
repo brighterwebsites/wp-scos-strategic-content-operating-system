@@ -17,6 +17,7 @@
  *                      every slot was scheduled.
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  * v2.1 | 2026-11-28 — Slots report images and images_found; the result lists image_warnings (#254).
+ * v2.2 | 2026-11-28 — Captions may use {link} for the tracked link (#255).
  */
 
 declare( strict_types=1 );
@@ -100,13 +101,13 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 				],
 				'captions'   => [
 					'type'        => 'array',
-					'description' => 'Optional. Captions you have already written, in order, one per scheduled slot. Supply these and no AI generation happens — they are scheduled as-is. Omit them and captions are generated server-side from the site brand knowledge.',
+					'description' => 'Optional. Captions you have already written, in order, one per scheduled slot. Supply these and no AI generation happens — they are scheduled as-is. Put {link} where the post link goes: it becomes the tracked link (the shortlink, or the permalink with UTMs), so the traffic is attributed. Omit captions and they are generated server-side from the site brand knowledge.',
 					'items'       => [ 'type' => 'string' ],
 					'maxItems'    => 10,
 				],
 				'gmb_caption' => [
 					'type'        => 'string',
-					'description' => 'Optional. A Google Business Profile caption you have already written. Supply it and no AI generation happens for GMB. Must contain no URLs, phone numbers or hashtags, and stay between 150 and 300 characters.',
+					'description' => 'Optional. A Google Business Profile caption you have already written. Supply it and no AI generation happens for GMB. Must contain no URLs, phone numbers or hashtags, and stay between 150 and 300 characters. The post link goes on the button, so {link} is removed here.',
 				],
 				'retry_failed' => [
 					'type'        => 'boolean',

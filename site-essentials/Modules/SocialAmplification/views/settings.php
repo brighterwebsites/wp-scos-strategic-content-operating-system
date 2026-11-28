@@ -11,6 +11,7 @@
  * v1.3 | 2026-07-21 — Remove Make.com settings tab and Post Framing card (deprecated,
  *                      unused on all sites).
  * v1.4 | 2026-11-27 — Knowledge file tiles open through the logged-in viewer (#249).
+ * v1.5 | 2026-11-28 — "Don't use post image attachments" removed (global and per type): it did nothing (#256).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -54,7 +55,6 @@ $gmb_channel_id   = get_option( 'scos_sa_postly_gmb_channel_id', get_option( 'se
 $global_frames      = Post_Type_Config::get_global_frames();
 $global_max_images  = get_option( Post_Type_Config::MAX_IMAGES_OPTION, Post_Type_Config::DEFAULT_MAX_IMAGES );
 $global_no_featured = get_option( Post_Type_Config::NO_FEATURED_OPTION, 0 );
-$global_no_attach   = get_option( Post_Type_Config::NO_ATTACH_OPTION, 0 );
 
 // Per post type config
 $pt_all_configs   = Post_Type_Config::get_all_configs();
@@ -847,7 +847,7 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
             <tr>
               <th>
                 <label><?php esc_html_e( 'Image sources', 'site-essentials' ); ?></label>
-                <div class="scos-form__slug">scos_sa_postly_no_featured / _no_attachments</div>
+                <div class="scos-form__slug">scos_sa_postly_no_featured</div>
               </th>
               <td>
                 <label class="scos-checkbox-row">
@@ -855,13 +855,8 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
                          value="1" <?php checked( $global_no_featured, '1' ); ?>>
                   <?php esc_html_e( "Don't use featured image", 'site-essentials' ); ?>
                 </label>
-                <label class="scos-checkbox-row" style="margin-top:var(--scos-s-2)">
-                  <input type="checkbox" name="<?php echo esc_attr( Post_Type_Config::NO_ATTACH_OPTION ); ?>"
-                         value="1" <?php checked( $global_no_attach, '1' ); ?>>
-                  <?php esc_html_e( "Don't use post image attachments", 'site-essentials' ); ?>
-                </label>
                 <p class="description" style="margin-top:var(--scos-s-2)">
-                  <?php esc_html_e( 'Featured image and image attachments are used by default. Add ACF image or gallery field keys in Postly API settings → ACF field settings.', 'site-essentials' ); ?>
+                  <?php esc_html_e( 'The featured image is used by default. Add ACF image or gallery field keys in Postly API settings → ACF field settings.', 'site-essentials' ); ?>
                 </p>
               </td>
             </tr>
@@ -954,12 +949,6 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
                        name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][no_featured]"
                        value="1" <?php checked( ! empty( $pt_cfg['no_featured'] ) ); ?>>
                 <?php esc_html_e( "Don't use featured image", 'site-essentials' ); ?>
-              </label>
-              <label class="scos-checkbox-row" style="margin-top:var(--scos-s-2)">
-                <input type="checkbox"
-                       name="scos_sa_pt_config[<?php echo esc_attr( $pt_slug ); ?>][no_attachments]"
-                       value="1" <?php checked( ! empty( $pt_cfg['no_attachments'] ) ); ?>>
-                <?php esc_html_e( "Don't use post image attachments", 'site-essentials' ); ?>
               </label>
 
               <div style="display:flex;align-items:center;gap:var(--scos-s-3);margin-top:var(--scos-s-3)">

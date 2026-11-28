@@ -717,7 +717,7 @@ class Amplification_Engine {
 
 	/**
 	 * @param array $pt_config  Resolved config from Post_Type_Config::get_config().
-	 *                          Keys: post_count, frames, no_featured, no_attachments,
+	 *                          Keys: post_count, frames, no_featured,
 	 *                          acf_gallery_keys, max_images.
 	 * @param array $queue      Failed slots are appended here for retry.
 	 */
@@ -933,8 +933,6 @@ class Amplification_Engine {
 	 *
 	 * Config keys used:
 	 *   no_featured      — skip the WP featured image
-	 *   no_attachments   — skip post image attachments (not currently fetched by default,
-	 *                      but governs future attachment-scan logic)
 	 *   acf_gallery_keys — comma-separated ACF field keys (overrides global option when
 	 *                      set to a non-empty string in per-type config)
 	 *

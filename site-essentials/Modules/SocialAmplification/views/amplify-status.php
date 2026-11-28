@@ -17,6 +17,7 @@
  *
  * @package SiteEssentials
  * v1.0 | 2026-09-11
+ * v1.1 | 2026-11-28 — Deleted slots are labelled (#259).
  */
 
 use SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine;
@@ -42,6 +43,7 @@ $status_labels   = [
 	'scheduled'       => __( 'Scheduled', 'site-essentials' ),
 	'retry_scheduled' => __( 'Retrying', 'site-essentials' ),
 	'error'           => __( 'Failed', 'site-essentials' ),
+	'deleted'         => __( 'Deleted', 'site-essentials' ),
 ];
 $platform_labels = [
 	'standard' => __( 'Social', 'site-essentials' ),

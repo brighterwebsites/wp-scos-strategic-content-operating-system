@@ -19,6 +19,7 @@
  *                      honour 429 "Try again in N seconds" across the request;
  *                      readable error text instead of Cloudflare HTML; GMB sends the
  *                      caption as text when there is no image; extract_post_id().
+ * v1.3 | 2026-11-28 — delete_post(): remove a scheduled post (#259).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -258,6 +259,24 @@ class Postly_Client {
 			'skip'        => $skip,
 		] );
 		return is_array( $data ) ? $data : [];
+	}
+
+	/**
+	 * Delete a post from Postly (DELETE /posts/<id>).
+	 *
+	 * Removes it from Postly only. The SCOS run log is not touched; use
+	 * Amplification_Engine::delete_slot() to delete a logged slot and record it.
+	 *
+	 * @throws \InvalidArgumentException when the ID is not a Postly ID.
+	 * @throws Postly_Exception           on failure, like the other methods.
+	 */
+	public function delete_post( string $postly_id ): void {
+		$postly_id = trim( $postly_id );
+		if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $postly_id ) ) {
+			throw new \InvalidArgumentException( "Not a Postly post ID: \"{$postly_id}\"." );
+		}
+		$this->request( 'DELETE', '/posts/' . $postly_id );
+		error_log( self::LOG_PREFIX . " Deleted post {$postly_id}." );
 	}
 
 	/**

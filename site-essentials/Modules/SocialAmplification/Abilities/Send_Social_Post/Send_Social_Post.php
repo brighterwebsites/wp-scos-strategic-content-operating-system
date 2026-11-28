@@ -16,6 +16,7 @@
  *                      reports the run outcome, and `success` is true only when
  *                      every slot was scheduled.
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
+ * v2.1 | 2026-11-28 — Slots report images and images_found; the result lists image_warnings (#254).
  */
 
 declare( strict_types=1 );
@@ -127,6 +128,14 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 					'description' => 'scheduled, retry_scheduled (failed; an automatic retry is queued) or error (failed; needs retry_failed).',
 				],
 				'postly_id' => [ 'type' => [ 'string', 'null' ] ],
+				'images'    => [
+					'type'        => 'integer',
+					'description' => 'Images sent to Postly with this post.',
+				],
+				'images_found' => [
+					'type'        => 'integer',
+					'description' => 'Images the post had for this slot. More than images means some failed to upload.',
+				],
 				'error'     => [ 'type' => 'string' ],
 				'note'      => [ 'type' => 'string' ],
 			],
@@ -150,6 +159,14 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 					'description' => 'Site-time Y-m-d H:i of the automatic retry of failed posts, or empty.',
 				],
 				'pending_retries' => [ 'type' => 'integer' ],
+				'image_warnings'  => [
+					'type'        => 'object',
+					'description' => 'Scheduled posts that went out short of images: no_images (none were found) and not_uploaded (some or all failed to reach Postly). Each lists slot labels such as "standard 2". A complete run can still have these.',
+					'properties'  => [
+						'no_images'    => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+						'not_uploaded' => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+					],
+				],
 				'standard_posts'  => [ 'type' => 'array', 'items' => $slot ],
 				'gmb_posts'       => [ 'type' => 'array', 'items' => $slot ],
 				'error'           => [ 'type' => 'string' ],
@@ -315,6 +332,7 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 			'message'         => Amplification_Engine::describe_outcome( $entry ),
 			'retry_at'        => (string) ( $entry['retry_at'] ?? '' ),
 			'pending_retries' => count( Amplification_Engine::get_retry_queue( $post_id ) ),
+			'image_warnings'  => $entry['image_warnings'] ?? Amplification_Engine::image_warnings( $entry ),
 			'standard_posts'  => $entry['standard_posts'] ?? [],
 			'gmb_posts'       => $entry['gmb_posts'] ?? [],
 		];

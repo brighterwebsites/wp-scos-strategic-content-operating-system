@@ -87,9 +87,11 @@ class SocialAmplification_Module implements Module_Interface {
 			require_once __DIR__ . '/CLI/Backfill_Command.php';
 			require_once __DIR__ . '/CLI/Send_Post_Command.php';
 			require_once __DIR__ . '/CLI/Cleanup_Make_Command.php';
+			require_once __DIR__ . '/CLI/Delete_Post_Command.php';
 			\WP_CLI::add_command( 'scos-social backfill', CLI\Backfill_Command::class );
 			\WP_CLI::add_command( 'scos-social sendpost', CLI\Send_Post_Command::class );
 			\WP_CLI::add_command( 'scos-social cleanup-make', CLI\Cleanup_Make_Command::class );
+			\WP_CLI::add_command( 'scos-social delete', CLI\Delete_Post_Command::class );
 		}
 
 		// WP Abilities API — category + send-social-post ability. Registration

@@ -48,6 +48,8 @@
  * v1.9 | 2026-11-28 — {link} in a standard caption becomes the tracked link; with no
  *                      shortlink the link is the permalink with UTMs, not a bare
  *                      permalink (#255).
+ * v2.0 | 2026-11-28 — delete_slot(): delete a scheduled slot from Postly and mark it
+ *                      deleted in the run log; deleted slots leave the counts (#259).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -1314,6 +1316,68 @@ class Amplification_Engine {
 	 * complete (every slot scheduled), partial, failed (none scheduled) or
 	 * skipped (no slots — nothing configured). Works on entries written before v1.5.
 	 */
+	/**
+	 * Delete one scheduled slot of a post's last run from Postly and mark it deleted
+	 * in the run log, so the outcome and counts stop including it.
+	 *
+	 * @param  string $platform standard | gmb
+	 * @param  int    $slot     Slot number as logged (1-based).
+	 * @return array  The updated log entry.
+	 * @throws \RuntimeException when there is no such scheduled slot, or Postly refuses.
+	 */
+	public static function delete_slot( int $post_id, string $platform, int $slot ): array {
+		$entry = self::get_log( $post_id );
+		$key   = 'gmb' === $platform ? 'gmb_posts' : ( 'standard' === $platform ? 'standard_posts' : '' );
+		if ( '' === $key || empty( $entry[ $key ] ) ) {
+			throw new \RuntimeException( "Post #{$post_id} has no {$platform} posts in its last run." );
+		}
+
+		$index = null;
+		foreach ( $entry[ $key ] as $i => $row ) {
+			if ( (int) ( $row['slot'] ?? 0 ) === $slot ) {
+				$index = $i;
+				break;
+			}
+		}
+		if ( null === $index ) {
+			throw new \RuntimeException( "Post #{$post_id} has no {$platform} slot {$slot} in its last run." );
+		}
+
+		$row       = $entry[ $key ][ $index ];
+		$postly_id = (string) ( $row['postly_id'] ?? '' );
+		if ( 'scheduled' !== ( $row['status'] ?? '' ) ) {
+			throw new \RuntimeException( "{$platform} slot {$slot} of post #{$post_id} is " . ( $row['status'] ?? 'unknown' ) . ', not scheduled; there is nothing in Postly to delete.' );
+		}
+		if ( '' === $postly_id ) {
+			throw new \RuntimeException( "{$platform} slot {$slot} of post #{$post_id} has no Postly ID logged. Delete it in Postly, or pass its ID with --postly-id." );
+		}
+
+		$client = new Postly_Client( (string) get_option( 'bw_postly_api_key', '' ), (string) get_option( 'bw_postly_workspace_id', '' ) );
+		try {
+			$client->delete_post( $postly_id );
+		} catch ( \InvalidArgumentException $e ) {
+			throw new \RuntimeException( $e->getMessage() );
+		}
+
+		$entry[ $key ][ $index ]['status']     = 'deleted';
+		$entry[ $key ][ $index ]['deleted_at'] = current_time( 'mysql' );
+		if ( 'standard_posts' === $key ) {
+			$entry['posts'] = $entry['standard_posts']; // Back-compat copy.
+		}
+
+		$counts                   = self::slot_counts( $entry );
+		$entry['outcome']         = self::outcome_of( $entry );
+		$entry['slot_count']      = $counts['total'];
+		$entry['scheduled_count'] = $counts['scheduled'];
+		$entry['image_warnings']  = self::image_warnings( $entry );
+
+		// Same run, one slot fewer: update in place rather than start a new history entry.
+		self::store_log_entry( $post_id, $entry );
+		error_log( self::LOG_PREFIX . " Post #{$post_id}: deleted {$platform} slot {$slot} (Postly {$postly_id}); outcome now {$entry['outcome']}." );
+
+		return $entry;
+	}
+
 	public static function outcome_of( array $entry ): string {
 		$counts = self::slot_counts( $entry );
 		if ( 0 === $counts['total'] ) {
@@ -1332,12 +1396,17 @@ class Amplification_Engine {
 			(array) ( $entry['gmb_posts'] ?? [] )
 		);
 		$scheduled = 0;
+		$deleted   = 0;
 		foreach ( $rows as $row ) {
-			if ( 'scheduled' === ( $row['status'] ?? '' ) ) {
+			$status = $row['status'] ?? '';
+			if ( 'scheduled' === $status ) {
 				$scheduled++;
+			} elseif ( 'deleted' === $status ) {
+				$deleted++;
 			}
 		}
-		return [ 'total' => count( $rows ), 'scheduled' => $scheduled ];
+		// A slot deleted from Postly on purpose (delete_slot) is not part of the run any more.
+		return [ 'total' => count( $rows ) - $deleted, 'scheduled' => $scheduled, 'deleted' => $deleted ];
 	}
 
 	/**
@@ -1352,6 +1421,10 @@ class Amplification_Engine {
 		$counts  = self::slot_counts( $entry );
 		$failed  = $counts['total'] - $counts['scheduled'];
 		$outcome = $entry['outcome'] ?? self::outcome_of( $entry );
+
+		if ( 0 === $counts['total'] && $counts['deleted'] > 0 ) {
+			return __( 'Every post from this run was deleted from Postly.', 'site-essentials' );
+		}
 
 		switch ( $outcome ) {
 			case 'complete':

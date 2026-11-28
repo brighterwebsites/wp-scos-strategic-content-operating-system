@@ -16,6 +16,9 @@
  * Captions: pass `captions` (post_1…post_N) and/or `gmb_caption` in $options to
  * schedule text the caller already wrote — no AI call is made. Omit them and the
  * text is generated through the WP AI Client. See CLAUDE.md § 6.
+ * A standard caption may contain {link}: it is replaced with the post's tracked
+ * link (the YOURLS shortlink, or the permalink with UTMs when there is none).
+ * GMB captions carry no URL, so {link} is removed from them.
  *
  * Outcome: every log entry carries `outcome` — complete (all slots scheduled),
  * partial, failed (none scheduled) or skipped (nothing configured). The
@@ -42,6 +45,9 @@
  *                      in its log entry and message (#254).
  * v1.8 | 2026-11-28 — Explicit standard_schedule_at / gmb_schedule_at pick the day only;
  *                      the time comes from the publish window, as for a normal run (#252).
+ * v1.9 | 2026-11-28 — {link} in a standard caption becomes the tracked link; with no
+ *                      shortlink the link is the permalink with UTMs, not a bare
+ *                      permalink (#255).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -53,6 +59,9 @@ require_once __DIR__ . '/Postly_Image_Guard.php';
 class Amplification_Engine {
 
 	const IMAGES_PER_POST    = 4;
+
+	/** Placeholder in a caption that becomes the post's tracked link (#255). */
+	const LINK_PLACEHOLDER   = '{link}';
 	const LOG_OPTION         = 'scos_sa_amplify_log';
 	const LOG_PREFIX         = '[SCOS SMA Engine]';
 
@@ -155,8 +164,8 @@ class Amplification_Engine {
 		$excerpt   = self::get_excerpt( $post );
 		error_log( self::LOG_PREFIX . " Post #{$post_id}: \"{$title}\" | {$permalink}" );
 
-		// ── 2. YOURLS shortlink ──────────────────────────────────────────────
-		$shortlink = self::get_shortlink( $post_id, $permalink );
+		// ── 2. YOURLS shortlink (else the permalink with UTMs) ───────────────
+		$shortlink = self::get_shortlink( $post_id, self::tracked_permalink( $post_id ) );
 		error_log( self::LOG_PREFIX . " Shortlink: {$shortlink}" );
 
 		// ── 3. Determine content type ────────────────────────────────────────
@@ -771,7 +780,7 @@ class Amplification_Engine {
 				'platform'      => 'standard',
 				'slot'          => $i + 1,
 				'caption_key'   => $caption_key,
-				'caption'       => (string) ( $captions[ $caption_key ] ?? '' ),
+				'caption'       => self::fill_link( (string) ( $captions[ $caption_key ] ?? '' ), (string) ( $context['shortlink'] ?? '' ) ),
 				'source_images' => array_values( $image_sets[ $i ] ?? [] ),
 				'schedule'      => $base_dt->modify( "+{$offset_days} days" )->format( 'Y-m-d H:i' ),
 				'attempts'      => 0,
@@ -819,7 +828,7 @@ class Amplification_Engine {
 		// Caller-supplied caption (agent-authored) wins; otherwise generate. See CLAUDE.md § 6.
 		if ( null !== $preset_caption && '' !== trim( $preset_caption ) ) {
 			error_log( self::LOG_PREFIX . ' Using caller-supplied GMB caption (no AI call).' );
-			$gmb_caption = trim( $preset_caption );
+			$gmb_caption = self::fill_link( trim( $preset_caption ), '' );
 		} else {
 			$gmb_caption = Caption_Generator::generate_gmb_caption( $context );
 		}
@@ -858,14 +867,8 @@ class Amplification_Engine {
 			return $fallback;
 		}
 
-		// Build destination URL: permalink + UTM params.
-		// YOURLS stores this as the long URL the shortlink resolves to.
-		$long_url = add_query_arg( [
-			'utm_source'   => 'social_media',
-			'utm_medium'   => 'social',
-			'utm_content'  => 'case-study_link',
-			'utm_campaign' => 'none',
-		], get_permalink( $post_id ) );
+		// YOURLS stores the tracked permalink as the long URL the shortlink resolves to.
+		$long_url = self::tracked_permalink( $post_id );
 
 		try {
 			// create_shortlink( $long_url, $keyword ) — long URL first, slug/keyword second.
@@ -880,6 +883,38 @@ class Amplification_Engine {
 		}
 
 		return $fallback;
+	}
+
+	/**
+	 * The permalink with the social UTMs: the YOURLS long URL, and the link used
+	 * when a post has no shortlink (#255).
+	 */
+	private static function tracked_permalink( int $post_id ): string {
+		$permalink = (string) get_permalink( $post_id );
+		if ( '' === $permalink ) {
+			return '';
+		}
+		return add_query_arg( [
+			'utm_source'   => 'social_media',
+			'utm_medium'   => 'social',
+			'utm_content'  => 'case-study_link',
+			'utm_campaign' => 'none',
+		], $permalink );
+	}
+
+	/**
+	 * Replace {link} in a caption with the tracked link. Pass '' to remove it
+	 * (GMB captions carry no URL).
+	 */
+	private static function fill_link( string $caption, string $link ): string {
+		if ( false === strpos( $caption, self::LINK_PLACEHOLDER ) ) {
+			return $caption;
+		}
+		$caption = str_replace( self::LINK_PLACEHOLDER, $link, $caption );
+		if ( '' === $link ) {
+			$caption = trim( (string) preg_replace( '/[ \t]{2,}/', ' ', $caption ) );
+		}
+		return $caption;
 	}
 
 	private static function build_cta_url( string $permalink, string $shortlink ): string {

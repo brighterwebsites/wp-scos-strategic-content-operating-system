@@ -18,6 +18,7 @@
  * @package SiteEssentials
  * v1.0 | 2026-09-11
  * v1.1 | 2026-11-28 — Deleted slots are labelled (#259).
+ * v1.2 | 2026-11-28 — A run with every slot deleted shows as deleted, not amplified.
  */
 
 use SiteEssentials\Modules\SocialAmplification\Amplification\Amplification_Engine;
@@ -31,6 +32,9 @@ if ( 'partial' === $outcome ) {
 } elseif ( 'failed' === $outcome ) {
 	$badge_class = 'is-no';
 	$badge_label = __( 'Failed — nothing scheduled', 'site-essentials' );
+} elseif ( 'deleted' === $outcome ) {
+	$badge_class = 'is-no';
+	$badge_label = __( 'Deleted from Postly — nothing scheduled', 'site-essentials' );
 } elseif ( 'complete' === $outcome || $amplified ) {
 	$badge_class = 'is-yes';
 	$badge_label = __( 'Amplified', 'site-essentials' );
@@ -63,6 +67,7 @@ $outcome_labels  = [
 	'partial'  => __( 'partly scheduled', 'site-essentials' ),
 	'failed'   => __( 'nothing scheduled', 'site-essentials' ),
 	'skipped'  => __( 'nothing to schedule', 'site-essentials' ),
+	'deleted'  => __( 'all deleted from Postly', 'site-essentials' ),
 ];
 
 $ran_at     = (string) ( $log_entry['ran_at'] ?? '' );

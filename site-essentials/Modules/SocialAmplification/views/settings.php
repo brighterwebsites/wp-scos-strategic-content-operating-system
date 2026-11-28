@@ -208,7 +208,7 @@ $page_url = admin_url( 'admin.php?page=site-essentials-social-amplification' );
         <div class="scos-notice scos-notice--info" style="margin-bottom:var(--scos-s-5)">
           <strong class="scos-notice__title"><?php esc_html_e( 'Example redirection', 'site-essentials' ); ?></strong>
           <code>shrtlnk.com/mypage</code> &rarr;
-          <code>mydomainname.com.au/my-long-page-title?utm_source=social_media&amp;utm_medium=social&amp;utm_content=[page-type]&amp;utm_campaign=none</code>
+          <code>mydomainname.com.au/my-long-page-title?utm_source=social_media&amp;utm_medium=social&amp;utm_content=[post-type]_link&amp;utm_campaign=scos-amplify</code>
         </div>
 
         <?php // SCOS-SA-PASS1 — input name uses scos_sma_yourls_url (existing key); slug label shows target scos_sa_ key ?>

@@ -21,6 +21,8 @@
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\CLI
  * v1.1 | 2026-07-01
+ * v1.2 | 2026-11-28 - Slots pick the day only; the engine draws the time from the publish
+ *                      window, so backfill posts no longer land at 00:00 (#252).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\CLI;
@@ -182,9 +184,9 @@ class Backfill_Command {
 			$title   = get_the_title( $post );
 
 			if ( $dry_run ) {
-				$slot_str = $slot_dt ? $slot_dt->format( 'Y-m-d H:i' ) : '(no slot available)';
+				$slot_str = $slot_dt ? $slot_dt->format( 'Y-m-d' ) . ' (time picked in the publish window)' : '(no slot available)';
 				$gmb_slot = $gmb_slots[ $i ] ?? null;
-				$gmb_str  = $gmb_slot ? $gmb_slot->format( 'Y-m-d H:i' ) : ( $gmb_channel_id !== '' ? '(no GMB slot available)' : '(GMB disabled)' );
+				$gmb_str  = $gmb_slot ? $gmb_slot->format( 'Y-m-d' ) : ( $gmb_channel_id !== '' ? '(no GMB slot available)' : '(GMB disabled)' );
 				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} \"{$title}\" -- standard slot: {$slot_str}; gmb slot: {$gmb_str}" );
 				continue;
 			}

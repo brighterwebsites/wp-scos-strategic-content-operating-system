@@ -50,6 +50,8 @@
  *                      permalink (#255).
  * v2.0 | 2026-11-28 — delete_slot(): delete a scheduled slot from Postly and mark it
  *                      deleted in the run log; deleted slots leave the counts (#259).
+ * v2.1 | 2026-11-28 — A run whose every slot was deleted has outcome "deleted", not
+ *                      "skipped"; the 403-style failure log says how to resend.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -635,7 +637,7 @@ class Amplification_Engine {
 			$row['platform'],
 			$row['slot'],
 			$attempts,
-			$auto ? 'will retry' : ( $retryable ? 'automatic retries used up' : 'not retryable' ),
+			$auto ? 'will retry' : ( $retryable ? 'automatic retries used up' : 'no automatic retry' ) . '; queued for Retry failed posts / retry_failed',
 			$message
 		) );
 
@@ -1313,10 +1315,6 @@ class Amplification_Engine {
 	}
 
 	/**
-	 * complete (every slot scheduled), partial, failed (none scheduled) or
-	 * skipped (no slots — nothing configured). Works on entries written before v1.5.
-	 */
-	/**
 	 * Delete one scheduled slot of a post's last run from Postly and mark it deleted
 	 * in the run log, so the outcome and counts stop including it.
 	 *
@@ -1378,10 +1376,15 @@ class Amplification_Engine {
 		return $entry;
 	}
 
+	/**
+	 * complete (every slot scheduled), partial, failed (none scheduled), deleted
+	 * (every slot deleted from Postly with delete_slot) or skipped (no slots —
+	 * nothing configured). Works on entries written before v1.5.
+	 */
 	public static function outcome_of( array $entry ): string {
 		$counts = self::slot_counts( $entry );
 		if ( 0 === $counts['total'] ) {
-			return 'skipped';
+			return $counts['deleted'] > 0 ? 'deleted' : 'skipped';
 		}
 		if ( $counts['scheduled'] === $counts['total'] ) {
 			return 'complete';
@@ -1389,7 +1392,7 @@ class Amplification_Engine {
 		return $counts['scheduled'] > 0 ? 'partial' : 'failed';
 	}
 
-	/** @return array{total: int, scheduled: int} */
+	/** @return array{total: int, scheduled: int, deleted: int} */
 	public static function slot_counts( array $entry ): array {
 		$rows = array_merge(
 			(array) ( $entry['standard_posts'] ?? $entry['posts'] ?? [] ),

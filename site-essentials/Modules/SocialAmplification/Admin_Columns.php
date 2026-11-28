@@ -8,6 +8,7 @@
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
  * v1.1 | 2026-09-11 — Shows Partial / Failed from the last run's outcome.
+ * v1.2 | 2026-11-28 — Shows Deleted when every slot of the last run was deleted from Postly.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -66,6 +67,9 @@ class Admin_Columns {
 		} elseif ( 'failed' === $outcome ) {
 			$label = __( 'Failed', 'site-essentials' );
 			$color = '#b32d2e';
+		} elseif ( 'deleted' === $outcome ) {
+			$label = __( 'Deleted', 'site-essentials' );
+			$color = '#6b7280';
 		} else {
 			$label = __( 'Yes', 'site-essentials' );
 			$color = '';

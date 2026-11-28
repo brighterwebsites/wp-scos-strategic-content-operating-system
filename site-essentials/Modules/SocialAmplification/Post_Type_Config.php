@@ -10,11 +10,11 @@
  *   scos_sa_postly_frames         — JSON array of framing angle strings (global)
  *   scos_sa_postly_max_images     — int, global max images per post (default 4)
  *   scos_sa_postly_no_featured    — int, globally disable featured image
- *   scos_sa_postly_no_attachments — int, globally disable image attachments
  *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification
  * v1.0 | 2026-07-01
+ * v1.1 | 2026-11-28 — no_attachments removed: the engine never read it (#256).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification;
@@ -27,7 +27,6 @@ class Post_Type_Config {
 	const FRAMES_OPTION        = 'scos_sa_postly_frames';
 	const MAX_IMAGES_OPTION    = 'scos_sa_postly_max_images';
 	const NO_FEATURED_OPTION   = 'scos_sa_postly_no_featured';
-	const NO_ATTACH_OPTION     = 'scos_sa_postly_no_attachments';
 	const DEFAULT_MAX_IMAGES   = 4;
 
 	const DEFAULT_FRAMES = [
@@ -94,14 +93,13 @@ class Post_Type_Config {
 	/**
 	 * Return the global defaults used when no per-type override is active.
 	 *
-	 * @return array{enabled: bool, post_count: int, no_featured: bool, no_attachments: bool, acf_gallery_keys: string, max_images: int, frames: string[]}
+	 * @return array{enabled: bool, post_count: int, no_featured: bool, acf_gallery_keys: string, max_images: int, frames: string[]}
 	 */
 	public static function get_global_defaults(): array {
 		return [
 			'enabled'          => false,
 			'post_count'       => max( 1, (int) get_option( 'scos_sa_postly_post_count', 3 ) ),
 			'no_featured'      => (bool) get_option( self::NO_FEATURED_OPTION, 0 ),
-			'no_attachments'   => (bool) get_option( self::NO_ATTACH_OPTION, 0 ),
 			'acf_gallery_keys' => (string) get_option( 'bw_social_acf_gallery_keys', '' ),
 			'max_images'       => max( 1, (int) get_option( self::MAX_IMAGES_OPTION, self::DEFAULT_MAX_IMAGES ) ),
 			'frames'           => self::get_global_frames(),
@@ -127,7 +125,7 @@ class Post_Type_Config {
 	 * Returns the per-type override when enabled; otherwise returns global defaults.
 	 *
 	 * @param  string $post_type WP post type slug.
-	 * @return array{enabled: bool, post_count: int, no_featured: bool, no_attachments: bool, acf_gallery_keys: string, max_images: int, frames: string[]}
+	 * @return array{enabled: bool, post_count: int, no_featured: bool, acf_gallery_keys: string, max_images: int, frames: string[]}
 	 */
 	public static function get_config( string $post_type ): array {
 		$all    = self::get_all_configs();
@@ -151,9 +149,6 @@ class Post_Type_Config {
 				'no_featured'      => isset( $pt_cfg['no_featured'] )
 					? (bool) $pt_cfg['no_featured']
 					: $global['no_featured'],
-				'no_attachments'   => isset( $pt_cfg['no_attachments'] )
-					? (bool) $pt_cfg['no_attachments']
-					: $global['no_attachments'],
 				'acf_gallery_keys' => isset( $pt_cfg['acf_gallery_keys'] )
 					? (string) $pt_cfg['acf_gallery_keys']
 					: $global['acf_gallery_keys'],
@@ -201,7 +196,6 @@ class Post_Type_Config {
 				'enabled'          => ! empty( $raw['enabled'] ),
 				'post_count'       => max( 1, absint( $raw['post_count'] ?? 3 ) ),
 				'no_featured'      => ! empty( $raw['no_featured'] ),
-				'no_attachments'   => ! empty( $raw['no_attachments'] ),
 				'acf_gallery_keys' => sanitize_text_field( $raw['acf_gallery_keys'] ?? '' ),
 				'max_images'       => max( 1, absint( $raw['max_images'] ?? self::DEFAULT_MAX_IMAGES ) ),
 				'frames'           => $frames,

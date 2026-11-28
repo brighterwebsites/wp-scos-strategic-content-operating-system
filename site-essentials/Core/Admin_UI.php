@@ -1222,10 +1222,8 @@ class Admin_UI {
                 \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_FEATURED_OPTION,
                 isset( $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_FEATURED_OPTION ] ) ? '1' : '0'
             );
-            update_option(
-                \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_ATTACH_OPTION,
-                isset( $_POST[ \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::NO_ATTACH_OPTION ] ) ? '1' : '0'
-            );
+            // The "no attachments" setting was removed (#256): drop the stored value on save.
+            delete_option( 'scos_sa_postly_no_attachments' );
 
             // Per post type config
             if ( isset( $_POST['scos_sa_pt_config'] ) && is_array( $_POST['scos_sa_pt_config'] ) ) {

@@ -14,6 +14,7 @@
  * @subpackage Modules\SocialAmplification\CLI
  * v1.0 | 2026-07-01
  * v1.1 | 2026-09-11 — Warns instead of reporting success when some slots failed.
+ * v1.2 | 2026-11-28 — Also warns when a complete run sent posts short of images (#254).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\CLI;
@@ -127,7 +128,8 @@ class Send_Post_Command {
 				. ' | gmb: '
 				. ( $scheduled_gmb ? implode( ', ', $scheduled_gmb ) : 'none' );
 
-			if ( 'complete' === ( $result['outcome'] ?? '' ) ) {
+			$image_warnings = array_filter( (array) ( $result['image_warnings'] ?? [] ) );
+			if ( 'complete' === ( $result['outcome'] ?? '' ) && ! $image_warnings ) {
 				\WP_CLI::success( "Post #{$post_id} amplified — {$summary}" );
 			} else {
 				\WP_CLI::warning( "Post #{$post_id}: " . Amplification_Engine::describe_outcome( $result ) . " ({$summary})" );

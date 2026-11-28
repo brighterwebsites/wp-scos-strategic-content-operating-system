@@ -3,7 +3,7 @@
  * Plugin Name: Site Essentials
  * Plugin URI:  https://brighterwebsites.com.au
  * Description: Modular site management system - Performance, Analytics, SEO, and more
- * Version:     1.4.0
+ * Version:     1.4.1
  * Author:      Brighter Websites
  * Author URI:  https://brighterwebsites.com.au
  * License:     GPL-3.0-or-later
@@ -15,8 +15,10 @@
  * It sets up constants, autoloading, and bootstraps the plugin.
  *
  * @package SiteEssentials
- * @version 1.4.0
+ * @version 1.4.1
  *
+ * v1.4.1 | 2026-11-28 — Social Amplification: non-ASCII image filenames no longer dropped;
+ *                       runs report posts sent short of images (#258, #254).
  * v1.4.0 | 2026-11-27 — ai-knowledge/ guard moves to Core (runs on every site, checks itself
  *                       over HTTP) and a logged-in viewer replaces direct file links (#249).
  * v1.3.0 | 2026-11-08 — Registers the Commerce module (store-only WooCommerce
@@ -117,7 +119,7 @@ add_action( 'init', [ 'SE_Deployment_Check', 'init' ] );
  *
  * @since 1.0.0
  */
-define('SITE_ESSENTIALS_VERSION', '1.4.0');
+define('SITE_ESSENTIALS_VERSION', '1.4.1');
 
 /**
  * Site Essentials Base Path

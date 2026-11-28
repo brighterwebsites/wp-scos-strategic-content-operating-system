@@ -36,6 +36,10 @@
  * v1.6 | 2026-09-11 — Images pass through Postly_Image_Guard so Postly never
  *                      receives WebP/AVIF (Facebook rejected a .jpg the server
  *                      answered with WebP).
+ * v1.7 | 2026-11-28 — Image URLs with non-ASCII filenames are percent-encoded instead of
+ *                      silently dropped (#258); each slot records images found vs sent,
+ *                      and a run that sends fewer images than it found, or none, says so
+ *                      in its log entry and message (#254).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -506,9 +510,9 @@ class Amplification_Engine {
 				'timezone'    => $timezone,
 			] );
 
-			return self::slot_succeeded( self::slot_row( $item, $attempts ) + [ 'images' => count( $uploaded ) ], $item, $result );
+			return self::slot_succeeded( self::slot_row( $item, $attempts ) + self::image_counts( count( $sources ), count( $uploaded ) ), $item, $result );
 		} catch ( \RuntimeException $e ) {
-			return self::slot_failed( self::slot_row( $item, $attempts ) + [ 'images' => count( $uploaded ) ], $item, $e, $attempts );
+			return self::slot_failed( self::slot_row( $item, $attempts ) + self::image_counts( count( $sources ), count( $uploaded ) ), $item, $e, $attempts );
 		}
 	}
 
@@ -543,10 +547,18 @@ class Amplification_Engine {
 				'gmb_channel_id' => $gmb_channel_id,
 			] );
 
-			return self::slot_succeeded( self::slot_row( $item, $attempts ) + [ 'images' => $image_url ? 1 : 0 ], $item, $result );
+			return self::slot_succeeded( self::slot_row( $item, $attempts ) + self::image_counts( '' !== $source ? 1 : 0, $image_url ? 1 : 0 ), $item, $result );
 		} catch ( \RuntimeException $e ) {
-			return self::slot_failed( self::slot_row( $item, $attempts ) + [ 'images' => $image_url ? 1 : 0 ], $item, $e, $attempts );
+			return self::slot_failed( self::slot_row( $item, $attempts ) + self::image_counts( '' !== $source ? 1 : 0, $image_url ? 1 : 0 ), $item, $e, $attempts );
 		}
+	}
+
+	/**
+	 * `images` is what reached Postly; `images_found` is what the slot had to send.
+	 * The gap between them is what image_warnings() reports (#254).
+	 */
+	private static function image_counts( int $found, int $sent ): array {
+		return [ 'images' => $sent, 'images_found' => $found ];
 	}
 
 	private static function slot_row( array $item, int $attempts ): array {
@@ -973,16 +985,37 @@ class Amplification_Engine {
 						} else {
 							$url = (string) $img;
 						}
+						$url = self::encode_non_ascii( (string) $url );
 						if ( $url && filter_var( $url, FILTER_VALIDATE_URL ) ) {
 							$urls[] = $url;
+						} elseif ( $url ) {
+							error_log( self::LOG_PREFIX . " Gallery image left out of post #{$post_id} ({$key}): not a valid URL — {$url}" );
 						}
 					}
 				}
 			}
 		}
 
+		// Featured URLs come from WordPress, which doesn't encode them either.
+		$urls = array_map( [ self::class, 'encode_non_ascii' ], $urls );
+
 		// Deduplicate while preserving order
 		return array_values( array_unique( $urls ) );
+	}
+
+	/**
+	 * Percent-encode the non-ASCII bytes in a URL (a filename like `a·b.jpg`), so
+	 * FILTER_VALIDATE_URL accepts it and Postly can fetch it (#258). ASCII,
+	 * including existing %XX escapes, is left as it is, so encoding twice is safe.
+	 * Postly_Image_Guard decodes the path again when it maps the URL to a file.
+	 */
+	private static function encode_non_ascii( string $url ): string {
+		return (string) preg_replace_callback( '/[^\x00-\x7F]+/', [ self::class, 'rawurlencode_match' ], $url );
+	}
+
+	/** preg_replace_callback() callback for encode_non_ascii(). */
+	private static function rawurlencode_match( array $m ): string {
+		return rawurlencode( $m[0] );
 	}
 
 	/**
@@ -1170,7 +1203,45 @@ class Amplification_Engine {
 		$entry['scheduled_count'] = $counts['scheduled'];
 		$entry['queued_count']    = count( $queue );
 		$entry['retry_at']        = $retry_at ? wp_date( 'Y-m-d H:i', $retry_at ) : '';
+		$entry['image_warnings']  = self::image_warnings( $entry );
+
+		foreach ( $entry['image_warnings'] as $kind => $slots ) {
+			if ( $slots ) {
+				error_log( self::LOG_PREFIX . " WARNING post #" . (int) ( $entry['post_id'] ?? 0 ) . ": {$kind} on " . count( $slots ) . ' scheduled slot(s): ' . implode( ', ', $slots ) );
+			}
+		}
 		return $entry;
+	}
+
+	/**
+	 * Scheduled slots that went out with fewer images than expected (#254):
+	 * - no_images:    the slot had no images to send (none collected, or all left out)
+	 * - not_uploaded: images were found but some or all failed to reach Postly
+	 * Failed slots are left out — they're already reported as failures. Rows
+	 * logged before v1.7 have no images_found and are skipped.
+	 *
+	 * @return array{no_images: string[], not_uploaded: string[]} Slot labels, e.g. "standard 2".
+	 */
+	public static function image_warnings( array $entry ): array {
+		$warnings = [ 'no_images' => [], 'not_uploaded' => [] ];
+		$rows     = array_merge(
+			(array) ( $entry['standard_posts'] ?? $entry['posts'] ?? [] ),
+			(array) ( $entry['gmb_posts'] ?? [] )
+		);
+		foreach ( $rows as $row ) {
+			if ( 'scheduled' !== ( $row['status'] ?? '' ) || ! isset( $row['images_found'] ) ) {
+				continue;
+			}
+			$label = ( $row['platform'] ?? 'standard' ) . ' ' . (int) ( $row['slot'] ?? 1 );
+			$found = (int) $row['images_found'];
+			$sent  = (int) ( $row['images'] ?? 0 );
+			if ( 0 === $found ) {
+				$warnings['no_images'][] = $label;
+			} elseif ( $sent < $found ) {
+				$warnings['not_uploaded'][] = $label;
+			}
+		}
+		return $warnings;
 	}
 
 	/**
@@ -1278,6 +1349,22 @@ class Amplification_Engine {
 					_n( '%d failed — see the error below.', '%d failed — see the errors below.', $failed, 'site-essentials' ),
 					$failed
 				) );
+		}
+
+		$warnings = $entry['image_warnings'] ?? self::image_warnings( $entry );
+		if ( ! empty( $warnings['not_uploaded'] ) ) {
+			$text .= ' ' . sprintf(
+				/* translators: %d: number of scheduled posts */
+				_n( '%d post went out with fewer images than it had — some failed to upload to Postly (see the error log).', '%d posts went out with fewer images than they had — some failed to upload to Postly (see the error log).', count( $warnings['not_uploaded'] ), 'site-essentials' ),
+				count( $warnings['not_uploaded'] )
+			);
+		}
+		if ( ! empty( $warnings['no_images'] ) ) {
+			$text .= ' ' . sprintf(
+				/* translators: %d: number of scheduled posts */
+				_n( '%d post went out with no image — none were found for it.', '%d posts went out with no image — none were found for them.', count( $warnings['no_images'] ), 'site-essentials' ),
+				count( $warnings['no_images'] )
+			);
 		}
 
 		$still = count( (array) ( $entry['previous_run']['still_scheduled'] ?? [] ) );

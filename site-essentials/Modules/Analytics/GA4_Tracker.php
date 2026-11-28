@@ -19,6 +19,8 @@
  *   script still skips them.
  *
  * v1.0 | 2026-10-23
+ * v1.1 | 2026-11-28 — config.serverLeads: the browser skips generate_lead when the
+ *                      server sends it (#319). Script 5.6.0.
  *
  * @package    SiteEssentials
  * @subpackage Modules\Analytics
@@ -36,7 +38,7 @@ class GA4_Tracker {
 	const HANDLE = 'brighter-ga4-enhanced';
 
 	/** Keep in step with the JS header — busts LiteSpeed/browser cache. */
-	const SCRIPT_VERSION = '5.5.0';
+	const SCRIPT_VERSION = '5.6.0';
 
 	public static function init() {
 		add_action( 'wp_head', [ __CLASS__, 'output_config' ], 5 );     // early: the bootstrap and enhanced script read window.brighterGA4
@@ -62,6 +64,7 @@ class GA4_Tracker {
 			'loadNow'       => (bool) apply_filters( 'scos_ga4_load_immediately', false ),
 			'skipTracking'  => current_user_can( 'edit_posts' ),
 			'seed'          => GA4_Seeder::is_seed_request(),
+			'serverLeads'   => GA4_Server_Events::sends_leads(),
 		];
 		?>
 <!-- Google Analytics 4 -->

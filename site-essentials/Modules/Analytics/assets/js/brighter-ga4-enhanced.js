@@ -1,6 +1,16 @@
 /**
- * Brighter GA4 Enhanced v5.5.0
+ * Brighter GA4 Enhanced v5.6.0
  * Lead Hierarchy + Selector Attribution + CTA Tracking
+ *
+ * v5.6.0 | 2026-11-28: lead accuracy (#319). Only chosen forms are tracked:
+ * Breakdance forms, form[data-ga-lead] and forms inside a ga-* form wrapper.
+ * WooCommerce (add to cart, cart, checkout, login, register), search and
+ * filter forms are never tracked, so they no longer count as leads. Form
+ * events fire when the form succeeds (Breakdance's success message, or a
+ * redirect with no error), not on submit, so a failed submit never counts.
+ * generate_lead comes from the server when config.serverLeads is true
+ * (GA4_Server_Events: real leads only, agent enquiries included); the browser
+ * only sends it when the server can't.
  *
  * v5.5.0 | 2026-10-21: parameter clean-up (#98). altc_primary → cluster,
  * altc_topic → topic (no dual-fire). content_topic, pillar_page and
@@ -276,19 +286,96 @@
       gtag('event', eventName, payload);
     }, true);
 
-    // Form tracking with lead hierarchy
+    // Form tracking with lead hierarchy (#319).
+    // Only forms someone chose to track. Anything else (WooCommerce add to cart,
+    // cart, checkout, login and register, product search, filters) is ignored.
+    const WRAPPERS = Object.keys(CLASS_TO_TYPE).concat(FORM_RULES.map(r => r.s.replace(/^\./, '')));
+    const LEAD_FORMS = ['form.breakdance-form', 'form[data-ga-lead]', '[class*="ga-form-"] form']
+      .concat(WRAPPERS.map(c => '.' + c + ' form')).join(', ');
+    const NEVER_FORMS = 'form.cart, form.variations_form, form.checkout, form.woocommerce-cart-form, ' +
+      'form.woocommerce-form, form.woocommerce-checkout, form[role="search"], form.search-form, form.dgwt-wcas-search-form';
+    const serverLeads = !!(window.brighterGA4 && window.brighterGA4.serverLeads === true);
     const started = new WeakSet();
-    document.querySelectorAll('form').forEach(form => {
-      const id    = form.id || form.className || 'Form';
-      const cat   = form.dataset.gaCategory || 'Forms';
-      const label = form.dataset.gaLabel || id;
+
+    function formPayload(form) {
+      const leadData   = detectFormLeadData(form);
+      const lastCTA    = getLastCTAContext();
+      const fieldCount = form.querySelectorAll('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])').length;
+
+      const payload = getBaseParams();
+      payload.event_category = form.dataset.gaCategory || 'Forms';
+      payload.event_label    = form.dataset.gaLabel || form.id || form.className || 'Form';
+      payload.lead_tier      = leadData.tier || 'unknown';
+      payload.lead_type      = leadData.type || 'unknown';
+      payload.form_type      = leadData.type || 'unknown';
+      payload.form_fields    = fieldCount;
+      payload.form_id        = form.id || form.getAttribute('name') || 'unknown';
+
+      if (lastCTA) {
+        payload.cta_label    = lastCTA.label;
+        payload.cta_location = lastCTA.location;
+        payload.cta_type     = lastCTA.type;
+      }
+
+      const wrapper = form.closest('[class*="ga-hrcy-"]');
+      payload.element_location = (wrapper && wrapper.classList.contains('ga-hrcy-atf')) ? 'above_fold' : 'below_fold';
+
+      const val = form.dataset.value;
+      if (val && !isNaN(val)) payload.value = parseFloat(val);
+      else payload.value = { hot: 50, warm: 25, cold: 10 }[leadData.tier] || 20;
+      payload.currency = form.dataset.currency || 'AUD';
+      return payload;
+    }
+
+    // The form succeeded: its wrapper event (form_quote etc.) and, when the
+    // server isn't sending it, generate_lead.
+    function formSucceeded(form) {
+      const payload = formPayload(form);
+      if (!serverLeads) gtag('event', 'generate_lead', payload);
+
+      const formRule = FORM_RULES.find(r => form.closest(r.s));
+      if (formRule) {
+        const rulePayload = Object.assign({}, payload, { event_category: formRule.c, event_label: formRule.l });
+        if (formRule.v) rulePayload.value = formRule.v;
+        gtag('event', formRule.e, rulePayload);
+      }
+    }
+
+    // Breakdance posts the form over AJAX and adds a .breakdance-form-message
+    // (--success or --error) after it, or redirects on success. It fires no event.
+    function watchBreakdanceResult(form) {
+      const box = form.parentElement;
+      if (!box) return;
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        observer.disconnect();
+        window.removeEventListener('pagehide', onLeave);
+        clearTimeout(timer);
+        if (ok) formSucceeded(form);
+      };
+      const observer = new MutationObserver(() => {
+        if (box.querySelector('.breakdance-form-message--error')) finish(false);
+        else if (box.querySelector('.breakdance-form-message--success')) finish(true);
+      });
+      // Redirect on success: the page leaves with no error shown. Leaving mid-request doesn't count.
+      const onLeave = () => finish(!form.classList.contains('is-loading') && !box.querySelector('.breakdance-form-message--error'));
+      observer.observe(box, { childList: true, subtree: true });
+      window.addEventListener('pagehide', onLeave);
+      const timer = setTimeout(() => finish(false), 30000);
+    }
+
+    document.querySelectorAll(LEAD_FORMS).forEach(form => {
+      if (form.matches(NEVER_FORMS) || form.dataset.gaTracked) return;
+      form.dataset.gaTracked = '1';
 
       form.addEventListener('input', () => {
         if (!started.has(form)) {
           const leadData = detectFormLeadData(form);
           const payload  = getBaseParams();
-          payload.event_category = cat;
-          payload.event_label    = label;
+          payload.event_category = form.dataset.gaCategory || 'Forms';
+          payload.event_label    = form.dataset.gaLabel || form.id || form.className || 'Form';
           payload.lead_tier      = leadData.tier || 'unknown';
           payload.lead_type      = leadData.type || 'unknown';
           gtag('event', 'lead_form_start', payload); // not form_start — that's enhanced measurement's name
@@ -297,42 +384,8 @@
       }, { once: true });
 
       form.addEventListener('submit', () => {
-        const leadData   = detectFormLeadData(form);
-        const lastCTA    = getLastCTAContext();
-        const fieldCount = form.querySelectorAll('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])').length;
-
-        const payload = getBaseParams();
-        payload.event_category = cat;
-        payload.event_label    = label;
-        payload.lead_tier      = leadData.tier || 'unknown';
-        payload.lead_type      = leadData.type || 'unknown';
-        payload.form_type      = leadData.type || 'unknown';
-        payload.form_fields    = fieldCount;
-        payload.form_id        = form.id || form.getAttribute('name') || 'unknown';
-
-        if (lastCTA) {
-          payload.cta_label    = lastCTA.label;
-          payload.cta_location = lastCTA.location;
-          payload.cta_type     = lastCTA.type;
-        }
-
-        const wrapper = form.closest('[class*="ga-hrcy-"]');
-        payload.element_location = (wrapper && wrapper.classList.contains('ga-hrcy-atf')) ? 'above_fold' : 'below_fold';
-
-        const val = form.dataset.value;
-        if (val && !isNaN(val)) payload.value = parseFloat(val);
-        else payload.value = { hot: 50, warm: 25, cold: 10 }[leadData.tier] || 20;
-        payload.currency = form.dataset.currency || 'AUD';
-
-        gtag('event', 'generate_lead', payload);
-
-        // Wrapper-specific lead event (form_quote etc.), once per submit — never on click
-        const formRule = FORM_RULES.find(r => form.closest(r.s));
-        if (formRule) {
-          const rulePayload = Object.assign({}, payload, { event_category: formRule.c, event_label: formRule.l });
-          if (formRule.v) rulePayload.value = formRule.v;
-          gtag('event', formRule.e, rulePayload);
-        }
+        if (form.classList.contains('breakdance-form')) watchBreakdanceResult(form);
+        else formSucceeded(form); // A plain form gives no success signal; submit is the best there is.
       });
     });
 

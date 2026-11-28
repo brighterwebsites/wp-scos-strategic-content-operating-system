@@ -40,6 +40,8 @@
  *                      silently dropped (#258); each slot records images found vs sent,
  *                      and a run that sends fewer images than it found, or none, says so
  *                      in its log entry and message (#254).
+ * v1.8 | 2026-11-28 — Explicit standard_schedule_at / gmb_schedule_at pick the day only;
+ *                      the time comes from the publish window, as for a normal run (#252).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -184,11 +186,17 @@ class Amplification_Engine {
 		// ── 4–5. Publish window and base schedule time ───────────────────────
 		// Slot 1 lands at a random time in the configured window (default 09:00–17:00
 		// site time), at least 60 minutes from now; otherwise tomorrow.
+		// An explicit schedule_at / standard_schedule_at / gmb_schedule_at picks the
+		// day only: the time is still drawn from the window, so a backfill slot built
+		// at 00:00 lands inside it (#252).
 		$window  = self::publish_window();
 		$now     = new \DateTimeImmutable( 'now', new \DateTimeZone( $timezone ) );
-		$base_dt = self::first_slot_time( $options['schedule_at'] ?? $options['standard_schedule_at'] ?? $now, $now, $window );
+		$base_dt = self::first_slot_time( $options['standard_schedule_at'] ?? $options['schedule_at'] ?? $now, $now, $window );
+		$gmb_dt  = isset( $options['gmb_schedule_at'] ) && $options['gmb_schedule_at'] instanceof \DateTimeImmutable
+			? self::first_slot_time( $options['gmb_schedule_at'], $now, $window )
+			: null;
 
-		error_log( self::LOG_PREFIX . ' Base schedule (standard default): ' . $base_dt->format( 'Y-m-d H:i T' ) . " (window {$window['label']})" );
+		error_log( self::LOG_PREFIX . ' Base schedule (standard): ' . $base_dt->format( 'Y-m-d H:i T' ) . " (window {$window['label']})" );
 
 		// ── 6. Resolve per-post-type config ─────────────────────────────────
 		$pt_config = \SiteEssentials\Modules\SocialAmplification\Post_Type_Config::get_config(
@@ -214,7 +222,7 @@ class Amplification_Engine {
 					$context,
 					$pt_config,
 					$timezone,
-					$options['standard_schedule_at'] ?? $base_dt,
+					$base_dt,
 					$options['captions'] ?? null,
 					$queue
 				);
@@ -226,7 +234,7 @@ class Amplification_Engine {
 						$post_id,
 						$context,
 						$timezone,
-						$options['gmb_schedule_at'] ?? null,
+						$gmb_dt,
 						$options['gmb_caption'] ?? null,
 						$queue
 					);

@@ -52,6 +52,9 @@
  *                      deleted in the run log; deleted slots leave the counts (#259).
  * v2.1 | 2026-11-28 — A run whose every slot was deleted has outcome "deleted", not
  *                      "skipped"; the 403-style failure log says how to resend.
+ * v2.2 | 2026-11-28 — UTMs: utm_campaign=scos-amplify (was "none"), utm_content is
+ *                      <post_type>_link (was always case-study_link); filter
+ *                      scos_sa_utm_params overrides them per site.
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\Amplification;
@@ -837,7 +840,7 @@ class Amplification_Engine {
 			$gmb_caption = Caption_Generator::generate_gmb_caption( $context );
 		}
 		// GMB CTA always uses the permalink (never YOURLS shortlink).
-		$cta_url      = self::build_cta_url( $permalink, '' );
+		$cta_url      = self::build_cta_url( $post_id, $permalink, '' );
 
 		// GMB is always one post per amplification run (no multi-slot schedule like standard).
 		$item = [
@@ -898,12 +901,32 @@ class Amplification_Engine {
 		if ( '' === $permalink ) {
 			return '';
 		}
-		return add_query_arg( [
+		$type = (string) get_post_type( $post_id );
+		return add_query_arg( self::utm_params( $post_id, ( '' !== $type ? $type : 'post' ) . '_link' ), $permalink );
+	}
+
+	/**
+	 * The UTM tags on links SCOS posts. utm_campaign marks traffic the amplification
+	 * engine brought in (vs links shared by hand); utm_content says what kind of page
+	 * it was. The landing page already identifies the post.
+	 *
+	 * Filter scos_sa_utm_params( array $params, int $post_id, string $content ) to change them.
+	 *
+	 * @param string $content e.g. post_link, projects_link, gmb_learn_more.
+	 * @return array<string, string>
+	 */
+	private static function utm_params( int $post_id, string $content ): array {
+		$params = [
 			'utm_source'   => 'social_media',
 			'utm_medium'   => 'social',
-			'utm_content'  => 'case-study_link',
-			'utm_campaign' => 'none',
-		], $permalink );
+			'utm_content'  => sanitize_key( $content ),
+			'utm_campaign' => 'scos-amplify',
+		];
+		$filtered = apply_filters( 'scos_sa_utm_params', $params, $post_id, $content );
+		if ( ! is_array( $filtered ) ) {
+			return $params;
+		}
+		return array_filter( array_map( 'strval', $filtered ), 'strlen' );
 	}
 
 	/**
@@ -921,7 +944,7 @@ class Amplification_Engine {
 		return $caption;
 	}
 
-	private static function build_cta_url( string $permalink, string $shortlink ): string {
+	private static function build_cta_url( int $post_id, string $permalink, string $shortlink ): string {
 		$base_url = $shortlink ?: $permalink;
 		if ( ! $base_url ) {
 			return '';
@@ -939,12 +962,7 @@ class Amplification_Engine {
 			}
 		}
 
-		return add_query_arg( [
-			'utm_source'   => 'social_media',
-			'utm_medium'   => 'social',
-			'utm_content'  => 'gmb_learn_more',
-			'utm_campaign' => 'none',
-		], $base_url );
+		return add_query_arg( self::utm_params( $post_id, 'gmb_learn_more' ), $base_url );
 	}
 
 	private static function get_featured_og_image( int $post_id ): string {

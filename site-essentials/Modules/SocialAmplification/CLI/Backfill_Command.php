@@ -18,11 +18,16 @@
  *  3. Assigning each project to the next free slot, optionally enforcing --slot-gap-days
  *     between consecutive slots in this run (wider spread when batching).
  *
+ * Captions: --captions-file=<path> supplies captions someone (or an agent) has
+ * already written, per post ID. Posts in the file are scheduled with those captions
+ * and no AI call; posts not in it are generated as before.
+ *
  * @package    SiteEssentials
  * @subpackage Modules\SocialAmplification\CLI
  * v1.1 | 2026-07-01
  * v1.2 | 2026-11-28 - Slots pick the day only; the engine draws the time from the publish
  *                      window, so backfill posts no longer land at 00:00 (#252).
+ * v1.3 | 2026-11-28 - --captions-file: supplied captions per post ID (#253).
  */
 
 namespace SiteEssentials\Modules\SocialAmplification\CLI;
@@ -64,6 +69,13 @@ class Backfill_Command {
 	 * [--limit=<n>]
 	 * : Maximum number of posts to process. Default: 3.
 	 *
+	 * [--captions-file=<path>]
+	 * : JSON file of captions already written, keyed by post ID:
+	 * `{"123": {"captions": ["...", "..."], "gmb_caption": "..."}}`, or `{"123": ["...", "..."]}`
+	 * for standard captions only. A post in the file gets one standard post per caption, and
+	 * no AI call is made for what the file supplies. Write {link} where the tracked link goes.
+	 * Posts not in the file are generated as before. The whole file is checked before anything is sent.
+	 *
 	 * [--dry-run]
 	 * : Print which posts would be processed without actually calling the APIs.
 	 *
@@ -72,6 +84,7 @@ class Backfill_Command {
 	 *     wp scos-social backfill
 	 *     wp scos-social backfill --post-type=projects --post-from=2025-01-01 --before=2025-12-31 --limit=5
 	 *     wp scos-social backfill --post-type=post --schedule-from=2026-05-01 --slot-gap-days=7 --limit=5 --dry-run
+	 *     wp scos-social backfill --post-type=projects --limit=5 --captions-file=/tmp/captions.json --dry-run
 	 *
 	 * @when after_wp_load
 	 *
@@ -89,6 +102,7 @@ class Backfill_Command {
 		$slot_gap  = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'slot-gap-days', 0 );
 		$limit     = (int) \WP_CLI\Utils\get_flag_value( $assoc_args, 'limit', 3 );
 		$dry_run   = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$cap_file  = (string) \WP_CLI\Utils\get_flag_value( $assoc_args, 'captions-file', '' );
 
 		if ( ! post_type_exists( $post_type ) ) {
 			\WP_CLI::error( "Post type '{$post_type}' does not exist." );
@@ -110,6 +124,11 @@ class Backfill_Command {
 		}
 
 		$this->validate_settings();
+
+		$supplied = '' !== trim( $cap_file ) ? $this->load_captions_file( trim( $cap_file ) ) : [];
+		if ( $supplied ) {
+			\WP_CLI::line( sprintf( 'Captions file: %d post(s) with supplied captions.', count( $supplied ) ) );
+		}
 
 		$date_clause = [
 			'before'    => $before,
@@ -149,6 +168,14 @@ class Backfill_Command {
 
 		\WP_CLI::line( sprintf( 'Found %d post(s) to amplify (post type: %s).', count( $pending ), $post_type ) );
 
+		// Captions for posts this run won't reach would be silently ignored, so say so.
+		$unused = array_diff( array_keys( $supplied ), array_map( static function ( \WP_Post $p ): int {
+			return (int) $p->ID;
+		}, $pending ) );
+		if ( $unused ) {
+			\WP_CLI::warning( 'Captions file has posts this run will not process (not matched, already amplified or past --limit): #' . implode( ', #', $unused ) );
+		}
+
 		// ── Build spread schedule ─────────────────────────────────────────────
 		$timezone = get_option( 'timezone_string', 'UTC' ) ?: 'UTC';
 		if ( $sched_from !== '' || $slot_gap > 0 ) {
@@ -187,7 +214,7 @@ class Backfill_Command {
 				$slot_str = $slot_dt ? $slot_dt->format( 'Y-m-d' ) . ' (time picked in the publish window)' : '(no slot available)';
 				$gmb_slot = $gmb_slots[ $i ] ?? null;
 				$gmb_str  = $gmb_slot ? $gmb_slot->format( 'Y-m-d' ) : ( $gmb_channel_id !== '' ? '(no GMB slot available)' : '(GMB disabled)' );
-				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} \"{$title}\" -- standard slot: {$slot_str}; gmb slot: {$gmb_str}" );
+				\WP_CLI::line( "[DRY RUN] Would amplify post #{$post->ID} \"{$title}\" -- standard slot: {$slot_str}; gmb slot: {$gmb_str}; captions: " . $this->describe_captions( $supplied[ $post->ID ] ?? null ) );
 				continue;
 			}
 
@@ -202,6 +229,20 @@ class Backfill_Command {
 			$gmb_slot = $gmb_slots[ $i ] ?? null;
 			if ( $gmb_slot && $gmb_channel_id !== '' ) {
 				$options['gmb_schedule_at'] = $gmb_slot;
+			}
+
+			// Supplied captions: one standard post per caption, as scos/send-social-post does.
+			$entry = $supplied[ $post->ID ] ?? null;
+			if ( $entry && $entry['captions'] ) {
+				$keyed = [];
+				foreach ( $entry['captions'] as $n => $caption ) {
+					$keyed[ 'post_' . ( $n + 1 ) ] = $caption;
+				}
+				$options['captions']   = $keyed;
+				$options['post_count'] = count( $keyed );
+			}
+			if ( $entry && '' !== $entry['gmb_caption'] ) {
+				$options['gmb_caption'] = $entry['gmb_caption'];
 			}
 
 			try {
@@ -233,6 +274,80 @@ class Backfill_Command {
 	// ──────────────────────────────────────────────────────────────────────────
 	// Helpers
 	// ──────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Read and check a captions file. Any problem stops the run before anything is sent.
+	 *
+	 * @return array<int, array{captions: string[], gmb_caption: string}> Keyed by post ID.
+	 */
+	private function load_captions_file( string $path ): array {
+		if ( ! is_readable( $path ) || ! is_file( $path ) ) {
+			\WP_CLI::error( "--captions-file: cannot read {$path}." );
+		}
+		$data = json_decode( (string) file_get_contents( $path ), true );
+		if ( ! is_array( $data ) || ( $data && array_is_list( $data ) ) ) {
+			\WP_CLI::error( '--captions-file: expected a JSON object keyed by post ID, e.g. {"123": {"captions": ["..."]}}.' . ( JSON_ERROR_NONE !== json_last_error() ? ' ' . json_last_error_msg() . '.' : '' ) );
+		}
+
+		$out = [];
+		foreach ( $data as $post_id => $entry ) {
+			$id = (int) $post_id;
+			if ( $id <= 0 || (string) $id !== (string) $post_id ) {
+				\WP_CLI::error( "--captions-file: \"{$post_id}\" is not a post ID." );
+			}
+			if ( is_array( $entry ) && array_is_list( $entry ) ) {
+				$entry = [ 'captions' => $entry ];
+			}
+			if ( ! is_array( $entry ) ) {
+				\WP_CLI::error( "--captions-file: post {$id} needs a list of captions or an object with captions / gmb_caption." );
+			}
+			$extra = array_diff( array_keys( $entry ), [ 'captions', 'gmb_caption' ] );
+			if ( $extra ) {
+				\WP_CLI::error( "--captions-file: post {$id} has unknown key(s): " . implode( ', ', $extra ) . '. Use captions and gmb_caption.' );
+			}
+
+			$captions = $entry['captions'] ?? [];
+			if ( ! is_array( $captions ) || ! array_is_list( $captions ) ) {
+				\WP_CLI::error( "--captions-file: post {$id} captions must be a list of strings." );
+			}
+			$clean = [];
+			foreach ( $captions as $n => $caption ) {
+				$caption = is_string( $caption ) ? trim( $caption ) : '';
+				if ( '' === $caption ) {
+					\WP_CLI::error( sprintf( '--captions-file: post %d caption %d is empty or not text.', $id, $n + 1 ) );
+				}
+				$clean[] = $caption;
+			}
+			if ( count( $clean ) > 10 ) {
+				\WP_CLI::error( "--captions-file: post {$id} has more than 10 captions." );
+			}
+
+			$gmb = $entry['gmb_caption'] ?? '';
+			if ( ! is_string( $gmb ) ) {
+				\WP_CLI::error( "--captions-file: post {$id} gmb_caption must be text." );
+			}
+			if ( ! $clean && '' === trim( $gmb ) ) {
+				\WP_CLI::error( "--captions-file: post {$id} has no captions and no gmb_caption." );
+			}
+
+			$out[ $id ] = [ 'captions' => $clean, 'gmb_caption' => trim( $gmb ) ];
+		}
+		return $out;
+	}
+
+	/**
+	 * Dry-run note on where a post's captions come from.
+	 *
+	 * @param array{captions: string[], gmb_caption: string}|null $entry
+	 */
+	private function describe_captions( ?array $entry ): string {
+		if ( ! $entry ) {
+			return 'generated';
+		}
+		$standard = $entry['captions'] ? count( $entry['captions'] ) . ' supplied' : 'generated';
+		$gmb      = '' !== $entry['gmb_caption'] ? 'supplied' : 'generated';
+		return "standard {$standard}, gmb {$gmb}";
+	}
 
 	/**
 	 * @param string $d YYYY-MM-DD.

@@ -6,10 +6,12 @@
  * Reset and save handlers are registered in Analytics_Module::admin_init hooks.
  *
  * v1.1 | 2026-10-21: events table matches the trimmed event set (#159)
+ * v1.2 | 2026-11-28: Measurement Protocol API secret field; the value is never printed (#319)
  */
 defined( 'ABSPATH' ) || exit;
 
 $ga4_id    = get_option( 'brighter_ga4_measurement_id', '' );
+$mp_set    = '' !== trim( (string) get_option( 'se_ga4_mp_api_secret', '' ) );
 $seeded    = get_transient( 'brighter_ga4_events_seeded' );
 $seed_date = get_transient( 'brighter_ga4_seed_date' );
 $seed_url  = home_url( '/?seedEvents=true' );
@@ -68,6 +70,39 @@ $reset_url = admin_url( 'admin.php?page=site-essentials-analytics&scos_reset_see
 									<strong class="scos-status scos-status--warn">&#9888; <?php esc_html_e( 'Not set', 'site-essentials' ); ?></strong>
 								<?php endif; ?>
 							</p>
+						</td>
+					</tr>
+					<tr>
+						<th>
+							<label for="se_ga4_mp_api_secret">
+								<?php esc_html_e( 'Measurement Protocol API secret', 'site-essentials' ); ?>
+							</label>
+							<div class="scos-form__slug">se_ga4_mp_api_secret</div>
+						</th>
+						<td>
+							<input
+								id="se_ga4_mp_api_secret"
+								name="se_ga4_mp_api_secret"
+								type="password"
+								class="scos-input scos-input--mono"
+								value=""
+								autocomplete="off"
+								placeholder="<?php echo $mp_set ? esc_attr__( 'Saved — leave blank to keep', 'site-essentials' ) : ''; ?>"
+							>
+							<p class="description">
+								<?php esc_html_e( 'Lets the site send generate_lead itself: only for real leads (a form with "SCOS: Save lead" that passed its checks, or an enquiry an agent sent), never for add to cart, search or login forms. Also sends sign_up when a customer account is created. Create it in Google Analytics → Admin → Data Streams → your web stream → Measurement Protocol API secrets. Without it, the browser counts Breakdance form successes as leads instead.', 'site-essentials' ); ?>
+								<?php if ( $mp_set ) : ?>
+									<strong class="scos-status scos-status--ok">&#10003; <?php esc_html_e( 'Saved — leads are sent from the server', 'site-essentials' ); ?></strong>
+								<?php else : ?>
+									<strong class="scos-status scos-status--warn">&#9888; <?php esc_html_e( 'Not set — the browser counts leads', 'site-essentials' ); ?></strong>
+								<?php endif; ?>
+							</p>
+							<?php if ( $mp_set ) : ?>
+								<label class="scos-checkbox-row">
+									<input type="checkbox" name="se_ga4_mp_api_secret_clear" value="1">
+									<?php esc_html_e( 'Remove the saved secret', 'site-essentials' ); ?>
+								</label>
+							<?php endif; ?>
 						</td>
 					</tr>
 				</tbody>

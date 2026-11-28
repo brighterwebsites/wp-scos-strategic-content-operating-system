@@ -14,6 +14,8 @@
  * - Bridges the WooCommerce GA plugin onto the SCOS gtag (Woo_GA_Bridge, hooked on
  *   plugins_loaded in site-essentials.php because WooCommerce needs it before init)
  *
+ * v1.4 | 2026-11-28: generate_lead and sign_up sent from the server (GA4_Server_Events,
+ *                     Measurement Protocol); API secret option se_ga4_mp_api_secret (#319)
  * v1.3 | 2026-10-23: owns GA4 tracking and seeding, moved from brighter-core (#93)
  * v1.2 | 2026-10-22: Woo_GA_Bridge::init() moved to plugins_loaded
  * v1.1 | 2026-10-21: Woo_GA_Bridge (#206)
@@ -65,6 +67,7 @@ class Analytics_Module implements Module_Interface {
 
 		GA4_Tracker::init();
 		GA4_Seeder::init();
+		GA4_Server_Events::init();
 
 		add_action( 'admin_init', [ __CLASS__, 'save_settings' ] );
 		add_action( 'admin_init', [ __CLASS__, 'handle_seed_reset' ] );
@@ -89,6 +92,16 @@ class Analytics_Module implements Module_Interface {
 				'brighter_ga4_measurement_id',
 				sanitize_text_field( wp_unslash( $_POST['brighter_ga4_measurement_id'] ) )
 			);
+		}
+		// The secret field is always blank on the page: a blank submit keeps the stored
+		// secret; the "remove" box clears it.
+		if ( ! empty( $_POST['se_ga4_mp_api_secret_clear'] ) ) {
+			delete_option( GA4_Measurement_Protocol::OPTION_SECRET );
+		} elseif ( isset( $_POST[ GA4_Measurement_Protocol::OPTION_SECRET ] ) ) {
+			$secret = trim( sanitize_text_field( wp_unslash( $_POST[ GA4_Measurement_Protocol::OPTION_SECRET ] ) ) );
+			if ( '' !== $secret ) {
+				update_option( GA4_Measurement_Protocol::OPTION_SECRET, $secret, false );
+			}
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=site-essentials-analytics&scos_analytics_saved=1' ) );
 		exit;

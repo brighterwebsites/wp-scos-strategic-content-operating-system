@@ -18,6 +18,8 @@
  * v2.0 | 2026-09-29 — Extend the SCOS ability base class instead of the AI plugin's, so registration needs only core.
  * v2.1 | 2026-11-28 — Slots report images and images_found; the result lists image_warnings (#254).
  * v2.2 | 2026-11-28 — Captions may use {link} for the tracked link (#255).
+ * v2.3 | 2026-11-28 — standard_schedule_at / gmb_schedule_at inputs pick the day of the first
+ *                      standard post and the GMB post; the time comes from the publish window (#251).
  */
 
 declare( strict_types=1 );
@@ -109,9 +111,19 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 					'type'        => 'string',
 					'description' => 'Optional. A Google Business Profile caption you have already written. Supply it and no AI generation happens for GMB. Must contain no URLs, phone numbers or hashtags, and stay between 150 and 300 characters. The post link goes on the button, so {link} is removed here.',
 				],
+				'standard_schedule_at' => [
+					'type'        => 'string',
+					'description' => 'Optional. Day of the first standard post, YYYY-MM-DD in site time, today or later. Later posts follow at the usual 42-day gap. The time is picked inside the site\'s publish window; if that has already passed today, the post goes tomorrow. Omit for the next available day.',
+					'pattern'     => '^\\d{4}-\\d{2}-\\d{2}$',
+				],
+				'gmb_schedule_at' => [
+					'type'        => 'string',
+					'description' => 'Optional. Day of the Google Business post, YYYY-MM-DD in site time, today or later. The time is picked inside the publish window. Omit to post it within the hour.',
+					'pattern'     => '^\\d{4}-\\d{2}-\\d{2}$',
+				],
 				'retry_failed' => [
 					'type'        => 'boolean',
-					'description' => 'Resend only the posts that failed in the last run (rate limit, Postly outage) — posts that were scheduled are left alone. Ignores channel, post_count, captions and force. Use this rather than force after a partial run, which would schedule duplicates.',
+					'description' => 'Resend only the posts that failed in the last run (rate limit, Postly outage) — posts that were scheduled are left alone. Ignores channel, post_count, captions, schedule dates and force. Use this rather than force after a partial run, which would schedule duplicates.',
 					'default'     => false,
 				],
 			],
@@ -253,6 +265,19 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 			);
 		}
 
+		// Schedule days (#251): checked before anything is sent.
+		$days = [];
+		foreach ( [ 'standard_schedule_at', 'gmb_schedule_at' ] as $key ) {
+			if ( ! isset( $input[ $key ] ) || '' === trim( (string) $input[ $key ] ) ) {
+				continue;
+			}
+			$day = self::parse_day( (string) $input[ $key ] );
+			if ( is_wp_error( $day ) ) {
+				return new WP_Error( $day->get_error_code(), sprintf( '%s: %s', $key, $day->get_error_message() ), [ 'status' => 400 ] );
+			}
+			$days[ $key ] = $day;
+		}
+
 		$valid_channels = [ 'facebook', 'instagram', 'gmb', 'others', 'all' ];
 		if ( ! in_array( $channel, $valid_channels, true ) ) {
 			$channel = 'all';
@@ -301,6 +326,9 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 			$options['post_count'] = $post_count;
 		}
 
+		// The engine picks the time inside the publish window; these set the day only.
+		$options = array_merge( $options, $days );
+
 		$options['trigger'] = 'ability';
 
 		try {
@@ -318,6 +346,27 @@ class Send_Social_Post extends Abstract_Scos_Ability {
 				[ 'status' => 500 ]
 			);
 		}
+	}
+
+	/**
+	 * A YYYY-MM-DD day in site time, today or later, as midnight of that day.
+	 *
+	 * @return \DateTimeImmutable|WP_Error
+	 */
+	private static function parse_day( string $value ) {
+		$tz  = new \DateTimeZone( get_option( 'timezone_string', 'UTC' ) ?: 'UTC' );
+		$day = \DateTimeImmutable::createFromFormat( '!Y-m-d', trim( $value ), $tz );
+		if ( ! $day || $day->format( 'Y-m-d' ) !== trim( $value ) ) {
+			return new WP_Error( 'scos_send_bad_date', __( 'use a real date in the form YYYY-MM-DD.', 'site-essentials' ) );
+		}
+		$today = new \DateTimeImmutable( 'today', $tz );
+		if ( $day < $today ) {
+			return new WP_Error( 'scos_send_past_date', sprintf( __( '%1$s is in the past (today is %2$s).', 'site-essentials' ), $day->format( 'Y-m-d' ), $today->format( 'Y-m-d' ) ) );
+		}
+		if ( $day > $today->modify( '+1 year' ) ) {
+			return new WP_Error( 'scos_send_far_date', __( 'pick a day within the next year.', 'site-essentials' ) );
+		}
+		return $day;
 	}
 
 	/**
